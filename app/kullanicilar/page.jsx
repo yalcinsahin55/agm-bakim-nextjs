@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { ROLE_LABELS } from "@/lib/status";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const ROLES = ["yonetici", "planlamaci", "teknisyen", "goruntuleyici"];
 
 export default function KullanicilarPage() {
   const router = useRouter();
+  const { user: currentUser } = useCurrentUser();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -25,7 +27,7 @@ export default function KullanicilarPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, [router]);
 
   async function addUser() {
     setSaving(true);
@@ -46,9 +48,31 @@ export default function KullanicilarPage() {
   }
 
   async function updateUser(id, patch) {
-    await fetch(`/api/users/${id}`, {
+    const res = await fetch(`/api/users/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setMessage({ ok: false, text: data.error || "Kullanıcı güncellenemedi." });
+      return;
+    }
+    load();
+  }
+
+  async function deleteUser(userToDelete) {
+    if (userToDelete.id === currentUser?.id) {
+      setMessage({ ok: false, text: "Kendi hesabınızı silemezsiniz." });
+      return;
+    }
+    if (!window.confirm(`${userToDelete.full_name} kullanıcısını silmek istediğinizden emin misiniz?`)) return;
+
+    const res = await fetch(`/api/users/${userToDelete.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setMessage({ ok: false, text: data.error || "Kullanıcı silinemedi." });
+      return;
+    }
+    setMessage({ ok: true, text: "Kullanıcı silindi." });
     load();
   }
 
@@ -102,6 +126,15 @@ export default function KullanicilarPage() {
                   <input type="checkbox" checked={u.active} onChange={(e) => updateUser(u.id, { active: e.target.checked })} />
                   Aktif
                 </label>
+                <button
+                  type="button"
+                  onClick={() => deleteUser(u)}
+                  disabled={u.id === currentUser?.id}
+                  title={u.id === currentUser?.id ? "Kendi hesabınız silinemez" : "Kullanıcıyı sil"}
+                  className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Sil
+                </button>
               </div>
             </div>
           ))}

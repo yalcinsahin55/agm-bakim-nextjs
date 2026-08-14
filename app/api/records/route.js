@@ -65,11 +65,17 @@ export async function POST(req) {
 
   const createdAt = backdated && record_date ? new Date(record_date) : new Date();
 
-  async function insertOneRecord(tKey, tLabel) {
+  const groupId = crypto.randomUUID();
+
+  async function insertOneRecord(tKey, tLabel, isPrimary = false) {
     const rec = {
       engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
-      hour_at_completion, note: note || "", technician_note: technician_note || "",
-      photos_b64: photos_b64 || [], videos: videos || [],
+      hour_at_completion,
+      note: isPrimary ? (note || "") : "",
+      technician_note: isPrimary ? (technician_note || "") : "",
+      photos_b64: isPrimary ? (photos_b64 || []) : [],
+      videos: isPrimary ? (videos || []) : [],
+      group_id: groupId,
       technician_id: user._id, technician_name: user.full_name,
       created_at: createdAt, backdated: !!backdated,
     };
@@ -85,7 +91,7 @@ export async function POST(req) {
       { upsert: true }
     );
   }
-  await insertOneRecord(type_key, type_label);
+  await insertOneRecord(type_key, type_label, true);
 
   const completedLabels = [type_label];
   if (Array.isArray(extra_types)) {

@@ -143,6 +143,7 @@ export default function KayitlarPage() {
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [editingId, setEditingId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
   async function load() {
     const params = new URLSearchParams();
@@ -158,7 +159,7 @@ export default function KayitlarPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [engineFilter, typeFilter]); // eslint-disable-line
+  useEffect(() => { load(); }, [engineFilter, typeFilter]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
@@ -192,19 +193,37 @@ export default function KayitlarPage() {
           <div className="flex flex-col gap-2">
             {records.map((r) => {
               const photos = r.photos_b64 || [];
+              const videos = r.videos || [];
+              const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
               const canEdit = user && (["yonetici", "planlamaci"].includes(user.role) || user.id === r.technician_id);
               return (
                 <div key={r._id} className="bg-panel border border-border rounded-card p-3.5">
-                  {photos.length > 0 && (
+                  {showMedia && photos.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mb-2">
                       {photos.map((p, idx) => <img key={idx} src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />)}
                     </div>
                   )}
-                  {(r.videos || []).map((v, idx) => (
-                    <video key={idx} controls className="w-full rounded-lg mb-2 border border-border">
-                      <source src={`data:${v.mime};base64,${v.data_b64}`} />
-                    </video>
-                  ))}
+                  {showMedia && videos.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mb-2">
+                      {videos.map((v, idx) => {
+                        const videoSrc = `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedVideo({ src: videoSrc, filename: v.filename || "Video" })}
+                            className="relative w-20 h-20 rounded-lg overflow-hidden border border-border bg-panel2"
+                            aria-label={`${v.filename || "Video"} videosunu oynat`}
+                          >
+                            <video muted preload="metadata" className="w-full h-full object-cover pointer-events-none">
+                              <source src={videoSrc} />
+                            </video>
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white text-xl">▶</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="text-[13px] font-bold text-text">
                     {r.type_label} · {r.engine_name} {r.backdated && <span className="text-faint font-normal">· 📅 geçmişe dönük</span>}
                   </div>
@@ -238,6 +257,23 @@ export default function KayitlarPage() {
           </div>
         )}
       </div>
+      {selectedVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label={selectedVideo.filename}>
+          <div className="relative w-full max-w-3xl">
+            <button
+              type="button"
+              onClick={() => setSelectedVideo(null)}
+              className="absolute -top-10 right-0 w-8 h-8 rounded-full bg-panel text-text text-lg"
+              aria-label="Videoyu kapat"
+            >
+              ✕
+            </button>
+            <video controls autoPlay className="w-full max-h-[80vh] rounded-xl border border-border bg-black">
+              <source src={selectedVideo.src} />
+            </video>
+          </div>
+        </div>
+      )}
       <BottomNav />
     </div>
   );

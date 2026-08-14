@@ -46,7 +46,7 @@ export default function YagAnalizleriPage() {
     if (engData.length && !engineId) setEngineId(engData[0]._id);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 

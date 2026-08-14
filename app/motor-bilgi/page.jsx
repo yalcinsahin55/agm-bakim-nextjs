@@ -40,7 +40,7 @@ export default function MotorBilgiPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []);
 
   const rows = useMemo(() => {
     const filtered = items.filter((i) => i.engine_name.toLowerCase().includes(query.toLowerCase()));

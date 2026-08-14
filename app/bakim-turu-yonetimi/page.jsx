@@ -33,7 +33,7 @@ export default function BakimTuruYonetimiPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []);
 
   async function addType() {
     setSaving(true);

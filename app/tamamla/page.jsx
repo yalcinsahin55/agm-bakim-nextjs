@@ -33,6 +33,7 @@ export default function TamamlaPage() {
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [engines, setEngines] = useState([]);
+  const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [engineId, setEngineId] = useState("");
@@ -55,6 +56,7 @@ export default function TamamlaPage() {
       const data = await res.json();
       setItems(data.items);
       setEngines(data.engines);
+      setTypes(data.types || []);
       setLoading(false);
     });
   }, [router]);
@@ -88,6 +90,16 @@ export default function TamamlaPage() {
   const chosen = engItems.find((i) => i.type_key === typeKey);
   const otherItems = engItems.filter((i) => i.type_key !== typeKey);
 
+  // Birlikte tamamlanan bakımlar: motora tanımlı olmayan bakım türlerini de göster
+  const allOtherTypes = useMemo(() => {
+    const engTypeKeys = new Set(engItems.map((i) => i.type_key));
+    const unassigned = types
+      .filter((t) => !engTypeKeys.has(t.key || t._id) && (t.key || t._id) !== typeKey)
+      .map((t) => ({ type_key: t.key || t._id, type_label: t.label, unassigned: true }));
+    const assigned = otherItems.map((i) => ({ type_key: i.type_key, type_label: i.type_label, unassigned: false }));
+    return [...assigned, ...unassigned];
+  }, [engItems, otherItems, types, typeKey]);
+
   async function handlePhotos(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -112,7 +124,9 @@ export default function TamamlaPage() {
 
     const extra_types = extraKeys.map((k) => {
       const it = engItems.find((i) => i.type_key === k);
-      return { type_key: it.type_key, type_label: it.type_label };
+      if (it) return { type_key: it.type_key, type_label: it.type_label };
+      const t = types.find((t) => (t.key || t._id) === k);
+      return { type_key: k, type_label: t ? t.label : k };
     });
 
     const res = await fetch("/api/records", {
@@ -137,6 +151,7 @@ export default function TamamlaPage() {
       const panelData = await panelRes.json();
       setItems(panelData.items);
       setEngines(panelData.engines);
+      setTypes(panelData.types || []);
     } else {
       const data = await res.json();
       setMessage({ ok: false, text: data.error || "Bir hata oluştu." });
@@ -212,18 +227,18 @@ export default function TamamlaPage() {
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
         />
 
-        {otherItems.length > 0 && (
+        {allOtherTypes.length > 0 && (
           <>
             <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide mt-1">Birlikte Tamamlanan Diğer Bakımlar</label>
             <p className="text-[11px] text-faint mb-1.5">Bazen bir bakımı yaparken diğerlerini de yapmış oluyorsunuz. Varsa işaretleyin — hepsi aynı saat/tarihle kaydedilir.</p>
             <div className="flex flex-col gap-1.5 mb-2">
-              {otherItems.map((i) => (
-                <label key={i.type_key} className="flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5 text-[12.5px] text-text">
+              {allOtherTypes.map((i) => (
+                <label key={i.type_key} className={`flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5 text-[12.5px] text-text ${i.unassigned ? "opacity-75" : ""}`}>
                   <input
                     type="checkbox" checked={extraKeys.includes(i.type_key)}
                     onChange={(e) => setExtraKeys((prev) => e.target.checked ? [...prev, i.type_key] : prev.filter((k) => k !== i.type_key))}
                   />
-                  {i.type_label}
+                  {i.type_label} {i.unassigned && <span className="text-[10px] text-faint">(bu motora tanımlı değil)</span>}
                 </label>
               ))}
             </div>

@@ -65,7 +65,7 @@ export default function KarterBasinciPage() {
     if (engData.length && !historyEngine) setHistoryEngine(engData[0]._id);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
