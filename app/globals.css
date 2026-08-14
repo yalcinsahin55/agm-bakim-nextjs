@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background: radial-gradient(circle at 20% 0%, #141a22 0%, #0f1319 55%);
+  color: #eef1f5;
+  font-family: 'Inter', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.status-pill.gecikmis { background: rgba(239,74,82,.14); color: #ef4a52; }
+.status-pill.kritik { background: rgba(242,153,74,.14); color: #f2994a; }
+.status-pill.yaklasiyor { background: rgba(240,201,61,.14); color: #f0c93d; }
+.status-pill.normal { background: rgba(51,201,138,.14); color: #33c98a; }
+
+.status-pill .dot {
+  width: 5px; height: 5px; border-radius: 999px; background: currentColor;
+}
