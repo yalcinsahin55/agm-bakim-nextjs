@@ -1,244 +1,387 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import TopBar from "@/components/TopBar";
-import BottomNav from "@/components/BottomNav";
-import { useCurrentUser } from "@/lib/useCurrentUser";
-import { engineSortKey } from "@/lib/status";
-
-function compressImage(file, maxDim = 720, quality = 0.65) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-const MAX_VIDEO_MB = 15;
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function EditForm({ record, onCancel, onSaved }) {
-  const [hours, setHours] = useState(record.hour_at_completion);
-  const [note, setNote] = useState(record.note || "");
-  const [techNote, setTechNote] = useState(record.technician_note || "");
-  const [pressure, setPressure] = useState(record.pressure_reading ?? "");
-  const [photos, setPhotos] = useState(record.photos_b64 || []);
-  const [videos, setVideos] = useState(record.videos || []);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  async function addPhotos(e) {
-    const files = Array.from(e.target.files || []);
-    const encoded = [];
-    for (const f of files) { try { encoded.push(await compressImage(f)); } catch {} }
-    setPhotos((p) => [...p, ...encoded]);
-    e.target.value = "";
-  }
-
-  async function addVideos(e) {
-    const files = Array.from(e.target.files || []);
-    for (const f of files) {
-      if (f.size > MAX_VIDEO_MB * 1024 * 1024) { setMsg({ ok: false, text: `'${f.name}' ${MAX_VIDEO_MB}MB sınırını aşıyor.` }); continue; }
-      const data_b64 = await fileToBase64(f);
-      setVideos((v) => [...v, { data_b64, filename: f.name, mime: f.type || "video/mp4" }]);
-    }
-    e.target.value = "";
-  }
-
-  async function save() {
-    setBusy(true);
-    setMsg(null);
-    const res = await fetch(`/api/records/${record._id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hour_at_completion: Number(hours), note, technician_note: techNote,
-        photos_b64: photos, videos, pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-      }),
-    });
-    setBusy(false);
-    if (res.ok) onSaved();
-    else { const d = await res.json(); setMsg({ ok: false, text: d.error || "Hata oluştu." }); }
-  }
-
-  return (
-    <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2">
-      <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
-      <input type="number" value={hours} onChange={(e) => setHours(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono" />
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ölçüm / Teknik Açıklama" rows={2} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm resize-none" />
-      <textarea value={techNote} onChange={(e) => setTechNote(e.target.value)} placeholder="Bakımcı Notu" rows={2} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm resize-none" />
-      {(record.type_key === "krank" || record.type_key === "intercooler" || record.pressure_reading != null) && (
-        <input type="number" step="0.1" value={pressure} onChange={(e) => setPressure(e.target.value)} placeholder="Fark Basıncı (bar)" className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono" />
-      )}
-
-      {photos.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {photos.map((p, idx) => (
-            <div key={idx} className="relative">
-              <img src={`data:image/jpeg;base64,${p}`} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
-              <button onClick={() => setPhotos((ph) => ph.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px]">✕</button>
-            </div>
-          ))}
-        </div>
-      )}
-      <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer">
-        📷 Fotoğraf ekle <input type="file" accept="image/*" multiple onChange={addPhotos} className="hidden" />
-      </label>
-
-      {videos.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {videos.map((v, idx) => (
-            <div key={idx} className="flex items-center justify-between bg-panel2 rounded-lg px-2.5 py-1.5 text-[11px] text-muted">
-              🎬 {v.filename}
-              <button onClick={() => setVideos((vs) => vs.filter((_, i) => i !== idx))} className="text-red">✕</button>
-            </div>
-          ))}
-        </div>
-      )}
-      <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer">
-        🎬 Video ekle (en fazla {MAX_VIDEO_MB}MB) <input type="file" accept="video/*" multiple onChange={addVideos} className="hidden" />
-      </label>
-
-      {msg && <div className="text-[11.5px] text-red">{msg.text}</div>}
-      <div className="flex gap-2 mt-1">
-        <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-border text-muted font-bold text-[12px]">Vazgeç</button>
-        <button onClick={save} disabled={busy} className="flex-1 py-2.5 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50">
-          {busy ? "..." : "💾 Kaydet"}
-        </button>
-      </div>
-    </div>
-  );
-}
+import { useState, useEffect, useMemo } from 'react';
 
 export default function KayitlarPage() {
-  const router = useRouter();
-  const { user } = useCurrentUser();
-  const [engines, setEngines] = useState([]);
-  const [types, setTypes] = useState([]);
   const [records, setRecords] = useState([]);
+  const [engines, setEngines] = useState([]);
+  const [maintenanceTypes, setMaintenanceTypes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [engineFilter, setEngineFilter] = useState("Tümü");
-  const [typeFilter, setTypeFilter] = useState("Tümü");
-  const [editingId, setEditingId] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  async function load() {
-    const params = new URLSearchParams();
-    if (engineFilter !== "Tümü") params.set("engine_id", engineFilter);
-    if (typeFilter !== "Tümü") params.set("type_label", typeFilter);
-    const [engRes, typeRes, recRes] = await Promise.all([
-      fetch("/api/engines"), fetch("/api/maintenance-types"), fetch(`/api/records?${params}`),
-    ]);
-    if (engRes.status === 401) { router.push("/login"); return; }
-    setEngines(await engRes.json());
-    setTypes(await typeRes.json());
-    setRecords(await recRes.json());
-    setLoading(false);
-  }
+  // Filtreleme State'leri
+  const [selectedEngine, setSelectedEngine] = useState('ALL');
+  const [selectedType, setSelectedType] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => { load(); }, [engineFilter, typeFilter]); // eslint-disable-line
+  // Modal / Medya Önizleme State'leri
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
-  const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
-  const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
+  // Verileri API'den Çekme
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  async function doDelete(id) {
-    await fetch(`/api/records/${id}`, { method: "DELETE" });
-    setConfirmDeleteId(null);
-    load();
-  }
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [recordsRes, enginesRes, typesRes] = await Promise.all([
+        fetch('/api/records'),
+        fetch('/api/engines'),
+        fetch('/api/maintenance-types'),
+      ]);
 
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+      if (recordsRes.ok) {
+        const data = await recordsRes.json();
+        setRecords(data);
+      }
+      if (enginesRes.ok) {
+        const data = await enginesRes.json();
+        setEngines(data);
+      }
+      if (typesRes.ok) {
+        const data = await typesRes.json();
+        setMaintenanceTypes(data);
+      }
+    } catch (err) {
+      console.error('Veriler yüklenirken hata oluştu:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Silme İşlemi
+  const handleDeleteGroup = async (recordIds) => {
+    if (!confirm('Bu bakım kaydını silmek istediğinize emin misiniz?')) return;
+
+    try {
+      setDeletingId(recordIds[0]);
+      for (const id of recordIds) {
+        await fetch(`/api/records/${id}`, { method: 'DELETE' });
+      }
+      fetchData();
+    } catch (err) {
+      alert('Silme işleminde hata oluştu.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // 1. Arama ve Filtreleme İşlemi
+  const filteredRecords = useMemo(() => {
+    return records.filter((rec) => {
+      const matchEngine =
+        selectedEngine === 'ALL' ||
+        String(rec.engine_id || rec.engine) === String(selectedEngine);
+
+      const matchType =
+        selectedType === 'ALL' ||
+        rec.maintenance_type === selectedType ||
+        rec.type === selectedType;
+
+      const searchLower = searchTerm.toLowerCase();
+      const matchSearch =
+        !searchTerm ||
+        (rec.notes && rec.notes.toLowerCase().includes(searchLower)) ||
+        (rec.engine_name && rec.engine_name.toLowerCase().includes(searchLower)) ||
+        (rec.maintenance_type && rec.maintenance_type.toLowerCase().includes(searchLower));
+
+      return matchEngine && matchType && matchSearch;
+    });
+  }, [records, selectedEngine, selectedType, searchTerm]);
+
+  // 2. Aynı gün/saat ve aynı motor için ÇİFT KAYITLARI BİRLEŞTİRME (Gruplama)
+  const groupedRecords = useMemo(() => {
+    const groups = {};
+
+    filteredRecords.forEach((record) => {
+      const engineId = record.engine_id || record.engine || 'UNKNOWN';
+      // Tarihi dakikalık hassasiyetle grupluyoruz (Aynı anda girilen bakımları birleştirir)
+      const dateKey = record.date
+        ? new Date(record.date).toISOString().slice(0, 16)
+        : record._id;
+
+      const groupKey = `${engineId}_${dateKey}`;
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          ids: [record._id || record.id],
+          engine_id: engineId,
+          engine_name: record.engine_name || `Motor #${engineId}`,
+          date: record.date,
+          maintenance_types: record.maintenance_type || record.type ? [record.maintenance_type || record.type] : [],
+          hours: record.hours || record.engine_hours || null,
+          images: Array.from(new Set(record.images || record.photos || [])),
+          videos: Array.from(new Set(record.videos || [])),
+          notes: record.notes ? [record.notes] : [],
+          performed_by: record.performed_by || record.user || null,
+        };
+      } else {
+        groups[groupKey].ids.push(record._id || record.id);
+
+        const typeName = record.maintenance_type || record.type;
+        if (typeName && !groups[groupKey].maintenance_types.includes(typeName)) {
+          groups[groupKey].maintenance_types.push(typeName);
+        }
+
+        const newImages = record.images || record.photos || [];
+        if (newImages.length > 0) {
+          groups[groupKey].images = Array.from(
+            new Set([...groups[groupKey].images, ...newImages])
+          );
+        }
+
+        const newVideos = record.videos || [];
+        if (newVideos.length > 0) {
+          groups[groupKey].videos = Array.from(
+            new Set([...groups[groupKey].videos, ...newVideos])
+          );
+        }
+
+        if (record.notes && !groups[groupKey].notes.includes(record.notes)) {
+          groups[groupKey].notes.push(record.notes);
+        }
+      }
+    });
+
+    return Object.values(groups).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [filteredRecords]);
 
   return (
-    <div>
-      <TopBar title="Bakım Kayıtları" subtitle={`${records.length} kayıt`} />
-      <div className="px-4 py-4">
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <select value={engineFilter} onChange={(e) => setEngineFilter(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px]">
-            <option value="Tümü">Tüm Motorlar</option>
-            {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-          </select>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px]">
-            <option value="Tümü">Tüm Türler</option>
-            {typeLabels.map((l) => <option key={l} value={l}>{l}</option>)}
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 pb-24 md:p-6 space-y-6">
+      {/* Üst Başlık */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Bakım Kayıtları</h1>
+          <p className="text-sm text-slate-400">
+            Yapılan tüm bakım ve servis geçmişini görüntüleyin
+          </p>
+        </div>
+        <div className="text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 self-start md:self-auto">
+          Toplam Kayıt: <span className="font-semibold text-amber-400">{groupedRecords.length}</span>
+        </div>
+      </div>
+
+      {/* Filtreleme Barları */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60">
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Motor</label>
+          <select
+            value={selectedEngine}
+            onChange={(e) => setSelectedEngine(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+          >
+            <option value="ALL">Tüm Motorlar</option>
+            {engines.map((e) => (
+              <option key={e._id || e.id} value={e.engine_id || e.id}>
+                {e.name || `Motor ${e.engine_id}`}
+              </option>
+            ))}
           </select>
         </div>
 
-        {records.length === 0 ? (
-          <div className="text-center text-muted text-sm py-10 bg-panel border border-border rounded-card">Kayıt bulunamadı.</div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {records.map((r) => {
-              const photos = r.photos_b64 || [];
-              const canEdit = user && (["yonetici", "planlamaci"].includes(user.role) || user.id === r.technician_id);
-              return (
-                <div key={r._id} className="bg-panel border border-border rounded-card p-3.5">
-                  {photos.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap mb-2">
-                      {photos.map((p, idx) => <img key={idx} src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />)}
-                    </div>
-                  )}
-                  {(r.videos || []).map((v, idx) => (
-                    <video key={idx} controls className="w-full rounded-lg mb-2 border border-border">
-                      <source src={`data:${v.mime};base64,${v.data_b64}`} />
-                    </video>
-                  ))}
-                  <div className="text-[13px] font-bold text-text">
-                    {r.type_label} · {r.engine_name} {r.backdated && <span className="text-faint font-normal">· 📅 geçmişe dönük</span>}
-                  </div>
-                  <div className="text-[11px] text-faint mt-0.5">
-                    {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {r.technician_name}
-                  </div>
-                  {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
-                  {r.note && <div className="text-[11.5px] text-muted mt-1">📝 {r.note}</div>}
-                  {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Bakım Türü</label>
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+          >
+            <option value="ALL">Tüm Bakım Türleri</option>
+            {maintenanceTypes.map((t, idx) => (
+              <option key={idx} value={t.name || t.key || t}>
+                {t.name || t.key || t}
+              </option>
+            ))}
+          </select>
+        </div>
 
-                  {canEdit && (
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => setEditingId(editingId === r._id ? null : r._id)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5">✏️ Düzenle</button>
-                      {confirmDeleteId === r._id ? (
-                        <>
-                          <button onClick={() => doDelete(r._id)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5">Evet, Sil</button>
-                          <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5">Vazgeç</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setConfirmDeleteId(r._id)} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5">🗑️ Sil</button>
-                      )}
-                    </div>
-                  )}
-
-                  {editingId === r._id && (
-                    <EditForm record={r} onCancel={() => setEditingId(null)} onSaved={() => { setEditingId(null); load(); }} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Arama</label>
+          <input
+            type="text"
+            placeholder="Notlarda veya motorlarda ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+          />
+        </div>
       </div>
-      <BottomNav />
+
+      {/* Yükleniyor Veya Boş Liste Durumu */}
+      {loading ? (
+        <div className="text-center py-12 text-slate-400">Kayıtlar yükleniyor...</div>
+      ) : groupedRecords.length === 0 ? (
+        <div className="text-center py-12 bg-slate-800/30 rounded-xl border border-slate-800 text-slate-400">
+          Kriterlere uygun bakım kaydı bulunamadı.
+        </div>
+      ) : (
+        /* Kayıt Kartları Listesi */
+        <div className="space-y-4">
+          {groupedRecords.map((item, index) => (
+            <div
+              key={index}
+              className="bg-slate-800/90 border border-slate-700/80 rounded-xl p-4 shadow-md hover:border-slate-600 transition-all space-y-3"
+            >
+              {/* Kart Üst Bilgisi */}
+              <div className="flex items-start justify-between gap-2 border-b border-slate-700/50 pb-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-lg text-amber-400">
+                      {item.engine_name}
+                    </span>
+                    {item.hours && (
+                      <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-mono">
+                        {item.hours} Saat
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    {item.date ? new Date(item.date).toLocaleString('tr-TR') : 'Tarih Belirtilmemiş'}
+                    {item.performed_by && ` • Yapan: ${item.performed_by}`}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleDeleteGroup(item.ids)}
+                  disabled={deletingId === item.ids[0]}
+                  className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2.5 py-1 rounded transition border border-rose-500/20"
+                >
+                  {deletingId === item.ids[0] ? 'Siliniyor...' : 'Sil'}
+                </button>
+              </div>
+
+              {/* Birleştirilmiş Bakım Türü Etiketleri */}
+              <div className="flex flex-wrap gap-1.5">
+                {item.maintenance_types.length > 0 ? (
+                  item.maintenance_types.map((type, tIdx) => (
+                    <span
+                      key={tIdx}
+                      className="bg-amber-500/10 text-amber-300 border border-amber-500/20 text-xs px-2.5 py-1 rounded-md font-medium"
+                    >
+                      {type}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-500 italic">Bakım Türü Girilmemiş</span>
+                )}
+              </div>
+
+              {/* Açıklama / Notlar */}
+              {item.notes.length > 0 && (
+                <div className="text-sm text-slate-300 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                  {item.notes.join(' | ')}
+                </div>
+              )}
+
+              {/* Medya Galeri Alanı (Küçük Kare Resimler ve Videolar) */}
+              {(item.images.length > 0 || item.videos.length > 0) && (
+                <div className="pt-2">
+                  <div className="text-xs font-semibold text-slate-400 mb-2">
+                    Eklentiler ({item.images.length + item.videos.length})
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    {/* Görseller (Küçük Kare) */}
+                    {item.images.map((imgUrl, iIdx) => (
+                      <div
+                        key={iIdx}
+                        onClick={() => setSelectedImage(imgUrl)}
+                        className="w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 cursor-pointer hover:opacity-80 transition relative shrink-0"
+                      >
+                        <img
+                          src={imgUrl}
+                          alt="Bakım Görseli"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+
+                    {/* Videolar (Küçük Kare + Oynat İkonu) */}
+                    {item.videos.map((videoUrl, vIdx) => (
+                      <div
+                        key={vIdx}
+                        onClick={() => setSelectedVideo(videoUrl)}
+                        className="relative w-20 h-20 bg-slate-950 rounded-lg overflow-hidden cursor-pointer border border-slate-700 hover:border-amber-500 transition group shrink-0 flex items-center justify-center"
+                      >
+                        <video
+                          src={videoUrl}
+                          className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition">
+                          <div className="w-8 h-8 rounded-full bg-amber-500/90 text-slate-950 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                            ▶
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* BÜYÜK VİDEO OYNATICI MODAL */}
+      {selectedVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setSelectedVideo(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-3.5 border-b border-slate-800 bg-slate-950">
+              <span className="text-sm font-medium text-slate-300">Video Önizleme</span>
+              <button
+                onClick={() => setSelectedVideo(null)}
+                className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-2 bg-black flex items-center justify-center">
+              <video
+                src={selectedVideo}
+                controls
+                autoPlay
+                className="max-h-[75vh] w-auto rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BÜYÜK RESİM İNCELEME MODAL */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-3 right-3 text-white bg-slate-900/80 hover:bg-slate-800 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold border border-slate-700 z-10"
+            >
+              ✕
+            </button>
+            <div className="p-2 bg-black flex items-center justify-center">
+              <img
+                src={selectedImage}
+                alt="Büyük Görsel"
+                className="max-h-[80vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
