@@ -15,6 +15,7 @@ function fileToBase64(file) {
 
 export default function ExcelPage() {
   const [importFile, setImportFile] = useState(null);
+  const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
 
@@ -24,7 +25,8 @@ export default function ExcelPage() {
     setImportMsg(null);
     const file_b64 = await fileToBase64(importFile);
     const res = await fetch("/api/import/hours", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64 }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_b64, import_date: importDate }),
     });
     setImporting(false);
     const data = await res.json();
@@ -51,6 +53,15 @@ export default function ExcelPage() {
           <p className="text-[11.5px] text-muted mb-3 leading-relaxed">
             'MOTOR' ve 'MOTOR ÇALIŞMA SAATİ' sütunlarını içeren bir Excel dosyası yükleyin. 'YÜK' sütunu varsa yükler de güncellenir.
           </p>
+
+          <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide">Bu verinin ait olduğu tarih</label>
+          <input
+            type="date" value={importDate} max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setImportDate(e.target.value)}
+            className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mt-1 mb-3"
+          />
+          <p className="text-[10.5px] text-faint -mt-2 mb-3">Saat geçmişine bu tarihle kaydedilir — geçmiş bir Excel dosyası yüklüyorsanız o tarihi seçin.</p>
+
           <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer mb-2">
             📊 {importFile ? importFile.name : "Excel dosyası seç"}
             <input type="file" accept=".xlsx,.xls" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="hidden" />

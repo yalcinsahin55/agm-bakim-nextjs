@@ -14,7 +14,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Bu işlem için yönetici veya planlamacı yetkisi gerekir." }, { status: 403 });
   }
 
-  const { file_b64 } = await req.json();
+  const { file_b64, import_date } = await req.json();
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
 
   let wb;
@@ -40,7 +40,8 @@ export async function POST(req) {
   }
 
   const enginesCol = db.collection("engines");
-  const stamp = new Date();
+  // Excel'deki verinin ait olduğu tarih seçilebilir — seçilmezse şu an kullanılır.
+  const stamp = import_date ? new Date(import_date) : new Date();
   let updated = 0;
 
   for (const row of rows) {
