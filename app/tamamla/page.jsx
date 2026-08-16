@@ -38,33 +38,36 @@ export default function TamamlaPage() {
 
   const [engineId, setEngineId] = useState("");
   const [typeKey, setTypeKey] = useState("");
+  const [primaryPeriod, setPrimaryPeriod] = useState(1000);
   const [hours, setHours] = useState(0);
-  const [backdated, setBackdated] = useState(false);
   const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10));
   const [pressure, setPressure] = useState("");
   const [note, setNote] = useState("");
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
+  const [extraPeriods, setExtraPeriods] = useState({});
   const [photos, setPhotos] = useState([]);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
 
-  useEffect(() => {
-    fetch("/api/maintenance-types/panel").then(async (res) => {
-      if (res.status === 401) { router.push("/login"); return; }
-      const data = await res.json();
-      setItems(data.items);
-      setEngines(data.engines);
-      setTypes(data.types || []);
-      setLoading(false);
-    });
-  }, [router]);
+  async function loadPanel() {
+    const res = await fetch("/api/maintenance-types/panel");
+    if (res.status === 401) { router.push("/login"); return; }
+    const data = await res.json();
+    setItems(data.items);
+    setEngines(data.engines);
+    setTypes(data.types);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadPanel(); }, []); // eslint-disable-line
 
   const engineList = useMemo(
     () => [...engines].sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })),
     [engines]
   );
+  const allTypesSorted = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label, "tr")), [types]);
 
   useEffect(() => {
     if (!engineId && engineList.length) setEngineId(engineList[0]._id);
@@ -76,29 +79,28 @@ export default function TamamlaPage() {
     if (eng) setHours(eng.hours);
   }, [engineId, engines]);
 
+  // Bu motor için ZATEN tanımlı olan bakım türleri (kalan saat vb. hesaplı)
   const engItems = useMemo(
     () => items.filter((i) => i.engine_id === engineId).sort((a, b) => a.remaining - b.remaining),
     [items, engineId]
   );
+  const trackedKeys = useMemo(() => new Set(engItems.map((i) => i.type_key)), [engItems]);
 
   useEffect(() => {
-    if (engItems.length && !engItems.find((i) => i.type_key === typeKey)) {
-      setTypeKey(engItems[0].type_key);
+    if (allTypesSorted.length && !allTypesSorted.find((t) => t.key === typeKey)) {
+      setTypeKey(allTypesSorted[0].key);
     }
-  }, [engItems, typeKey]);
+  }, [allTypesSorted, typeKey]);
 
-  const chosen = engItems.find((i) => i.type_key === typeKey);
-  const otherItems = engItems.filter((i) => i.type_key !== typeKey);
+  const chosenItem = engItems.find((i) => i.type_key === typeKey); // tanımlıysa dolu
+  const chosenType = types.find((t) => t.key === typeKey);
+  const isPrimaryNew = !!chosenType && !trackedKeys.has(typeKey);
 
-  // Birlikte tamamlanan bakımlar: motora tanımlı olmayan bakım türlerini de göster
-  const allOtherTypes = useMemo(() => {
-    const engTypeKeys = new Set(engItems.map((i) => i.type_key));
-    const unassigned = types
-      .filter((t) => !engTypeKeys.has(t.key || t._id) && (t.key || t._id) !== typeKey)
-      .map((t) => ({ type_key: t.key || t._id, type_label: t.label, unassigned: true }));
-    const assigned = otherItems.map((i) => ({ type_key: i.type_key, type_label: i.type_label, unassigned: false }));
-    return [...assigned, ...unassigned];
-  }, [engItems, otherItems, types, typeKey]);
+  useEffect(() => {
+    if (isPrimaryNew && chosenType) setPrimaryPeriod(chosenType.default_period_hours);
+  }, [isPrimaryNew, chosenType]);
+
+  const otherTypes = allTypesSorted.filter((t) => t.key !== typeKey);
 
   async function handlePhotos(e) {
     const files = Array.from(e.target.files || []);
@@ -117,27 +119,39 @@ export default function TamamlaPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function toggleExtra(key, checked) {
+    setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
+    if (checked && extraPeriods[key] === undefined) {
+      const t = types.find((tt) => tt.key === key);
+      setExtraPeriods((prev) => ({ ...prev, [key]: t ? t.default_period_hours : 1000 }));
+    }
+  }
+
   async function submit() {
-    if (!chosen) return;
+    if (!chosenType) return;
     setSubmitting(true);
     setMessage(null);
 
+    const isBackdated = recordDate !== new Date().toISOString().slice(0, 10);
+
     const extra_types = extraKeys.map((k) => {
-      const it = engItems.find((i) => i.type_key === k);
-      if (it) return { type_key: it.type_key, type_label: it.type_label };
-      const t = types.find((t) => (t.key || t._id) === k);
-      return { type_key: k, type_label: t ? t.label : k };
+      const t = types.find((tt) => tt.key === k);
+      const trackedForEngine = trackedKeys.has(k);
+      return {
+        type_key: k, type_label: t.label,
+        period: trackedForEngine ? undefined : Number(extraPeriods[k]),
+      };
     });
 
     const res = await fetch("/api/records", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        engine_id: engineId, type_key: chosen.type_key, type_label: chosen.type_label,
+        engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
         hour_at_completion: Number(hours), note, technician_note: techNote,
         photos_b64: photos, pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-        backdated, record_date: backdated ? recordDate : undefined,
-        period: chosen.period, extra_types,
+        backdated: isBackdated, record_date: recordDate,
+        period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
       }),
     });
 
@@ -145,13 +159,8 @@ export default function TamamlaPage() {
     if (res.ok) {
       const data = await res.json();
       setMessage({ ok: true, text: `${data.completed.join(", ")} bakımı kaydedildi.` });
-      setNote(""); setTechNote(""); setPhotos([]); setExtraKeys([]); setPressure(""); setBackdated(false);
-      // panel verisini tazele
-      const panelRes = await fetch("/api/maintenance-types/panel");
-      const panelData = await panelRes.json();
-      setItems(panelData.items);
-      setEngines(panelData.engines);
-      setTypes(panelData.types || []);
+      setNote(""); setTechNote(""); setPhotos([]); setExtraKeys([]); setExtraPeriods({}); setPressure(""); setRecordDate(new Date().toISOString().slice(0, 10));
+      loadPanel();
     } else {
       const data = await res.json();
       setMessage({ ok: false, text: data.error || "Bir hata oluştu." });
@@ -171,18 +180,31 @@ export default function TamamlaPage() {
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Türü</label>
         <select value={typeKey} onChange={(e) => setTypeKey(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2">
-          {engItems.map((i) => (
-            <option key={i.type_key} value={i.type_key}>
-              {i.type_label} · {STATUS_LABELS[i.status]} · {Math.round(i.remaining)} sa
-            </option>
-          ))}
+          {allTypesSorted.map((t) => {
+            const it = engItems.find((i) => i.type_key === t.key);
+            const label = it
+              ? `${t.label} · ${STATUS_LABELS[it.status]} · ${Math.round(it.remaining)} sa`
+              : `${t.label} · ⚪ Bu motor için tanımlı değil`;
+            return <option key={t.key} value={t.key}>{label}</option>;
+          })}
         </select>
 
-        {chosen && (
+        {chosenItem ? (
           <div className="bg-teal/10 border border-teal/30 rounded-xl px-3.5 py-3 mb-2 text-[11.5px] text-muted">
-            Motor saati: {chosen.engine_hours.toLocaleString("tr-TR")} · Son bakım: {chosen.last_hour.toLocaleString("tr-TR")} · Periyot: {chosen.period.toLocaleString("tr-TR")} sa
+            Motor saati: {chosenItem.engine_hours.toLocaleString("tr-TR")} · Son bakım: {chosenItem.last_hour.toLocaleString("tr-TR")} · Periyot: {chosenItem.period.toLocaleString("tr-TR")} sa
           </div>
-        )}
+        ) : chosenType ? (
+          <div className="bg-amber/10 border border-amber/30 rounded-xl px-3.5 py-3 mb-2">
+            <div className="text-[11.5px] text-muted mb-2">
+              <b className="text-amber">{chosenType.label}</b>, bu motor için tanımlı değildi. Bu kaydı eklersen yeni bir bakım takibi başlatılır.
+            </div>
+            <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
+            <input
+              type="number" value={primaryPeriod} onChange={(e) => setPrimaryPeriod(e.target.value)}
+              className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono mt-1"
+            />
+          </div>
+        ) : null}
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">O Anki Motor Çalışma Saati</label>
         <input
@@ -193,19 +215,14 @@ export default function TamamlaPage() {
           Bu değer motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu bakım kaydına yazılır.
         </p>
 
-        <label className="flex items-center gap-2 text-[12.5px] mb-2 text-text">
-          <input type="checkbox" checked={backdated} onChange={(e) => setBackdated(e.target.checked)} />
-          📅 Geçmişe dönük kayıt (bu bakım geçmişte yapıldı)
-        </label>
-        {backdated && (
-          <input
-            type="date" value={recordDate} max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => setRecordDate(e.target.value)}
-            className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2"
-          />
-        )}
+        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Tarihi</label>
+        <input
+          type="date" value={recordDate} max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setRecordDate(e.target.value)}
+          className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2"
+        />
 
-        {(chosen?.type_key === "krank" || chosen?.type_key === "intercooler") && (
+        {(typeKey === "krank" || typeKey === "intercooler") && (
           <>
             <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fark Basıncı (bar)</label>
             <input
@@ -227,20 +244,37 @@ export default function TamamlaPage() {
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
         />
 
-        {allOtherTypes.length > 0 && (
+        {otherTypes.length > 0 && (
           <>
             <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide mt-1">Birlikte Tamamlanan Diğer Bakımlar</label>
-            <p className="text-[11px] text-faint mb-1.5">Bazen bir bakımı yaparken diğerlerini de yapmış oluyorsunuz. Varsa işaretleyin — hepsi aynı saat/tarihle kaydedilir.</p>
+            <p className="text-[11px] text-faint mb-1.5">
+              Bazen bir bakımı yaparken diğerlerini de yapmış oluyorsunuz — motor için daha önce hiç tanımlı olmayan
+              bir bakım türü de olsa, işaretleyip periyodunu girerek ekleyebilirsiniz. Hepsi aynı saat/tarihle kaydedilir.
+            </p>
             <div className="flex flex-col gap-1.5 mb-2">
-              {allOtherTypes.map((i) => (
-                <label key={i.type_key} className={`flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5 text-[12.5px] text-text ${i.unassigned ? "opacity-75" : ""}`}>
-                  <input
-                    type="checkbox" checked={extraKeys.includes(i.type_key)}
-                    onChange={(e) => setExtraKeys((prev) => e.target.checked ? [...prev, i.type_key] : prev.filter((k) => k !== i.type_key))}
-                  />
-                  {i.type_label} {i.unassigned && <span className="text-[10px] text-faint">(bu motora tanımlı değil)</span>}
-                </label>
-              ))}
+              {otherTypes.map((t) => {
+                const tracked = trackedKeys.has(t.key);
+                const checked = extraKeys.includes(t.key);
+                return (
+                  <div key={t.key} className="bg-panel border border-border rounded-xl px-3 py-2.5">
+                    <label className="flex items-center gap-2 text-[12.5px] text-text">
+                      <input type="checkbox" checked={checked} onChange={(e) => toggleExtra(t.key, e.target.checked)} />
+                      {t.label}
+                      {!tracked && <span className="text-[10px] text-faint">· ⚪ tanımlı değil</span>}
+                    </label>
+                    {checked && !tracked && (
+                      <div className="mt-2 pl-6">
+                        <label className="text-[10px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
+                        <input
+                          type="number" value={extraPeriods[t.key] ?? ""}
+                          onChange={(e) => setExtraPeriods((prev) => ({ ...prev, [t.key]: e.target.value }))}
+                          className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-1.5 text-[12.5px] font-mono mt-1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
@@ -266,7 +300,7 @@ export default function TamamlaPage() {
         )}
 
         <button
-          onClick={submit} disabled={submitting || !chosen}
+          onClick={submit} disabled={submitting || !chosenType}
           className="mt-2 py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50"
         >
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}
