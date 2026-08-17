@@ -28,20 +28,30 @@ export async function PATCH(req) {
 
     const setFields = {};
     let pushHistory = false;
+    let hoursChanged = false;
+    let loadChanged = false;
 
     if (typeof u.hours === "number" && u.hours !== existing.hours) {
       setFields.hours = u.hours;
-      pushHistory = true;
+      hoursChanged = true;
     }
     if (typeof u.load_kw === "number" && u.load_kw !== (existing.load_kw || 0)) {
       setFields.load_kw = u.load_kw;
+      loadChanged = true;
     }
     if (Object.keys(setFields).length === 0) continue;
+    pushHistory = hoursChanged || loadChanged;
 
     setFields.updated_at = stamp;
     const updateOp = { $set: setFields };
     if (pushHistory) {
-      updateOp.$push = { history: { date: stamp.toISOString(), hours: u.hours } };
+      updateOp.$push = {
+        history: {
+          date: stamp.toISOString(),
+          hours: hoursChanged ? u.hours : existing.hours,
+          load_kw: loadChanged ? u.load_kw : (existing.load_kw || 0),
+        },
+      };
     }
     await enginesCol.updateOne({ _id: u.engine_id }, updateOp);
     changed++;

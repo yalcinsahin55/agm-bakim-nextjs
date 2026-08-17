@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -64,22 +65,23 @@ export async function POST(req) {
   if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
   const createdAt = backdated && record_date ? new Date(record_date) : new Date();
+  const groupId = new ObjectId().toString();
 
-  const groupId = crypto.randomUUID();
-
-  async function insertOneRecord(tKey, tLabel, isPrimary = false) {
+  async function insertOneRecord(tKey, tLabel, isPrimary) {
     const rec = {
       engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
       hour_at_completion,
+      // Fotoğraf/video/not yalnızca birlikte tamamlanan bakımların ANA kaydında
+      // saklanır — aynı içerik her bir bakım türü için tekrar tekrar kopyalanmaz.
       note: isPrimary ? (note || "") : "",
       technician_note: isPrimary ? (technician_note || "") : "",
       photos_b64: isPrimary ? (photos_b64 || []) : [],
       videos: isPrimary ? (videos || []) : [],
-      group_id: groupId,
       technician_id: user._id, technician_name: user.full_name,
       created_at: createdAt, backdated: !!backdated,
+      group_id: groupId, grouped_with: isPrimary ? null : type_label,
     };
-    if (typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
+    if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
     await recordsCol.insertOne(rec);
     await recomputeLastMaintenance(db, engine_id, tKey);
   }
@@ -96,7 +98,14 @@ export async function POST(req) {
   const completedLabels = [type_label];
   if (Array.isArray(extra_types)) {
     for (const ex of extra_types) {
-      await insertOneRecord(ex.type_key, ex.type_label);
+      if (typeof ex.period === "number") {
+        await typesCol.updateOne(
+          { _id: ex.type_key },
+          { $set: { [`engine_states.${engine_id}.period_hours`]: ex.period } },
+          { upsert: true }
+        );
+      }
+      await insertOneRecord(ex.type_key, ex.type_label, false);
       completedLabels.push(ex.type_label);
     }
   }
@@ -108,7 +117,7 @@ export async function POST(req) {
       { _id: engine_id },
       {
         $set: { hours: hour_at_completion, updated_at: stamp },
-        $push: { history: { date: stamp.toISOString(), hours: hour_at_completion } },
+        $push: { history: { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 } },
       }
     );
   }

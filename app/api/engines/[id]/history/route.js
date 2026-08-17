@@ -30,10 +30,13 @@ export async function PATCH(req, { params }) {
   const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
 
   const update = { history: sorted, updated_at: new Date() };
-  // Geçmişteki en güncel kayıt, motorun 'güncel' çalışma saatini de temsil eder —
-  // düzenleme/silme sonrası bu değeri tutarlı tutmak için de güncellenir.
+  // Geçmişteki en güncel kayıt, motorun 'güncel' çalışma saati ve yükünü de
+  // temsil eder — düzenleme/silme sonrası bu değerler tutarlı kalır.
   if (sorted.length > 0) {
     update.hours = sorted[sorted.length - 1].hours;
+    if (typeof sorted[sorted.length - 1].load_kw === "number") {
+      update.load_kw = sorted[sorted.length - 1].load_kw;
+    }
   }
 
   await enginesCol.updateOne({ _id: params.id }, { $set: update });

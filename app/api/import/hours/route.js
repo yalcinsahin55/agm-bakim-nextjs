@@ -53,13 +53,23 @@ export async function POST(req) {
     if (!existing) continue;
 
     const setFields = { updated_at: stamp };
-    let pushHistory = false;
-    if (hours !== existing.hours) { setFields.hours = hours; pushHistory = true; }
+    let hoursChanged = false;
+    let loadChanged = false;
+    if (hours !== existing.hours) { setFields.hours = hours; hoursChanged = true; }
     if (loadCol && row[loadCol] !== null && !Number.isNaN(Number(row[loadCol]))) {
-      setFields.load_kw = Number(row[loadCol]);
+      const newLoad = Number(row[loadCol]);
+      if (newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
     }
     const updateOp = { $set: setFields };
-    if (pushHistory) updateOp.$push = { history: { date: stamp.toISOString(), hours } };
+    if (hoursChanged || loadChanged) {
+      updateOp.$push = {
+        history: {
+          date: stamp.toISOString(),
+          hours: hoursChanged ? hours : existing.hours,
+          load_kw: loadChanged ? setFields.load_kw : (existing.load_kw || 0),
+        },
+      };
+    }
     await enginesCol.updateOne({ _id: name }, updateOp);
     updated++;
   }

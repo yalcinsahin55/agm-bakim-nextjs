@@ -7,9 +7,9 @@ import BottomNav from "@/components/BottomNav";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 
-function MiniLineChart({ points }) {
+function MiniLineChart({ points, color = "#e8952f" }) {
   if (points.length < 2) return null;
-  const w = 300, h = 130, pad = 10;
+  const w = 300, h = 110, pad = 10;
   const ys = points.map((p) => p.y);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const range = maxY - minY || 1;
@@ -20,7 +20,7 @@ function MiniLineChart({ points }) {
   }).join(" ");
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="bg-panel border border-border rounded-card">
-      <path d={path} fill="none" stroke="#e8952f" strokeWidth="2.5" />
+      <path d={path} fill="none" stroke={color} strokeWidth="2.5" />
     </svg>
   );
 }
@@ -35,6 +35,7 @@ export default function SaatGecmisiPage() {
   const [editingIdx, setEditingIdx] = useState(null);
   const [editDate, setEditDate] = useState("");
   const [editHours, setEditHours] = useState("");
+  const [editLoad, setEditLoad] = useState("");
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -57,6 +58,8 @@ export default function SaatGecmisiPage() {
     return [...(engine.history || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [engine]);
 
+  const hasLoadData = history.some((h) => typeof h.load_kw === "number");
+
   const totalDelta = history.length >= 2 ? history[history.length - 1].hours - history[0].hours : 0;
   const spanMs = history.length >= 2 ? (new Date(history[history.length - 1].date) - new Date(history[0].date)) : 0;
   const spanDaysPrecise = history.length >= 2 ? Math.max(spanMs / 86400000, 1 / 24) : 0;
@@ -69,6 +72,7 @@ export default function SaatGecmisiPage() {
     setEditingIdx(realIdx);
     setEditDate(new Date(h.date).toISOString().slice(0, 10));
     setEditHours(h.hours);
+    setEditLoad(typeof h.load_kw === "number" ? h.load_kw : "");
     setConfirmDeleteIdx(null);
     setMessage(null);
   }
@@ -92,7 +96,9 @@ export default function SaatGecmisiPage() {
 
   function saveEdit(realIdx) {
     const newHistory = history.map((h, i) => (
-      i === realIdx ? { date: new Date(editDate).toISOString(), hours: Number(editHours) } : h
+      i === realIdx
+        ? { date: new Date(editDate).toISOString(), hours: Number(editHours), load_kw: editLoad !== "" ? Number(editLoad) : undefined }
+        : h
     ));
     saveHistory(newHistory);
   }
@@ -131,9 +137,19 @@ export default function SaatGecmisiPage() {
               </div>
             </div>
 
+            <div className="text-[10px] text-faint uppercase font-bold mb-1.5">Çalışma Saati</div>
             <div className="mb-4">
-              <MiniLineChart points={history.map((h) => ({ y: h.hours }))} />
+              <MiniLineChart points={history.map((h) => ({ y: h.hours }))} color="#e8952f" />
             </div>
+
+            {hasLoadData && (
+              <>
+                <div className="text-[10px] text-faint uppercase font-bold mb-1.5">Yük (kW)</div>
+                <div className="mb-4">
+                  <MiniLineChart points={history.filter((h) => typeof h.load_kw === "number").map((h) => ({ y: h.load_kw }))} color="#3fb5c4" />
+                </div>
+              </>
+            )}
 
             {message && <div className="text-[12px] text-red mb-2">{message.text}</div>}
 
@@ -147,9 +163,10 @@ export default function SaatGecmisiPage() {
                 if (isEditing) {
                   return (
                     <div key={realIdx} className="bg-panel border border-teal/40 rounded-xl px-3 py-2.5 flex flex-col gap-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input type="date" value={editDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setEditDate(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px]" />
-                        <input type="number" value={editHours} onChange={(e) => setEditHours(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="date" value={editDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setEditDate(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] col-span-1" />
+                        <input type="number" value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder="Saat" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono" />
+                        <input type="number" value={editLoad} onChange={(e) => setEditLoad(e.target.value)} placeholder="Yük (kW)" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono" />
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => setEditingIdx(null)} className="flex-1 py-1.5 rounded-lg border border-border text-muted font-bold text-[11.5px]">Vazgeç</button>
@@ -162,8 +179,11 @@ export default function SaatGecmisiPage() {
                 return (
                   <div key={realIdx} className="flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5">
                     <span className="text-[12px] text-text flex-shrink-0">{new Date(h.date).toLocaleDateString("tr-TR")}</span>
-                    <span className="font-mono text-[12.5px] font-semibold text-text flex-1 text-center">{h.hours.toLocaleString("tr-TR")}</span>
-                    <span className="font-mono text-[11.5px] text-teal flex-shrink-0">{delta === null ? "İlk kayıt" : `+${delta.toLocaleString("tr-TR")}`}</span>
+                    <span className="font-mono text-[12.5px] font-semibold text-text flex-1 text-center">
+                      {h.hours.toLocaleString("tr-TR")} sa
+                      {typeof h.load_kw === "number" && <span className="text-teal"> · {h.load_kw.toLocaleString("tr-TR")} kW</span>}
+                    </span>
+                    <span className="font-mono text-[11.5px] text-amber flex-shrink-0">{delta === null ? "İlk kayıt" : `+${delta.toLocaleString("tr-TR")}`}</span>
                     {canEdit && (
                       confirmDeleteIdx === realIdx ? (
                         <div className="flex gap-1 flex-shrink-0">
