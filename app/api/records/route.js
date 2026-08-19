@@ -63,6 +63,27 @@ export async function POST(req) {
       return NextResponse.json({ error: "Eksik veya geçersiz veri." }, { status: 400 });
     }
 
+    // Video validasyonu (max 5 video, her biri max 20MB)
+    if (videos && Array.isArray(videos)) {
+      if (videos.length > 5) {
+        return NextResponse.json({ error: "En fazla 5 video ekleyebilirsiniz." }, { status: 400 });
+      }
+      for (let i = 0; i < videos.length; i++) {
+        const video = videos[i];
+        if (typeof video !== "string") {
+          return NextResponse.json({ error: `Video ${i + 1} geçersiz formatta.` }, { status: 400 });
+        }
+        // Base64 boyut kontrolü (20MB)
+        if (video.length > 20 * 1024 * 1024 * 1.4) {
+          return NextResponse.json({ error: `Video ${i + 1} 20MB sınırını aşıyor.` }, { status: 400 });
+        }
+        // Video formatı kontrolü
+        if (!video.startsWith("data:video/")) {
+          return NextResponse.json({ error: `Video ${i + 1} geçersiz video formatı.` }, { status: 400 });
+        }
+      }
+    }
+
     const enginesCol = db.collection("engines");
     const typesCol = db.collection("maintenance_types");
     const recordsCol = db.collection("maintenance_records");
