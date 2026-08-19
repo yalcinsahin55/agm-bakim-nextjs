@@ -7,41 +7,56 @@ import { engineSortKey } from "@/lib/status";
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
-  const db = await getDb();
-  await seedIfEmpty(db);
-  const usersCol = db.collection("users");
-  const user = await getCurrentUser(req, usersCol);
-  if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  try {
+    const db = await getDb();
+    await seedIfEmpty(db);
+    const usersCol = db.collection("users");
+    const user = await getCurrentUser(req, usersCol);
+    if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-  const engines = await db.collection("engines").find().toArray();
-  engines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
-  return NextResponse.json(engines);
+    const engines = await db.collection("engines").find().toArray();
+    engines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
+    return NextResponse.json(engines);
+  } catch (error) {
+    console.error("Motorlar getirilirken hata:", error);
+    return NextResponse.json({ error: "Motorlar yüklenirken bir hata oluştu." }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
-  // Yeni motor ekleme (yönetici/planlamacı)
-  const db = await getDb();
-  const usersCol = db.collection("users");
-  const user = await getCurrentUser(req, usersCol);
-  if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  if (!["yonetici", "planlamaci"].includes(user.role)) {
-    return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
-  }
+  try {
+    const db = await getDb();
+    const usersCol = db.collection("users");
+    const user = await getCurrentUser(req, usersCol);
+    if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    if (!["yonetici", "planlamaci"].includes(user.role)) {
+      return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
+    }
 
-  const { name, hours, load_kw } = await req.json();
-  if (!name || !name.trim()) {
-    return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });
+    const { name, hours, load_kw } = await req.json();
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });
+    }
+    
+    const enginesCol = db.collection("engines");
+    const existing = await enginesCol.findOne({ _id: name.trim() });
+    if (existing) {
+      return NextResponse.json({ error: "Bu isimde bir motor zaten var." }, { status: 409 });
+    }
+    
+    const now = new Date();
+    const doc = {
+      _id: name.trim(), 
+      name: name.trim(), 
+      hours: Number(hours) || 0, 
+      load_kw: Number(load_kw) || 0,
+      updated_at: now, 
+      history: [{ date: now.toISOString(), hours: Number(hours) || 0 }],
+    };
+    await enginesCol.insertOne(doc);
+    return NextResponse.json(doc);
+  } catch (error) {
+    console.error("Motor eklenirken hata:", error);
+    return NextResponse.json({ error: "Motor eklenirken bir hata oluştu." }, { status: 500 });
   }
-  const enginesCol = db.collection("engines");
-  const existing = await enginesCol.findOne({ _id: name.trim() });
-  if (existing) {
-    return NextResponse.json({ error: "Bu isimde bir motor zaten var." }, { status: 409 });
-  }
-  const now = new Date();
-  const doc = {
-    _id: name.trim(), name: name.trim(), hours: Number(hours) || 0, load_kw: Number(load_kw) || 0,
-    updated_at: now, history: [{ date: now.toISOString(), hours: Number(hours) || 0 }],
-  };
-  await enginesCol.insertOne(doc);
-  return NextResponse.json(doc);
 }
