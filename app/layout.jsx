@@ -1,5 +1,6 @@
 import "@/app/globals.css";
 import { Toaster } from "sonner";
+import Sidebar from "@/components/Sidebar";
 
 export const metadata = {
   title: "AGM Motor Bakım Merkezi",
@@ -24,10 +25,16 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="AGM Bakım" />
       </head>
       <body className="antialiased">
-        {/* PC'de ortalanmış, kenarları çizgili şık sütun; mobilde tam ekran */}
-        <div className="min-h-screen max-w-5xl mx-auto md:border-x md:border-border">
-          {children}
+        {/* PC için yan menü - sadece md+ ekranlarda görünür */}
+        <Sidebar />
+        
+        {/* Ana içerik - PC'de sidebar'ın sağına kaydırılır */}
+        <div className="min-h-screen md:ml-64">
+          <div className="max-w-5xl mx-auto md:border-x md:border-border">
+            {children}
+          </div>
         </div>
+        
         <Toaster position="top-center" theme="dark" richColors closeButton />
       </body>
     </html>
