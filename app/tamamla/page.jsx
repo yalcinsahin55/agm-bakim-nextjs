@@ -46,8 +46,13 @@ export default function TamamlaPage() {
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
+  
+  // Fotoğraf ve Video State'leri
   const [photos, setPhotos] = useState([]);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [videos, setVideos] = useState([]);
+  const [videoBusy, setVideoBusy] = useState(false);
+  
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -79,7 +84,6 @@ export default function TamamlaPage() {
     if (eng) setHours(eng.hours);
   }, [engineId, engines]);
 
-  // Bu motor için ZATEN tanımlı olan bakım türleri (kalan saat vb. hesaplı)
   const engItems = useMemo(
     () => items.filter((i) => i.engine_id === engineId).sort((a, b) => a.remaining - b.remaining),
     [items, engineId]
@@ -92,7 +96,7 @@ export default function TamamlaPage() {
     }
   }, [allTypesSorted, typeKey]);
 
-  const chosenItem = engItems.find((i) => i.type_key === typeKey); // tanımlıysa dolu
+  const chosenItem = engItems.find((i) => i.type_key === typeKey);
   const chosenType = types.find((t) => t.key === typeKey);
   const isPrimaryNew = !!chosenType && !trackedKeys.has(typeKey);
 
@@ -118,6 +122,48 @@ export default function TamamlaPage() {
   function removePhoto(idx) {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
+
+  // --- YENİ: Video Yükleme Fonksiyonu ---
+  async function handleVideos(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    if (videos.length + files.length > 5) {
+      alert("Toplamda en fazla 5 video ekleyebilirsiniz.");
+      return;
+    }
+
+    setVideoBusy(true);
+    const newVideos = [];
+    const MAX_SIZE = 20 * 1024 * 1024; // 20MB Sınırı
+
+    for (const f of files) {
+      if (f.size > MAX_SIZE) {
+        alert(`${f.name} dosyası 20MB sınırını aşıyor. Lütfen daha kısa/küçük bir video seçin.`);
+        continue;
+      }
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(f);
+        });
+        newVideos.push(base64);
+      } catch (err) {
+        console.error("Video okuma hatası:", err);
+      }
+    }
+
+    setVideos((prev) => [...prev, ...newVideos]);
+    setVideoBusy(false);
+    e.target.value = "";
+  }
+
+  function removeVideo(idx) {
+    setVideos((prev) => prev.filter((_, i) => i !== idx));
+  }
+  // --------------------------------------
 
   function toggleExtra(key, checked) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
@@ -149,7 +195,9 @@ export default function TamamlaPage() {
       body: JSON.stringify({
         engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
         hour_at_completion: Number(hours), note, technician_note: techNote,
-        photos_b64: photos, pressure_reading: pressure !== "" ? Number(pressure) : undefined,
+        photos_b64: photos, 
+        videos: videos, // --- YENİ: Videoları API'ye gönder ---
+        pressure_reading: pressure !== "" ? Number(pressure) : undefined,
         backdated: isBackdated, record_date: recordDate,
         period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
       }),
@@ -159,7 +207,10 @@ export default function TamamlaPage() {
     if (res.ok) {
       const data = await res.json();
       setMessage({ ok: true, text: `${data.completed.join(", ")} bakımı kaydedildi.` });
-      setNote(""); setTechNote(""); setPhotos([]); setExtraKeys([]); setExtraPeriods({}); setPressure(""); setRecordDate(new Date().toISOString().slice(0, 10));
+      
+      // Formu sıfırla
+      setNote(""); setTechNote(""); setPhotos([]); setVideos([]); // --- YENİ: Videoları sıfırla ---
+      setExtraKeys([]); setExtraPeriods({}); setPressure(""); setRecordDate(new Date().toISOString().slice(0, 10));
       loadPanel();
     } else {
       const data = await res.json();
@@ -279,6 +330,7 @@ export default function TamamlaPage() {
           </>
         )}
 
+        {/* --- YENİ: Fotoğraf Bölümü --- */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
@@ -294,6 +346,29 @@ export default function TamamlaPage() {
             ))}
           </div>
         )}
+
+        {/* --- YENİ: Video Bölümü --- */}
+        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Video</label>
+        <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
+          🎥 {videoBusy ? "İşleniyor..." : "Video ekle (Max 5 adet, her biri max 20MB)"}
+          <input type="file" accept="video/*" multiple onChange={handleVideos} className="hidden" />
+        </label>
+        {videos.length > 0 && (
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            {videos.map((v, idx) => (
+              <div key={idx} className="relative">
+                <video src={v} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" />
+                <button 
+                  onClick={() => removeVideo(idx)} 
+                  className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5 text-red"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* --------------------------- */}
 
         {message && (
           <div className={`text-[12.5px] mb-2 ${message.ok ? "text-green" : "text-red"}`}>{message.text}</div>
