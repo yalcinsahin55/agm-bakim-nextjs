@@ -20,6 +20,36 @@ html, body {
   height: 0;
 }
 
+/* ✨ YENİ: Sayfa açılışında yumuşak belirme animasyonu */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+body > div {
+  animation: fadeInUp .35s ease both;
+}
+
+.animate-fade-in {
+  animation: fadeInUp .35s ease both;
+}
+
+/* ✨ YENİ: Metin seçimi rengi (turuncu tema ile uyumlu) */
+::selection {
+  background: rgba(232, 149, 47, .35);
+  color: #eef1f5;
+}
+
+/* ✨ YENİ: iPhone'larda alt menünün home çizgisine binmemesi için */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ✨ YENİ: Kartlar için hafif parlama efekti */
+.hover-glow:hover {
+  box-shadow: 0 6px 24px rgba(232, 149, 47, .10);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
