@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner"; // ✨ YENİ: Modern bildirimler için eklendi
+import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import Skeleton from "@/components/Skeleton"; // ✨ YENİ: İskelet yükleme ekranı için
 import { STATUS_LABELS } from "@/lib/status";
 
 function compressImage(file, maxDim = 720, quality = 0.65) {
@@ -55,7 +56,6 @@ export default function TamamlaPage() {
   const [videoBusy, setVideoBusy] = useState(false);
   
   const [submitting, setSubmitting] = useState(false);
-  // ❌ message state'i artık kullanılmıyor, kaldırıldı
 
   async function loadPanel() {
     const res = await fetch("/api/maintenance-types/panel");
@@ -130,7 +130,7 @@ export default function TamamlaPage() {
     if (!files.length) return;
 
     if (videos.length + files.length > 5) {
-      toast.warning("Toplamda en fazla 5 video ekleyebilirsiniz."); // Toast kullanıldı
+      toast.warning("Toplamda en fazla 5 video ekleyebilirsiniz.");
       return;
     }
 
@@ -140,7 +140,7 @@ export default function TamamlaPage() {
 
     for (const f of files) {
       if (f.size > MAX_SIZE) {
-        toast.error(`${f.name} dosyası 20MB sınırını aşıyor.`); // Toast kullanıldı
+        toast.error(`${f.name} dosyası 20MB sınırını aşıyor.`);
         continue;
       }
       try {
@@ -174,7 +174,7 @@ export default function TamamlaPage() {
     }
   }
 
-  // ✨ YENİ: Modern Toast bildirimleriyle güncellenmiş submit fonksiyonu
+  // Modern Toast bildirimleriyle submit fonksiyonu
   async function submit() {
     if (!chosenType) {
       toast.error("Lütfen bir bakım türü seçin.");
@@ -234,7 +234,50 @@ export default function TamamlaPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+  // ✨ YENİ: Modern İskelet (Skeleton) Yükleme Ekranı
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="Bakım Tamamla" subtitle="Veriler yükleniyor..." />
+        <div className="px-4 py-4 flex flex-col gap-1">
+          {/* Motor seçimi iskeleti */}
+          <Skeleton className="h-4 w-16 mb-2" />
+          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+
+          {/* Bakım türü iskeleti */}
+          <Skeleton className="h-4 w-24 mb-2" />
+          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+
+          {/* Bilgi kartı iskeleti */}
+          <Skeleton className="h-16 w-full rounded-xl mb-2" />
+
+          {/* Motor saati iskeleti */}
+          <Skeleton className="h-4 w-40 mb-2" />
+          <Skeleton className="h-12 w-full rounded-xl mb-1" />
+          <Skeleton className="h-3 w-3/4 mb-2" />
+
+          {/* Tarih iskeleti */}
+          <Skeleton className="h-4 w-24 mb-2" />
+          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+
+          {/* Not alanları iskeleti */}
+          <Skeleton className="h-4 w-44 mb-2" />
+          <Skeleton className="h-16 w-full rounded-xl mb-2" />
+
+          <Skeleton className="h-4 w-28 mb-2" />
+          <Skeleton className="h-16 w-full rounded-xl mb-2" />
+
+          {/* Fotoğraf / video alanları iskeleti */}
+          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+
+          {/* Buton iskeleti */}
+          <Skeleton className="h-14 w-full rounded-xl mt-2" />
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -384,8 +427,6 @@ export default function TamamlaPage() {
             ))}
           </div>
         )}
-
-        {/* ❌ Eski message bloğu kaldırıldı */}
 
         <button
           onClick={submit} disabled={submitting || !chosenType}
