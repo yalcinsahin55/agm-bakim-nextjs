@@ -2,107 +2,220 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
-import GaugeCardList from "@/components/GaugeCardList";
-import { engineSortKey, STATUS_COLORS } from "@/lib/status";
-
-const SORT_OPTIONS = [
-  ["durum", "Durum"],
-  ["no", "Motor No"],
-  ["saat", "Çalışma Saati"],
-  ["yuk", "Yük"],
-];
+import { useCurrentUser } from "@/lib/useCurrentUser";
+import { engineSortKey } from "@/lib/status";
 
 export default function MotorlarPage() {
   const router = useRouter();
-  const [items, setItems] = useState([]);
+  const { user } = useCurrentUser();
   const [engines, setEngines] = useState([]);
+  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState("durum");
-  const [expanded, setExpanded] = useState(null);
+  const [openId, setOpenId] = useState(null);
 
-  useEffect(() => {
-    fetch("/api/maintenance-types/panel").then(async (res) => {
-      if (res.status === 401) { router.push("/login"); return; }
-      const data = await res.json();
-      setItems(data.items);
-      setEngines(data.engines);
-      setLoading(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newHours, setNewHours] = useState("");
+  const [newLoad, setNewLoad] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const canAdd = user && ["yonetici", "planlamaci"].includes(user.role);
+
+  async function load() {
+    const [engRes, recRes] = await Promise.all([
+      fetch("/api/engines"),
+      fetch("/api/records?limit=1000"),
+    ]);
+    if (engRes.status === 401) { router.push("/login"); return; }
+    setEngines(await engRes.json());
+    setRecords(recRes.ok ? await recRes.json() : []);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const sorted = useMemo(
+    () => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)),
+    [engines]
+  );
+
+  const recordsByEngine = useMemo(() => {
+    const map = {};
+    records.forEach((r) => {
+      (map[r.engine_id] = map[r.engine_id] || []).push(r);
     });
-  }, [router]);
+    return map;
+  }, [records]);
 
-  const rows = useMemo(() => {
-    const statusOrder = { gecikmis: 0, kritik: 1, yaklasiyor: 2, normal: 3 };
-    let list = engines
-      .filter((e) => e.name.toLowerCase().includes(query.toLowerCase()))
-      .map((e) => {
-        const engItems = items.filter((i) => i.engine_id === e._id).sort((a, b) => a.remaining - b.remaining);
-        const worst = engItems[0];
-        return { engine: e, items: engItems, status: worst ? worst.status : "normal", worstRemaining: worst ? worst.remaining : 999999 };
+  async function addEngine(e) {
+    e.preventDefault();
+    if (!newName.trim()) { toast.error("Motor adı gerekli."); return; }
+    setSaving(true);
+    const loadingToast = toast.loading("Motor ekleniyor...");
+    try {
+      const res = await fetch("/api/engines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName,
+          hours: Number(newHours) || 0,
+          load_kw: Number(newLoad) || 0,
+        }),
       });
+      const data = await res.json();
+      if (res.ok) {
+        toast.dismiss(loadingToast);
+        toast.success(`${data.name} eklendi! ⚙️`);
+        setShowAdd(false);
+        setNewName(""); setNewHours(""); setNewLoad("");
+        load();
+      } else {
+        toast.dismiss(loadingToast);
+        toast.error(data.error || "Motor eklenemedi.");
+      }
+    } catch {
+      toast.dismiss(loadingToast);
+      toast.error("Sunucu hatası.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
-    if (sortBy === "durum") list.sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || a.worstRemaining - b.worstRemaining);
-    else if (sortBy === "no") list.sort((a, b) => engineSortKey(a.engine.name) - engineSortKey(b.engine.name));
-    else if (sortBy === "saat") list.sort((a, b) => b.engine.hours - a.engine.hours);
-    else list.sort((a, b) => (b.engine.load_kw || 0) - (a.engine.load_kw || 0));
-
-    return list;
-  }, [engines, items, query, sortBy]);
-
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="Motorlar" subtitle="Tüm motorların bakım geçmişi" />
+        <div className="px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <Skeleton className="h-28 rounded-card" />
+          <Skeleton className="h-28 rounded-card" />
+          <Skeleton className="h-28 rounded-card" />
+          <Skeleton className="h-28 rounded-card" />
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <TopBar title="Motorlar" subtitle={`${engines.length} motor · Bir motoru açarak tüm bakımlarını görün`} />
-      <div className="px-4 py-4">
-        <input
-          value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara (örn. AGM 12)"
-          className="w-full bg-panel2 border border-border rounded-xl px-4 py-2.5 text-sm mb-2 outline-none focus:border-teal"
-        />
-        <div className="flex gap-1.5 overflow-x-auto pb-3">
-          {SORT_OPTIONS.map(([key, label]) => (
-            <button
-              key={key} onClick={() => setSortBy(key)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${sortBy === key ? "bg-teal/10 text-teal border-teal/40" : "text-faint border-border"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <TopBar
+        title="Motorlar"
+        subtitle={`${sorted.length} motor listeleniyor`}
+        right={canAdd ? (
+          <button
+            onClick={() => setShowAdd((s) => !s)}
+            className="px-3 py-2 rounded-lg bg-amber text-[#161006] text-[12px] font-extrabold shadow hover:brightness-110 active:scale-95 transition"
+          >
+            {showAdd ? "✕ Vazgeç" : "＋ Yeni Motor"}
+          </button>
+        ) : undefined}
+      />
 
-        <div className="flex flex-col gap-1.5">
-          {rows.map(({ engine, items: engItems, status }) => {
-            const isOpen = expanded === engine._id;
-            const color = STATUS_COLORS[status];
+      <div className="px-4 py-4">
+        {showAdd && (
+          <form onSubmit={addEngine} className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
+            <div className="text-[12px] font-bold text-teal mb-2">➕ Yeni Motor Ekle</div>
+            <div className="flex flex-col gap-2">
+              <input
+                required placeholder="Motor adı (örn. Motor 7)" value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number" placeholder="Güncel saat" value={newHours}
+                  onChange={(e) => setNewHours(e.target.value)}
+                  className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
+                />
+                <input
+                  type="number" placeholder="Yük (kW)" value={newLoad}
+                  onChange={(e) => setNewLoad(e.target.value)}
+                  className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
+                />
+              </div>
+              <button
+                type="submit" disabled={saving}
+                className="py-2.5 rounded-lg bg-teal text-[#06181b] text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
+              >
+                {saving ? "Ekleniyor..." : "💾 Kaydet"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {sorted.map((e) => {
+            const recs = (recordsByEngine[e._id] || [])
+              .slice()
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const open = openId === e._id;
             return (
-              <div key={engine._id} className="bg-panel border border-border rounded-card overflow-hidden" style={{ borderLeft: `3px solid ${color}` }}>
-                <button onClick={() => setExpanded(isOpen ? null : engine._id)} className="w-full flex items-center gap-3 p-3 text-left">
-                  <EngineBadge name={engine.name} size={34} />
+              <div
+                key={e._id}
+                className="bg-panel border border-border rounded-card overflow-hidden hover:border-borderlt transition-all"
+              >
+                <button
+                  onClick={() => setOpenId(open ? null : e._id)}
+                  className="w-full flex items-center gap-3 p-3 text-left"
+                >
+                  <EngineBadge name={e.name} size={36} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-bold text-text">{engine.name}</div>
-                    <div className="flex gap-2.5 mt-0.5">
-                      <span className="font-mono text-[11px] text-muted">{engine.hours.toLocaleString("tr-TR")} sa</span>
-                      <span className="font-mono text-[11px] text-faint">{(engine.load_kw || 0).toLocaleString("tr-TR")} kW</span>
+                    <div className="text-[13.5px] font-bold text-text truncate">{e.name}</div>
+                    <div className="text-[10.5px] text-faint mt-0.5">
+                      {recs.length} bakım kaydı
                     </div>
                   </div>
-                  <span className="text-faint text-base">{isOpen ? "▲" : "▼"}</span>
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-mono text-[13px] font-bold text-amber">
+                      {(e.hours || 0).toLocaleString("tr-TR")}
+                    </div>
+                    <div className="text-[8.5px] text-faint tracking-wide">SAAT</div>
+                  </div>
+                  <span className={`text-faint transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
                 </button>
-                {isOpen && (
-                  <div className="px-3 pb-3">
-                    {engItems.length === 0 ? (
-                      <div className="text-center text-faint text-xs py-4">Bu motor için tanımlı bakım türü yok.</div>
+
+                {open && (
+                  <div className="border-t border-border bg-[#12161d] p-3 animate-fade-in">
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-panel2 rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-faint uppercase font-bold">Yük</div>
+                        <div className="font-mono text-[13px] font-bold text-teal mt-0.5">
+                          {(e.load_kw || 0).toLocaleString("tr-TR")} kW
+                        </div>
+                      </div>
+                      <div className="bg-panel2 rounded-lg p-2 text-center">
+                        <div className="text-[9px] text-faint uppercase font-bold">Son Güncelleme</div>
+                        <div className="text-[11px] font-bold text-text mt-0.5">
+                          {e.updated_at ? new Date(e.updated_at).toLocaleDateString("tr-TR") : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {recs.length === 0 ? (
+                      <div className="text-center text-[11px] text-faint py-4">
+                        Henüz bakım kaydı yok.
+                      </div>
                     ) : (
-                      <GaugeCardList rows={engItems.map((i) => ({
-                        key: i.type_key,
-                        title: i.type_label,
-                        subtitle: `Periyot ${i.period.toLocaleString("tr-TR")} sa · Son bakım ${i.last_hour.toLocaleString("tr-TR")} sa · Çalışılan ${(i.engine_hours - i.last_hour).toLocaleString("tr-TR")} sa`,
-                        status: i.status, remaining: i.remaining, period: i.period,
-                        valueLabel: (i.remaining <= 0 ? "+" : "") + Math.abs(Math.round(i.remaining)).toLocaleString("tr-TR"),
-                        unitLabel: i.remaining <= 0 ? "SAAT GECİKME" : "SAAT KALDI",
-                      }))} />
+                      <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
+                        {recs.slice(0, 20).map((r) => (
+                          <div key={r._id?.toString?.() || r.group_id} className="flex items-center justify-between bg-panel rounded-lg px-2.5 py-2 border border-border">
+                            <div className="min-w-0">
+                              <div className="text-[11.5px] font-semibold text-text truncate">{r.type_label}</div>
+                              <div className="text-[9.5px] text-faint">
+                                {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.technician_name || ""}
+                              </div>
+                            </div>
+                            <div className="font-mono text-[11px] text-amber flex-shrink-0">
+                              {(r.hour_at_completion || 0).toLocaleString("tr-TR")} sa
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -110,6 +223,13 @@ export default function MotorlarPage() {
             );
           })}
         </div>
+
+        {sorted.length === 0 && (
+          <div className="text-center py-12 bg-panel border border-border rounded-card">
+            <div className="text-4xl mb-3">⚙️</div>
+            <p className="text-sm text-muted">Henüz motor eklenmemiş.</p>
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>
