@@ -7,6 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import StatCards from "@/components/StatCards";
 import LoadCards from "@/components/LoadCards";
 import GaugeCardList from "@/components/GaugeCardList";
+import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
 
 export default function DashboardPage() {
@@ -60,7 +61,52 @@ export default function DashboardPage() {
     badgeName: r.engine_name,
   }));
 
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+  // ✨ YENİ: Modern Skeleton Yükleme Ekranı
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="AGM Motor Bakım Merkezi" subtitle="Bakım Merkezi" />
+        <div className="px-4 py-4">
+          {/* Stat Cards İskeleti */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+          </div>
+
+          {/* Motor Yükleri Başlığı */}
+          <Skeleton className="h-6 w-40 mb-3" />
+          <div className="flex gap-4 mb-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          
+          {/* Load Cards İskeleti */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+          </div>
+
+          {/* Filtreler Başlığı */}
+          <Skeleton className="h-6 w-56 mb-3" />
+          <div className="flex flex-col gap-2 mb-4">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+
+          {/* Gauge Cards İskeleti */}
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -76,15 +122,66 @@ export default function DashboardPage() {
         <LoadCards engines={sortedEngines} />
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
-        <div className="flex flex-col gap-2 mb-3">
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm">
-            {typeOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm">
-            {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
+        
+        {/* ✨ YENİ: Modern Filtre Butonları (Dropdown yerine chip/pill butonlar) */}
+        <div className="mb-3">
+          <label className="text-[11px] font-bold text-muted uppercase tracking-wide mb-2 block">Bakım Türü</label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {typeOptions.map((option) => (
+              <button
+                key={option}
+                onClick={() => setTypeFilter(option)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  typeFilter === option
+                    ? "bg-amber text-white shadow-lg"
+                    : "bg-panel2 text-muted hover:bg-panel border border-border"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+
+          <label className="text-[11px] font-bold text-muted uppercase tracking-wide mb-2 block">Durum</label>
+          <div className="flex flex-wrap gap-2">
+            {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((option) => (
+              <button
+                key={option}
+                onClick={() => setStatusFilter(option)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  statusFilter === option
+                    ? "bg-teal text-white shadow-lg"
+                    : "bg-panel2 text-muted hover:bg-panel border border-border"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Sonuç Sayacı */}
+        {cardRows.length > 0 && (
+          <div className="text-[11px] text-muted mb-2">
+            <b className="text-text">{cardRows.length}</b> bakım kaydı gösteriliyor
+          </div>
+        )}
+
         <GaugeCardList rows={cardRows} />
+
+        {/* Boş Durum Mesajı */}
+        {cardRows.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-4xl mb-3">🔍</div>
+            <p className="text-sm text-muted">Seçili filtrelere uygun bakım kaydı bulunamadı.</p>
+            <button
+              onClick={() => { setTypeFilter("Tümü"); setStatusFilter("Tümü"); }}
+              className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel"
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>
