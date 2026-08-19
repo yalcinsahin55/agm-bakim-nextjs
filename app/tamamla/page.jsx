@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner"; // ✨ YENİ: Modern bildirimler için eklendi
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { STATUS_LABELS } from "@/lib/status";
@@ -54,7 +55,7 @@ export default function TamamlaPage() {
   const [videoBusy, setVideoBusy] = useState(false);
   
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState(null);
+  // ❌ message state'i artık kullanılmıyor, kaldırıldı
 
   async function loadPanel() {
     const res = await fetch("/api/maintenance-types/panel");
@@ -123,13 +124,13 @@ export default function TamamlaPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // --- YENİ: Video Yükleme Fonksiyonu ---
+  // --- Video Yükleme Fonksiyonu ---
   async function handleVideos(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
     if (videos.length + files.length > 5) {
-      alert("Toplamda en fazla 5 video ekleyebilirsiniz.");
+      toast.warning("Toplamda en fazla 5 video ekleyebilirsiniz."); // Toast kullanıldı
       return;
     }
 
@@ -139,7 +140,7 @@ export default function TamamlaPage() {
 
     for (const f of files) {
       if (f.size > MAX_SIZE) {
-        alert(`${f.name} dosyası 20MB sınırını aşıyor. Lütfen daha kısa/küçük bir video seçin.`);
+        toast.error(`${f.name} dosyası 20MB sınırını aşıyor.`); // Toast kullanıldı
         continue;
       }
       try {
@@ -163,7 +164,7 @@ export default function TamamlaPage() {
   function removeVideo(idx) {
     setVideos((prev) => prev.filter((_, i) => i !== idx));
   }
-  // --------------------------------------
+  // --------------------------------
 
   function toggleExtra(key, checked) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
@@ -173,11 +174,15 @@ export default function TamamlaPage() {
     }
   }
 
+  // ✨ YENİ: Modern Toast bildirimleriyle güncellenmiş submit fonksiyonu
   async function submit() {
-    if (!chosenType) return;
+    if (!chosenType) {
+      toast.error("Lütfen bir bakım türü seçin.");
+      return;
+    }
+    
     setSubmitting(true);
-    setMessage(null);
-
+    
     const isBackdated = recordDate !== new Date().toISOString().slice(0, 10);
 
     const extra_types = extraKeys.map((k) => {
@@ -189,32 +194,43 @@ export default function TamamlaPage() {
       };
     });
 
-    const res = await fetch("/api/records", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
-        hour_at_completion: Number(hours), note, technician_note: techNote,
-        photos_b64: photos, 
-        videos: videos, // --- YENİ: Videoları API'ye gönder ---
-        pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-        backdated: isBackdated, record_date: recordDate,
-        period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
-      }),
-    });
+    const loadingToast = toast.loading("Bakım kaydı işleniyor...");
 
-    setSubmitting(false);
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
+          hour_at_completion: Number(hours), note, technician_note: techNote,
+          photos_b64: photos, 
+          videos: videos,
+          pressure_reading: pressure !== "" ? Number(pressure) : undefined,
+          backdated: isBackdated, record_date: recordDate,
+          period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
+        }),
+      });
+
       const data = await res.json();
-      setMessage({ ok: true, text: `${data.completed.join(", ")} bakımı kaydedildi.` });
-      
-      // Formu sıfırla
-      setNote(""); setTechNote(""); setPhotos([]); setVideos([]); // --- YENİ: Videoları sıfırla ---
-      setExtraKeys([]); setExtraPeriods({}); setPressure(""); setRecordDate(new Date().toISOString().slice(0, 10));
-      loadPanel();
-    } else {
-      const data = await res.json();
-      setMessage({ ok: false, text: data.error || "Bir hata oluştu." });
+
+      if (res.ok) {
+        toast.dismiss(loadingToast);
+        toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
+        
+        // Formu sıfırla
+        setNote(""); setTechNote(""); setPhotos([]); setVideos([]);
+        setExtraKeys([]); setExtraPeriods({}); setPressure(""); 
+        setRecordDate(new Date().toISOString().slice(0, 10));
+        loadPanel();
+      } else {
+        toast.dismiss(loadingToast);
+        toast.error(data.error || "Kayıt sırasında bir hata oluştu.");
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error("Sunucu bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -330,7 +346,7 @@ export default function TamamlaPage() {
           </>
         )}
 
-        {/* --- YENİ: Fotoğraf Bölümü --- */}
+        {/* Fotoğraf Bölümü */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
@@ -347,7 +363,7 @@ export default function TamamlaPage() {
           </div>
         )}
 
-        {/* --- YENİ: Video Bölümü --- */}
+        {/* Video Bölümü */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Video</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           🎥 {videoBusy ? "İşleniyor..." : "Video ekle (Max 5 adet, her biri max 20MB)"}
@@ -368,11 +384,8 @@ export default function TamamlaPage() {
             ))}
           </div>
         )}
-        {/* --------------------------- */}
 
-        {message && (
-          <div className={`text-[12.5px] mb-2 ${message.ok ? "text-green" : "text-red"}`}>{message.text}</div>
-        )}
+        {/* ❌ Eski message bloğu kaldırıldı */}
 
         <button
           onClick={submit} disabled={submitting || !chosenType}
