@@ -8,6 +8,7 @@ import { STATUS_COLORS } from "@/lib/status";
 /**
  * rows: { title, subtitle, status, remaining, period, valueLabel, unitLabel, badgeName? }[]
  * Her satırı gösterge halkalı, durum renkli bir kart olarak çizer.
+ * Mobilde tek sütun, PC'de (md+) iki sütun gösterir.
  */
 export default function GaugeCardList({ rows, onCardClick }) {
   if (!rows || rows.length === 0) {
@@ -19,7 +20,7 @@ export default function GaugeCardList({ rows, onCardClick }) {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
       {rows.map((r, idx) => {
         const color = STATUS_COLORS[r.status];
         const Wrapper = onCardClick ? "button" : "div";
@@ -27,7 +28,7 @@ export default function GaugeCardList({ rows, onCardClick }) {
           <Wrapper
             key={r.key || idx}
             onClick={onCardClick ? () => onCardClick(r) : undefined}
-            className={`flex items-center gap-3 bg-panel border border-border rounded-card p-3 text-left w-full ${onCardClick ? "cursor-pointer active:opacity-80" : ""}`}
+            className={`flex items-center gap-3 bg-panel border border-border rounded-card p-3 text-left w-full transition-all hover:border-borderlt hover:-translate-y-0.5 ${onCardClick ? "cursor-pointer active:opacity-80" : ""}`}
           >
             {r.badgeName && <EngineBadge name={r.badgeName} />}
             <GaugeRing remaining={r.remaining} period={r.period} color={color} />
