@@ -15,7 +15,6 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [gecikmis, setGecikmis] = useState(0);
 
-  // Gecikmiş bakım sayısını rozet için çek
   useEffect(() => {
     let alive = true;
     fetch("/api/maintenance-types/panel")
@@ -30,9 +29,10 @@ export default function BottomNav() {
 
   return (
     <>
-      <div className="h-24 md:h-28" aria-hidden="true" />
-      <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:pb-6 md:px-4 md:pointer-events-none">
-        <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4 md:pointer-events-auto md:max-w-md md:rounded-2xl md:border md:shadow-2xl md:pt-2 md:pb-2">
+      {/* Sadece mobilde boşluk bırak, PC'de sidebar var */}
+      <div className="h-24 md:hidden" aria-hidden="true" />
+      <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
+        <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4">
           {ITEMS.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
