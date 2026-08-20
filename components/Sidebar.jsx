@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cachedFetch } from "@/lib/apiCache";
 
 const ITEMS = [
   { href: "/dashboard", label: "Özet", icon: "📊" },
@@ -24,8 +25,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/maintenance-types/panel")
-      .then((r) => (r.ok ? r.json() : null))
+    cachedFetch("/api/maintenance-types/panel", 30000)
       .then((data) => {
         if (!data || !alive) return;
         setGecikmis((data.items || []).filter((i) => i.status === "gecikmis").length);
@@ -59,7 +59,7 @@ export default function Sidebar() {
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">
               Avcıkoru <span className="text-amber">Santrali</span>
             </div>
-            <div className="text-[10px] text-faint">Motor Bakım Merkezi</div>
+            <div className="text-[10px] text-faint">Bakım Merkezi</div>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* Alt Bilgi - Çıkış */}
+      {/* Çıkış */}
       <div className="p-3 border-t border-border">
         <button
           onClick={handleLogout}
