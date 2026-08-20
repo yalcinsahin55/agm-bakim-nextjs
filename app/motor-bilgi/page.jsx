@@ -67,23 +67,34 @@ export default function MotorBilgiPage() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info"), fetch("/api/engines")]);
-    if (infoRes.status === 401) { router.push("/login"); return; }
-    setItems(await infoRes.json());
-    setEngines(await engRes.json());
-    setLoading(false);
+    try {
+      const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info"), fetch("/api/engines")]);
+      if (infoRes.status === 401) { router.push("/login"); return; }
+      const infoData = await infoRes.json().catch(() => []);
+      const engData = await engRes.json().catch(() => []);
+      setItems(Array.isArray(infoData) ? infoData : []);
+      setEngines(Array.isArray(engData) ? engData : []);
+    } catch {
+      toast.error("Veriler yüklenirken bir hata oluştu.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
   const rows = useMemo(() => {
-    const filtered = items.filter((i) => i.engine_name.toLowerCase().includes(query.toLowerCase()));
-    return filtered.sort((a, b) => engineSortKey(a.engine_name) - engineSortKey(b.engine_name));
+    const safe = Array.isArray(items) ? items : [];
+    const q = (query || "").toLowerCase();
+    const filtered = safe.filter((i) => (i.engine_name || "").toLowerCase().includes(q));
+    return filtered.sort((a, b) => engineSortKey(a.engine_name || "") - engineSortKey(b.engine_name || ""));
   }, [items, query]);
 
   const engineNamesWithoutCard = useMemo(() => {
-    const existing = new Set(items.map((i) => i.engine_name));
-    return [...engines].map((e) => e.name).filter((n) => !existing.has(n)).sort((a, b) => engineSortKey(a) - engineSortKey(b));
+    const safeItems = Array.isArray(items) ? items : [];
+    const safeEngines = Array.isArray(engines) ? engines : [];
+    const existing = new Set(safeItems.map((i) => i.engine_name || ""));
+    return safeEngines.map((e) => e.name || "").filter((n) => n && !existing.has(n)).sort((a, b) => engineSortKey(a) - engineSortKey(b));
   }, [items, engines]);
 
   async function doImport() {
@@ -291,7 +302,7 @@ export default function MotorBilgiPage() {
               return (
                 <div key={r._id} className={`bg-panel border rounded-card p-3.5 transition-all ${isEditing ? "border-teal/40" : "border-border hover:border-borderlt"}`}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-[13.5px] font-bold text-text">{r.engine_name}</div>
+                    <div className="text-[13.5px] font-bold text-text">{r.engine_name || "İsimsiz Motor"}</div>
                     {canEdit && !isEditing && (
                       <button onClick={() => startEdit(r)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1 hover:bg-teal/10 transition">✏️ Düzenle</button>
                     )}
