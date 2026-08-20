@@ -81,7 +81,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div>
-        <TopBar title="AGM Motor Bakım Merkezi" subtitle="Bakım Merkezi" />
+        <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle="Bakım Merkezi" />
         <div className="px-4 py-4">
           <Skeleton className="h-32 w-full rounded-card mb-4" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title="AGM Motor Bakım Merkezi" subtitle={todayStr} />
+      <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle={todayStr} />
       <div className="px-4 py-4">
         {/* ✨ Karşılama Kartı */}
         <div className="bg-gradient-to-br from-amber/15 via-panel to-panel border border-amber/20 rounded-card p-4 mb-4 animate-fade-in">
