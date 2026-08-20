@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import Skeleton from "@/components/Skeleton";
 import GaugeCardList from "@/components/GaugeCardList";
 
 export default function BakimTurleriPage() {
@@ -34,28 +35,92 @@ export default function BakimTurleriPage() {
     return [...list].sort((a, b) => a.remaining - b.remaining);
   }, [items, selectedKey, statusFilter]);
 
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+  const selectedType = types.find((t) => t.key === selectedKey);
+
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="Bakım Türleri" />
+        <div className="px-4 py-4">
+          <div className="flex gap-2 mb-3">
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+          <div className="flex gap-2 mb-4">
+            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-16 rounded-full" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Skeleton className="h-24 rounded-card" />
+            <Skeleton className="h-24 rounded-card" />
+            <Skeleton className="h-24 rounded-card" />
+            <Skeleton className="h-24 rounded-card" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <TopBar title="Bakım Türleri" />
+      <TopBar title="Bakım Türleri" subtitle={selectedType ? `${selectedType.label} · ${rows.length} motor` : ""} />
       <div className="px-4 py-4">
-        <select value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2">
-          {sortedTypes.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4">
-          {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        {/* ✨ Bakım türü çipleri (yatay kaydırmalı) */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4">
+          {sortedTypes.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setSelectedKey(t.key)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+                selectedKey === t.key
+                  ? "bg-amber text-[#161006] shadow-lg"
+                  : "bg-panel2 text-muted border border-border hover:text-text"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-        <GaugeCardList rows={rows.map((r) => ({
-          key: r.engine_id,
-          title: r.engine_name,
-          subtitle: `Motor saati ${r.engine_hours.toLocaleString("tr-TR")} sa · Son bakım ${r.last_hour.toLocaleString("tr-TR")} sa · Çalışılan ${(r.engine_hours - r.last_hour).toLocaleString("tr-TR")} sa`,
-          status: r.status, remaining: r.remaining, period: r.period,
-          valueLabel: (r.remaining <= 0 ? "+" : "") + Math.abs(Math.round(r.remaining)).toLocaleString("tr-TR"),
-          unitLabel: r.remaining <= 0 ? "SAAT GECİKME" : "SAAT KALDI",
-          badgeName: r.engine_name,
-        }))} />
+        {/* ✨ Durum çipleri */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
+          {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((o) => (
+            <button
+              key={o}
+              onClick={() => setStatusFilter(o)}
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
+                statusFilter === o
+                  ? "bg-teal text-[#06181b] shadow-lg"
+                  : "bg-panel2 text-muted border border-border hover:text-text"
+              }`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
+            <div className="text-4xl mb-3">🔧</div>
+            <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
+          </div>
+        ) : (
+          <div className="animate-fade-in">
+            <GaugeCardList rows={rows.map((r) => ({
+              key: r.engine_id,
+              title: r.engine_name,
+              subtitle: `Motor saati ${r.engine_hours.toLocaleString("tr-TR")} sa · Son bakım ${r.last_hour.toLocaleString("tr-TR")} sa · Çalışılan ${(r.engine_hours - r.last_hour).toLocaleString("tr-TR")} sa`,
+              status: r.status, remaining: r.remaining, period: r.period,
+              valueLabel: (r.remaining <= 0 ? "+" : "") + Math.abs(Math.round(r.remaining)).toLocaleString("tr-TR"),
+              unitLabel: r.remaining <= 0 ? "SAAT GECİKME" : "SAAT KALDI",
+              badgeName: r.engine_name,
+            }))} />
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>
