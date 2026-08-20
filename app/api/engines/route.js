@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { seedIfEmpty } from "@/lib/seed";
+
 import { engineSortKey } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   try {
     const db = await getDb();
-    await seedIfEmpty(db);
+    
     const usersCol = db.collection("users");
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
