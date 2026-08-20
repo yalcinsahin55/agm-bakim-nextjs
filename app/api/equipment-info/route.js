@@ -12,12 +12,19 @@ export async function GET(req) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    await seedEquipmentIfEmpty(db);
+    // ✨ ÖNEMLİ DÜZELTME: Seed hatası verse bile sayfa çökmesin,
+    // hata sadece konsola yazılsın ve liste boş dönse de çalışsın.
+    try {
+      await seedEquipmentIfEmpty(db);
+    } catch (seedError) {
+      console.error("Seed uyarısı (sayfa çalışmaya devam ediyor):", seedError);
+    }
+
     const items = await db.collection("equipment_info").find().toArray();
     return NextResponse.json(items);
   } catch (error) {
-    console.error("Motor bilgi kartları getirilirken hata:", error);
-    return NextResponse.json({ error: "Motor bilgi kartları yüklenirken bir hata oluştu." }, { status: 500 });
+    console.error("equipment-info GET hatası:", error);
+    return NextResponse.json({ error: "Veriler yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
 
@@ -53,7 +60,7 @@ export async function POST(req) {
     await col.insertOne(doc);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Motor bilgi kartı eklenirken hata:", error);
+    console.error("equipment-info POST hatası:", error);
     return NextResponse.json({ error: "Motor bilgi kartı eklenirken bir hata oluştu." }, { status: 500 });
   }
 }
