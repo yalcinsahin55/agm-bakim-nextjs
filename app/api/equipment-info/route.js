@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { seedEquipmentIfEmpty } from "@/lib/seed";
+
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function GET(req) {
     // ✨ ÖNEMLİ DÜZELTME: Seed hatası verse bile sayfa çökmesin,
     // hata sadece konsola yazılsın ve liste boş dönse de çalışsın.
     try {
-      await seedEquipmentIfEmpty(db);
+      
     } catch (seedError) {
       console.error("Seed uyarısı (sayfa çalışmaya devam ediyor):", seedError);
     }
