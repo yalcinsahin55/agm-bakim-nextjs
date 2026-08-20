@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -15,6 +16,7 @@ function fileToBase64(file) {
 }
 
 export default function ExcelPage() {
+  const router =useRouter();
   const [importFile, setImportFile] = useState(null);
   const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
@@ -36,7 +38,7 @@ export default function ExcelPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.updated} motor güncellendi! 📊`);
-        setImportFile(null);
+        router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Dosya okunamadı.");
