@@ -47,3 +47,4 @@ Baştan sona yaptığımız yolculuğun özeti:
 | 📚 **Doküman** | Profesyonel README + env tablosu |
 
 Artık uygulaman hem **kullanıcı deneyimi** hem **güvenlik** hem **dokümantasyon** açısından production-ready bir ürün. 🚀
+v2 - video sistemi güncellendi
