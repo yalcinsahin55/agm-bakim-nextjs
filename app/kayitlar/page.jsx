@@ -69,8 +69,9 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
       try {
         const blob = await upload(f.name, f, { url: "/api/upload", method: "POST" });
         setVideos((v) => [...v, { url: blob.url, filename: f.name, mime: f.type || "video/mp4" }]);
-      } catch {
-        toast.error(`${f.name} yüklenemedi.`);
+      } catch (err) {
+      console.error("Video yükleme hatası:", err);
+      toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
       }
     }
     e.target.value = "";
