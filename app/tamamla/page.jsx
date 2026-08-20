@@ -210,14 +210,10 @@ export default function TamamlaPage() {
 
       const data = await res.json();
 
-      if (res.ok) {
+   if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
-        
-        setTechNote(""); setPhotos([]); setVideos([]);
-        setExtraKeys([]); setExtraPeriods({}); setPressure(""); 
-        setRecordDate(new Date().toISOString().slice(0, 10));
-        loadPanel();
+        toast.success(${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉);
+        router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Kayıt sırasında bir hata oluştu.");
