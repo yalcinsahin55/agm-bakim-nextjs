@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata = {
-  title: "AGM Motor Bakım Merkezi",
+  title: "Avcıkoru Santrali Bakım Merkezi",
   description: "Profesyonel motor bakım takip sistemi",
   manifest: "/manifest.json",
   themeColor: "#0f1319",
@@ -24,7 +24,7 @@ export default function RootLayout({ children }) {
           href="icon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="AGM Bakım" />
+        <meta name="apple-mobile-web-app-title" content="Avcıkoru Bakım" />
       </head>
       <body className="antialiased">
         {/* PC için yan menü - sadece md+ ekranlarda görünür */}
