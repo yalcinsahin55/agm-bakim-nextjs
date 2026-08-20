@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState("login");
+  const [redirectPath, setRedirectPath] = useState("/dashboard");
+
+  useEffect(() => {
+    const redirectTo = searchParams.get("redirect");
+    if (redirectTo) setRedirectPath(redirectTo);
+  }, [searchParams]);
   const [form, setForm] = useState({ full_name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +33,7 @@ export default function LoginPage() {
         return;
       }
       toast.success(tab === "login" ? "Giriş başarılı, hoş geldiniz! 👋" : "Hesabınız oluşturuldu! 🎉");
-      router.push("/dashboard");
+      router.push(redirectPath);
       router.refresh();
     } catch {
       toast.error("Sunucuya ulaşılamadı. Lütfen tekrar deneyin.");
