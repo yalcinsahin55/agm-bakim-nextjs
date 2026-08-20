@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { cachedFetch } from "@/lib/apiCache";
 
 const ITEMS = [
@@ -14,6 +15,7 @@ const ITEMS = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [gecikmis, setGecikmis] = useState(0);
 
   useEffect(() => {
@@ -26,6 +28,19 @@ export default function BottomNav() {
       .catch(() => {});
     return () => { alive = false; };
   }, [pathname]);
+
+  async function handleLogout() {
+    const loadingToast = toast.loading("Çıkış yapılıyor...");
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      toast.dismiss(loadingToast);
+      toast.success("Güvenli çıkış yapıldı 👋");
+      router.push("/login");
+    } catch {
+      toast.dismiss(loadingToast);
+      toast.error("Çıkış yapılamadı.");
+    }
+  }
 
   return (
     <>
@@ -52,6 +67,14 @@ export default function BottomNav() {
               </Link>
             );
           })}
+          {/* 🚪 Mobil Çıkış */}
+          <button
+            onClick={handleLogout}
+            className="flex-1 flex flex-col items-center gap-1 rounded-xl py-1 text-faint hover:text-red transition"
+          >
+            <span className="text-lg leading-none">🚪</span>
+            <span className="text-[9.5px] font-bold">Çıkış</span>
+          </button>
         </div>
       </div>
     </>
