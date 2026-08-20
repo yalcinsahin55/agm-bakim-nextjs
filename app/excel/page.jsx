@@ -16,7 +16,7 @@ function fileToBase64(file) {
 }
 
 export default function ExcelPage() {
-  const router =useRouter();
+  const router = useRouter();
   const [importFile, setImportFile] = useState(null);
   const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
