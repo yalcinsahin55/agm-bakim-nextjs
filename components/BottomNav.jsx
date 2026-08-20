@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { cachedFetch } from "@/lib/apiCache";
 
 const ITEMS = [
   { href: "/dashboard", label: "Özet", icon: "📊" },
@@ -17,8 +18,7 @@ export default function BottomNav() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/maintenance-types/panel")
-      .then((r) => (r.ok ? r.json() : null))
+    cachedFetch("/api/maintenance-types/panel", 30000)
       .then((data) => {
         if (!data || !alive) return;
         setGecikmis((data.items || []).filter((i) => i.status === "gecikmis").length);
@@ -29,7 +29,6 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Sadece mobilde boşluk bırak, PC'de sidebar var */}
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
         <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4">
