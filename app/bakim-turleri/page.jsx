@@ -42,15 +42,18 @@ export default function BakimTurleriPage() {
       <div>
         <TopBar title="Bakım Türleri" />
         <div className="px-4 py-4">
-          <div className="flex gap-2 mb-3">
+          <div className="flex flex-wrap gap-2 mb-3">
             <Skeleton className="h-9 w-24 rounded-full" />
             <Skeleton className="h-9 w-24 rounded-full" />
             <Skeleton className="h-9 w-24 rounded-full" />
+            <Skeleton className="h-9 w-28 rounded-full" />
+            <Skeleton className="h-9 w-20 rounded-full" />
           </div>
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-full" />
             <Skeleton className="h-8 w-16 rounded-full" />
-            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-full" />
             <Skeleton className="h-8 w-16 rounded-full" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -69,33 +72,39 @@ export default function BakimTurleriPage() {
     <div>
       <TopBar title="Bakım Türleri" subtitle={selectedType ? `${selectedType.label} · ${rows.length} motor` : ""} />
       <div className="px-4 py-4">
-        {/* ✨ Bakım türü çipleri (yatay kaydırmalı) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4">
-          {sortedTypes.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setSelectedKey(t.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
-                selectedKey === t.key
-                  ? "bg-amber text-[#161006] shadow-lg"
-                  : "bg-panel2 text-muted border border-border hover:text-text"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* ✨ Bakım türü çipleri — PC'de alt satıra geçer, hepsi görünür */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {sortedTypes.map((t) => {
+            const count = items.filter((i) => i.type_key === t.key).length;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setSelectedKey(t.key)}
+                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+                  selectedKey === t.key
+                    ? "bg-amber text-[#161006] shadow-lg"
+                    : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
+                }`}
+              >
+                {t.label}
+                <span className={`ml-1.5 text-[10px] ${selectedKey === t.key ? "opacity-70" : "text-faint"}`}>
+                  ({count})
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* ✨ Durum çipleri */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
+        {/* ✨ Durum çipleri — PC'de alt satıra geçer */}
+        <div className="flex flex-wrap gap-2 mb-4">
           {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((o) => (
             <button
               key={o}
               onClick={() => setStatusFilter(o)}
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
                 statusFilter === o
                   ? "bg-teal text-[#06181b] shadow-lg"
-                  : "bg-panel2 text-muted border border-border hover:text-text"
+                  : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >
               {o}
@@ -103,10 +112,22 @@ export default function BakimTurleriPage() {
           ))}
         </div>
 
+        {rows.length > 0 && (
+          <div className="text-[11px] text-muted mb-2">
+            <b className="text-text">{rows.length}</b> motor gösteriliyor
+          </div>
+        )}
+
         {rows.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
             <div className="text-4xl mb-3">🔧</div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
+            <button
+              onClick={() => setStatusFilter("Tümü")}
+              className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
+            >
+              Filtreyi Temizle
+            </button>
           </div>
         ) : (
           <div className="animate-fade-in">
