@@ -1,21 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [tab, setTab] = useState("login");
-  const [redirectPath, setRedirectPath] = useState("/dashboard");
-
-  useEffect(() => {
-    const redirectTo = searchParams.get("redirect");
-    if (redirectTo) setRedirectPath(redirectTo);
-  }, [searchParams]);
   const [form, setForm] = useState({ full_name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState("/dashboard");
+
+  // ✏️ DÜZELTME: Suspense gerektirmeyen, hatasız redirect okuma
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get("redirect");
+      if (redirectTo && redirectTo.startsWith("/")) setRedirectPath(redirectTo);
+    } catch {
+      /* önemsenmez */
+    }
+  }, []);
 
   async function submit(e) {
     e.preventDefault();
@@ -44,7 +49,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col min-h-screen justify-center px-6 py-10">
-      {/* ✨ Animasyonlu Logo */}
+      {/* Animated logo */}
       <div className="text-center mb-8 animate-fade-in">
         <div className="mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-[#232d3a] to-panel border border-borderlt flex items-center justify-center shadow-2xl mb-4 relative">
           <span className="text-4xl">🔧</span>
@@ -56,7 +61,7 @@ export default function LoginPage() {
         <p className="text-faint text-xs mt-2">Profesyonel motor bakım takip sistemi</p>
       </div>
 
-      {/* ✨ Cam Efektli Kart */}
+      {/* Glass-effect card */}
       <div className="bg-panel/70 backdrop-blur-xl border border-border rounded-2xl p-5 shadow-2xl animate-fade-in">
         <div className="flex gap-1 bg-[#12161d] p-1 rounded-xl border border-border mb-5">
           <button
