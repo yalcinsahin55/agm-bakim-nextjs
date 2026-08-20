@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
+import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 
@@ -42,7 +43,7 @@ function fileToBase64(file) {
   });
 }
 
-function EditForm({ record, onCancel, onSaved }) {
+function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
   const [hours, setHours] = useState(record.hour_at_completion);
   const [note, setNote] = useState(record.note || "");
   const [techNote, setTechNote] = useState(record.technician_note || "");
@@ -114,7 +115,14 @@ function EditForm({ record, onCancel, onSaved }) {
         <div className="flex gap-1.5 flex-wrap">
           {photos.map((p, idx) => (
             <div key={idx} className="relative">
-              <img src={`data:image/jpeg;base64,${p}`} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+              <button
+                type="button"
+                onClick={() => onPhotoClick && onPhotoClick(`data:image/jpeg;base64,${p}`)}
+                className="block hover:scale-105 transition-transform"
+                aria-label="Fotoğrafı büyüt"
+              >
+                <img src={`data:image/jpeg;base64,${p}`} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+              </button>
               <button onClick={() => setPhotos((ph) => ph.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px] hover:bg-red hover:text-white transition">✕</button>
             </div>
           ))}
@@ -166,6 +174,7 @@ export default function KayitlarPage() {
   const [editingId, setEditingId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   async function load() {
     const params = new URLSearchParams();
@@ -186,7 +195,6 @@ export default function KayitlarPage() {
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
 
-  // ✨ YENİ: Metin arama filtresi
   const filteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return records;
@@ -216,7 +224,6 @@ export default function KayitlarPage() {
     }
   }
 
-  // ✨ Skeleton Loading
   if (loading) {
     return (
       <div>
@@ -243,7 +250,6 @@ export default function KayitlarPage() {
     <div>
       <TopBar title="Bakım Kayıtları" subtitle={`${filteredRecords.length} kayıt görüntüleniyor`} />
       <div className="px-4 py-4">
-        {/* ✨ Arama Kutusu */}
         <div className="relative mb-3">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm">🔍</span>
           <input
@@ -289,7 +295,17 @@ export default function KayitlarPage() {
                 <div key={r._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
                   {showMedia && photos.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mb-2">
-                      {photos.map((p, idx) => <img key={idx} src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />)}
+                      {photos.map((p, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSelectedPhoto(`data:image/jpeg;base64,${p}`)}
+                          className="hover:scale-105 transition-transform"
+                          aria-label="Fotoğrafı büyüt"
+                        >
+                          <img src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                        </button>
+                      ))}
                     </div>
                   )}
                   {showMedia && videos.length > 0 && (
@@ -338,7 +354,12 @@ export default function KayitlarPage() {
                   )}
 
                   {editingId === r._id && (
-                    <EditForm record={r} onCancel={() => setEditingId(null)} onSaved={() => { setEditingId(null); load(); }} />
+                    <EditForm
+                      record={r}
+                      onPhotoClick={setSelectedPhoto}
+                      onCancel={() => setEditingId(null)}
+                      onSaved={() => { setEditingId(null); load(); }}
+                    />
                   )}
                 </div>
               );
@@ -365,6 +386,10 @@ export default function KayitlarPage() {
           </div>
         </div>
       )}
+
+      {/* ✨ Resim Büyütme Penceresi */}
+      <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+
       <BottomNav />
     </div>
   );
