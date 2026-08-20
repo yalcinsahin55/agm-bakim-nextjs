@@ -210,9 +210,9 @@ export default function TamamlaPage() {
 
       const data = await res.json();
 
-   if (res.ok) {
+      if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success(${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉);
+        toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
         router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);
@@ -355,7 +355,7 @@ export default function TamamlaPage() {
           </>
         )}
 
-        {/* Fotoğraf Bölümü — tıklayınca büyür */}
+        {/* Fotoğraf Bölümü */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
