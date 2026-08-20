@@ -1,52 +1,45 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-// ✏️ DÜZELTME: Sistemin gerçek cookie adı "agm_session"
 const COOKIE_NAME = "agm_session";
 
-const PUBLIC_PATHS = [
-  "/",
-  "/login",
-  "/register",
-  "/api/auth/login",
-  "/api/auth/register",
-];
-
-const PUBLIC_PREFIXES = ["/_next", "/favicon.ico", "/icon", "/manifest"];
+const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/icon", "/manifest"];
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
-  // Let public routes through
-  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
+  // Herkese açık yollar
+  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // Dosya uzantılı statik istekler (svg, png, webmanifest...)
+  if (/\.[a-zA-Z0-9]+$/.test(pathname)) {
+    return NextResponse.next();
+  }
 
   const token = req.cookies.get(COOKIE_NAME)?.value;
 
-  if (!token) {
-    return redirectToLogin(req);
+  // 🔐 Secret yoksa güvenli tarafı seç: kimseyi içeri alma
+  if (!process.env.JWT_SECRET || !token) {
+    return unauthorized(req, pathname);
   }
 
   try {
-    // Secret yoksa güvenli tarafı seç: kimseyi içeri alma
-    if (!process.env.JWT_SECRET) return redirectToLogin(req);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    await jwtVerify(token, secret);
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
     return NextResponse.next();
-  } catch (err) {
-    // Token is invalid or expired
-    const response = redirectToLogin(req);
-    response.cookies.delete(COOKIE_NAME);
-    return response;
+  } catch {
+    return unauthorized(req, pathname);
   }
 }
 
-function redirectToLogin(req) {
-  const loginUrl = new URL("/login", req.url);
-  if (req.nextUrl.pathname !== "/") {
-    loginUrl.searchParams.set("redirect", req.nextUrl.pathname);
+function unauthorized(req, pathname) {
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   }
-  return NextResponse.redirect(loginUrl);
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  return NextResponse.redirect(url);
 }
 
 export const config = {
