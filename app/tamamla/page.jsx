@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { upload } from "@vercel/blob/client";
+import { uploadVideoChunked } from "@/lib/chunkUpload";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -142,8 +142,8 @@ export default function TamamlaPage() {
         continue;
       }
       try {
-        const blob = await upload(f.name, f, { url: "/api/upload", method: "POST" });
-        setVideos((v) => [...v, { url: blob.url, filename: f.name }]);
+      const url = await uploadVideoChunked(f);
+        setVideos((v) => [...v, { url, filename: f.name }]);  
       } catch (err) {
         console.error("Video yükleme hatası:", err);
         toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
