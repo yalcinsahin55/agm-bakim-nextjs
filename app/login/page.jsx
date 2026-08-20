@@ -56,7 +56,7 @@ export default function LoginPage() {
           <span className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-amber border-2 border-[#0f1319] flex items-center justify-center text-[13px]">⚙️</span>
         </div>
         <div className="font-display text-3xl font-bold uppercase tracking-wide leading-tight">
-          Avcıkoru Santrali <span className="text-amber">Bakım Merkezi</span>
+          Avcıkoru Santrali <span className="text-amber">Motor Bakım Merkezi</span>
         </div>
         <p className="text-faint text-xs mt-2">Profesyonel motor bakım takip sistemi</p>
       </div>
