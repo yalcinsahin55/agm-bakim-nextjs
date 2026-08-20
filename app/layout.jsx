@@ -3,7 +3,7 @@ import { Toaster } from "sonner";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata = {
-  title: "Avcıkoru Santrali Bakım Merkezi",
+  title: "Avcıkoru Santrali Motor Bakım Merkezi",
   description: "Profesyonel motor bakım takip sistemi",
   manifest: "/manifest.json",
   themeColor: "#0f1319",
