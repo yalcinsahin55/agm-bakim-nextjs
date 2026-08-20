@@ -163,16 +163,16 @@ export default function DashboardPage() {
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
 
-        {/* Bakım türü çipleri */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4">
+        {/* Bakım türü çipleri — PC'de sarılır, mobilde kaydırma yok */}
+        <div className="flex flex-wrap gap-2 mb-3">
           {typeOptions.map((option) => (
             <button
               key={option}
               onClick={() => setTypeFilter(option)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+              className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
                 typeFilter === option
                   ? "bg-amber text-[#161006] shadow-lg"
-                  : "bg-panel2 text-muted border border-border hover:text-text"
+                  : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >
               {option}
@@ -180,16 +180,16 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Durum çipleri */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
+        {/* Durum çipleri — PC'de sarılır, mobilde kaydırma yok */}
+        <div className="flex flex-wrap gap-2 mb-4">
           {["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((option) => (
             <button
               key={option}
               onClick={() => setStatusFilter(option)}
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
                 statusFilter === option
                   ? "bg-teal text-[#06181b] shadow-lg"
-                  : "bg-panel2 text-muted border border-border hover:text-text"
+                  : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >
               {option}
