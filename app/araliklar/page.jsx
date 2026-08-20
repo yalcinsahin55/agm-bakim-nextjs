@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { engineSortKey } from "@/lib/status";
 
@@ -36,15 +37,31 @@ export default function AraliklarPage() {
   const engineNames = useMemo(() => Array.from(new Set(records.map((r) => r.engine_name))).sort((a, b) => engineSortKey(a) - engineSortKey(b)), [records]);
   const filteredGroups = engineFilter === "Tümü" ? groups : groups.filter((g) => g.engine === engineFilter);
 
-  if (loading) return <div className="p-8 text-center text-muted text-sm">Yükleniyor...</div>;
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="Bakım Aralıkları" />
+        <div className="px-4 py-4">
+          <Skeleton className="h-12 w-full rounded-xl mb-4" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-40 rounded-card" />
+            <Skeleton className="h-40 rounded-card" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   if (records.length === 0) {
     return (
       <div>
         <TopBar title="Bakım Aralıkları" />
         <div className="px-4 py-4">
-          <div className="text-center text-muted text-sm py-10 bg-panel border border-border rounded-card">
-            Henüz tamamlanmış bakım yok. İlk bakımı kaydettiğinizde burada birikmeye başlayacak.
+          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
+            <div className="text-4xl mb-3">⏱️</div>
+            <p className="text-sm text-muted">Henüz tamamlanmış bakım yok.</p>
+            <p className="text-xs text-faint mt-1">İlk bakımı kaydettiğinizde burada birikmeye başlayacak.</p>
           </div>
         </div>
         <BottomNav />
@@ -54,12 +71,34 @@ export default function AraliklarPage() {
 
   return (
     <div>
-      <TopBar title="Bakım Aralıkları" subtitle="Art arda tamamlanan bakımlar arasında geçen saat farkı" />
+      <TopBar title="Bakım Aralıkları" subtitle={`${filteredGroups.length} grup listeleniyor`} />
       <div className="px-4 py-4">
-        <select value={engineFilter} onChange={(e) => setEngineFilter(e.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4">
-          <option value="Tümü">Tüm Motorlar</option>
-          {engineNames.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+        {/* Motor filtre çipleri */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
+          <button
+            onClick={() => setEngineFilter("Tümü")}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+              engineFilter === "Tümü"
+                ? "bg-amber text-[#161006] shadow-lg"
+                : "bg-panel2 text-muted border border-border hover:text-text"
+            }`}
+          >
+            Tüm Motorlar
+          </button>
+          {engineNames.map((n) => (
+            <button
+              key={n}
+              onClick={() => setEngineFilter(n)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+                engineFilter === n
+                  ? "bg-amber text-[#161006] shadow-lg"
+                  : "bg-panel2 text-muted border border-border hover:text-text"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
 
         <div className="flex flex-col gap-3">
           {filteredGroups.map((g, gi) => {
@@ -67,7 +106,7 @@ export default function AraliklarPage() {
               ? (g.entries[g.entries.length - 1].hour_at_completion - g.entries[0].hour_at_completion) / (g.entries.length - 1)
               : null;
             return (
-              <div key={gi} className="bg-panel border border-border rounded-card overflow-hidden">
+              <div key={gi} className="bg-panel border border-border rounded-card overflow-hidden hover:border-borderlt transition-all animate-fade-in">
                 <div className="flex items-center justify-between gap-2 p-3 bg-panel2 border-b border-border">
                   <div className="flex items-center gap-2 min-w-0">
                     <EngineBadge name={g.engine} size={26} />
@@ -87,7 +126,7 @@ export default function AraliklarPage() {
                   const prev = idx > 0 ? g.entries[idx - 1] : null;
                   const delta = prev ? entry.hour_at_completion - prev.hour_at_completion : null;
                   return (
-                    <div key={entry._id} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border last:border-b-0">
+                    <div key={entry._id} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-panel2/50 transition-colors">
                       <div className="w-5 h-5 rounded-full bg-green/10 flex items-center justify-center flex-shrink-0">
                         <span className="text-[10px] font-extrabold text-green">{idx + 1}</span>
                       </div>
