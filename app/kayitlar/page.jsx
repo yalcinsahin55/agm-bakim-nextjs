@@ -45,7 +45,6 @@ function fileToBase64(file) {
 
 function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
   const [hours, setHours] = useState(record.hour_at_completion);
-  const [note, setNote] = useState(record.note || "");
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState(record.pressure_reading ?? "");
   const [photos, setPhotos] = useState(record.photos_b64 || []);
@@ -80,7 +79,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
       const res = await fetch(`/api/records/${record._id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hour_at_completion: Number(hours), note, technician_note: techNote,
+          hour_at_completion: Number(hours), technician_note: techNote,
           photos_b64: photos, videos, pressure_reading: pressure !== "" ? Number(pressure) : undefined,
         }),
       });
@@ -105,7 +104,6 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
       <input type="number" value={hours} onChange={(e) => setHours(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ölçüm / Teknik Açıklama" rows={2} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm resize-none outline-none focus:border-teal transition" />
       <textarea value={techNote} onChange={(e) => setTechNote(e.target.value)} placeholder="Bakımcı Notu" rows={2} className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm resize-none outline-none focus:border-teal transition" />
       {(record.type_key === "krank" || record.type_key === "intercooler" || record.pressure_reading != null) && (
         <input type="number" step="0.1" value={pressure} onChange={(e) => setPressure(e.target.value)} placeholder="Fark Basıncı (bar)" className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition" />
@@ -201,7 +199,6 @@ export default function KayitlarPage() {
     return records.filter((r) =>
       (r.engine_name || "").toLowerCase().includes(q) ||
       (r.type_label || "").toLowerCase().includes(q) ||
-      (r.note || "").toLowerCase().includes(q) ||
       (r.technician_name || "").toLowerCase().includes(q)
     );
   }, [records, search]);
@@ -255,7 +252,7 @@ export default function KayitlarPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Motor, tür, not veya teknisyen ara..."
+            placeholder="Motor, tür veya teknisyen ara..."
             className="w-full bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
           />
         </div>
@@ -330,13 +327,12 @@ export default function KayitlarPage() {
                     </div>
                   )}
                   <div className="text-[13px] font-bold text-text">
-                    {r.type_label} · {r.engine_name} {r.backdated && <span className="text-faint font-normal">· 📅 geçmişe dönük</span>}
+                    {r.type_label} · {r.engine_name}
                   </div>
                   <div className="text-[11px] text-faint mt-0.5">
                     {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {r.technician_name}
                   </div>
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
-                  {r.note && <div className="text-[11.5px] text-muted mt-1">📝 {r.note}</div>}
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
 
                   {canEdit && (
@@ -387,7 +383,7 @@ export default function KayitlarPage() {
         </div>
       )}
 
-      {/* ✨ Resim Büyütme Penceresi */}
+      {/* Resim Büyütme Penceresi */}
       <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
 
       <BottomNav />
