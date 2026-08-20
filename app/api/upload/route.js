@@ -5,7 +5,14 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// 🩺 TEŞHİS: Sunucunun gördüğü deponun Public mi Private mi olduğunu gösterir
+// 🔑 Yedek anahtar (Vercel değişkeni olmasa da sistem çalışır)
+const FALLBACK_BLOB_TOKEN = "vercel_blob_rw_QYyuJntX1bdYnage_oywzsJRuVR4YSGoe0rmCORIyTXrxgl";
+
+if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  process.env.BLOB_READ_WRITE_TOKEN = FALLBACK_BLOB_TOKEN;
+}
+
+// 🩺 TEŞHİS
 export async function GET(req) {
   const db = await getDb();
   const user = await getCurrentUser(req, db.collection("users"));
@@ -31,13 +38,6 @@ export async function POST(req) {
   const user = await getCurrentUser(req, db.collection("users"));
   if (!user) {
     return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: "BLOB_READ_WRITE_TOKEN tanımlı değil! Vercel ortam değişkeni eksik." },
-      { status: 500 }
-    );
   }
 
   try {
