@@ -19,7 +19,6 @@ export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    // 🔒 Zod validasyonu
     const parsed = registerSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
@@ -35,27 +34,28 @@ export async function POST(req) {
       return NextResponse.json({ error: "Bu e-posta adresi zaten kullanılıyor." }, { status: 409 });
     }
 
-    // İlk kayıt olan kullanıcı otomatik yönetici olur
+    // 🔐 GÜVENLİK: Sistemde kullanıcı varken halka açık kayıt KAPALIDIR.
+    // Yeni hesapları yalnızca yönetici, Kullanıcılar sayfasından açar.
     const userCount = await usersCol.countDocuments();
-    const role = userCount === 0 ? "yonetici" : "teknisyen";
+    if (userCount > 0) {
+      return NextResponse.json(
+        { error: "Yeni hesap oluşturma kapalıdır. Lütfen yöneticinizle iletişime geçin." },
+        { status: 403 }
+      );
+    }
 
+    // İlk kurulum: ilk kullanıcı yönetici olur
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
       _id: id, full_name, email: id, password_hash: passwordHash,
-      role, active: true, created_at: new Date(),
+      role: "yonetici", active: true, created_at: new Date(),
     });
 
     const token = await createSessionToken(id);
-    const res = NextResponse.json({
-      ok: true,
-      user: { id, full_name, role },
-    });
+    const res = NextResponse.json({ ok: true, user: { id, full_name, role: "yonetici" } });
     res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
+      httpOnly: true, secure: true, sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, path: "/",
     });
     return res;
   } catch (error) {
