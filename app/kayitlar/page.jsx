@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -33,14 +34,12 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
   });
 }
 
-const MAX_VIDEO_MB = 15;
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+// ✨ Eski (base64) ve yeni (blob link) videoların hepsini destekler
+function getVideoSrc(v) {
+  if (typeof v === "string") return v;
+  if (v && v.url) return v.url;
+  if (v && v.data_b64) return `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
+  return "";
 }
 
 function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
@@ -59,15 +58,20 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
     e.target.value = "";
   }
 
+  // ✨ YENİ: Videolar doğrudan Blob'a
   async function addVideos(e) {
     const files = Array.from(e.target.files || []);
     for (const f of files) {
-      if (f.size > MAX_VIDEO_MB * 1024 * 1024) {
-        toast.error(`'${f.name}' ${MAX_VIDEO_MB}MB sınırını aşıyor.`);
+      if (f.size > 100 * 1024 * 1024) {
+        toast.error(`'${f.name}' çok büyük (en fazla 100MB).`);
         continue;
       }
-      const data_b64 = await fileToBase64(f);
-      setVideos((v) => [...v, { data_b64, filename: f.name, mime: f.type || "video/mp4" }]);
+      try {
+        const blob = await upload(f.name, f, { url: "/api/upload", method: "POST" });
+        setVideos((v) => [...v, { url: blob.url, filename: f.name, mime: f.type || "video/mp4" }]);
+      } catch {
+        toast.error(`${f.name} yüklenemedi.`);
+      }
     }
     e.target.value = "";
   }
@@ -134,14 +138,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }) {
         <div className="flex flex-col gap-1">
           {videos.map((v, idx) => (
             <div key={idx} className="flex items-center justify-between bg-panel2 rounded-lg px-2.5 py-1.5 text-[11px] text-muted">
-              🎬 {v.filename}
+              🎬 {v.filename || "Video"}
               <button onClick={() => setVideos((vs) => vs.filter((_, i) => i !== idx))} className="text-red hover:scale-110 transition">✕</button>
             </div>
           ))}
         </div>
       )}
       <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-        🎬 Video ekle (en fazla {MAX_VIDEO_MB}MB) <input type="file" accept="video/*" multiple onChange={addVideos} className="hidden" />
+        🎬 Video ekle (max 100MB) <input type="file" accept="video/*" multiple onChange={addVideos} className="hidden" />
       </label>
 
       <div className="flex gap-2 mt-1">
@@ -308,7 +312,8 @@ export default function KayitlarPage() {
                   {showMedia && videos.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mb-2">
                       {videos.map((v, idx) => {
-                        const videoSrc = `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
+                        const videoSrc = getVideoSrc(v);
+                        if (!videoSrc) return null;
                         return (
                           <button
                             key={idx}
