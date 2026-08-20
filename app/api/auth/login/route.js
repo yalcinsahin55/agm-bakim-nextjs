@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { verifyPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
+  // 🔒 Brute-force koruması: IP başına 1 dakikada en fazla 5 deneme
+  const rl = checkRateLimit(`login:${getClientIp(req)}`, 5, 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Çok fazla giriş denemesi. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
+      { status: 429 }
+    );
+  }
+
   try {
     const { email, password } = await req.json();
 
-    // E-posta formatı kontrolü
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
       return NextResponse.json({ error: "Lütfen geçerli bir e-posta adresi girin." }, { status: 400 });
@@ -34,7 +43,11 @@ export async function POST(req) {
       user: { id: user._id, full_name: user.full_name, role: user.role },
     });
     res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true, secure: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30, path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
     });
     return res;
   } catch (error) {
