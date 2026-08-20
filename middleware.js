@@ -28,10 +28,9 @@ export async function middleware(req) {
   }
 
   try {
-    // Must use the same secret as lib/auth.js
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET || "CHANGE_ME_IN_PRODUCTION"
-    );
+    // Secret yoksa güvenli tarafı seç: kimseyi içeri alma
+    if (!process.env.JWT_SECRET) return redirectToLogin(req);
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     await jwtVerify(token, secret);
     return NextResponse.next();
   } catch (err) {
