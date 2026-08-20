@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { hashPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
+  // 🔒 IP başına 10 dakikada en fazla 3 kayıt denemesi
+  const rl = checkRateLimit(`register:${getClientIp(req)}`, 3, 10 * 60 * 1000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Çok fazla kayıt denemesi. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
+      { status: 429 }
+    );
+  }
+
   try {
     const { full_name, email, password } = await req.json();
 
-    // E-posta ve şifre kontrolü
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!full_name || !email || !emailRegex.test(email)) {
       return NextResponse.json({ error: "Lütfen geçerli bir isim ve e-posta adresi girin." }, { status: 400 });
@@ -26,7 +35,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Bu e-posta adresi zaten kullanılıyor." }, { status: 409 });
     }
 
-    // İlk kayıt olan kullanıcı otomatik olarak yönetici olur
+    // İlk kayıt olan kullanıcı otomatik yönetici olur
     const userCount = await usersCol.countDocuments();
     const role = userCount === 0 ? "yonetici" : "teknisyen";
 
@@ -42,7 +51,11 @@ export async function POST(req) {
       user: { id, full_name: full_name.trim(), role },
     });
     res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true, secure: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30, path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
     });
     return res;
   } catch (error) {
