@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -124,6 +125,7 @@ export default function TamamlaPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  // ✨ YENİ: Videolar doğrudan Vercel Blob'a yüklenir (boyut sınırı yok)
   async function handleVideos(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -134,28 +136,19 @@ export default function TamamlaPage() {
     }
 
     setVideoBusy(true);
-    const newVideos = [];
-    const MAX_SIZE = 20 * 1024 * 1024;
-
     for (const f of files) {
-      if (f.size > MAX_SIZE) {
-        toast.error(`${f.name} dosyası 20MB sınırını aşıyor.`);
+      if (f.size > 100 * 1024 * 1024) {
+        toast.error(`${f.name} çok büyük (en fazla 100MB).`);
         continue;
       }
       try {
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(f);
-        });
-        newVideos.push(base64);
+        const blob = await upload(f.name, f, { url: "/api/upload", method: "POST" });
+        setVideos((v) => [...v, { url: blob.url, filename: f.name }]);
       } catch (err) {
-        console.error("Video okuma hatası:", err);
+        console.error("Video yükleme hatası:", err);
+        toast.error(`${f.name} yüklenemedi. Bağlantınızı kontrol edin.`);
       }
     }
-
-    setVideos((prev) => [...prev, ...newVideos]);
     setVideoBusy(false);
     e.target.value = "";
   }
@@ -379,17 +372,17 @@ export default function TamamlaPage() {
           </div>
         )}
 
-        {/* Video Bölümü */}
+        {/* Video Bölümü — ✨ Blob'a yüklenir */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Video</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
-          🎥 {videoBusy ? "İşleniyor..." : "Video ekle (Max 5 adet, her biri max 20MB)"}
+          🎥 {videoBusy ? "Yükleniyor..." : "Video ekle (Max 5 adet, her biri max 100MB)"}
           <input type="file" accept="video/*" multiple onChange={handleVideos} className="hidden" />
         </label>
         {videos.length > 0 && (
           <div className="flex gap-1.5 mb-2 flex-wrap">
             {videos.map((v, idx) => (
               <div key={idx} className="relative">
-                <video src={v} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" />
+                <video src={v.url} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" />
                 <button 
                   onClick={() => removeVideo(idx)} 
                   className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5 text-red"
