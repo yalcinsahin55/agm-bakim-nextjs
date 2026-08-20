@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
-import Skeleton from "@/components/Skeleton"; // ✨ YENİ: İskelet yükleme ekranı için
+import Skeleton from "@/components/Skeleton";
+import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 
 function compressImage(file, maxDim = 720, quality = 0.65) {
@@ -49,11 +50,11 @@ export default function TamamlaPage() {
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
   
-  // Fotoğraf ve Video State'leri
   const [photos, setPhotos] = useState([]);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [videos, setVideos] = useState([]);
   const [videoBusy, setVideoBusy] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   
   const [submitting, setSubmitting] = useState(false);
 
@@ -124,7 +125,6 @@ export default function TamamlaPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // --- Video Yükleme Fonksiyonu ---
   async function handleVideos(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -136,7 +136,7 @@ export default function TamamlaPage() {
 
     setVideoBusy(true);
     const newVideos = [];
-    const MAX_SIZE = 20 * 1024 * 1024; // 20MB Sınırı
+    const MAX_SIZE = 20 * 1024 * 1024;
 
     for (const f of files) {
       if (f.size > MAX_SIZE) {
@@ -164,7 +164,6 @@ export default function TamamlaPage() {
   function removeVideo(idx) {
     setVideos((prev) => prev.filter((_, i) => i !== idx));
   }
-  // --------------------------------
 
   function toggleExtra(key, checked) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
@@ -174,7 +173,6 @@ export default function TamamlaPage() {
     }
   }
 
-  // Modern Toast bildirimleriyle submit fonksiyonu
   async function submit() {
     if (!chosenType) {
       toast.error("Lütfen bir bakım türü seçin.");
@@ -217,7 +215,6 @@ export default function TamamlaPage() {
         toast.dismiss(loadingToast);
         toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
         
-        // Formu sıfırla
         setNote(""); setTechNote(""); setPhotos([]); setVideos([]);
         setExtraKeys([]); setExtraPeriods({}); setPressure(""); 
         setRecordDate(new Date().toISOString().slice(0, 10));
@@ -234,44 +231,27 @@ export default function TamamlaPage() {
     }
   }
 
-  // ✨ YENİ: Modern İskelet (Skeleton) Yükleme Ekranı
   if (loading) {
     return (
       <div>
         <TopBar title="Bakım Tamamla" subtitle="Veriler yükleniyor..." />
         <div className="px-4 py-4 flex flex-col gap-1">
-          {/* Motor seçimi iskeleti */}
           <Skeleton className="h-4 w-16 mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
-
-          {/* Bakım türü iskeleti */}
           <Skeleton className="h-4 w-24 mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
-
-          {/* Bilgi kartı iskeleti */}
           <Skeleton className="h-16 w-full rounded-xl mb-2" />
-
-          {/* Motor saati iskeleti */}
           <Skeleton className="h-4 w-40 mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-1" />
           <Skeleton className="h-3 w-3/4 mb-2" />
-
-          {/* Tarih iskeleti */}
           <Skeleton className="h-4 w-24 mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
-
-          {/* Not alanları iskeleti */}
           <Skeleton className="h-4 w-44 mb-2" />
           <Skeleton className="h-16 w-full rounded-xl mb-2" />
-
           <Skeleton className="h-4 w-28 mb-2" />
           <Skeleton className="h-16 w-full rounded-xl mb-2" />
-
-          {/* Fotoğraf / video alanları iskeleti */}
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
-
-          {/* Buton iskeleti */}
           <Skeleton className="h-14 w-full rounded-xl mt-2" />
         </div>
         <BottomNav />
@@ -389,7 +369,7 @@ export default function TamamlaPage() {
           </>
         )}
 
-        {/* Fotoğraf Bölümü */}
+        {/* Fotoğraf Bölümü — ✨ tıklayınca büyür */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
@@ -399,7 +379,14 @@ export default function TamamlaPage() {
           <div className="flex gap-1.5 mb-2 flex-wrap">
             {photos.map((p, idx) => (
               <div key={idx} className="relative">
-                <img src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhoto(`data:image/jpeg;base64,${p}`)}
+                  className="block hover:scale-105 transition-transform"
+                  aria-label="Fotoğrafı büyüt"
+                >
+                  <img src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                </button>
                 <button onClick={() => removePhoto(idx)} className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5">✕</button>
               </div>
             ))}
@@ -435,6 +422,10 @@ export default function TamamlaPage() {
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}
         </button>
       </div>
+
+      {/* ✨ Resim büyütme penceresi */}
+      <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+
       <BottomNav />
     </div>
   );
