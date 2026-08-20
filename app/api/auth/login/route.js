@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { verifyPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { loginSchema, formatZodError } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -16,19 +17,18 @@ export async function POST(req) {
   }
 
   try {
-    const { email, password } = await req.json();
+    const body = await req.json().catch(() => ({}));
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return NextResponse.json({ error: "Lütfen geçerli bir e-posta adresi girin." }, { status: 400 });
+    // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    if (!password || password.length < 6) {
-      return NextResponse.json({ error: "Şifre en az 6 karakter olmalıdır." }, { status: 400 });
-    }
+    const { email, password } = parsed.data;
 
     const db = await getDb();
     const usersCol = db.collection("users");
-    const user = await usersCol.findOne({ _id: email.toLowerCase().trim() });
+    const user = await usersCol.findOne({ _id: email.toLowerCase() });
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return NextResponse.json({ error: "E-posta veya şifre hatalı." }, { status: 401 });
