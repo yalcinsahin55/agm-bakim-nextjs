@@ -45,7 +45,6 @@ export default function TamamlaPage() {
   const [hours, setHours] = useState(0);
   const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10));
   const [pressure, setPressure] = useState("");
-  const [note, setNote] = useState("");
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
@@ -200,7 +199,7 @@ export default function TamamlaPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
-          hour_at_completion: Number(hours), note, technician_note: techNote,
+          hour_at_completion: Number(hours), technician_note: techNote,
           photos_b64: photos, 
           videos: videos,
           pressure_reading: pressure !== "" ? Number(pressure) : undefined,
@@ -215,7 +214,7 @@ export default function TamamlaPage() {
         toast.dismiss(loadingToast);
         toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
         
-        setNote(""); setTechNote(""); setPhotos([]); setVideos([]);
+        setTechNote(""); setPhotos([]); setVideos([]);
         setExtraKeys([]); setExtraPeriods({}); setPressure(""); 
         setRecordDate(new Date().toISOString().slice(0, 10));
         loadPanel();
@@ -246,9 +245,6 @@ export default function TamamlaPage() {
           <Skeleton className="h-3 w-3/4 mb-2" />
           <Skeleton className="h-4 w-24 mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
-          <Skeleton className="h-4 w-44 mb-2" />
-          <Skeleton className="h-16 w-full rounded-xl mb-2" />
-          <Skeleton className="h-4 w-28 mb-2" />
           <Skeleton className="h-16 w-full rounded-xl mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
           <Skeleton className="h-12 w-full rounded-xl mb-2" />
@@ -322,12 +318,6 @@ export default function TamamlaPage() {
           </>
         )}
 
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Ölçüm / Teknik Açıklama</label>
-        <textarea
-          value={note} onChange={(e) => setNote(e.target.value)} rows={2}
-          className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
-        />
-
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakımcı Notu</label>
         <textarea
           value={techNote} onChange={(e) => setTechNote(e.target.value)} rows={2}
@@ -369,7 +359,7 @@ export default function TamamlaPage() {
           </>
         )}
 
-        {/* Fotoğraf Bölümü — ✨ tıklayınca büyür */}
+        {/* Fotoğraf Bölümü — tıklayınca büyür */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
           📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
@@ -423,7 +413,6 @@ export default function TamamlaPage() {
         </button>
       </div>
 
-      {/* ✨ Resim büyütme penceresi */}
       <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
 
       <BottomNav />
