@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
-import { handleUpload } from "@vercel/blob";
+import { handleUpload, put } from "@vercel/blob";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// 🩺 TEŞHİS: Tarayıcıda bu adresi açınca sistemin durumunu gösterir
+// 🩺 TEŞHİS: Sunucunun gördüğü deponun Public mi Private mi olduğunu gösterir
 export async function GET(req) {
   const db = await getDb();
   const user = await getCurrentUser(req, db.collection("users"));
+  let testUrl = null;
+  let testError = null;
+  try {
+    const b = await put(`diag/test-${Date.now()}.txt`, "public test", { access: "public" });
+    testUrl = b.url;
+  } catch (e) {
+    testError = String(e.message || e);
+  }
   return NextResponse.json({
     ok: true,
-    tokenSet: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     loggedIn: Boolean(user),
+    tokenSet: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    testUrl,
+    testError,
   });
 }
 
