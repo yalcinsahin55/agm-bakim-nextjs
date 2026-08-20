@@ -28,7 +28,7 @@ Bu proje özel bir işletme içi araçtır — tüm hakları saklıdır.
 
 ---
 
-*AGM Motor Bakım Merkezi • Next.js 14 + MongoDB*
+*Avcıkoru Santrali Motor Bakım Merkezi • Next.js 14 + MongoDB*
 ````
 
 ---
