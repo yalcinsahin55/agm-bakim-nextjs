@@ -146,7 +146,7 @@ export default function TamamlaPage() {
         setVideos((v) => [...v, { url: blob.url, filename: f.name }]);
       } catch (err) {
         console.error("Video yükleme hatası:", err);
-        toast.error(`${f.name} yüklenemedi. Bağlantınızı kontrol edin.`);
+        toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
       }
     }
     setVideoBusy(false);
