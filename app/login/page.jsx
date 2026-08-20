@@ -112,8 +112,7 @@ export default function LoginPage() {
 
       {tab === "register" && (
         <p className="text-faint text-[11px] text-center mt-4 leading-relaxed px-2 animate-fade-in">
-          Sistemde ilk kayıt olan kişi otomatik yönetici olur. Sonraki kayıtlar teknisyen rolüyle başlar;
-          bir yönetici daha sonra Kullanıcılar sayfasından rolünüzü değiştirebilir.
+          Hesaplar yalnızca yönetici tarafından oluşturulur. Erişim için yöneticinizle iletişime geçin.
         </p>
       )}
     </div>
