@@ -1,51 +1,49 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-// Korunacak sayfalar (public olanlar hariç)
+// ✏️ DÜZELTME: Sistemin gerçek cookie adı "agm_session"
+const COOKIE_NAME = "agm_session";
+
 const PUBLIC_PATHS = [
   "/",
   "/login",
   "/register",
   "/api/auth/login",
   "/api/auth/register",
-  "/api/auth/me",
-  "/api/create-indexes",
-  "/api/setup-yag-esanjoru",
 ];
 
-// Statik dosyalar ve API dışındaki public rotalar
 const PUBLIC_PREFIXES = ["/_next", "/favicon.ico", "/icon", "/manifest"];
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
-  // Public rotaları atla
+  // Let public routes through
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
-  // Session cookie'sini kontrol et
-  const token = req.cookies.get("session_token")?.value;
+  const token = req.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) {
     return redirectToLogin(req);
   }
 
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+    // Must use the same secret as lib/auth.js
+    const secret = new TextEncoder().encode(
+      process.env.JWT_SECRET || "CHANGE_ME_IN_PRODUCTION"
+    );
     await jwtVerify(token, secret);
     return NextResponse.next();
   } catch (err) {
-    // Token geçersiz veya süresi dolmuş
+    // Token is invalid or expired
     const response = redirectToLogin(req);
-    // Geçersiz cookie'yi temizle
-    response.cookies.delete("session_token");
+    response.cookies.delete(COOKIE_NAME);
     return response;
   }
 }
 
 function redirectToLogin(req) {
   const loginUrl = new URL("/login", req.url);
-  // Kullanıcıyı, erişmeye çalıştığı sayfaya geri yönlendirmek için
   if (req.nextUrl.pathname !== "/") {
     loginUrl.searchParams.set("redirect", req.nextUrl.pathname);
   }
@@ -53,13 +51,5 @@ function redirectToLogin(req) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
