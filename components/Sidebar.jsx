@@ -57,7 +57,7 @@ export default function Sidebar() {
           </div>
           <div>
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">
-              AGM <span className="text-amber">Bakım</span>
+              Avcıkoru <span className="text-amber">Santrali</span>
             </div>
             <div className="text-[10px] text-faint">Motor Bakım Merkezi</div>
           </div>
