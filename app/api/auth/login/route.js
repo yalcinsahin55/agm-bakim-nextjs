@@ -7,11 +7,11 @@ import { loginSchema, formatZodError } from "@/lib/schemas";
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
-  // 🔒 Brute-force koruması: IP başına 1 dakikada en fazla 5 deneme
-  const rl = checkRateLimit(`login:${getClientIp(req)}`, 5, 60 * 1000);
+  // 🔒 IP başına 10 dakikada en fazla 5 giriş denemesi
+  const rl = checkRateLimit(`login:${getClientIp(req)}`, 5, 10 * 60 * 1000);
   if (!rl.ok) {
     return NextResponse.json(
-      { error: `Çok fazla giriş denemesi. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
+      { error: `Çok fazla deneme. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
       { status: 429 }
     );
   }
@@ -19,7 +19,6 @@ export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
@@ -33,8 +32,9 @@ export async function POST(req) {
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       return NextResponse.json({ error: "E-posta veya şifre hatalı." }, { status: 401 });
     }
-    if (user.active === false) {
-      return NextResponse.json({ error: "Hesabınız devre dışı bırakılmış. Yöneticinizle iletişime geçin." }, { status: 403 });
+
+    if (!user.active) {
+      return NextResponse.json({ error: "Hesabınız pasif durumda. Yöneticinizle iletişime geçin." }, { status: 403 });
     }
 
     const token = await createSessionToken(user._id);
@@ -51,7 +51,7 @@ export async function POST(req) {
     });
     return res;
   } catch (error) {
-    console.error("Login hatası:", error);
-    return NextResponse.json({ error: "Giriş işlemi sırasında beklenmeyen bir hata oluştu." }, { status: 500 });
+    console.error("Giriş hatası:", error);
+    return NextResponse.json({ error: "Giriş sırasında bir hata oluştu." }, { status: 500 });
   }
 }
