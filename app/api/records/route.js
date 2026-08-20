@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { recordSchema, formatZodError } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -53,36 +54,18 @@ export async function POST(req) {
       return NextResponse.json({ error: "Görüntüleyici rolü bakım tamamlayamaz." }, { status: 403 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
+
+    // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
+    const parsed = recordSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
+    }
+
     const {
       engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, videos, pressure_reading, backdated, record_date, period, extra_types,
-    } = body;
-
-    if (!engine_id || !type_key || typeof hour_at_completion !== "number") {
-      return NextResponse.json({ error: "Eksik veya geçersiz veri." }, { status: 400 });
-    }
-
-    // Video validasyonu (max 5 video, her biri max 20MB)
-    if (videos && Array.isArray(videos)) {
-      if (videos.length > 5) {
-        return NextResponse.json({ error: "En fazla 5 video ekleyebilirsiniz." }, { status: 400 });
-      }
-      for (let i = 0; i < videos.length; i++) {
-        const video = videos[i];
-        if (typeof video !== "string") {
-          return NextResponse.json({ error: `Video ${i + 1} geçersiz formatta.` }, { status: 400 });
-        }
-        // Base64 boyut kontrolü (20MB)
-        if (video.length > 20 * 1024 * 1024 * 1.4) {
-          return NextResponse.json({ error: `Video ${i + 1} 20MB sınırını aşıyor.` }, { status: 400 });
-        }
-        // Video formatı kontrolü
-        if (!video.startsWith("data:video/")) {
-          return NextResponse.json({ error: `Video ${i + 1} geçersiz video formatı.` }, { status: 400 });
-        }
-      }
-    }
+    } = parsed.data;
 
     const enginesCol = db.collection("engines");
     const typesCol = db.collection("maintenance_types");
@@ -104,7 +87,7 @@ export async function POST(req) {
         videos: isPrimary ? (videos || []) : [],
         technician_id: user._id, technician_name: user.full_name,
         created_at: createdAt, backdated: !!backdated,
-        group_id: groupId, grouped_with: isPrimary ? null : type_label,
+        group_id: groupId, grouped_with: isPrimary ? null : tLabel,
       };
       if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
       await recordsCol.insertOne(rec);
