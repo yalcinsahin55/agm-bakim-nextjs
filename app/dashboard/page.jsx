@@ -152,6 +152,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {counts.gecikmis > 0 && (
+          <div className="bg-red/10 border border-red/40 rounded-card p-4 mb-4 flex items-center gap-3 animate-fade-in">
+            <span className="text-2xl">🚨</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-bold text-red">{counts.gecikmis} bakım gecikmiş durumda!</div>
+              <div className="text-[11px] text-muted mt-0.5">Gecikmiş bakımlar motor ömrünü kısaltır, hemen planlayın.</div>
+            </div>
+            <button
+              onClick={() => { setStatusFilter("Gecikmiş"); setTypeFilter("Tümü"); }}
+              className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition"
+            >
+              Görüntüle
+            </button>
+          </div>
+        )}
+
         <StatCards counts={counts} />
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Yükleri</h2>
