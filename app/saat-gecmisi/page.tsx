@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -9,7 +9,26 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 
-function MiniLineChart({ points, color = "#e8952f", label = "" }) {
+interface HistoryEntry {
+  date: string;
+  hours: number;
+  load_kw?: number;
+}
+
+interface Engine {
+  _id: string;
+  name: string;
+  hours: number;
+  history?: HistoryEntry[];
+  load_kw?: number;
+}
+
+interface ChartPoint {
+  y: number;
+  label: string;
+}
+
+function MiniLineChart({ points, color = "#e8952f", label = "" }: { points: ChartPoint[]; color?: string; label?: string }) {
   if (points.length < 2) return null;
   const w = 400, h = 140, pad = 15;
   const ys = points.map((p) => p.y);
@@ -60,54 +79,62 @@ function MiniLineChart({ points, color = "#e8952f", label = "" }) {
 export default function SaatGecmisiPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const [engines, setEngines] = useState([]);
+  const [engines, setEngines] = useState<Engine[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState("");
 
-  const [editingIdx, setEditingIdx] = useState(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editHours, setEditHours] = useState("");
   const [editLoad, setEditLoad] = useState("");
-  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState(null);
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function load() {
     const res = await fetch("/api/engines");
     if (res.status === 401) { router.push("/login"); return; }
-    const data = await res.json();
+    const data = await res.json() as Engine[];
     setEngines(data);
     setLoading(false);
-    if (data.length && !selected) setSelected([...data].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name))[0]._id);
+    if (data.length && !selected) {
+      const sorted = [...data].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
+      setSelected(sorted[0]._id);
+    }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const engine = engines.find((e) => e._id === selected);
+  
   const history = useMemo(() => {
     if (!engine) return [];
-    return [...(engine.history || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return [...(engine.history || [])].sort((a: HistoryEntry, b: HistoryEntry) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
   }, [engine]);
 
   const hasLoadData = history.some((h) => typeof h.load_kw === "number");
 
   const totalDelta = history.length >= 2 ? history[history.length - 1].hours - history[0].hours : 0;
-  const spanMs = history.length >= 2 ? (new Date(history[history.length - 1].date) - new Date(history[0].date)) : 0;
+  const spanMs = history.length >= 2 
+    ? (new Date(history[history.length - 1].date).getTime() - new Date(history[0].date).getTime())
+    : 0;
   const spanDaysPrecise = history.length >= 2 ? Math.max(spanMs / 86400000, 1 / 24) : 0;
   const avgPerDay = history.length >= 2 ? Math.min(totalDelta / spanDaysPrecise, 24) : 0;
 
   const canEdit = user && ["yonetici", "planlamaci"].includes(user.role);
 
-  function startEdit(realIdx) {
+  function startEdit(realIdx: number) {
     const h = history[realIdx];
     setEditingIdx(realIdx);
     setEditDate(new Date(h.date).toISOString().slice(0, 10));
-    setEditHours(h.hours);
-    setEditLoad(typeof h.load_kw === "number" ? h.load_kw : "");
+    setEditHours(String(h.hours));
+    setEditLoad(typeof h.load_kw === "number" ? String(h.load_kw) : "");
     setConfirmDeleteIdx(null);
   }
 
-  async function saveHistory(newHistory) {
+  async function saveHistory(newHistory: HistoryEntry[]) {
     setSaving(true);
     const loadingToast = toast.loading("Kaydediliyor...");
     try {
@@ -133,7 +160,7 @@ export default function SaatGecmisiPage() {
     }
   }
 
-  function saveEdit(realIdx) {
+  function saveEdit(realIdx: number) {
     const newHistory = history.map((h, i) => (
       i === realIdx
         ? { date: new Date(editDate).toISOString(), hours: Number(editHours), load_kw: editLoad !== "" ? Number(editLoad) : undefined }
@@ -142,16 +169,15 @@ export default function SaatGecmisiPage() {
     saveHistory(newHistory);
   }
 
-  function deleteEntry(realIdx) {
+  function deleteEntry(realIdx: number) {
     const newHistory = history.filter((_, i) => i !== realIdx);
     saveHistory(newHistory);
   }
 
-  // ✨ Skeleton Loading
   if (loading) {
     return (
       <div>
-        <TopBar title="Saat Geçmişi" />
+        <TopBar title="Saat Geçmişi" subtitle="" />
         <div className="px-4 py-4">
           <Skeleton className="h-12 w-full rounded-xl mb-4" />
           <div className="grid grid-cols-3 gap-2 mb-4">
@@ -176,9 +202,13 @@ export default function SaatGecmisiPage() {
 
   return (
     <div>
-      <TopBar title="Saat Geçmişi" />
+      <TopBar title="Saat Geçmişi" subtitle={engine ? engine.name : ""} />
       <div className="px-4 py-4">
-        <select value={selected} onChange={(e) => { setSelected(e.target.value); setEditingIdx(null); setConfirmDeleteIdx(null); }} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4 focus:border-teal focus:ring-2 focus:ring-teal/20 outline-none transition">
+        <select 
+          value={selected} 
+          onChange={(e: ChangeEvent<HTMLSelectElement>) => { setSelected(e.target.value); setEditingIdx(null); setConfirmDeleteIdx(null); }} 
+          className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4 focus:border-teal focus:ring-2 focus:ring-teal/20 outline-none transition"
+        >
           {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
         </select>
 
@@ -217,12 +247,12 @@ export default function SaatGecmisiPage() {
 
             {/* Geliştirilmiş Grafikler */}
             <div className="mb-4">
-              <MiniLineChart points={history.map((h, i) => ({ y: h.hours, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#e8952f" label="Çalışma Saati" />
+              <MiniLineChart points={history.map((h) => ({ y: h.hours, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#e8952f" label="Çalışma Saati" />
             </div>
 
             {hasLoadData && (
               <div className="mb-4">
-                <MiniLineChart points={history.filter((h) => typeof h.load_kw === "number").map((h, i) => ({ y: h.load_kw, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#3fb5c4" label="Yük (kW)" />
+                <MiniLineChart points={history.filter((h) => typeof h.load_kw === "number").map((h) => ({ y: h.load_kw as number, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#3fb5c4" label="Yük (kW)" />
               </div>
             )}
 
@@ -244,7 +274,7 @@ export default function SaatGecmisiPage() {
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => setEditingIdx(null)} className="flex-1 py-1.5 rounded-lg border border-border text-muted font-bold text-[11.5px] hover:bg-panel2 transition">Vazgeç</button>
-                        <button onClick={() => saveEdit(realIdx)} disabled={saving} className="flex-1 py-1.5 rounded-lg bg-teal text-[#06181b] font-bold text-[11.5px] disabled:opacity-50 hover:brightness-110 transition">💾 Kaydet</button>
+                        <button onClick={() => saveEdit(realIdx)} disabled={saving} className="flex-1 py-1.5 rounded-lg bg-teal text-[#06181b] font-bold text-[11.5px] disabled:opacity-50 hover:brightness-110 transition"> Kaydet</button>
                       </div>
                     </div>
                   );
