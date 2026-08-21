@@ -1,11 +1,18 @@
 import type { NextRequest } from "next/server";
 
-type RateEntry = { count: number; resetAt: number };
+interface RateEntry {
+  count: number;
+  resetAt: number;
+}
+
 const store = new Map<string, RateEntry>();
 
-export type RateResult =
-  | { ok: true; remaining: number }
-  | { ok: false; remaining: number; retryAfterMs: number };
+// retryAfterMs her zaman vardır (ok=true iken 0) — TS daraltma derdi olmaz
+export interface RateResult {
+  ok: boolean;
+  remaining: number;
+  retryAfterMs: number;
+}
 
 export function getClientIp(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
@@ -28,7 +35,7 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): Ra
 
   if (!entry || now > entry.resetAt) {
     store.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true, remaining: limit - 1 };
+    return { ok: true, remaining: limit - 1, retryAfterMs: 0 };
   }
 
   if (entry.count >= limit) {
@@ -36,5 +43,5 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): Ra
   }
 
   entry.count += 1;
-  return { ok: true, remaining: limit - entry.count };
+  return { ok: true, remaining: limit - entry.count, retryAfterMs: 0 };
 }
