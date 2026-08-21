@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     }
 
-    const { label, default_period_hours, apply_to_all } = await req.json();
+    const { label, default_period_hours, apply_to_all, engine_states } = await req.json();
     if (!label || !label.trim()) {
       return NextResponse.json({ error: "Bakım türü adı gerekli." }, { status: 400 });
     }
@@ -53,8 +53,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bu veya çok benzer isimde bir bakım türü zaten var." }, { status: 409 });
     }
 
+    // 🎯 Motor bazlı durumlar (yeni özellik) — yoksa eski apply_to_all davranışı
     let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number }> = {};
-    if (apply_to_all) {
+    if (engine_states && typeof engine_states === "object") {
+      Object.entries(engine_states).forEach(([engId, st]: [string, any]) => {
+        engineStates[engId] = {
+          last_maintenance_hour: Number(st?.last_maintenance_hour) || 0,
+          period_hours: Number(st?.period_hours) || 0,
+        };
+      });
+    } else if (apply_to_all) {
       const engines = await (db.collection("engines") as any).find().toArray();
       engines.forEach((e: any) => {
         engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0 };
