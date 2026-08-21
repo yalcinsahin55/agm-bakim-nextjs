@@ -81,3 +81,12 @@ MongoDB Atlas tarafında cluster planınız destekliyorsa Atlas Cloud Backup/Sna
 
 Vercel Blob Storage kurulumu için resmi belge: https://vercel.com/docs/vercel-blob/client-upload
 MongoDB Atlas yedekleme belgesi: https://www.mongodb.com/docs/atlas/backup-restore-cluster/
+
+
+## Otomatik bakım bildirimi yenileme
+
+Vercel Cron, `/api/cron/refresh` endpoint’ini her gün UTC 06:00’da çalıştırarak bakım durumlarına göre uygulama içi ve kayıtlı Web Push bildirimlerini yeniler. Endpoint `CRON_SECRET` ile korunur; bu değeri Vercel Environment Variables bölümünde Production ortamına ekleyin. Cron zamanı UTC’dir. `vercel.json` içindeki zamanlamayı değiştirmek isterseniz Vercel Cron ifadelerini kullanın.
+
+`CRON_SECRET` değerini GitHub’a göndermeyin ve istemci kodunda kullanmayın. Cron yalnızca bildirim yenileme işlemi yapar; uygulama kullanıcıları kapalıyken e-posta göndermez.
+
+Vercel Cron belgesi: https://vercel.com/docs/cron-jobs
