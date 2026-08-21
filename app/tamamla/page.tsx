@@ -48,6 +48,14 @@ function getPhotoSrc(photo) {
     : `data:image/jpeg;base64,${photo}`;
 }
 
+function withTimeout(promise, milliseconds, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
+
 export default function TamamlaPage() {
   const router = useRouter();
   const [items, setItems] = useState([]);
@@ -131,10 +139,14 @@ export default function TamamlaPage() {
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
-        const blob = await upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
-          access: "public",
-          handleUploadUrl: "/api/blob/upload",
-        });
+        const blob = await withTimeout(
+          upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
+            access: "public",
+            handleUploadUrl: "/api/blob/upload",
+          }),
+          60_000,
+          "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+        );
         uploaded.push(blob.url);
       } catch {
         toast.error(`${f.name} yüklenemedi.`);
@@ -160,21 +172,28 @@ export default function TamamlaPage() {
     }
 
     setVideoBusy(true);
-    for (const f of files) {
+    try {
+      for (const f of files) {
       if (f.size > 100 * 1024 * 1024) {
         toast.error(`${f.name} çok büyük (en fazla 100MB).`);
         continue;
       }
       try {
-      const url = await uploadVideoChunked(f);
+      const url = await withTimeout(
+          uploadVideoChunked(f),
+          120_000,
+          "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
+        );
         setVideos((v) => [...v, { url, filename: f.name }]);  
       } catch (err) {
         console.error("Video yükleme hatası:", err);
         toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
       }
+      }
+    } finally {
+      setVideoBusy(false);
+      e.target.value = "";
     }
-    setVideoBusy(false);
-    e.target.value = "";
   }
 
   function removeVideo(idx) {
