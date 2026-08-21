@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
-import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -139,15 +138,16 @@ export default function TamamlaPage() {
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
-        const blob = await withTimeout(
-          upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
-            access: "public",
-            handleUploadUrl: "/api/blob/upload",
-          }),
+        const formData = new FormData();
+        formData.append("file", base64ToFile(compressed, f.name, "image/jpeg"));
+        const response = await withTimeout(
+          fetch("/api/blob/upload-server", { method: "POST", body: formData }),
           60_000,
           "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
         );
-        uploaded.push(blob.url);
+        const result = await response.json();
+        if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
+        uploaded.push(result.url);
       } catch {
         toast.error(`${f.name} yüklenemedi.`);
       }
