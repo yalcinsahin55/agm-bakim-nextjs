@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import type { ReactNode } from "react";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/BottomNav";
+import PwaRegister from "@/components/PwaRegister";
 
 export const metadata = {
   title: "Avcıkoru Santrali Motor Bakım Merkezi",
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Mobil alt menü - sadece mobilde görünür */}
         <BottomNav />
         
+        <PwaRegister />
         <Toaster position="top-center" theme="dark" richColors closeButton />
       </body>
     </html>
