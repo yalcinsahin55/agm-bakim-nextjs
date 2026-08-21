@@ -188,7 +188,6 @@ export default function KarterBasinciPage() {
   const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
   const numericHistory = engineHistory.filter((r) => r.pressure_bar !== null && r.pressure_bar !== undefined);
 
-  // ✨ Skeleton Loading
   if (loading) {
     return (
       <div>
@@ -237,7 +236,7 @@ export default function KarterBasinciPage() {
               className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
             />
             <p className="text-[11px] text-faint mb-3">Her motor için yük ve fark basıncını girin, bakımda/yedek olanları işaretleyin.</p>
-            <div className="flex flex-col gap-2 mb-24">
+            <div className="flex flex-col gap-2 mb-40">
               {sortedEngines.map((e) => {
                 const entry = entries[e._id] || {};
                 return (
@@ -277,8 +276,8 @@ export default function KarterBasinciPage() {
                 );
               })}
             </div>
-            <div className="fixed bottom-24 left-0 right-0 z-20 px-4">
-              <div className="max-w-lg mx-auto">
+            <div className="fixed bottom-32 left-0 right-0 z-40 px-4 pointer-events-none">
+              <div className="max-w-lg mx-auto pointer-events-auto">
                 <button
                   onClick={saveReadings}
                   disabled={saving}
