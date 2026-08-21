@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   }
 
   const { key } = params;
-  const { label, default_period_hours, apply_period_to_all } = await req.json();
+  const { label, default_period_hours, apply_period_to_all, engine_states } = await req.json();
 
   const typesCol = db.collection("maintenance_types") as any;
   const type = await typesCol.findOne({ _id: key });
@@ -24,12 +24,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   const update: Record<string, any> = {};
   if (label) update.label = label.trim();
   if (typeof default_period_hours === "number") update.default_period_hours = default_period_hours;
-  await typesCol.updateOne({ _id: key }, { $set: update });
+  if (Object.keys(update).length) await typesCol.updateOne({ _id: key }, { $set: update });
 
   if (apply_period_to_all && typeof default_period_hours === "number") {
     const engineIds = Object.keys(type.engine_states || {});
     for (const engId of engineIds) {
       await typesCol.updateOne({ _id: key }, { $set: { [`engine_states.${engId}.period_hours`]: default_period_hours } });
+    }
+  }
+
+  // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
+  if (engine_states && typeof engine_states === "object") {
+    for (const [engId, st] of Object.entries(engine_states as Record<string, any>)) {
+      const set: Record<string, any> = {};
+      if (typeof st?.period_hours === "number") set[`engine_states.${engId}.period_hours`] = st.period_hours;
+      if (typeof st?.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = st.last_maintenance_hour;
+      if (Object.keys(set).length) await typesCol.updateOne({ _id: key }, { $set: set });
     }
   }
 
