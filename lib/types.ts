@@ -98,3 +98,19 @@ export interface SessionUser {
   full_name: string;
   role: Role;
 }
+
+export type NotificationStatus = "gecikmis" | "kritik" | "yaklasiyor" | "system";
+
+export interface Notification {
+  _id?: string;
+  user_id: string;
+  type: "maintenance" | "system";
+  status: NotificationStatus;
+  title: string;
+  message: string;
+  href?: string;
+  dedupe_key?: string;
+  read_at?: Date | string | null;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}

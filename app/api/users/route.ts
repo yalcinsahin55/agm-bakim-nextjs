@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { canManageUsers } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (user.role !== "yonetici") return NextResponse.json({ error: "Bu sayfa yalnızca yöneticiler içindir." }, { status: 403 });
+    if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu sayfa yalnızca yöneticiler içindir." }, { status: 403 });
 
     const users = await usersCol.find().toArray();
     return NextResponse.json(users.map((u: any) => ({
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (user.role !== "yonetici") return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
+    if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
 
     const { full_name, email, password, role } = await req.json();
 

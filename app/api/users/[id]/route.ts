@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { canManageUsers } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ async function getAuthorizedAdmin(req: NextRequest) {
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return { db, usersCol, response: NextResponse.json({ error: "Giriş gerekli" }, { status: 401 }) };
-  if (user.role !== "yonetici") {
+  if (!canManageUsers(user.role)) {
     return { db, usersCol, response: NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 }) };
   }
   return { db, usersCol, user };

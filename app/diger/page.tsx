@@ -13,6 +13,7 @@ const GROUPS = [
       { href: "/bakim-turleri", icon: "🔧", label: "Bakım Türleri", desc: "Tür bazında tüm motorları listele" },
       { href: "/tahmin", icon: "📅", label: "Bakım Tarihi Tahmini", desc: "En geç bakım tarihi tahmini" },
       { href: "/kayitlar", icon: "📋", label: "Bakım Kayıtları", desc: "Listele, filtrele, düzenle, sil" },
+      { href: "/bildirimler", icon: "🔔", label: "Bildirimler", desc: "Gecikmiş ve yaklaşan bakımlar" },
     ],
   },
   {

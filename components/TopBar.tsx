@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import NotificationBell from "@/components/NotificationBell";
 
 interface TopBarProps {
   title: string;
@@ -20,7 +21,10 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
             {subtitle && <div className="text-[10.5px] text-faint mt-0.5 truncate">{subtitle}</div>}
           </div>
         </div>
-        {right}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          {right}
+        </div>
       </div>
     </div>
   );
