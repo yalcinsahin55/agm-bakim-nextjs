@@ -165,7 +165,7 @@ export default function BakimTurleriPage() {
   if (loading) {
     return (
       <div>
-        <TopBar title="Bakım Türleri" />
+        <TopBar title="Bakım Türleri" subtitle="" />
         <div className="px-4 py-4">
           <div className="flex flex-wrap gap-2 mb-3">
             <Skeleton className="h-9 w-24 rounded-full" />
