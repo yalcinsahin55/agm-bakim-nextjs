@@ -22,6 +22,17 @@ function canModify(user: any, record: any): boolean {
   return ["yonetici", "planlamaci"].includes(user.role) || record.technician_id === user._id;
 }
 
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const db = await getDb();
+  const usersCol = db.collection("users") as any;
+  const user = await getCurrentUser(req, usersCol);
+  if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+
+  const record = await (db.collection("maintenance_records") as any).findOne({ _id: new ObjectId(params.id) });
+  if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
+  return NextResponse.json(record);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const db = await getDb();
   const usersCol = db.collection("users") as any;

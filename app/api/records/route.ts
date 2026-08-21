@@ -18,19 +18,54 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const engineId = searchParams.get("engine_id");
     const typeLabel = searchParams.get("type_label");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "500", 10), 1000);
+    const search = searchParams.get("search")?.trim();
+    const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
+    const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
+    const includeMedia = searchParams.get("include_media") === "true";
+    const legacyLimit = searchParams.get("limit");
+    const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size"));
 
-    const query: Record<string, string> = {};
+    const query: Record<string, any> = {};
     if (engineId) query.engine_id = engineId;
     if (typeLabel) query.type_label = typeLabel;
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+      query.$or = [
+        { engine_name: { $regex: escaped, $options: "i" } },
+        { type_label: { $regex: escaped, $options: "i" } },
+        { technician_name: { $regex: escaped, $options: "i" } },
+      ];
+    }
 
-    const records = await (db.collection("maintenance_records") as any)
-      .find(query)
-      .sort({ created_at: -1 })
-      .limit(limit)
-      .toArray();
+    const recordsCol = db.collection("maintenance_records") as any;
+    await Promise.all([
+      recordsCol.createIndex({ engine_id: 1, type_label: 1, created_at: -1 }),
+      recordsCol.createIndex({ created_at: -1 }),
+    ]);
+    if (legacyRequest) {
+      const records = await recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+        .sort({ created_at: -1 })
+        .limit(Math.min(Math.max(parseInt(legacyLimit || "500", 10), 1), 1000))
+        .toArray();
+      return NextResponse.json(records);
+    }
 
-    return NextResponse.json(records);
+    const [records, total] = await Promise.all([
+      recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+        .sort({ created_at: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray(),
+      recordsCol.countDocuments(query),
+    ]);
+
+    return NextResponse.json({
+      records,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(Math.ceil(total / pageSize), 1),
+    });
   } catch (error) {
     console.error("GET /api/records hatası:", error);
     return NextResponse.json({ error: "Kayıtlar getirilirken bir hata oluştu." }, { status: 500 });

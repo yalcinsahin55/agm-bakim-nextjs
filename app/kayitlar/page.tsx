@@ -268,6 +268,10 @@ export default function KayitlarPage() {
   const [engines, setEngines] = useState<Engine[]>([]);
   const [types, setTypes] = useState<MaintenanceType[]>([]);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [mediaLoadingId, setMediaLoadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [engineFilter, setEngineFilter] = useState("Tümü");
   const [typeFilter, setTypeFilter] = useState("Tümü");
@@ -277,43 +281,59 @@ export default function KayitlarPage() {
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; filename: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
-  async function load() {
-    const params = new URLSearchParams();
+  async function load(requestedPage = 1) {
+    const params = new URLSearchParams({ page: String(requestedPage), page_size: "25" });
     if (engineFilter !== "Tümü") params.set("engine_id", engineFilter);
     if (typeFilter !== "Tümü") params.set("type_label", typeFilter);
-    const [engRes, typeRes, recRes] = await Promise.all([
-      fetch("/api/engines"),
-      fetch("/api/maintenance-types"),
-      fetch(`/api/records?${params}`),
-    ]);
-    if (engRes.status === 401) {
-      router.push("/login");
-      return;
+    if (search.trim()) params.set("search", search.trim());
+    const requests: Promise<Response>[] = [fetch(`/api/records?${params}`)];
+    if (engines.length === 0) requests.push(fetch("/api/engines"), fetch("/api/maintenance-types"));
+    const [recRes, engRes, typeRes] = await Promise.all(requests);
+    if (recRes.status === 401) { router.push("/login"); return; }
+    const recordData = await recRes.json();
+    setRecords(recordData.records || []);
+    setTotal(recordData.total || 0);
+    setPage(recordData.page || requestedPage);
+    setTotalPages(recordData.totalPages || 1);
+    if (engRes && typeRes) {
+      setEngines(await engRes.json());
+      setTypes(await typeRes.json());
     }
-    setEngines(await engRes.json());
-    setTypes(await typeRes.json());
-    setRecords(await recRes.json());
     setLoading(false);
   }
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(() => { load(1); }, search.trim() ? 300 : 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engineFilter, typeFilter]);
+  }, [engineFilter, typeFilter, search]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
 
-  const filteredRecords = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter(
-      (r) =>
-        (r.engine_name || "").toLowerCase().includes(q) ||
-        (r.type_label || "").toLowerCase().includes(q) ||
-        (r.technician_name || "").toLowerCase().includes(q)
-    );
-  }, [records, search]);
+  const filteredRecords = records;
+
+  async function loadRecordMedia(record: MaintenanceRecord) {
+    if (record.photos_b64 || record.videos) return record;
+    setMediaLoadingId(record._id);
+    try {
+      const res = await fetch(`/api/records/${record._id}`);
+      if (!res.ok) throw new Error("Medya yüklenemedi");
+      const detail = await res.json() as MaintenanceRecord;
+      setRecords((current) => current.map((item) => item._id === record._id ? detail : item));
+      return detail;
+    } catch {
+      toast.error("Kayıt detayları yüklenemedi.");
+      return null;
+    } finally {
+      setMediaLoadingId(null);
+    }
+  }
+
+  async function openEdit(record: MaintenanceRecord) {
+    const detail = await loadRecordMedia(record);
+    if (detail) setEditingId(detail._id);
+  }
 
   async function doDelete(id: string) {
     const loadingToast = toast.loading("Kayıt siliniyor...");
@@ -323,7 +343,7 @@ export default function KayitlarPage() {
       if (res.ok) {
         toast.success("Kayıt silindi! 🗑️");
         setConfirmDeleteId(null);
-        load();
+        load(page);
       } else {
         toast.error("Kayıt silinemedi.");
       }
@@ -357,7 +377,7 @@ export default function KayitlarPage() {
 
   return (
     <div>
-      <TopBar title="Bakım Kayıtları" subtitle={`${filteredRecords.length} kayıt görüntüleniyor`} />
+      <TopBar title="Bakım Kayıtları" subtitle={`${total.toLocaleString("tr-TR")} kayıt bulundu · Sayfa ${page}/${totalPages}`} />
       <div className="px-4 py-4">
         <div className="relative mb-3">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm">🔍</span>
@@ -414,6 +434,7 @@ export default function KayitlarPage() {
             )}
           </div>
         ) : (
+          <>
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
             {filteredRecords.map((r) => {
               const photos = r.photos_b64 || [];
@@ -423,6 +444,16 @@ export default function KayitlarPage() {
               const canEdit = user && (["yonetici", "planlamaci"].includes(user.role) || (user as any)?._id === r.technician_id || (user as any)?.id === r.technician_id);
               return (
                 <div key={r._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
+                  {!photos.length && !videos.length && (
+                    <button
+                      type="button"
+                      onClick={() => loadRecordMedia(r)}
+                      disabled={mediaLoadingId === r._id}
+                      className="mb-2 rounded-lg border border-border px-2.5 py-1.5 text-[10.5px] font-bold text-muted hover:border-teal/40 hover:text-teal disabled:opacity-50"
+                    >
+                      {mediaLoadingId === r._id ? "Medya yükleniyor..." : "📎 Medyayı görüntüle"}
+                    </button>
+                  )}
                   {showMedia && photos.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mb-2">
                       {photos.map((p, idx) => (
@@ -472,7 +503,7 @@ export default function KayitlarPage() {
                   {canEdit && (
                     <div className="flex gap-2 mt-2">
                       <button
-                        onClick={() => setEditingId(editingId === r._id ? null : r._id)}
+                        onClick={() => editingId === r._id ? setEditingId(null) : openEdit(r)}
                         className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
                       >
                         ✏️ Düzenle
@@ -510,7 +541,7 @@ export default function KayitlarPage() {
                       onCancel={() => setEditingId(null)}
                       onSaved={() => {
                         setEditingId(null);
-                        load();
+                        load(page);
                       }}
                     />
                   )}
@@ -518,6 +549,28 @@ export default function KayitlarPage() {
               );
             })}
           </div>
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">
+              <button
+                type="button"
+                onClick={() => load(page - 1)}
+                disabled={page <= 1}
+                className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted disabled:opacity-40"
+              >
+                ← Önceki
+              </button>
+              <span className="text-[11px] text-faint">{page} / {totalPages}</span>
+              <button
+                type="button"
+                onClick={() => load(page + 1)}
+                disabled={page >= totalPages}
+                className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted disabled:opacity-40"
+              >
+                Sonraki →
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
