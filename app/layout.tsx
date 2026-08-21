@@ -8,7 +8,6 @@ export const metadata = {
   title: "Avcıkoru Santrali Motor Bakım Merkezi",
   description: "Profesyonel motor bakım takip sistemi",
   manifest: "/manifest.json",
-  themeColor: "#0f1319",
 };
 
 export const viewport = {
