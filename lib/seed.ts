@@ -1,43 +1,5 @@
 import type { Db } from "mongodb";
-import seedData from "./seed_data.json";
-import karterHistory from "./karter_history.json";
-
-// Seed data tipleri (JSON'dan gelen yapı)
-interface SeedEngineInfo {
-  hours: number;
-  load: number;
-}
-
-interface SeedOilRecord {
-  changeHour: number;
-  maxHours: number;
-}
-
-interface SeedMaintenanceRecord {
-  lastHour: number;
-  period: number;
-}
-
-interface SeedMaintenanceType {
-  key: string;
-  label: string;
-  perEngine: Record<string, SeedMaintenanceRecord>;
-}
-
-interface SeedData {
-  engines: Record<string, SeedEngineInfo>;
-  oil: Record<string, SeedOilRecord>;
-  maintTypes: SeedMaintenanceType[];
-}
-
-interface KarterRecord {
-  engine: string;
-  date: string;
-  load: number;
-  pressure: number;
-  status?: string | null;
-  new_type?: boolean;
-}
+import { seedData, karterHistory } from "./seed_data";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -50,14 +12,12 @@ declare global {
  * üzerine yazmaz — güvenle tekrar tekrar çağrılabilir.
  *
  * 🚀 OPTİMİZE: İlk çağrıda seed yapar, sonraki çağrılarda atlar.
- * Böylece her request'te boşuna DB sorgusu yapılmaz.
  */
 export async function seedIfEmpty(db: Db): Promise<void> {
-  // ⚡ Performans: Bir kez çalıştırıldıysa atla
   if (global._seeded) return;
 
-  const data = seedData as SeedData;
-  const history = karterHistory as KarterRecord[];
+  const data = seedData as any;
+  const history = karterHistory as any[];
 
   const enginesCol = db.collection("engines");
   const typesCol = db.collection("maintenance_types");
@@ -66,7 +26,7 @@ export async function seedIfEmpty(db: Db): Promise<void> {
   const engineCount = await enginesCol.countDocuments();
   if (engineCount < Object.keys(data.engines).length) {
     const now = new Date();
-    const ops = Object.entries(data.engines).map(([name, info]) => ({
+    const ops = Object.entries(data.engines).map(([name, info]: [string, any]) => ({
       updateOne: {
         filter: { _id: name },
         update: {
@@ -81,14 +41,14 @@ export async function seedIfEmpty(db: Db): Promise<void> {
         upsert: true,
       },
     }));
-    if (ops.length) await enginesCol.bulkWrite(ops);
+    if (ops.length) await enginesCol.bulkWrite(ops as any);
   }
 
   const expectedTypeCount = 1 + data.maintTypes.length; // +1 = yağ
   const typeCount = await typesCol.countDocuments();
   if (typeCount < expectedTypeCount) {
     const oilStates: Record<string, { last_maintenance_hour: number; period_hours: number }> = {};
-    Object.entries(data.oil).forEach(([name, rec]) => {
+    Object.entries(data.oil).forEach(([name, rec]: [string, any]) => {
       oilStates[name] = { last_maintenance_hour: rec.changeHour, period_hours: rec.maxHours };
     });
     await typesCol.updateOne(
@@ -97,9 +57,9 @@ export async function seedIfEmpty(db: Db): Promise<void> {
       { upsert: true }
     );
 
-    for (const mt of data.maintTypes) {
+    for (const mt of data.maintTypes as any[]) {
       const states: Record<string, { last_maintenance_hour: number; period_hours: number }> = {};
-      Object.entries(mt.perEngine).forEach(([name, rec]) => {
+      Object.entries(mt.perEngine).forEach(([name, rec]: [string, any]) => {
         states[name] = { last_maintenance_hour: rec.lastHour, period_hours: rec.period };
       });
       const defaultPeriod = Object.values(states)[0]?.period_hours || 0;
@@ -113,7 +73,7 @@ export async function seedIfEmpty(db: Db): Promise<void> {
 
   const pressureCount = await pressureCol.countDocuments();
   if (pressureCount === 0 && Array.isArray(history) && history.length) {
-    const docs = history.map((r) => ({
+    const docs = history.map((r: any) => ({
       engine_id: r.engine,
       engine_name: r.engine,
       reading_date: new Date(r.date),
@@ -125,7 +85,7 @@ export async function seedIfEmpty(db: Db): Promise<void> {
       uploaded_by: "V10 içe aktarma",
       created_at: new Date(),
     }));
-    await pressureCol.insertMany(docs);
+    await pressureCol.insertMany(docs as any);
   }
 
   // ✅ Seed tamamlandı, sonraki çağrılarda atla
