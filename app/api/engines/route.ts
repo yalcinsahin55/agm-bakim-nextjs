@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const engines = await (db.collection("engines") as any).find().toArray();
+    const includeHistory = new URL(req.url).searchParams.get("include_history") === "true";
+    const projection = includeHistory ? undefined : { history: 0 };
+    const engines = await (db.collection("engines") as any).find({}, projection).toArray();
     engines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
     return NextResponse.json(engines);
   } catch (error) {

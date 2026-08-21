@@ -23,7 +23,7 @@ interface OilAnalysis {
   analysis_date: string;
   result: string;
   note?: string;
-  pdf_b64: string;
+  pdf_b64?: string;
   pdf_filename: string;
   uploaded_by: string;
   uploaded_by_id: string;
@@ -101,6 +101,32 @@ export default function YagAnalizleriPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function loadPdf(analysis: OilAnalysis): Promise<OilAnalysis | null> {
+    try {
+      const res = await fetch(`/api/oil-analyses/${analysis._id}`);
+      if (!res.ok) throw new Error("PDF yüklenemedi");
+      const data = await res.json();
+      return { ...analysis, pdf_b64: data.pdf_b64, pdf_filename: data.pdf_filename || analysis.pdf_filename };
+    } catch {
+      toast.error("PDF yüklenemedi.");
+      return null;
+    }
+  }
+
+  async function openPreview(analysis: OilAnalysis) {
+    const detail = await loadPdf(analysis);
+    if (detail) setPreview(detail);
+  }
+
+  async function downloadPdf(analysis: OilAnalysis) {
+    const detail = await loadPdf(analysis);
+    if (!detail?.pdf_b64) return;
+    const link = document.createElement("a");
+    link.href = `data:application/pdf;base64,${detail.pdf_b64}`;
+    link.download = detail.pdf_filename;
+    link.click();
   }
 
   async function remove(id: string) {
@@ -205,18 +231,17 @@ export default function YagAnalizleriPage() {
                 </div>
                 <div className="flex gap-2 mt-2.5">
                   <button
-                    onClick={() => setPreview(a)}
+                    onClick={() => openPreview(a)}
                     className="flex-1 text-[11px] font-bold text-amber border border-amber/40 rounded-lg px-2.5 py-1.5 hover:bg-amber/10 transition"
                   >
                     👁️ Görüntüle
                   </button>
-                  <a
-                    href={`data:application/pdf;base64,${a.pdf_b64}`}
-                    download={a.pdf_filename}
+                  <button
+                    onClick={() => downloadPdf(a)}
                     className="flex-1 text-center text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
                   >
                     📄 İndir
-                  </a>
+                  </button>
                   {(user?.role === "yonetici" || user?.role === "planlamaci" || user?._id === a.uploaded_by_id) && (
                     confirmDeleteId === a._id ? (
                       <>
@@ -250,7 +275,7 @@ export default function YagAnalizleriPage() {
               </button>
             </div>
             <iframe
-              src={`data:application/pdf;base64,${preview.pdf_b64}`}
+              src={preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64}` : undefined}
               title={preview.pdf_filename}
               className="w-full h-[calc(100%-3rem)] rounded-xl border border-border bg-white"
             />

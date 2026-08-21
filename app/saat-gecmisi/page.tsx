@@ -91,7 +91,7 @@ export default function SaatGecmisiPage() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/engines");
+    const res = await fetch("/api/engines?include_history=true");
     if (res.status === 401) { router.push("/login"); return; }
     const data = await res.json() as Engine[];
     setEngines(data);

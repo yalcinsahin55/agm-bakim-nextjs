@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
     const engineId = searchParams.get("engine_id");
     const query = engineId ? { engine_id: engineId } : {};
 
-    const analyses = await (db.collection("oil_analyses") as any).find(query).sort({ analysis_date: -1 }).toArray();
+    const analyses = await (db.collection("oil_analyses") as any)
+      .find(query, { projection: { pdf_b64: 0 } })
+      .sort({ analysis_date: -1 })
+      .toArray();
     return NextResponse.json(analyses);
   } catch (error) {
     console.error("Yağ analizleri getirilirken hata:", error);
