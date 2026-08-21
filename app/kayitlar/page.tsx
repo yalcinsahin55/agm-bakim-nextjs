@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -41,6 +42,7 @@ interface MaintenanceRecord {
   hour_at_completion: number;
   technician_note?: string;
   photos_b64?: string[];
+  photos?: string[];
   videos?: VideoItem[];
   pressure_reading?: number;
   created_at: string;
@@ -82,6 +84,17 @@ function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<string
   });
 }
 
+function getPhotoSrc(photo: string): string {
+  return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
+    ? photo
+    : `data:image/jpeg;base64,${photo}`;
+}
+
+function base64ToFile(base64: string, filename: string, mime: string): File {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  return new File([bytes], filename, { type: mime });
+}
+
 function getVideoSrc(v: VideoItem | string): string {
   if (typeof v === "string") return v;
   if (v && v.url) return v.url;
@@ -100,21 +113,26 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
-  const [photos, setPhotos] = useState<string[]>(record.photos_b64 || []);
+  const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [busy, setBusy] = useState(false);
 
   async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
-    const encoded: string[] = [];
+    const uploaded: string[] = [];
     for (const f of files) {
       try {
-        encoded.push(await compressImage(f));
+        const compressed = await compressImage(f);
+        const blob = await upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
+          access: "public",
+          handleUploadUrl: "/api/blob/upload",
+        });
+        uploaded.push(blob.url);
       } catch {
-        /* ignore */
+        toast.error(`${f.name} yüklenemedi.`);
       }
     }
-    setPhotos((p) => [...p, ...encoded]);
+    setPhotos((p) => [...p, ...uploaded]);
     e.target.value = "";
   }
 
@@ -146,7 +164,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         body: JSON.stringify({
           hour_at_completion: Number(hours),
           technician_note: techNote,
-          photos_b64: photos,
+          photos,
           videos,
           pressure_reading: pressure !== "" ? Number(pressure) : undefined,
         }),
@@ -201,11 +219,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
             <div key={idx} className="relative">
               <button
                 type="button"
-                onClick={() => onPhotoClick && onPhotoClick(`data:image/jpeg;base64,${p}`)}
+                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p))}
                 className="block hover:scale-105 transition-transform"
                 aria-label="Fotoğrafı büyüt"
               >
-                <img src={`data:image/jpeg;base64,${p}`} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+                <img src={getPhotoSrc(p)} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
               </button>
               <button
                 onClick={() => setPhotos((ph) => ph.filter((_, i) => i !== idx))}
@@ -314,7 +332,7 @@ export default function KayitlarPage() {
   const filteredRecords = records;
 
   async function loadRecordMedia(record: MaintenanceRecord) {
-    if (record.photos_b64 || record.videos) return record;
+    if (record.photos || record.photos_b64 || record.videos) return record;
     setMediaLoadingId(record._id);
     try {
       const res = await fetch(`/api/records/${record._id}`);
@@ -437,7 +455,7 @@ export default function KayitlarPage() {
           <>
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
             {filteredRecords.map((r) => {
-              const photos = r.photos_b64 || [];
+              const photos = r.photos || r.photos_b64 || [];
               const videos = r.videos || [];
               const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
               // user._id veya user.id kontrolü (MongoDB standartlarına göre _id kullanılır)
@@ -460,7 +478,7 @@ export default function KayitlarPage() {
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setSelectedPhoto(`data:image/jpeg;base64,${p}`)}
+                          onClick={() => setSelectedPhoto(getPhotoSrc(p))}
                           className="hover:scale-105 transition-transform"
                           aria-label="Fotoğrafı büyüt"
                         >

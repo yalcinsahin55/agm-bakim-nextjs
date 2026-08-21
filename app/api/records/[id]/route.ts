@@ -45,13 +45,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, videos, pressure_reading, extra_types } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types } = body;
 
   const update: Record<string, any> = {};
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
   if (typeof technician_note === "string") update.technician_note = technician_note;
   if (Array.isArray(photos_b64)) update.photos_b64 = photos_b64;
+  if (Array.isArray(photos)) update.photos = photos;
   if (Array.isArray(videos)) update.videos = videos;
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
@@ -97,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         engine_id: record.engine_id, engine_name: record.engine_name,
         type_key: ex.type_key, type_label: ex.type_label,
         hour_at_completion: finalHour, note: "", technician_note: "",
-        photos_b64: [], videos: [],
+        photos_b64: [], photos: [], videos: [],
         technician_id: user._id, technician_name: user.full_name,
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,

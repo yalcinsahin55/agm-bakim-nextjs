@@ -46,6 +46,7 @@ export const recordSchema = z.object({
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
 
   photos_b64: z.array(z.string()).max(10, "En fazla 10 fotoğraf.").optional(),
+  photos: z.array(z.string().url("Geçerli bir medya URL’si gerekli.")).max(10, "En fazla 10 fotoğraf.").optional(),
 
   // Hem eski (base64) hem yeni (blob link) video formatlarını kabul et
   videos: z

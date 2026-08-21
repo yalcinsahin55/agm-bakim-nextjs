@@ -57,6 +57,7 @@ export interface MaintenanceRecord {
   note?: string;
   technician_note?: string;
   photos_b64?: string[];
+  photos?: string[];
   videos?: (VideoRef | string)[];
   pressure_reading?: number;
   technician_id: string;

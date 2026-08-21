@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -34,6 +35,17 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function base64ToFile(base64, filename, mime) {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  return new File([bytes], filename, { type: mime });
+}
+
+function getPhotoSrc(photo) {
+  return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
+    ? photo
+    : `data:image/jpeg;base64,${photo}`;
 }
 
 export default function TamamlaPage() {
@@ -115,11 +127,20 @@ export default function TamamlaPage() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setPhotoBusy(true);
-    const encoded = [];
+    const uploaded = [];
     for (const f of files) {
-      try { encoded.push(await compressImage(f)); } catch { /* atla */ }
+      try {
+        const compressed = await compressImage(f);
+        const blob = await upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
+          access: "public",
+          handleUploadUrl: "/api/blob/upload",
+        });
+        uploaded.push(blob.url);
+      } catch {
+        toast.error(`${f.name} yüklenemedi.`);
+      }
     }
-    setPhotos((prev) => [...prev, ...encoded]);
+    setPhotos((prev) => [...prev, ...uploaded]);
     setPhotoBusy(false);
     e.target.value = "";
   }
@@ -196,7 +217,7 @@ export default function TamamlaPage() {
         body: JSON.stringify({
           engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
           hour_at_completion: Number(hours), technician_note: techNote,
-          photos_b64: photos, 
+          photos,
           videos: videos,
           pressure_reading: pressure !== "" ? Number(pressure) : undefined,
           backdated: isBackdated, record_date: recordDate,
@@ -363,11 +384,11 @@ export default function TamamlaPage() {
               <div key={idx} className="relative">
                 <button
                   type="button"
-                  onClick={() => setSelectedPhoto(`data:image/jpeg;base64,${p}`)}
+                  onClick={() => setSelectedPhoto(getPhotoSrc(p))}
                   className="block hover:scale-105 transition-transform"
                   aria-label="Fotoğrafı büyüt"
                 >
-                  <img src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                  <img src={getPhotoSrc(p)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
                 </button>
                 <button onClick={() => removePhoto(idx)} className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5">✕</button>
               </div>

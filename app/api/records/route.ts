@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     const {
       engine_id, type_key, type_label, hour_at_completion, note, technician_note,
-      photos_b64, videos, pressure_reading, backdated, record_date, period, extra_types,
+      photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
     } = parsed.data as RecordInput;
 
     const enginesCol = db.collection("engines") as any;
@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
         note: isPrimary ? (note || "") : "",
         technician_note: isPrimary ? (technician_note || "") : "",
         photos_b64: isPrimary ? (photos_b64 || []) : [],
+        photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
         technician_id: user._id, technician_name: user.full_name,
         created_at: createdAt, backdated: !!backdated,

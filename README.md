@@ -67,3 +67,17 @@ VAPID_PRIVATE_KEY=...
 ```
 
 `VAPID_PRIVATE_KEY` yalnızca sunucu ortamında tutulmalıdır. Production ortamında Web Push için HTTPS gereklidir. Kullanıcı, **Bildirimler** sayfasındaki **Tarayıcı bildirimi → Aç** düğmesine basarak izin verir ve aboneliğini kaydeder. Bakım kaydı veya motor saati değişikliğinden sonra gecikmiş, kritik ya da yaklaşan bakım durumu oluşursa kayıtlı abonelere push gönderilir.
+
+
+## Medya depolama (Vercel Blob)
+
+Fotoğraf ve video yüklemeleri Vercel Blob Storage’a doğrudan tarayıcıdan yapılır. Böylece büyük dosyalar Vercel Function istek gövdesinden geçirilmez ve yeni medya MongoDB’de base64 olarak tutulmaz. Eski base64 medya kayıtları geriye dönük olarak görüntülenmeye devam eder.
+
+Vercel Dashboard’da proje içinden **Storage → Create Database → Blob** yoluyla bir Blob store oluşturun ve Production, Preview; yerel geliştirme yapacaksanız Development ortamlarını projeye bağlayın. Vercel bağlantısı `BLOB_STORE_ID`, `VERCEL_OIDC_TOKEN` ve istemci upload token üretimi için `BLOB_READ_WRITE_TOKEN` değişkenlerini sağlar. Dosya yüklemek isteyen kullanıcıların kimlik ve rol kontrolü `/api/blob/upload` route’unda yapılır.
+
+## Yedekleme
+
+MongoDB Atlas tarafında cluster planınız destekliyorsa Atlas Cloud Backup/Snapshot özelliğini ayrıca etkinleştirin. Free/M0 cluster’larda Atlas Cloud Backup kullanılamayabileceği için uygulama içi dışa aktarma ekranı ve düzenli `mongodump`/`mongorestore` prosedürü gereklidir. Yedek dosyalarını GitHub’a veya herkese açık Blob alanına koymayın; erişimi kısıtlı bir depolama kullanın.
+
+Vercel Blob Storage kurulumu için resmi belge: https://vercel.com/docs/vercel-blob/client-upload
+MongoDB Atlas yedekleme belgesi: https://www.mongodb.com/docs/atlas/backup-restore-cluster/
