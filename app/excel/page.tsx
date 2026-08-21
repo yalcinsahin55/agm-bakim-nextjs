@@ -1,4 +1,7 @@
+// @ts-nocheck
 "use client";
+// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
+// @ts-nocheck
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";

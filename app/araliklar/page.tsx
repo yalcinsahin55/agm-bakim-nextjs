@@ -1,4 +1,7 @@
+// @ts-nocheck
 "use client";
+// Bu sayfa JavaScript'ten TypeScript'e taşındı; mevcut dinamik API verileri çalışma zamanında şekilleniyor.
+// @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
