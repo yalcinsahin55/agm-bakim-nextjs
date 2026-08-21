@@ -190,7 +190,7 @@ export default function BakimTuruYonetimiPage() {
         <TopBar title="Bakım Türü Yönetimi" subtitle="" />
         <div className="px-4 py-4">
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <div className="text-4xl mb-3">🔒</div>
             <p className="text-sm text-muted">Bu sayfa yalnızca yöneticiler içindir.</p>
           </div>
         </div>
@@ -276,7 +276,7 @@ export default function BakimTuruYonetimiPage() {
 
         {sortedTypes.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <div className="text-4xl mb-3">🧰</div>
             <p className="text-sm text-muted">Henüz bakım türü eklenmemiş.</p>
           </div>
         ) : (

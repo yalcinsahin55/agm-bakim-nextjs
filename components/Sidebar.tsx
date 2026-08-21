@@ -20,7 +20,7 @@ const ITEMS: MenuItem[] = [
   { href: "/karter-basinci", label: "Karter Basıncı", icon: "📈" },
   { href: "/saat-gecmisi", label: "Saat Geçmişi", icon: "📉" },
   { href: "/yag-analizleri", label: "Yağ Analizleri", icon: "🧪" },
-  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "" },
+  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "📋" },
   { href: "/diger", label: "Diğer Menüler", icon: "☰" },
 ];
 
@@ -59,7 +59,7 @@ export default function Sidebar() {
       <div className="px-5 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-xl shadow-lg">
-            
+            🔧
           </div>
           <div>
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">

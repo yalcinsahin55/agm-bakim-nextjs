@@ -16,7 +16,7 @@ const ITEMS: MenuItem[] = [
   { href: "/dashboard", label: "Özet", icon: "📊" },
   { href: "/motorlar", label: "Motorlar", icon: "⚙️" },
   { href: "/tamamla", label: "Tamamla", icon: "✅" },
-  { href: "/diger", label: "Diğer", icon: "" },
+  { href: "/diger", label: "Diğer", icon: "☰" },
 ];
 
 export default function BottomNav() {
