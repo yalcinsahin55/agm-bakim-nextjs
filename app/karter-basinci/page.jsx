@@ -24,7 +24,7 @@ function MiniLineChart({ points, color = "#e8952f", label = "" }) {
   const ys = points.map((p) => p.y);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const range = maxY - minY || 1;
-  
+
   const path = points.map((p, i) => {
     const x = pad + (i / (points.length - 1)) * (w - pad * 2);
     const y = h - pad - ((p.y - minY) / range) * (h - pad * 2);
@@ -276,24 +276,6 @@ export default function KarterBasinciPage() {
                 );
               })}
             </div>
-            <div className="fixed bottom-32 left-0 right-0 z-40 px-4 pointer-events-none">
-              <div className="max-w-lg mx-auto pointer-events-auto">
-                <button
-                  onClick={saveReadings}
-                  disabled={saving}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
-                >
-                  {saving ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
-                      Kaydediliyor...
-                    </span>
-                  ) : (
-                    "💾 Tüm Ölçümleri Kaydet"
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -392,6 +374,29 @@ export default function KarterBasinciPage() {
           </div>
         )}
       </div>
+
+      {/* 💾 Kaydet butonu — animate-fade-in DIŞINDA (transform fixed'i bozmasın diye) */}
+      {tab === "new" && (
+        <div className="fixed bottom-32 md:bottom-8 left-0 right-0 z-40 px-4 pointer-events-none">
+          <div className="max-w-lg mx-auto pointer-events-auto">
+            <button
+              onClick={saveReadings}
+              disabled={saving}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+            >
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+                  Kaydediliyor...
+                </span>
+              ) : (
+                "💾 Tüm Ölçümleri Kaydet"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );
