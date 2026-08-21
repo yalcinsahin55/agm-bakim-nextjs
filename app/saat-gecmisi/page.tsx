@@ -86,7 +86,7 @@ export default function SaatGecmisiPage() {
   const engine = engines.find((e) => e._id === selected);
   const history = useMemo(() => {
     if (!engine) return [];
-    return [...(engine.history || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    return [...(engine.history || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [engine]);
 
   const hasLoadData = history.some((h) => typeof h.load_kw === "number");
