@@ -40,6 +40,7 @@ const GROUPS = [
     items: [
       { href: "/kullanicilar", icon: "👥", label: "Kullanıcılar", desc: "Kullanıcı ekle, rol değiştir" },
       { href: "/bakim-turu-yonetimi", icon: "⚙️", label: "Bakım Türü Yönetimi", desc: "Tür ekle, düzenle, sil" },
+      { href: "/audit-log", icon: "🧾", label: "İşlem Geçmişi", desc: "Kullanıcı ve veri değişiklikleri" },
     ],
   },
 ];

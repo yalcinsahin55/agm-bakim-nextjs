@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
 import { syncMaintenanceNotificationsForAllUsers } from "@/lib/notifications";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +176,14 @@ export async function POST(req: NextRequest) {
     } catch (notificationError) {
       console.error("Bakım sonrası bildirimler güncellenemedi:", notificationError);
     }
+    await writeAuditLog(db, {
+      user,
+      action: "create",
+      entity: "maintenance_record",
+      entityId: groupId,
+      summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu`,
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels },
+    });
     return NextResponse.json({ ok: true, completed: completedLabels });
   } catch (error) {
     console.error("POST /api/records hatası:", error);

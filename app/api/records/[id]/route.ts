@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { ObjectId, type Db } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
   await recordsCol.updateOne({ _id: record._id }, { $set: update });
+  await writeAuditLog(db, {
+    user,
+    action: "update",
+    entity: "maintenance_record",
+    entityId: params.id,
+    summary: `${record.engine_name} · ${record.type_label} bakım kaydı güncellendi`,
+    before: record,
+    after: update,
+  });
 
   if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
     await recomputeLastMaintenance(db, record.engine_id, record.type_key);
@@ -123,6 +133,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   await recordsCol.deleteOne({ _id: record._id });
   await recomputeLastMaintenance(db, record.engine_id, record.type_key);
+  await writeAuditLog(db, {
+    user,
+    action: "delete",
+    entity: "maintenance_record",
+    entityId: params.id,
+    summary: `${record.engine_name} · ${record.type_label} bakım kaydı silindi`,
+    before: record,
+  });
 
   return NextResponse.json({ ok: true });
 }
