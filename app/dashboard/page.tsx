@@ -25,16 +25,18 @@ export default function DashboardPage() {
   const { user } = useCurrentUser();
   const [items, setItems] = useState([]);
   const [engines, setEngines] = useState([]);
+  const [analytics, setAnalytics] = useState({ monthly: [], byEngine: [] });
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [statusFilter, setStatusFilter] = useState("Tümü");
 
   useEffect(() => {
-    fetch("/api/maintenance-types/panel").then(async (res) => {
-      if (res.status === 401) { router.push("/login"); return; }
-      const data = await res.json();
+    Promise.all([fetch("/api/maintenance-types/panel"), fetch("/api/analytics/summary")]).then(async ([panelRes, analyticsRes]) => {
+      if (panelRes.status === 401) { router.push("/login"); return; }
+      const data = await panelRes.json();
       setItems(data.items);
       setEngines(data.engines);
+      if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
       setLoading(false);
     });
   }, [router]);
@@ -169,6 +171,25 @@ export default function DashboardPage() {
         )}
 
         <StatCards counts={counts} />
+
+        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Trendi</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+          <div className="rounded-card border border-border bg-panel p-3.5">
+            <div className="mb-3 text-[11px] font-bold uppercase text-muted">Son 6 Ay</div>
+            <div className="flex h-28 items-end gap-2">
+              {analytics.monthly.length === 0 ? <span className="text-[11px] text-faint">Henüz trend verisi yok.</span> : analytics.monthly.map((row) => {
+                const max = Math.max(...analytics.monthly.map((item) => item.count), 1);
+                return <div key={row.month} className="flex min-w-0 flex-1 flex-col items-center gap-1"><div className="w-full rounded-t bg-teal/80" style={{ height: `${Math.max((row.count / max) * 88, 6)}px` }} title={`${row.count} bakım`} /><span className="truncate text-[9px] text-faint">{row.month.slice(5)}</span></div>;
+              })}
+            </div>
+          </div>
+          <div className="rounded-card border border-border bg-panel p-3.5">
+            <div className="mb-3 text-[11px] font-bold uppercase text-muted">Motor Bazlı Bakımlar</div>
+            <div className="flex flex-col gap-2">
+              {analytics.byEngine.slice(0, 5).map((row) => <div key={row.engine} className="flex items-center gap-2"><span className="w-16 truncate text-[10px] text-muted">{row.engine}</span><div className="h-2 flex-1 rounded-full bg-panel2"><div className="h-2 rounded-full bg-amber" style={{ width: `${Math.min(row.count * 12, 100)}%` }} /></div><span className="w-5 text-right text-[10px] font-mono text-text">{row.count}</span></div>)}
+            </div>
+          </div>
+        </div>
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Yükleri</h2>
         <div className="flex gap-4 text-xs text-muted mb-2">
