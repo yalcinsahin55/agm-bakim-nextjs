@@ -19,9 +19,10 @@ export async function seedIfEmpty(db: Db): Promise<void> {
   const data = seedData as any;
   const history = karterHistory as any[];
 
-  const enginesCol = db.collection("engines");
-  const typesCol = db.collection("maintenance_types");
-  const pressureCol = db.collection("pressure_readings");
+  //  _id alanları string olduğu için koleksiyonları gevşetiyoruz
+  const enginesCol = db.collection("engines") as any;
+  const typesCol = db.collection("maintenance_types") as any;
+  const pressureCol = db.collection("pressure_readings") as any;
 
   const engineCount = await enginesCol.countDocuments();
   if (engineCount < Object.keys(data.engines).length) {
@@ -41,7 +42,7 @@ export async function seedIfEmpty(db: Db): Promise<void> {
         upsert: true,
       },
     }));
-    if (ops.length) await enginesCol.bulkWrite(ops as any);
+    if (ops.length) await enginesCol.bulkWrite(ops);
   }
 
   const expectedTypeCount = 1 + data.maintTypes.length; // +1 = yağ
@@ -85,7 +86,7 @@ export async function seedIfEmpty(db: Db): Promise<void> {
       uploaded_by: "V10 içe aktarma",
       created_at: new Date(),
     }));
-    await pressureCol.insertMany(docs as any);
+    await pressureCol.insertMany(docs);
   }
 
   // ✅ Seed tamamlandı, sonraki çağrılarda atla
