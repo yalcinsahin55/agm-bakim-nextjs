@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import type { Notification } from "@/lib/types";
+import PushNotificationToggle from "@/components/PushNotificationToggle";
 
 const STATUS_STYLE: Record<string, string> = {
   gecikmis: "border-red/40 bg-red/10 text-red",
@@ -69,6 +70,7 @@ export default function NotificationsPage() {
             </button>
           )}
         </div>
+        <PushNotificationToggle />
 
         {loading ? (
           <div className="flex flex-col gap-2.5">

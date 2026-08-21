@@ -4,6 +4,7 @@ import { ObjectId, type Db } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
+import { syncMaintenanceNotificationsForAllUsers } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    try {
+      await syncMaintenanceNotificationsForAllUsers(db);
+    } catch (notificationError) {
+      console.error("Bakım sonrası bildirimler güncellenemedi:", notificationError);
+    }
     return NextResponse.json({ ok: true, completed: completedLabels });
   } catch (error) {
     console.error("POST /api/records hatası:", error);

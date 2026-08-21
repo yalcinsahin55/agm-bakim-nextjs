@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { syncMaintenanceNotificationsForAllUsers } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,13 @@ export async function PATCH(req: NextRequest) {
       changed++;
     }
 
+    if (changed > 0) {
+      try {
+        await syncMaintenanceNotificationsForAllUsers(db);
+      } catch (notificationError) {
+        console.error("Motor saatleri sonrası bildirimler güncellenemedi:", notificationError);
+      }
+    }
     return NextResponse.json({ ok: true, changed });
   } catch (error) {
     console.error("Motor saatleri güncellenirken hata:", error);

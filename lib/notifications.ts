@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 import type { Notification, User } from "./types";
 import { buildItems, STATUS_LABELS } from "./status";
+import { sendPushToUser } from "./push";
 
 function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineName: string, typeLabel: string, remaining: number) {
   if (status === "gecikmis") {
@@ -44,28 +45,35 @@ export async function syncMaintenanceNotifications(db: Db, user: User): Promise<
   }
 
   if (actionable.length > 0) {
-    await collection.bulkWrite(actionable.map((item) => {
+    for (const item of actionable) {
       const dedupeKey = `maintenance:${user._id}:${item.engine_id}:${item.type_key}`;
       const text = notificationText(item.status as "gecikmis" | "kritik" | "yaklasiyor", item.engine_name, item.type_label, item.remaining);
-      return {
-        updateOne: {
-          filter: { dedupe_key: dedupeKey },
-          update: {
-            $set: {
-              user_id: user._id,
-              type: "maintenance",
-              status: item.status,
-              title: text.title,
-              message: text.message,
-              href: "/dashboard",
-              updated_at: now,
-            },
-            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, read_at: null },
+      const existing = await collection.findOne({ dedupe_key: dedupeKey });
+      await collection.updateOne(
+        { dedupe_key: dedupeKey },
+        {
+          $set: {
+            user_id: user._id,
+            type: "maintenance",
+            status: item.status,
+            title: text.title,
+            message: text.message,
+            href: "/dashboard",
+            updated_at: now,
           },
-          upsert: true,
+          $setOnInsert: { dedupe_key: dedupeKey, created_at: now, read_at: null },
         },
-      };
-    }));
+        { upsert: true },
+      );
+      if (!existing || existing.status !== item.status) {
+        await sendPushToUser(db, user._id, {
+          title: text.title,
+          body: text.message,
+          href: "/bildirimler",
+          tag: dedupeKey,
+        });
+      }
+    }
   }
 
   return (await collection
@@ -73,6 +81,13 @@ export async function syncMaintenanceNotifications(db: Db, user: User): Promise<
     .sort({ read_at: 1, created_at: -1 })
     .limit(50)
     .toArray()) as unknown as Notification[];
+}
+
+export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<void> {
+  const users = await db.collection("users").find({ active: { $ne: false } }).toArray();
+  for (const user of users) {
+    await syncMaintenanceNotifications(db, user as unknown as User);
+  }
 }
 
 export function statusLabel(status: Notification["status"]): string {

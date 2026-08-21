@@ -48,3 +48,22 @@ Baştan sona yaptığımız yolculuğun özeti:
 
 Artık uygulaman hem **kullanıcı deneyimi** hem **güvenlik** hem **dokümantasyon** açısından production-ready bir ürün. 🚀
 v2 - video sistemi güncellendi
+
+
+## Web Push Bildirimleri
+
+Tarayıcı bildirimi kullanmak için VAPID anahtarlarını üretin:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Çıktıdaki public ve private anahtarları `.env.local` veya Vercel Environment Variables bölümünde şu değerlerle tanımlayın:
+
+```env
+VAPID_SUBJECT=mailto:admin@example.com
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+```
+
+`VAPID_PRIVATE_KEY` yalnızca sunucu ortamında tutulmalıdır. Production ortamında Web Push için HTTPS gereklidir. Kullanıcı, **Bildirimler** sayfasındaki **Tarayıcı bildirimi → Aç** düğmesine basarak izin verir ve aboneliğini kaydeder. Bakım kaydı veya motor saati değişikliğinden sonra gecikmiş, kritik ya da yaklaşan bakım durumu oluşursa kayıtlı abonelere push gönderilir.
