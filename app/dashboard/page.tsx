@@ -111,6 +111,12 @@ export default function DashboardPage() {
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
   const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
+  const healthRows = useMemo(() => sortedEngines.map((engine) => {
+    const engineItems = items.filter((item) => item.engine_id === engine._id);
+    const penalty = engineItems.reduce((sum, item) => sum + (item.status === "gecikmis" ? 25 : item.status === "kritik" ? 15 : item.status === "yaklasiyor" ? 5 : 0), 0);
+    const score = Math.max(0, Math.min(100, 100 - penalty));
+    return { engine, score, attention: engineItems.filter((item) => item.status !== "normal").length };
+  }), [items, sortedEngines]);
 
   const filteredRows = useMemo(() => {
     let rows = items;
@@ -270,6 +276,18 @@ export default function DashboardPage() {
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Yükleri</h2>
         <div className="flex gap-4 text-xs text-muted mb-2"><span>Toplam <b className="text-text font-mono">{totalLoad.toLocaleString("tr-TR")}</b> kW</span><span>Ort. <b className="text-text font-mono">{avgLoad.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</b> kW</span></div>
         <LoadCards engines={sortedEngines} />
+
+        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
+          {healthRows.map(({ engine, score, attention }) => {
+            const tone = score >= 80 ? "text-green" : score >= 55 ? "text-amber" : "text-red";
+            return <div key={engine._id} className="rounded-xl border border-border bg-panel p-3">
+              <div className="flex items-center justify-between gap-2"><span className="truncate text-[12px] font-bold text-text">{engine.name}</span><span className={`font-mono text-lg font-extrabold ${tone}`}>%{score}</span></div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel2"><div className={`h-full rounded-full ${score >= 80 ? "bg-green" : score >= 55 ? "bg-amber" : "bg-red"}`} style={{ width: `${score}%` }} /></div>
+              <div className="mt-1 text-[10px] text-faint">{attention ? `${attention} bakım maddesi dikkat istiyor` : "Tüm bakım maddeleri normal"}</div>
+            </div>;
+          })}
+        </div>
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
         <div className="flex flex-wrap gap-2 mb-3">{typeOptions.map((option) => <button key={option} onClick={() => setTypeFilter(option)} className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${typeFilter === option ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>

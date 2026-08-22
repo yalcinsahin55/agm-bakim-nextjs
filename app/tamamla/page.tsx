@@ -14,6 +14,23 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 
+const CHECKLIST_TEMPLATES = {
+  yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
+  krank: ["Fark basıncı ölçümü", "Filtre yüzeyi kontrolü", "Bağlantı ve kaçak kontrolü"],
+  intercooler: ["Fark basıncı ölçümü", "Hortum ve kelepçe kontrolü", "Soğutucu yüzey kontrolü"],
+  alternator: ["Kablo ve bağlantı kontrolü", "Görsel hasar kontrolü", "Çalışma testi"],
+  default: ["Görsel genel kontrol", "Bakım işlemi tamamlandı", "Çalışma sonrası kontrol"],
+};
+
+function checklistForType(typeKey, label) {
+  const normalized = `${typeKey} ${label || ""}`.toLocaleLowerCase("tr");
+  if (normalized.includes("yağ")) return CHECKLIST_TEMPLATES.yag;
+  if (normalized.includes("krank")) return CHECKLIST_TEMPLATES.krank;
+  if (normalized.includes("intercooler")) return CHECKLIST_TEMPLATES.intercooler;
+  if (normalized.includes("alternat")) return CHECKLIST_TEMPLATES.alternator;
+  return CHECKLIST_TEMPLATES.default;
+}
+
 function compressImage(file, maxDim = 720, quality = 0.65) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -79,6 +96,7 @@ export default function TamamlaPage() {
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
+  const [checklist, setChecklist] = useState({});
   
   const [photos, setPhotos] = useState([]);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -148,11 +166,13 @@ export default function TamamlaPage() {
 
   const chosenItem = engItems.find((i) => i.type_key === typeKey);
   const chosenType = types.find((t) => t.key === typeKey);
+  const checklistItems = useMemo(() => checklistForType(typeKey, chosenType?.label), [typeKey, chosenType]);
   const isPrimaryNew = !!chosenType && !trackedKeys.has(typeKey);
 
   useEffect(() => {
     if (isPrimaryNew && chosenType) setPrimaryPeriod(chosenType.default_period_hours);
-  }, [isPrimaryNew, chosenType]);
+    setChecklist(Object.fromEntries(checklistItems.map((item) => [item, false])));
+  }, [isPrimaryNew, chosenType, checklistItems]);
 
   const otherTypes = allTypesSorted.filter((t) => t.key !== typeKey);
 
@@ -321,6 +341,7 @@ export default function TamamlaPage() {
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       backdated: isBackdated, record_date: recordDate,
       period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
+      checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
     };
 
     try {
@@ -459,6 +480,14 @@ export default function TamamlaPage() {
           value={techNote} onChange={(e) => setTechNote(e.target.value)} rows={2}
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
         />
+
+        <div className="mb-2 rounded-xl border border-border bg-panel p-3">
+          <div className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-muted">Kontrol Listesi</div>
+          <div className="mb-2 text-[10.5px] text-faint">Standart maddeleri işaretleyerek bakımın tamamlandığını doğrula.</div>
+          <div className="flex flex-col gap-1.5">
+            {checklistItems.map((item) => <label key={item} className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(e) => setChecklist((current) => ({ ...current, [item]: e.target.checked }))} />{item}</label>)}
+          </div>
+        </div>
 
         {otherTypes.length > 0 && (
           <>
