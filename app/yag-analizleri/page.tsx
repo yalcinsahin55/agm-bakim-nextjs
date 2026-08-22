@@ -108,7 +108,8 @@ export default function YagAnalizleriPage() {
       const data = await res.json();
       return {
         ...analysis,
-        pdf_url: data.pdf_url || analysis.pdf_url,
+        // PDF’yi aynı-origin route üzerinden sunmak; mobil Chrome iframe ve Blob header sorunlarını önler.
+        pdf_url: `/api/oil-analyses/${analysis._id}/file`,
         pdf_b64: data.pdf_b64 || analysis.pdf_b64,
         pdf_filename: data.pdf_filename || analysis.pdf_filename,
       };
@@ -125,14 +126,16 @@ export default function YagAnalizleriPage() {
 
   async function downloadPdf(analysis: OilAnalysis) {
     const detail = await loadPdf(analysis);
-    const source = detail?.pdf_url || (detail?.pdf_b64 ? `data:application/pdf;base64,${detail.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : null);
+    const source = detail?.pdf_url;
     if (!source) return;
     const link = document.createElement("a");
-    link.href = source;
+    link.href = `${source}?download=1`;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.download = detail.pdf_filename;
+    document.body.appendChild(link);
     link.click();
+    link.remove();
   }
 
   async function remove(id: string) {
@@ -270,15 +273,31 @@ export default function YagAnalizleriPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setPreview(null)}>
           <div className="relative w-full max-w-3xl h-[85vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[12px] font-bold text-text truncate">📄 {preview.pdf_filename}</div>
-              <button
+              <div className="min-w-0 flex-1 text-[12px] font-bold text-text truncate">📄 {preview.pdf_filename}</div>
+              <div className="flex items-center gap-1.5 ml-2">
+                <a
+                  href={`${preview.pdf_url || ""}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-teal/40 px-2 py-1 text-[10px] font-bold text-teal"
+                >
+                  Yeni sekme
+                </a>
+                <a
+                  href={`${preview.pdf_url || ""}?download=1`}
+                  className="rounded-lg border border-amber/40 px-2 py-1 text-[10px] font-bold text-amber"
+                >
+                  İndir
+                </a>
+                <button
                 type="button"
                 onClick={() => setPreview(null)}
                 className="w-8 h-8 rounded-full bg-panel text-text text-lg hover:bg-red hover:text-white transition flex-shrink-0 ml-2"
-                aria-label="Kapat"
-              >
-                ✕
-              </button>
+                  aria-label="Kapat"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <iframe
               src={preview.pdf_url || (preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : undefined)}
