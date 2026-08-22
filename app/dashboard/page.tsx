@@ -21,7 +21,7 @@ interface DashboardEngine {
 
 interface AnalyticsSummary {
   monthly: Array<{ month: string; count: number }>;
-  byEngine: Array<{ engine: string; count: number }>;
+  byEngine: Array<{ engine_id: string | null; engine: string; count: number }>;
   thisCount: number;
   lastCount: number;
 }
@@ -32,6 +32,13 @@ interface PanelResponse {
 }
 
 const EMPTY_ANALYTICS: AnalyticsSummary = { monthly: [], byEngine: [], thisCount: 0, lastCount: 0 };
+type EnginePeriod = "all" | "month" | "3months" | "year";
+const ENGINE_PERIOD_LABELS: Record<EnginePeriod, string> = {
+  all: "Tümü",
+  month: "Bu ay",
+  "3months": "Son 3 ay",
+  year: "Bu yıl",
+};
 const STATUS_LABEL_TO_KEY: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis",
   "Kritik": "kritik",
@@ -55,9 +62,28 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [enginePeriod, setEnginePeriod] = useState<EnginePeriod>("all");
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [statusFilter, setStatusFilter] = useState("Tümü");
+
+  async function loadAnalytics(period: EnginePeriod = enginePeriod) {
+    setAnalyticsLoading(true);
+    try {
+      const summary = await cachedFetch<AnalyticsSummary>(`/api/analytics/summary?period=${period}`, 30_000);
+      setAnalytics({
+        monthly: Array.isArray(summary.monthly) ? summary.monthly : [],
+        byEngine: Array.isArray(summary.byEngine) ? summary.byEngine : [],
+        thisCount: Number(summary.thisCount || 0),
+        lastCount: Number(summary.lastCount || 0),
+      });
+    } catch (analyticsError) {
+      console.warn("Dashboard analytics yüklenemedi:", analyticsError);
+      setAnalytics(EMPTY_ANALYTICS);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }
 
   async function loadDashboard() {
     setError("");
@@ -67,22 +93,7 @@ export default function DashboardPage() {
       setItems(Array.isArray(panel.items) ? panel.items : []);
       setEngines(Array.isArray(panel.engines) ? panel.engines : []);
       setLoading(false);
-
-      setAnalyticsLoading(true);
-      try {
-        const summary = await cachedFetch<AnalyticsSummary>("/api/analytics/summary", 30_000);
-        setAnalytics({
-          monthly: Array.isArray(summary.monthly) ? summary.monthly : [],
-          byEngine: Array.isArray(summary.byEngine) ? summary.byEngine : [],
-          thisCount: Number(summary.thisCount || 0),
-          lastCount: Number(summary.lastCount || 0),
-        });
-      } catch (analyticsError) {
-        console.warn("Dashboard analytics yüklenemedi:", analyticsError);
-        setAnalytics(EMPTY_ANALYTICS);
-      } finally {
-        setAnalyticsLoading(false);
-      }
+      void loadAnalytics();
     } catch (loadError) {
       console.error("Dashboard yüklenemedi:", loadError);
       setError("Dashboard verileri yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.");
@@ -243,9 +254,9 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="rounded-card border border-border bg-panel p-3.5">
-            <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="text-[11px] font-bold uppercase text-muted">Motor Bazlı Bakım Sayıları</div>
-              {!analyticsLoading && engineChartRows.length > 0 && <div className="text-[9px] text-faint">Toplam kayıt</div>}
+              <label className="flex items-center gap-1.5 text-[9px] text-faint">Tarih<select value={enginePeriod} onChange={(event) => { const period = event.target.value as EnginePeriod; setEnginePeriod(period); void loadAnalytics(period); }} className="rounded-md border border-border bg-panel2 px-1.5 py-1 text-[10px] font-bold text-text outline-none focus:border-amber" aria-label="Motor bakım grafiği tarih aralığı">{(Object.keys(ENGINE_PERIOD_LABELS) as EnginePeriod[]).map((period) => <option key={period} value={period}>{ENGINE_PERIOD_LABELS[period]}</option>)}</select></label>
             </div>
             {analyticsLoading ? <div className="flex h-36 items-end gap-2 px-1"><div className="h-16 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-24 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-20 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-28 flex-1 animate-pulse rounded-t bg-panel2" /></div> : (
               <div>
@@ -253,7 +264,8 @@ export default function DashboardPage() {
                   <div className="flex h-36 items-end gap-1.5 overflow-x-auto px-1 pb-5 pt-2" aria-label="Motorlara göre bakım kayıt sayıları">
                     {engineChartRows.map((row) => {
                       const height = Math.max((row.count / maxEngineMaintenance) * 92, 8);
-                      return <div key={row.engine} className="flex h-full min-w-[42px] flex-1 flex-col items-center justify-end gap-1" title={`${row.engine}: ${row.count} bakım kaydı`}><span className="text-[10px] font-mono font-bold text-text">{row.count}</span><div className="w-full max-w-12 rounded-t bg-gradient-to-t from-amber to-[#f7c66a] transition-all" style={{ height: `${height}px` }} /><span className="max-w-14 truncate text-[9px] text-faint">{row.engine}</span></div>;
+                      const href = row.engine_id ? `/motorlar?engine_id=${encodeURIComponent(row.engine_id)}` : "/motorlar";
+                      return <Link key={row.engine_id || row.engine} href={href} className="group flex h-full min-w-[42px] flex-1 flex-col items-center justify-end gap-1 rounded-md px-0.5 outline-none transition hover:bg-amber/10 focus-visible:ring-2 focus-visible:ring-amber" title={`${row.engine}: ${row.count} bakım kaydı`} aria-label={`${row.engine} motorunun ${row.count} bakım kaydı var; detayları aç`}><span className="text-[10px] font-mono font-bold text-text">{row.count}</span><div className="w-full max-w-12 rounded-t bg-gradient-to-t from-amber to-[#f7c66a] transition-all group-hover:brightness-110" style={{ height: `${height}px` }} /><span className="max-w-14 truncate text-[9px] text-faint">{row.engine}</span></Link>;
                     })}
                   </div>
                 )}
