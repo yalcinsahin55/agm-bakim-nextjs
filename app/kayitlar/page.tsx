@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
@@ -131,6 +131,51 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const previewUrlsRef = useRef<Record<string, string>>({});
+
+  function createOfflinePreview(id: string, blob: Blob): string {
+    const url = URL.createObjectURL(blob);
+    previewUrlsRef.current[id] = url;
+    setOfflinePreviews((current) => ({ ...current, [id]: url }));
+    return url;
+  }
+
+  function revokeOfflinePreview(id: string): void {
+    const url = previewUrlsRef.current[id];
+    if (url) URL.revokeObjectURL(url);
+    delete previewUrlsRef.current[id];
+    setOfflinePreviews((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  useEffect(() => () => {
+    Object.values(previewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    previewUrlsRef.current = {};
+  }, []);
+
+  function removePhoto(index: number): void {
+    const photo = photos[index];
+    const id = photo?.startsWith("offline:") ? photo.slice("offline:".length) : "";
+    if (id) {
+      revokeOfflinePreview(id);
+      setOfflineMedia((current) => current.filter((media) => media.id !== id));
+    }
+    setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function removeVideo(index: number): void {
+    const video = videos[index];
+    const url = typeof video === "string" ? video : video?.url;
+    const id = url?.startsWith("offline:") ? url.slice("offline:".length) : "";
+    if (id) {
+      revokeOfflinePreview(id);
+      setOfflineMedia((current) => current.filter((media) => media.id !== id));
+    }
+    setVideos((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
 
   async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
@@ -142,7 +187,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+          createOfflinePreview(id, compressed);
           uploaded.push(`offline:${id}`);
           continue;
         }
@@ -164,7 +209,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
             const id = makeOfflineId();
             const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
             setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+            createOfflinePreview(id, compressed);
             uploaded.push(`offline:${id}`);
             continue;
           } catch {
@@ -189,7 +234,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
       if (!navigator.onLine) {
         const id = makeOfflineId();
         setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-        setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+        createOfflinePreview(id, f);
         setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
         continue;
       }
@@ -204,7 +249,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+          createOfflinePreview(id, f);
           setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
           continue;
         }
@@ -241,6 +286,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success("Kayıt güncellendi! ✅");
+        window.dispatchEvent(new Event("notifications:refresh"));
         onSaved();
       } else {
         const d = await res.json();
@@ -300,7 +346,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
                 <img src={getPhotoSrc(p, offlinePreviews)} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
               </button>
               <button
-                onClick={() => setPhotos((ph) => ph.filter((_, i) => i !== idx))}
+                onClick={() => removePhoto(idx)}
                 className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px] hover:bg-red hover:text-white transition"
               >
                 ✕
@@ -319,7 +365,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
           {videos.map((v, idx) => (
             <div key={idx} className="flex items-center justify-between bg-panel2 rounded-lg px-2.5 py-1.5 text-[11px] text-muted">
               🎬 {v.filename || "Video"}
-              <button onClick={() => setVideos((vs) => vs.filter((_, i) => i !== idx))} className="text-red hover:scale-110 transition">
+              <button onClick={() => removeVideo(idx)} className="text-red hover:scale-110 transition">
                 ✕
               </button>
             </div>
@@ -440,6 +486,7 @@ export default function KayitlarPage() {
       toast.dismiss(loadingToast);
       if (res.ok) {
         toast.success("Kayıt silindi! 🗑️");
+        window.dispatchEvent(new Event("notifications:refresh"));
         setConfirmDeleteId(null);
         load(page);
       } else {

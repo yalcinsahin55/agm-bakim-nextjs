@@ -3,7 +3,7 @@
 // JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
 // @ts-nocheck
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
@@ -13,6 +13,8 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
+import { ApiFetchError } from "@/lib/apiCache";
+import { getMaintenancePanel } from "@/lib/maintenancePanel";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -110,21 +112,49 @@ export default function TamamlaPage() {
   const [offlinePreviews, setOfflinePreviews] = useState({});
   const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
+  const offlinePreviewUrlsRef = useRef<Record<string, string>>({});
   
   const [submitting, setSubmitting] = useState(false);
 
+  function createOfflinePreview(id: string, blob: Blob): string {
+    const url = URL.createObjectURL(blob);
+    offlinePreviewUrlsRef.current[id] = url;
+    setOfflinePreviews((current) => ({ ...current, [id]: url }));
+    return url;
+  }
+
+  function revokeOfflinePreview(id: string): void {
+    const url = offlinePreviewUrlsRef.current[id];
+    if (url) URL.revokeObjectURL(url);
+    delete offlinePreviewUrlsRef.current[id];
+    setOfflinePreviews((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  useEffect(() => () => {
+    Object.values(offlinePreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    offlinePreviewUrlsRef.current = {};
+  }, []);
+
   async function loadPanel() {
-    const res = await fetch("/api/maintenance-types/panel");
-    if (res.status === 401) {
-      const redirect = `${window.location.pathname}${window.location.search}`;
-      router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
-      return;
+    try {
+      const data = await getMaintenancePanel();
+      setItems(data.items);
+      setEngines(data.engines);
+      setTypes(data.types);
+      setLoading(false);
+    } catch (error) {
+      if (error instanceof ApiFetchError && error.status === 401) {
+        const redirect = `${window.location.pathname}${window.location.search}`;
+        router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+        return;
+      }
+      setLoading(false);
+      toast.error("Bakım paneli yüklenemedi.");
     }
-    const data = await res.json();
-    setItems(data.items);
-    setEngines(data.engines);
-    setTypes(data.types);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -213,7 +243,7 @@ export default function TamamlaPage() {
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+          createOfflinePreview(id, compressed);
           uploaded.push(`offline:${id}`);
           continue;
         }
@@ -235,7 +265,7 @@ export default function TamamlaPage() {
             const id = makeOfflineId();
             const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
             setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+            createOfflinePreview(id, compressed);
             uploaded.push(`offline:${id}`);
             continue;
           } catch {
@@ -256,12 +286,7 @@ export default function TamamlaPage() {
     if (photo && photo.startsWith("offline:")) {
       const id = photo.slice("offline:".length);
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
-      setOfflinePreviews((current) => {
-        if (current[id]) URL.revokeObjectURL(current[id]);
-        const next = { ...current };
-        delete next[id];
-        return next;
-      });
+      revokeOfflinePreview(id);
     }
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
@@ -286,7 +311,7 @@ export default function TamamlaPage() {
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+          createOfflinePreview(id, f);
           setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
           continue;
         }
@@ -301,7 +326,7 @@ export default function TamamlaPage() {
           if (!navigator.onLine) {
             const id = makeOfflineId();
             setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+            createOfflinePreview(id, f);
             setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
             continue;
           }
@@ -320,12 +345,7 @@ export default function TamamlaPage() {
     if (video?.url?.startsWith("offline:")) {
       const id = video.url.slice("offline:".length);
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
-      setOfflinePreviews((current) => {
-        if (current[id]) URL.revokeObjectURL(current[id]);
-        const next = { ...current };
-        delete next[id];
-        return next;
-      });
+      revokeOfflinePreview(id);
     }
     setVideos((prev) => prev.filter((_, i) => i !== idx));
   }
@@ -390,6 +410,7 @@ export default function TamamlaPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
+        window.dispatchEvent(new Event("notifications:refresh"));
         router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);

@@ -9,22 +9,26 @@ export default function NotificationBell() {
 
   useEffect(() => {
     let alive = true;
-    const load = async (force = false) => {
+    const load = async (refresh = false) => {
       try {
-        const data = await cachedFetch<{ unreadCount?: number }>("/api/notifications", force ? 0 : 30_000);
+        const endpoint = refresh ? "/api/notifications?refresh=1" : "/api/notifications";
+        const data = await cachedFetch<{ unreadCount?: number }>(endpoint, refresh ? 0 : 30_000);
         if (alive) setUnreadCount(Number(data.unreadCount || 0));
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
       }
     };
-    const handleChanged = () => { void load(true); };
+    const handleChanged = () => { void load(false); };
+    const handleRefresh = () => { void load(true); };
     void load();
-    const timer = window.setInterval(load, 60_000);
+    const timer = window.setInterval(() => { void load(false); }, 60_000);
     window.addEventListener("notifications:changed", handleChanged);
+    window.addEventListener("notifications:refresh", handleRefresh);
     return () => {
       alive = false;
       window.clearInterval(timer);
       window.removeEventListener("notifications:changed", handleChanged);
+      window.removeEventListener("notifications:refresh", handleRefresh);
     };
   }, []);
 

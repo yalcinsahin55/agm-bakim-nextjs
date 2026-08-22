@@ -72,6 +72,7 @@ export default function SaatGuncellePage() {
         const data = await res.json();
         toast.dismiss(loadingToast);
         toast.success(`${data.changed} motor güncellendi! 🕒`);
+        window.dispatchEvent(new Event("notifications:refresh"));
         setValues({});
         load();
       } else {

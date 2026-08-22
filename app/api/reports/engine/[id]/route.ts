@@ -1,0 +1,93 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getDb } from "@/lib/mongodb";
+import { getCurrentUser } from "@/lib/auth";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { withApiTiming } from "@/lib/performance";
+
+export const dynamic = "force-dynamic";
+
+function parseParams(req: NextRequest) {
+  const searchParams = new URL(req.url).searchParams;
+  const all = searchParams.get("all") === "1";
+  const requestedPage = Number(searchParams.get("page") || 1);
+  const requestedPageSize = Number(searchParams.get("page_size") || 50);
+  const page = Number.isFinite(requestedPage) ? Math.max(Math.trunc(requestedPage), 1) : 1;
+  const pageSize = all ? 5_000 : Number.isFinite(requestedPageSize) ? Math.min(Math.max(Math.trunc(requestedPageSize), 1), 50) : 50;
+  return { all, page, pageSize, skip: (page - 1) * pageSize };
+}
+
+async function getEngineReport(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const db = await getDb();
+    await ensureAppIndexes(db);
+    const usersCol = db.collection("users") as any;
+    const user = await getCurrentUser(req, usersCol);
+    if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+
+    const { all, page, pageSize, skip } = parseParams(req);
+    const recordsCol = db.collection("maintenance_records") as any;
+    const match = { engine_id: params.id };
+    const [result] = await recordsCol.aggregate([
+      { $match: match },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          stats: [
+            {
+              $group: {
+                _id: null,
+                first_date: { $min: "$created_at" },
+                last_date: { $max: "$created_at" },
+              },
+            },
+          ],
+          records: [
+            { $sort: { created_at: -1, _id: -1 } },
+            { $skip: skip },
+            { $limit: pageSize },
+            {
+              $project: {
+                _id: 1,
+                engine_id: 1,
+                engine_name: 1,
+                type_label: 1,
+                hour_at_completion: 1,
+                technician_name: 1,
+                created_at: 1,
+              },
+            },
+          ],
+        },
+      },
+    ]).toArray();
+
+    const total = Number(result?.metadata?.[0]?.total || 0);
+    const range = result?.stats?.[0];
+    const firstTime = range?.first_date ? new Date(range.first_date).getTime() : 0;
+    const lastTime = range?.last_date ? new Date(range.last_date).getTime() : 0;
+    const avgDays = total > 1 && lastTime >= firstTime ? Math.round((lastTime - firstTime) / 86400000 / (total - 1)) : 0;
+
+    return NextResponse.json({
+      records: result?.records || [],
+      total,
+      page,
+      pageSize,
+      totalPages: all ? 1 : Math.max(Math.ceil(total / pageSize), 1),
+      all,
+      truncated: all && total > pageSize,
+      summary: {
+        first_date: range?.first_date || null,
+        last_date: range?.last_date || null,
+        avg_days: avgDays,
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/reports/engine/[id] hatası:", error);
+    return NextResponse.json({ error: "Motor raporu hazırlanırken bir hata oluştu." }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
+  return withApiTiming("GET /api/reports/engine/[id]", () => getEngineReport(req, context));
+}

@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ObjectId, type Db } from "mongodb";
+import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
+import { recomputeLastMaintenance } from "@/lib/maintenance";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
-async function recomputeLastMaintenance(db: Db, engineId: string, typeKey: string): Promise<void> {
-  const recordsCol = db.collection("maintenance_records") as any;
-  const all = await recordsCol.find({ engine_id: engineId, type_key: typeKey }).toArray();
-  if (all.length === 0) return;
-  const maxHour = Math.max(...all.map((r: any) => r.hour_at_completion));
-  await (db.collection("maintenance_types") as any).updateOne(
-    { _id: typeKey },
-    { $set: { [`engine_states.${engineId}.last_maintenance_hour`]: maxHour } },
-    { upsert: true }
-  );
-}
 
 function canModify(user: any, record: any): boolean {
   return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
@@ -26,6 +17,7 @@ function canModify(user: any, record: any): boolean {
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const db = await getDb();
+  await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -37,6 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const db = await getDb();
+  await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -123,6 +116,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const db = await getDb();
+  await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });

@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
-import { ensureAuditIndexes } from "@/lib/audit";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(to)) query.created_at.$lte = new Date(`${to}T23:59:59.999Z`);
   }
 
-  await ensureAuditIndexes(db);
+  await ensureAppIndexes(db);
   const logs = db.collection("audit_logs") as any;
   const projection = includeDetails ? undefined : { before: 0, after: 0 };
   const [items, total] = await Promise.all([

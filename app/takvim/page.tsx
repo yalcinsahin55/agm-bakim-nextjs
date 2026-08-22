@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
+import { ApiFetchError } from "@/lib/apiCache";
+import { getMaintenancePanel } from "@/lib/maintenancePanel";
 
 interface Item { engine_id: string; engine_name: string; type_label: string; status: string; remaining: number; period: number; engine_hours: number; }
 
@@ -17,12 +19,15 @@ export default function TakvimPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/maintenance-types/panel").then(async (res) => {
-      if (res.status === 401) return router.push("/login");
-      const data = await res.json();
-      setItems(data.items || []);
-      setLoading(false);
-    });
+    getMaintenancePanel()
+      .then((data) => {
+        setItems(data.items || []);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
+        else setLoading(false);
+      });
   }, [router]);
 
   const grouped = useMemo(() => [...items].sort((a, b) => a.remaining - b.remaining), [items]);

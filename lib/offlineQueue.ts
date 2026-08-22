@@ -212,6 +212,9 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
 
   const remaining = await getPendingOfflineCount();
   dispatchChanged(remaining);
+  if (synced > 0 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("notifications:refresh"));
+  }
   return { synced, remaining, error: lastError };
 }
 

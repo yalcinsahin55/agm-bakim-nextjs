@@ -4,10 +4,11 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { engineSortKey } from "@/lib/status";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function getEngines(req: NextRequest) {
   try {
     const db = await getDb();
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function postEngine(req: NextRequest) {
   try {
     const db = await getDb();
     const usersCol = db.collection("users") as any;
@@ -62,4 +63,12 @@ export async function POST(req: NextRequest) {
     console.error("Motor eklenirken hata:", error);
     return NextResponse.json({ error: "Motor eklenirken bir hata oluştu." }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return withApiTiming("GET /api/engines", () => getEngines(req));
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/engines", () => postEngine(req));
 }

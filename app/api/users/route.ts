@@ -6,6 +6,7 @@ import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { adminUserSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
+    await ensureAppIndexes(db);
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -41,11 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
     const { full_name, phone, password, role } = parsed.data;
-    try {
-      await usersCol.createIndex({ phone_normalized: 1 }, { unique: true, sparse: true, name: "users_phone_normalized_unique" });
-    } catch (indexError) {
-      console.warn("Telefon benzersiz indeksi oluşturulamadı; mevcut kayıtlar korunuyor.", indexError);
-    }
     if (!isValidPhone(phone)) {
       return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin (05xx xxx xx xx)." }, { status: 400 });
     }

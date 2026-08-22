@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { getPublicVapidKey, isPushConfigured } from "@/lib/push";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     const { db, user } = await getUser(req);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    await ensureAppIndexes(db);
     if (!isPushConfigured()) return NextResponse.json({ error: "Web Push henüz yapılandırılmamış." }, { status: 503 });
 
     const body = await req.json();
@@ -32,7 +34,6 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
     const collection = db.collection("push_subscriptions");
-    await collection.createIndex({ endpoint: 1 }, { unique: true });
     await collection.updateOne(
       { endpoint: subscription.endpoint },
       {

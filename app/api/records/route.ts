@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ObjectId, type Db } from "mongodb";
+import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
-import { syncMaintenanceNotificationsForAllUsers } from "@/lib/notifications";
 import { writeAuditLog } from "@/lib/audit";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { recomputeLastMaintenance } from "@/lib/maintenance";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function getRecords(req: NextRequest) {
   try {
     const db = await getDb();
+    await ensureAppIndexes(db);
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -19,16 +22,20 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const engineId = searchParams.get("engine_id");
     const typeLabel = searchParams.get("type_label");
+    const typeKey = searchParams.get("type_key");
     const search = searchParams.get("search")?.trim();
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
     const includeMedia = searchParams.get("include_media") === "true";
+    const sortDirection = searchParams.get("sort") === "asc" ? 1 : -1;
+    const sortSpec = { created_at: sortDirection, _id: sortDirection } as const;
     const legacyLimit = searchParams.get("limit");
     const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size"));
 
     const query: Record<string, any> = {};
     if (engineId) query.engine_id = engineId;
     if (typeLabel) query.type_label = typeLabel;
+    if (typeKey) query.type_key = typeKey;
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
       query.$or = [
@@ -39,13 +46,9 @@ export async function GET(req: NextRequest) {
     }
 
     const recordsCol = db.collection("maintenance_records") as any;
-    await Promise.all([
-      recordsCol.createIndex({ engine_id: 1, type_label: 1, created_at: -1 }),
-      recordsCol.createIndex({ created_at: -1 }),
-    ]);
     if (legacyRequest) {
       const records = await recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
-        .sort({ created_at: -1 })
+        .sort(sortSpec)
         .limit(Math.min(Math.max(parseInt(legacyLimit || "500", 10), 1), 1000))
         .toArray();
       return NextResponse.json(records);
@@ -53,7 +56,7 @@ export async function GET(req: NextRequest) {
 
     const [records, total] = await Promise.all([
       recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
-        .sort({ created_at: -1 })
+        .sort(sortSpec)
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .toArray(),
@@ -73,21 +76,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function recomputeLastMaintenance(db: Db, engineId: string, typeKey: string): Promise<void> {
-  const recordsCol = db.collection("maintenance_records") as any;
-  const all = await recordsCol.find({ engine_id: engineId, type_key: typeKey }).toArray();
-  if (all.length === 0) return;
-  const maxHour = Math.max(...all.map((r: any) => r.hour_at_completion));
-  await (db.collection("maintenance_types") as any).updateOne(
-    { _id: typeKey },
-    { $set: { [`engine_states.${engineId}.last_maintenance_hour`]: maxHour } },
-    { upsert: true }
-  );
-}
 
-export async function POST(req: NextRequest) {
+async function postRecord(req: NextRequest) {
   try {
     const db = await getDb();
+    await ensureAppIndexes(db);
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -122,7 +115,6 @@ export async function POST(req: NextRequest) {
 
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
-    if (client_request_id) await recordsCol.createIndex({ client_request_id: 1 }, { unique: true, sparse: true });
 
     async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean) {
       const rec: any = {
@@ -178,11 +170,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    try {
-      await syncMaintenanceNotificationsForAllUsers(db);
-    } catch (notificationError) {
-      console.error("Bakım sonrası bildirimler güncellenemedi:", notificationError);
-    }
     await writeAuditLog(db, {
       user,
       action: "create",
@@ -196,4 +183,12 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/records hatası:", error);
     return NextResponse.json({ error: "Bakım kaydı oluşturulurken bir hata oluştu." }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return withApiTiming("GET /api/records", () => getRecords(req));
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/records", () => postRecord(req));
 }

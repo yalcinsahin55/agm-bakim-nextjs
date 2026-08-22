@@ -8,6 +8,8 @@ import Skeleton from "@/components/Skeleton";
 import GaugeCardList from "@/components/GaugeCardList";
 import type { PanelItem, StatusKey } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
+import { ApiFetchError } from "@/lib/apiCache";
+import { getMaintenancePanel } from "@/lib/maintenancePanel";
 
 const STATUS_MAP: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis", "Kritik": "kritik", "Yaklaşıyor": "yaklasiyor", "Normal": "normal",
@@ -22,13 +24,16 @@ export default function BakimTurleriPage() {
   const [statusFilter, setStatusFilter] = useState("Tümü");
 
   async function load() {
-    const res = await fetch("/api/maintenance-types/panel");
-    if (res.status === 401) { router.push("/login"); return; }
-    const data = await res.json();
-    setItems(data.items);
-    setTypes(data.types);
-    setLoading(false);
-    if (data.types.length) setSelectedKey([...data.types].sort((a: any, b: any) => a.label.localeCompare(b.label, "tr"))[0].key);
+    try {
+      const data = await getMaintenancePanel();
+      setItems(data.items);
+      setTypes(data.types);
+      setLoading(false);
+      if (data.types.length) setSelectedKey([...data.types].sort((a: any, b: any) => a.label.localeCompare(b.label, "tr"))[0].key);
+    } catch (error) {
+      if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
+      else setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);

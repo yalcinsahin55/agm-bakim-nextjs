@@ -6,6 +6,8 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import GaugeCardList from "@/components/GaugeCardList";
+import { ApiFetchError } from "@/lib/apiCache";
+import { getMaintenancePanel } from "@/lib/maintenancePanel";
 
 const MAX_DAILY_HOURS = 24;
 
@@ -16,12 +18,15 @@ export default function TahminPage() {
   const [typeFilter, setTypeFilter] = useState("Tümü");
 
   useEffect(() => {
-    fetch("/api/maintenance-types/panel").then(async (res) => {
-      if (res.status === 401) { router.push("/login"); return; }
-      const data = await res.json();
-      setItems(data.items);
-      setLoading(false);
-    });
+    getMaintenancePanel()
+      .then((data) => {
+        setItems(data.items);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
+        else setLoading(false);
+      });
   }, [router]);
 
   const typeOptions = useMemo(() => ["Tümü", ...Array.from(new Set(items.map((i) => i.type_label))).sort()], [items]);

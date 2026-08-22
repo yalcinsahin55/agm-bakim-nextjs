@@ -29,7 +29,7 @@ export default function NotificationsPage() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/notifications", { cache: "no-store" });
+      const response = await fetch("/api/notifications?refresh=1", { cache: "no-store" });
       if (response.status === 401) {
         window.location.href = "/login";
         return;
