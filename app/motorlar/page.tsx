@@ -73,8 +73,8 @@ export default function MotorlarPage() {
       return;
     }
     const value = typeof window === "undefined"
-      ? `/motorlar?engine_id=${encodeURIComponent(qrEngine._id)}&plant_id=avcikoru`
-      : `${window.location.origin}/motorlar?engine_id=${encodeURIComponent(qrEngine._id)}&plant_id=avcikoru`;
+      ? `/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`
+      : `${window.location.origin}/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`;
     QRCode.toDataURL(value, { width: 320, margin: 2, errorCorrectionLevel: "M" })
       .then((dataUrl) => setQrDataUrl(dataUrl))
       .catch(() => {
@@ -85,7 +85,7 @@ export default function MotorlarPage() {
 
   async function copyQrLink() {
     if (!qrEngine) return;
-    const value = `${window.location.origin}/motorlar?engine_id=${encodeURIComponent(qrEngine._id)}&plant_id=avcikoru`;
+    const value = `${window.location.origin}/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`;
     try {
       await navigator.clipboard.writeText(value);
       toast.success("Motor bağlantısı kopyalandı.");
@@ -269,7 +269,7 @@ export default function MotorlarPage() {
                       onClick={() => setQrEngine(e)}
                       className="w-full mb-3 py-2 rounded-lg border border-amber/40 bg-amber/10 text-amber text-[11px] font-bold hover:bg-amber/20 active:scale-[.98] transition"
                     >
-                      ▣ QR kodu göster ve indir
+                      ▣ Hızlı bakım QR kodu göster ve indir
                     </button>
 
                     {recordsLoading ? (

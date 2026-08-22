@@ -4,7 +4,7 @@
 // @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { getPendingOfflineCount, queueRecord, syncOfflineQueue, type QueuedMedia } from "@/lib/offlineQueue";
@@ -82,6 +82,9 @@ function withTimeout(promise, milliseconds, message) {
 
 export default function TamamlaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const quickMode = searchParams.get("mode") === "quick";
+  const qrEngineId = searchParams.get("engine_id");
   const [items, setItems] = useState([]);
   const [engines, setEngines] = useState([]);
   const [types, setTypes] = useState([]);
@@ -150,8 +153,19 @@ export default function TamamlaPage() {
   const allTypesSorted = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label, "tr")), [types]);
 
   useEffect(() => {
-    if (!engineId && engineList.length) setEngineId(engineList[0]._id);
-  }, [engineList, engineId]);
+    if (!engineList.length) return;
+    if (quickMode && qrEngineId) {
+      const matched = engineList.find((engine) => engine._id === qrEngineId || engine.name === qrEngineId);
+      if (matched) {
+        setEngineId(matched._id);
+        return;
+      }
+      toast.error("QR kodundaki motor bulunamadı.");
+      router.replace("/tamamla");
+      return;
+    }
+    if (!engineId) setEngineId(engineList[0]._id);
+  }, [engineList, engineId, quickMode, qrEngineId, router]);
 
   useEffect(() => {
     if (!engineId) return;
@@ -412,8 +426,17 @@ export default function TamamlaPage() {
 
   return (
     <div>
-      <TopBar title="Bakım Tamamla" subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""} />
+      <TopBar
+        title={quickMode ? "Hızlı Bakım" : "Bakım Tamamla"}
+        subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""}
+      />
       <div className="px-4 py-4 flex flex-col gap-1">
+        {quickMode && (
+          <div className="mb-2 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2.5 text-[11px] text-teal" role="status">
+            <div className="font-bold">QR ile Hızlı Bakım Modu</div>
+            <div className="mt-0.5 text-[10px] text-muted">Motor QR koddan seçildi ve kilitlendi. Yalnızca yapılan bakımları işaretleyip kaydı tamamlayın.</div>
+          </div>
+        )}
         {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
           <div className="mb-2 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
             <div className="font-bold">{!isOnline ? "Çevrimdışı çalışma açık." : "Senkronizasyon bekleyen kayıt var."}</div>
@@ -424,7 +447,13 @@ export default function TamamlaPage() {
           </div>
         )}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Motor</label>
-        <select value={engineId} onChange={(e) => setEngineId(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2">
+        <select
+          value={engineId}
+          onChange={(e) => setEngineId(e.target.value)}
+          disabled={quickMode}
+          className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode ? "cursor-not-allowed opacity-80" : ""}`}
+          aria-label={quickMode ? "QR ile seçilen motor" : "Motor seçimi"}
+        >
           {engineList.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
         </select>
 
