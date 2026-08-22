@@ -69,6 +69,8 @@ export interface MaintenanceRecord {
   pressure_reading?: number;
   technician_id: string;
   technician_name: string;
+  technician_source?: "internal" | "external_service";
+  external_service_name?: string;
   other_technician_ids?: string[];
   other_technicians?: Array<{ id: string; full_name: string }>;
   checklist?: Array<{ label: string; completed: boolean }>;

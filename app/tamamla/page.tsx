@@ -15,6 +15,7 @@ import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { EXTERNAL_SERVICE_TECHNICIAN_NAME } from "@/lib/technicians";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
@@ -109,6 +110,8 @@ export default function TamamlaPage() {
   const [extraPeriods, setExtraPeriods] = useState({});
   const [technicians, setTechnicians] = useState([]);
   const [otherTechnicianIds, setOtherTechnicianIds] = useState([]);
+  const [technicianSource, setTechnicianSource] = useState("internal");
+  const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState({});
   
   const [photos, setPhotos] = useState([]);
@@ -388,6 +391,11 @@ export default function TamamlaPage() {
     setOtherTechnicianIds((current) => checked ? [...new Set([...current, id])] : current.filter((currentId) => currentId !== id));
   }
 
+  function changeTechnicianSource(source) {
+    setTechnicianSource(source);
+    if (source === "external_service") setOtherTechnicianIds([]);
+  }
+
   const currentUserId = user?._id || user?.id || "";
   const selectableTechnicians = technicians.filter((technician) => technician.id !== currentUserId);
 
@@ -425,6 +433,8 @@ export default function TamamlaPage() {
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
     const payload = {
       engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
+      technician_source: technicianSource,
+      external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       hour_at_completion: Number(hours), technician_note: techNote,
       time_tracking_version: TIME_TRACKING_VERSION,
       maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
@@ -601,13 +611,26 @@ export default function TamamlaPage() {
           </>
         )}
 
+        {user?.role === "yonetici" && <div className="mb-2 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
+          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</div>
+          <div className="mt-0.5 text-[10.5px] text-faint">Dış servis veya garanti kapsamındaki bakımlarda kayıtlı teknisyen seçmeden kayıt oluşturabilirsin.</div>
+          <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
+            <option value="internal">Kayıtlı teknisyenler / benim hesabım</option>
+            <option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
+          </select>
+          {technicianSource === "external_service" && <>
+            <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400" />
+            <div className="mt-2 rounded-lg bg-purple-400/10 px-2.5 py-2 text-[10.5px] text-purple-200">Bu kayıt sorumlu teknisyen performansına dahil edilmez; bakım geçmişinde dış hizmet olarak görünür ve yalnızca yönetici tarafından girilebilir.</div>
+          </>}
+        </div>}
+
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakımcı Notu</label>
         <textarea
           value={techNote} onChange={(e) => setTechNote(e.target.value)} rows={2}
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
         />
 
-        {selectableTechnicians.length > 0 && <div className="mb-2 rounded-xl border border-teal/30 bg-teal/5 p-3">
+        {technicianSource !== "external_service" && selectableTechnicians.length > 0 && <div className="mb-2 rounded-xl border border-teal/30 bg-teal/5 p-3">
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında bakıma katılan ekip üyelerini seçebilirsin.</div>
           <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">

@@ -11,6 +11,7 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 interface Engine {
@@ -53,6 +54,8 @@ interface MaintenanceRecord {
   created_at: string;
   technician_name: string;
   technician_id: string;
+  technician_source?: "internal" | "external_service";
+  external_service_name?: string;
   other_technician_ids?: string[];
   other_technicians?: Array<{ id: string; full_name: string }>;
   checklist?: Array<{ label: string; completed: boolean }>;
@@ -130,6 +133,12 @@ function toLocalDateTimeInput(value: string | Date | undefined): string {
   return Number.isFinite(date.getTime()) ? formatDateTimeLocal(date) : "";
 }
 
+function technicianLabel(record: MaintenanceRecord): string {
+  return record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID
+    ? record.technician_name || EXTERNAL_SERVICE_TECHNICIAN_NAME
+    : record.technician_name || "—";
+}
+
 interface EditFormProps {
   record: MaintenanceRecord;
   onCancel: () => void;
@@ -149,8 +158,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
+  const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
-  const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.other_technician_ids || []);
+  const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
 
@@ -305,8 +316,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       photos,
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-      other_technician_ids: otherTechnicianIds,
-      responsible_technician_id: isAdmin ? responsibleTechnicianId : undefined,
+      other_technician_ids: technicianSource === "external_service" ? [] : otherTechnicianIds,
+      technician_source: technicianSource,
+      external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
+      responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -342,12 +355,19 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   return (
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
       {isAdmin && <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
-        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu Teknisyen</label>
-        <p className="mt-0.5 text-[10px] text-faint">Yalnızca aktif ve onaylı teknisyenler seçilebilir.</p>
-        <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
-          {!technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
-          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</label>
+        <p className="mt-0.5 text-[10px] text-faint">Kayıtlı teknisyen veya dış servis/garanti bakım kaynağı seçilebilir.</p>
+        <select value={technicianSource} onChange={(event) => { const nextSource = event.target.value as "internal" | "external_service"; setTechnicianSource(nextSource); if (nextSource === "external_service") { setOtherTechnicianIds([]); setResponsibleTechnicianId(EXTERNAL_SERVICE_TECHNICIAN_ID); } else if (responsibleTechnicianId === EXTERNAL_SERVICE_TECHNICIAN_ID) { setResponsibleTechnicianId(technicians[0]?.id || ""); } }} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
+          <option value="internal">Kayıtlı teknisyen</option>
+          <option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
         </select>
+        {technicianSource === "external_service" ? <>
+          <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber" />
+          <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu kayıt teknisyen performansına dahil edilmez ve yalnızca yönetici tarafından düzenlenebilir.</div>
+        </> : <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
+          {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
+          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+        </select>}
       </div>}
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
       <input
@@ -388,7 +408,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         />
       )}
 
-      {technicians.filter((technician) => technician.id !== responsibleTechnicianId).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
+      {technicianSource !== "external_service" && technicians.filter((technician) => technician.id !== responsibleTechnicianId).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
         <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında bakıma katılanları seç.</div>
         <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== responsibleTechnicianId).map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id))} />{technician.full_name}</label>)}</div>
@@ -706,7 +726,7 @@ export default function KayitlarPage() {
                     {r.type_label} · {r.engine_name}
                   </div>
                   <div className="text-[11px] text-faint mt-0.5">
-                    {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {r.technician_name}
+                    {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
                   </div>
                   {(r.maintenance_start_at || r.maintenance_end_at || r.maintenance_duration_minutes != null) && <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] text-teal"><span>Başlangıç: {r.maintenance_start_at ? new Date(r.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {r.maintenance_end_at ? new Date(r.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>Süre: {formatMaintenanceDuration(r.maintenance_duration_minutes)}</span></div>}
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
@@ -809,7 +829,7 @@ export default function KayitlarPage() {
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
-              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{selectedRecord.technician_name || "—"}</div></div>
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{technicianLabel(selectedRecord)}</div></div>
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 text-[11px]">
               <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Başlangıç</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_start_at ? new Date(selectedRecord.maintenance_start_at).toLocaleString("tr-TR") : "—"}</div></div>

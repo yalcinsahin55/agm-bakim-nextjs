@@ -7,7 +7,7 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
 
   const update: Record<string, any> = {};
   let nextStartAt: Date | undefined = record.maintenance_start_at ? new Date(record.maintenance_start_at) : undefined;
@@ -63,35 +63,62 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     update.maintenance_end_at = end;
     update.maintenance_duration_minutes = duration;
   }
-  let nextResponsibleId = record.technician_id;
-  let nextResponsibleName = record.technician_name;
-  if (typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id) {
-    if (user.role !== "yonetici") {
-      return NextResponse.json({ error: "Sorumlu teknisyeni yalnızca yöneticiler değiştirebilir." }, { status: 403 });
+  const requestedSource = technician_source === "external_service" || technician_source === "internal" ? technician_source : undefined;
+  const useExternalService = requestedSource === "external_service" || (requestedSource === undefined && (record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID));
+  if (useExternalService && user.role !== "yonetici") {
+    return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler düzenleyebilir." }, { status: 403 });
+  }
+  const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
+  let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
+  let nextResponsibleName = useExternalService
+    ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
+    : record.technician_name;
+  let effectiveOtherTechnicians: Array<{ id: string; full_name: string }> = [];
+  if (useExternalService) {
+    if (Array.isArray(other_technician_ids) && other_technician_ids.length > 0) {
+      return NextResponse.json({ error: "Dış hizmet kaydında kayıtlı yardımcı teknisyen seçilemez." }, { status: 400 });
     }
-    const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
-    if (!resolvedResponsible || resolvedResponsible.length !== 1) {
-      return NextResponse.json({ error: "Seçilen sorumlu teknisyen aktif veya onaylı değil." }, { status: 400 });
-    }
-    nextResponsibleId = resolvedResponsible[0].id;
-    nextResponsibleName = resolvedResponsible[0].full_name;
     update.technician_id = nextResponsibleId;
     update.technician_name = nextResponsibleName;
-  }
-
-  let effectiveOtherTechnicians: Array<{ id: string; full_name: string }> = Array.isArray(record.other_technicians)
-    ? record.other_technicians.filter((technician: any) => technician && typeof technician.id === "string" && typeof technician.full_name === "string")
-    : [];
-  if (Array.isArray(other_technician_ids)) {
-    const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
-    if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
-      return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
+    update.technician_source = "external_service";
+    if (externalServiceName) update.external_service_name = externalServiceName;
+    else update.$unset = { external_service_name: "" };
+    update.other_technician_ids = [];
+    update.other_technicians = [];
+  } else {
+    if (record.technician_source === "external_service" && typeof responsible_technician_id !== "string") {
+      return NextResponse.json({ error: "Dış hizmet kaydını kayıtlı teknisyene çevirmek için sorumlu teknisyen seçin." }, { status: 400 });
     }
-    effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
-    update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
-    update.other_technicians = effectiveOtherTechnicians;
-  } else if (nextResponsibleId !== record.technician_id && effectiveOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
-    return NextResponse.json({ error: "Yeni sorumlu teknisyen yardımcı listesinde bulunamaz." }, { status: 400 });
+    if (typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id) {
+      if (user.role !== "yonetici") {
+        return NextResponse.json({ error: "Sorumlu teknisyeni yalnızca yöneticiler değiştirebilir." }, { status: 403 });
+      }
+      const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
+      if (!resolvedResponsible || resolvedResponsible.length !== 1) {
+        return NextResponse.json({ error: "Seçilen sorumlu teknisyen aktif veya onaylı değil." }, { status: 400 });
+      }
+      nextResponsibleId = resolvedResponsible[0].id;
+      nextResponsibleName = resolvedResponsible[0].full_name;
+      update.technician_id = nextResponsibleId;
+      update.technician_name = nextResponsibleName;
+    }
+    update.technician_source = "internal";
+    update.$unset = { external_service_name: "" };
+
+    effectiveOtherTechnicians = Array.isArray(record.other_technicians)
+      ? record.other_technicians.filter((technician: any) => technician && typeof technician.id === "string" && typeof technician.full_name === "string")
+      : [];
+    if (Array.isArray(other_technician_ids)) {
+      const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
+      if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
+        return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
+      }
+      effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
+      update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
+      update.other_technicians = effectiveOtherTechnicians;
+    } else if (nextResponsibleId !== record.technician_id && effectiveOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
+      return NextResponse.json({ error: "Yeni sorumlu teknisyen yardımcı listesinde bulunamaz." }, { status: 400 });
+    }
   }
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
@@ -101,7 +128,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (Array.isArray(videos)) update.videos = videos;
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
-  await recordsCol.updateOne({ _id: record._id }, { $set: update });
+  const unset = update.$unset;
+  delete update.$unset;
+  await recordsCol.updateOne({ _id: record._id }, { $set: update, ...(unset ? { $unset: unset } : {}) });
   await writeAuditLog(db, {
     user,
     action: "update",
@@ -161,8 +190,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         note: "", technician_note: "",
         photos_b64: [], photos: [], videos: [],
         technician_id: nextResponsibleId, technician_name: nextResponsibleName,
-        other_technician_ids: effectiveOtherTechnicians.map((technician) => technician.id),
-        other_technicians: effectiveOtherTechnicians,
+        ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
+        other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
+        other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,
       });

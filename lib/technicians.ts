@@ -5,6 +5,9 @@ export interface TechnicianOption {
   full_name: string;
 }
 
+export const EXTERNAL_SERVICE_TECHNICIAN_ID = "__external_service__" as const;
+export const EXTERNAL_SERVICE_TECHNICIAN_NAME = "Dış Hizmet / Harici Servis";
+
 const TECHNICIAN_ROLES = ["teknisyen", "planlamaci"];
 
 /** Aynı kişinin büyük-küçük harf, Unicode ve fazla boşluk farklarını tek anahtarda birleştirir. */

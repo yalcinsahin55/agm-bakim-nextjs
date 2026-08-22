@@ -8,7 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
-import { resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -102,7 +102,7 @@ async function postRecord(req: NextRequest) {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
       other_technician_ids, checklist, completion_confirmation, time_tracking_version,
-      maintenance_start_at, maintenance_end_at,
+      maintenance_start_at, maintenance_end_at, technician_source, external_service_name,
     } = parsed.data as RecordInput;
 
     const enginesCol = db.collection("engines") as any;
@@ -139,7 +139,19 @@ async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
-    const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
+    const useExternalService = technician_source === "external_service";
+    if (useExternalService && user.role !== "yonetici") {
+      return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler oluşturabilir." }, { status: 403 });
+    }
+    if (useExternalService && Array.isArray(other_technician_ids) && other_technician_ids.length > 0) {
+      return NextResponse.json({ error: "Dış hizmet kaydında kayıtlı yardımcı teknisyen seçilemez." }, { status: 400 });
+    }
+    const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : "";
+    const responsibleTechnicianId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : user._id;
+    const responsibleTechnicianName = useExternalService
+      ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
+      : user.full_name;
+    const resolvedOtherTechnicians = useExternalService ? [] : await resolveTechnicianOptions(db, other_technician_ids);
     if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === user._id)) {
       return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
     }
@@ -165,7 +177,10 @@ async function postRecord(req: NextRequest) {
         videos: isPrimary ? (videos || []) : [],
         checklist: isPrimary ? (checklist || []) : [],
         completion_confirmed_at: isPrimary && completion_confirmation === true ? new Date() : undefined,
-        technician_id: user._id, technician_name: user.full_name,
+        technician_id: responsibleTechnicianId,
+        technician_name: responsibleTechnicianName,
+        technician_source: useExternalService ? "external_service" : "internal",
+        ...(useExternalService && externalServiceName ? { external_service_name: externalServiceName } : {}),
         other_technician_ids: otherTechnicians.map((technician) => technician.id),
         other_technicians: otherTechnicians,
         client_request_id: client_request_id || undefined,
@@ -218,7 +233,7 @@ async function postRecord(req: NextRequest) {
       entity: "maintenance_record",
       entityId: groupId,
       summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     return NextResponse.json({ ok: true, completed: completedLabels });
   } catch (error) {

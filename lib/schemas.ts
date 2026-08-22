@@ -49,6 +49,8 @@ export const recordSchema = z.object({
   engine_id: z.string().min(1, "Motor seçimi zorunludur."),
   type_key: z.string().min(1, "Bakım türü zorunludur."),
   type_label: z.string().min(1, "Bakım türü adı zorunludur."),
+  technician_source: z.enum(["internal", "external_service"]).optional(),
+  external_service_name: z.string().trim().max(160, "Dış hizmet adı çok uzun.").optional().or(z.literal("")),
 
   hour_at_completion: z
     .number({ required_error: "Motor çalışma saati gereklidir.", invalid_type_error: "Motor saati bir sayı olmalıdır." })
