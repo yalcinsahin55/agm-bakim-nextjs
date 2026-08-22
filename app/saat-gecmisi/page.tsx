@@ -123,7 +123,7 @@ export default function SaatGecmisiPage() {
   const spanDaysPrecise = history.length >= 2 ? Math.max(spanMs / 86400000, 1 / 24) : 0;
   const avgPerDay = history.length >= 2 ? Math.min(totalDelta / spanDaysPrecise, 24) : 0;
 
-  const canEdit = user && ["yonetici", "planlamaci"].includes(user.role);
+  const canEdit = user?.role === "yonetici";
 
   function startEdit(realIdx: number) {
     const h = history[realIdx];

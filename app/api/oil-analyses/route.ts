@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { canWriteMaintenance } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (user.role === "goruntuleyici") return NextResponse.json({ error: "Görüntüleyici rolü rapor ekleyemez." }, { status: 403 });
+    if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap yağ analizi ekleyemez." }, { status: 403 });
 
     const { engine_id, analysis_date, result, note, pdf_url, pdf_b64, pdf_filename } = await req.json();
     if (!engine_id || (!pdf_url && !pdf_b64)) {

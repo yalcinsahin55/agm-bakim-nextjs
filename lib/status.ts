@@ -23,7 +23,7 @@ export type RoleKey = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   yonetici: "Yönetici",
-  planlamaci: "Planlamacı",
+  planlamaci: "Teknisyen (eski Planlamacı)",
   teknisyen: "Teknisyen",
   goruntuleyici: "Görüntüleyici",
 };

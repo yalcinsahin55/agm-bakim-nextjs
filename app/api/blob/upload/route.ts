@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { canWriteMaintenance } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const db = await getDb();
   const user = await getCurrentUser(request, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
 
   const body = (await request.json()) as HandleUploadBody;
 

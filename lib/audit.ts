@@ -44,6 +44,8 @@ export async function ensureAuditIndexes(db: Db): Promise<void> {
   await Promise.all([
     (db.collection("audit_logs") as any).createIndex({ created_at: -1 }),
     (db.collection("audit_logs") as any).createIndex({ user_id: 1, created_at: -1 }),
+    (db.collection("audit_logs") as any).createIndex({ action: 1, created_at: -1 }),
+    (db.collection("audit_logs") as any).createIndex({ entity: 1, created_at: -1 }),
     (db.collection("audit_logs") as any).createIndex({ entity: 1, entity_id: 1, created_at: -1 }),
   ]);
 }

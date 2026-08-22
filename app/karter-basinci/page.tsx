@@ -190,6 +190,8 @@ export default function KarterBasinciPage() {
 
   const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
   const numericHistory = engineHistory.filter((r) => r.pressure_bar !== null && r.pressure_bar !== undefined);
+  const canWrite = user?.role !== "goruntuleyici";
+  const visibleTab = canWrite ? tab : "history";
 
   if (loading) {
     return (
@@ -216,12 +218,12 @@ export default function KarterBasinciPage() {
       <div className="px-4 py-4">
         {/* Modern Tab Butonları */}
         <div className="flex gap-1 bg-[#12161d] p-1 rounded-xl border border-border mb-4">
-          {[["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]].map(([key, label]) => (
+          {(canWrite ? [["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]] : [["history", "📈 Geçmiş"]]).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               className={`flex-1 py-2 rounded-lg text-[11.5px] font-bold transition-all ${
-                tab === key ? "bg-amber text-[#161006] shadow-lg" : "text-faint hover:text-muted"
+                visibleTab === key ? "bg-amber text-[#161006] shadow-lg" : "text-faint hover:text-muted"
               }`}
             >
               {label}
@@ -229,7 +231,7 @@ export default function KarterBasinciPage() {
           ))}
         </div>
 
-        {tab === "new" && (
+        {canWrite && visibleTab === "new" && (
           <div className="animate-fade-in">
             <input
               type="date"
@@ -282,7 +284,7 @@ export default function KarterBasinciPage() {
           </div>
         )}
 
-        {tab === "history" && (
+        {visibleTab === "history" && (
           <div className="animate-fade-in">
             <select
               value={historyEngine}
@@ -326,7 +328,7 @@ export default function KarterBasinciPage() {
                         </>
                       )}
                     </div>
-                    {(user?.role === "yonetici" || user?.role === "planlamaci" || user?.id === r.uploaded_by_id) && (
+                    {(user?.role === "yonetici" || user?.id === r.uploaded_by_id) && (
                       <button
                         onClick={() => removeReading(r._id)}
                         className="text-[11px] text-red font-bold flex-shrink-0 ml-2 opacity-60 group-hover:opacity-100 hover:scale-110 transition"
@@ -341,7 +343,7 @@ export default function KarterBasinciPage() {
           </div>
         )}
 
-        {tab === "import" && (
+        {canWrite && visibleTab === "import" && (
           <div className="bg-panel border border-border rounded-card p-3.5 animate-fade-in">
             <div className="flex items-start gap-3 mb-3">
               <span className="text-2xl">📊</span>
@@ -379,7 +381,7 @@ export default function KarterBasinciPage() {
       </div>
 
       {/* 💾 Kaydet butonu — animate-fade-in DIŞINDA (transform fixed'i bozmasın diye) */}
-      {tab === "new" && (
+      {canWrite && visibleTab === "new" && (
         <div className="fixed bottom-32 md:bottom-8 left-0 right-0 z-40 px-4 pointer-events-none">
           <div className="max-w-lg mx-auto pointer-events-auto">
             <button

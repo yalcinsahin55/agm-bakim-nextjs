@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { ObjectId, type Db } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ async function recomputeLastMaintenance(db: Db, engineId: string, typeKey: strin
 }
 
 function canModify(user: any, record: any): boolean {
-  return ["yonetici", "planlamaci"].includes(user.role) || record.technician_id === user._id;
+  return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

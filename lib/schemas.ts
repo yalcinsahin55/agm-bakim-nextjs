@@ -36,7 +36,7 @@ export const adminUserSchema = z.object({
   full_name: z.string().trim().min(2, "Ad Soyad en az 2 karakter olmalı.").max(100),
   phone: z.string().trim().min(5, "Telefon numarası gereklidir.").max(30),
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır.").max(128),
-  role: z.enum(["yonetici", "planlamaci", "teknisyen", "goruntuleyici"]).default("teknisyen"),
+  role: z.enum(["yonetici", "teknisyen", "goruntuleyici"]).default("teknisyen"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -50,6 +50,7 @@ export default function YagAnalizleriPage() {
   const [filterEngine, setFilterEngine] = useState("Tümü");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [preview, setPreview] = useState<OilAnalysis | null>(null);
+  const canWrite = user?.role !== "goruntuleyici";
 
   async function load() {
     const [engRes, anaRes] = await Promise.all([fetch("/api/engines"), fetch("/api/oil-analyses")]);
@@ -181,18 +182,20 @@ export default function YagAnalizleriPage() {
     <div>
       <TopBar title="Yağ Analizleri" subtitle={`${filtered.length} rapor listeleniyor`} />
       <div className="px-4 py-4">
-        <button
-          onClick={() => setShowForm((s) => !s)}
+        {canWrite && (
+          <button
+            onClick={() => setShowForm((s) => !s)}
           className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
             showForm
               ? "border border-border text-muted hover:bg-panel2"
               : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"
           }`}
         >
-          {showForm ? "✕ Kapat" : "➕ Yeni Analiz Raporu Ekle"}
-        </button>
+            {showForm ? "✕ Kapat" : "➕ Yeni Analiz Raporu Ekle"}
+          </button>
+        )}
 
-        {showForm && (
+        {canWrite && showForm && (
           <div className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 flex flex-col gap-2 animate-fade-in">
             <select value={engineId} onChange={(e: ChangeEvent<HTMLSelectElement>) => setEngineId(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
@@ -251,7 +254,7 @@ export default function YagAnalizleriPage() {
                   >
                     📄 İndir
                   </button>
-                  {(user?.role === "yonetici" || user?.role === "planlamaci" || user?._id === a.uploaded_by_id) && (
+                  {(user?.role === "yonetici" || user?._id === a.uploaded_by_id) && (
                     confirmDeleteId === a._id ? (
                       <>
                         <button onClick={() => remove(a._id)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition">Evet</button>

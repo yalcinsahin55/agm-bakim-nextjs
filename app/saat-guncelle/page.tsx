@@ -18,7 +18,7 @@ export default function SaatGuncellePage() {
   const [values, setValues] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const canEdit = user && ["yonetici", "planlamaci"].includes(user.role);
+  const canEdit = user?.role === "yonetici";
 
   async function load() {
     const res = await fetch("/api/engines");

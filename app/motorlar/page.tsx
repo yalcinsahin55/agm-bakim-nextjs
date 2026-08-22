@@ -32,7 +32,7 @@ export default function MotorlarPage() {
   const [newLoad, setNewLoad] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const canAdd = user && ["yonetici", "planlamaci"].includes(user.role);
+  const canAdd = user?.role === "yonetici";
 
   async function load() {
     const engRes = await fetch("/api/engines");

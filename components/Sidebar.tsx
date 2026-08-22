@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
+import { canAccessRoute } from "@/lib/permissions";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface MenuItem {
   href: string;
@@ -29,6 +31,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [gecikmis, setGecikmis] = useState<number>(0);
+  const { user } = useCurrentUser();
 
   useEffect(() => {
     let alive = true;
@@ -76,7 +79,7 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-3 px-3">
         <div className="text-[9px] font-bold text-faint uppercase tracking-wider px-2 mb-2">Ana Menü</div>
         <div className="flex flex-col gap-0.5">
-          {ITEMS.map((item) => {
+          {ITEMS.filter((item) => canAccessRoute(user?.role, item.href)).map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
               <Link

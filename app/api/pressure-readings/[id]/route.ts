@@ -16,7 +16,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const doc = await col.findOne({ _id: new ObjectId(params.id) });
   if (!doc) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
-  const canDelete = ["yonetici", "planlamaci"].includes(user.role) || doc.uploaded_by_id === user._id;
+  const canDelete = user.role === "yonetici" || doc.uploaded_by_id === user._id;
   if (!canDelete) return NextResponse.json({ error: "Bu kaydı silme yetkiniz yok." }, { status: 403 });
 
   await col.deleteOne({ _id: doc._id });

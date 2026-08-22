@@ -9,7 +9,7 @@ import Skeleton from "@/components/Skeleton";
 import { ROLE_LABELS } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
-const ROLES = ["yonetici", "planlamaci", "teknisyen", "goruntuleyici"];
+const ROLES = ["yonetici", "teknisyen", "goruntuleyici"];
 
 const ROLE_COLORS = {
   yonetici: "text-amber bg-amber/10 border-amber/30",
@@ -204,6 +204,7 @@ export default function KullanicilarPage() {
               </div>
               <div className="flex gap-2 items-center">
                 <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value })} className="flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition">
+                  {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
                 <label className="flex items-center gap-1.5 text-[11px] text-muted flex-shrink-0 cursor-pointer">

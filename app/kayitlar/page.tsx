@@ -539,7 +539,7 @@ export default function KayitlarPage() {
               const videos = r.videos || [];
               const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
               // user._id veya user.id kontrolü (MongoDB standartlarına göre _id kullanılır)
-              const canEdit = user && (["yonetici", "planlamaci"].includes(user.role) || (user as any)?._id === r.technician_id || (user as any)?.id === r.technician_id);
+              const canEdit = user && (user.role === "yonetici" || (user as any)?._id === r.technician_id || (user as any)?.id === r.technician_id);
               return (
                 <div key={r._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
                   {!photos.length && !videos.length && (

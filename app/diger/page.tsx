@@ -3,6 +3,7 @@
 import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import { canAccessRoute, isAdmin } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const GROUPS = [
@@ -50,37 +51,44 @@ const GROUPS = [
 
 export default function DigerPage() {
   const { user } = useCurrentUser();
-  const isAdmin = user?.role === "yonetici";
+  const admin = isAdmin(user?.role);
 
   return (
     <div>
-      <TopBar title="Diğer Menüler" subtitle="Tüm modüllere hızlı erişim" />
+      <TopBar title="Diğer Menüler" subtitle="Rolünüze uygun modüller" />
       <div className="px-4 py-4 flex flex-col gap-2">
-        {GROUPS.filter((g) => !g.admin || isAdmin).map((group) => (
-          <section key={group.title}>
-            <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-4 mb-3 border-b border-border pb-2">
-              {group.title}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group flex items-center gap-3 bg-panel border border-border rounded-card p-3.5 hover:border-borderlt hover:-translate-y-0.5 transition-all"
-                >
-                  <div className="w-11 h-11 rounded-xl bg-panel2 border border-border flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
-                    {item.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-bold text-text truncate">{item.label}</div>
-                    <div className="text-[10.5px] text-faint mt-0.5 truncate">{item.desc}</div>
-                  </div>
-                  <span className="text-faint group-hover:text-amber group-hover:translate-x-1 transition-all">→</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))}
+        {GROUPS.map((group) => {
+          const items = group.admin
+            ? (admin ? group.items : [])
+            : group.items.filter((item) => canAccessRoute(user?.role, item.href));
+          if (items.length === 0) return null;
+
+          return (
+            <section key={group.title}>
+              <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-4 mb-3 border-b border-border pb-2">
+                {group.title}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="group flex items-center gap-3 bg-panel border border-border rounded-card p-3.5 hover:border-borderlt hover:-translate-y-0.5 transition-all"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-panel2 border border-border flex items-center justify-center text-xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold text-text truncate">{item.label}</div>
+                      <div className="text-[10.5px] text-faint mt-0.5 truncate">{item.desc}</div>
+                    </div>
+                    <span className="text-faint group-hover:text-amber group-hover:translate-x-1 transition-all">→</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
       <BottomNav />
     </div>

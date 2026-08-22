@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { put } from "@vercel/blob";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { canWriteMaintenance } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +28,8 @@ export async function POST(request: NextRequest) {
     if (!allowedContentTypes.has(file.type)) {
       return NextResponse.json({ error: "Desteklenmeyen dosya türü." }, { status: 415 });
     }
-    if (folder === "oil-analyses" && user.role === "goruntuleyici") {
-      return NextResponse.json({ error: "Bu hesap PDF yükleyemez." }, { status: 403 });
+    if (!canWriteMaintenance(user.role)) {
+      return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
     }
     if (file.type === "application/pdf" && file.size > maxPdfSize) {
       return NextResponse.json({ error: "PDF dosyası 10 MB’tan küçük olmalıdır." }, { status: 413 });

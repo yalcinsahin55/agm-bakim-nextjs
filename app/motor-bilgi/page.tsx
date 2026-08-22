@@ -213,7 +213,7 @@ export default function MotorBilgiPage() {
     );
   }
 
-  const canEdit = user && ["yonetici", "planlamaci"].includes(user.role);
+  const canEdit = user?.role === "yonetici";
 
   return (
     <div>

@@ -7,29 +7,85 @@ export type Permission =
   | "maintenance:write"
   | "reports:read";
 
+/** Yeni hesaplarda kullanılacak üç rol. `planlamaci` yalnızca eski kayıtlarla uyumluluk için tutulur. */
+export const ROLE_OPTIONS = ["yonetici", "teknisyen", "goruntuleyici"] as const;
+export type AssignableRole = (typeof ROLE_OPTIONS)[number];
+
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   yonetici: ["users:read", "users:write", "maintenance:read", "maintenance:write", "reports:read"],
+  // Eski planlamacı kayıtları, geçiş süresince teknisyen erişiminde çalışır.
   planlamaci: ["maintenance:read", "maintenance:write", "reports:read"],
   teknisyen: ["maintenance:read", "maintenance:write", "reports:read"],
   goruntuleyici: ["maintenance:read", "reports:read"],
 };
+
+export function normalizeRole(role: Role | string | undefined): AssignableRole | null {
+  if (role === "planlamaci") return "teknisyen";
+  if (role === "yonetici" || role === "teknisyen" || role === "goruntuleyici") return role;
+  return null;
+}
 
 export function hasPermission(role: Role | string | undefined, permission: Permission): boolean {
   if (!role || !(role in ROLE_PERMISSIONS)) return false;
   return ROLE_PERMISSIONS[role as Role].includes(permission);
 }
 
+export function isAdmin(role: Role | string | undefined): boolean {
+  return normalizeRole(role) === "yonetici";
+}
+
 export function canManageUsers(role: Role | string | undefined): boolean {
-  return hasPermission(role, "users:write");
+  return isAdmin(role);
 }
 
 export function canWriteMaintenance(role: Role | string | undefined): boolean {
   return hasPermission(role, "maintenance:write");
 }
 
+const TECHNICIAN_ROUTES = [
+  "/dashboard",
+  "/tamamla",
+  "/kayitlar",
+  "/diger",
+  "/karter-basinci",
+  "/saat-gecmisi",
+  "/yag-analizleri",
+  "/araliklar",
+];
+
+const VIEWER_ROUTES = [
+  "/dashboard",
+  "/motorlar",
+  "/kayitlar",
+  "/diger",
+  "/karter-basinci",
+  "/saat-gecmisi",
+  "/yag-analizleri",
+  "/araliklar",
+  "/motor-bilgi",
+  "/qr-etiketleri",
+  "/excel",
+  "/rapor",
+  "/istatistik",
+  "/bakim-turleri",
+  "/tahmin",
+];
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+/** Sayfa görünürlüğünün tek kaynağı; API yetkileri yine sunucuda ayrıca doğrulanır. */
+export function canAccessRoute(role: Role | string | undefined, pathname: string): boolean {
+  const normalized = normalizeRole(role);
+  if (normalized === "yonetici") return true;
+  const routes = normalized === "teknisyen" ? TECHNICIAN_ROUTES : normalized === "goruntuleyici" ? VIEWER_ROUTES : [];
+  return routes.some((route) => matchesRoute(pathname, route));
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   yonetici: "Yönetici",
-  planlamaci: "Planlamacı",
+  planlamaci: "Teknisyen (eski Planlamacı)",
   teknisyen: "Teknisyen",
   goruntuleyici: "Görüntüleyici",
 };

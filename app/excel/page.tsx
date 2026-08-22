@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -20,6 +21,8 @@ function fileToBase64(file) {
 
 export default function ExcelPage() {
   const router = useRouter();
+  const { user } = useCurrentUser();
+  const canImport = user?.role === "yonetici";
   const [importFile, setImportFile] = useState(null);
   const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
@@ -116,8 +119,8 @@ export default function ExcelPage() {
           </a>
         </div>
 
-        {/* İçe Aktar */}
-        <div className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all animate-fade-in">
+        {canImport && (
+          <div className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all animate-fade-in">
           <div className="flex items-start gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-amber/10 border border-amber/30 flex items-center justify-center text-xl flex-shrink-0">
               📥
@@ -152,7 +155,8 @@ export default function ExcelPage() {
               </span>
             ) : "🚀 İçe Aktar"}
           </button>
-        </div>
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>

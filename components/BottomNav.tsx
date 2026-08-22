@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
+import { canAccessRoute } from "@/lib/permissions";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 interface MenuItem {
   href: string;
@@ -23,6 +25,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [gecikmis, setGecikmis] = useState<number>(0);
+  const { user } = useCurrentUser();
 
   useEffect(() => {
     let alive = true;
@@ -54,7 +57,7 @@ export default function BottomNav() {
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
         <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4">
-          {ITEMS.map((item) => {
+          {ITEMS.filter((item) => canAccessRoute(user?.role, item.href)).map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
               <Link

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { canManageUsers } from "@/lib/permissions";
+import { canManageUsers, normalizeRole } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 
@@ -28,7 +28,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Kendi yönetici erişiminizi pasifleştiremez veya onayını kaldıramazsınız." }, { status: 400 });
   }
   const update: Record<string, any> = {};
-  if (role) update.role = role;
+  if (role !== undefined) {
+    const normalizedRole = normalizeRole(role);
+    if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });
+    update.role = normalizedRole;
+  }
   if (typeof active === "boolean") update.active = active;
   if (typeof approved === "boolean") update.approved = approved;
   if (phone !== undefined) {

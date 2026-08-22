@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/permissions";
 import { syncMaintenanceNotificationsForAllUsers } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,8 @@ export async function PATCH(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (!["yonetici", "planlamaci"].includes(user.role)) {
-      return NextResponse.json({ error: "Bu işlem için yönetici veya planlamacı yetkisi gerekir." }, { status: 403 });
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
     }
 
     const { updates } = await req.json();
