@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -103,6 +103,13 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [statusFilter, setStatusFilter] = useState("Tümü");
+  const maintenanceTypeSectionRef = useRef<HTMLHeadingElement | null>(null);
+
+  function showOverdueMaintenance() {
+    setStatusFilter("Gecikmiş");
+    setTypeFilter("Tümü");
+    window.setTimeout(() => maintenanceTypeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
 
   async function loadAnalytics(period: EnginePeriod = enginePeriod) {
     setAnalyticsLoading(true);
@@ -279,7 +286,7 @@ export default function DashboardPage() {
           <div className="bg-red/10 border border-red/40 rounded-card p-4 mb-4 flex items-center gap-3 animate-fade-in">
             <span className="text-2xl">🚨</span>
             <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-red">{counts.gecikmis} bakım gecikmiş durumda!</div><div className="text-[11px] text-muted mt-0.5">Gecikmiş bakımlar motor ömrünü kısaltır, hemen planlayın.</div></div>
-            <button onClick={() => { setStatusFilter("Gecikmiş"); setTypeFilter("Tümü"); }} className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition">Görüntüle</button>
+            <button onClick={showOverdueMaintenance} className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition">Görüntüle</button>
           </div>
         )}
 
@@ -377,7 +384,7 @@ export default function DashboardPage() {
           })}
         </div>
 
-        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
+        <h2 ref={maintenanceTypeSectionRef} id="maintenance-type-view" className="scroll-mt-20 font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
         <div className="flex flex-wrap gap-2 mb-3">{typeOptions.map((option) => <button key={option} onClick={() => setTypeFilter(option)} className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${typeFilter === option ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
         <div className="flex flex-wrap gap-2 mb-4">{["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((option) => <button key={option} onClick={() => setStatusFilter(option)} className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${statusFilter === option ? "bg-teal text-[#06181b] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
         {cardRows.length > 0 && <div className="text-[11px] text-muted mb-2"><b className="text-text">{cardRows.length}</b> bakım kaydı gösteriliyor</div>}
