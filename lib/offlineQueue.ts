@@ -18,6 +18,8 @@ export interface QueuedMedia {
 export interface QueuedRecordJob {
   id: string;
   createdAt: string;
+  method: "POST" | "PATCH";
+  endpoint: string;
   payload: Record<string, unknown>;
   media: QueuedMedia[];
   retryCount: number;
@@ -64,10 +66,22 @@ export function isOfflinePlaceholder(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(OFFLINE_PREFIX);
 }
 
-export async function queueRecord(payload: Record<string, unknown>, media: QueuedMedia[]): Promise<string> {
+export async function queueRecord(
+  payload: Record<string, unknown>,
+  media: QueuedMedia[],
+  options: { method?: "POST" | "PATCH"; endpoint?: string } = {},
+): Promise<string> {
   const database = await openDatabase();
   const id = makeId();
-  const job: QueuedRecordJob = { id, createdAt: new Date().toISOString(), payload, media, retryCount: 0 };
+  const job: QueuedRecordJob = {
+    id,
+    createdAt: new Date().toISOString(),
+    method: options.method || "POST",
+    endpoint: options.endpoint || "/api/records",
+    payload,
+    media,
+    retryCount: 0,
+  };
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(job);
@@ -166,8 +180,8 @@ export async function syncOfflineQueue(): Promise<{ synced: number; remaining: n
         }
       }
 
-      const response = await fetch("/api/records", {
-        method: "POST",
+      const response = await fetch(job.endpoint, {
+        method: job.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(job.payload),
       });

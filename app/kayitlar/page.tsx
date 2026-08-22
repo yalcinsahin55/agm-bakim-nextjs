@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { queueRecord, type QueuedMedia } from "@/lib/offlineQueue";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -93,16 +94,24 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: stri
   });
 }
 
-function getPhotoSrc(photo: string): string {
+function getPhotoSrc(photo: string, previews: Record<string, string> = {}): string {
+  if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
   return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
     ? photo
     : `data:image/jpeg;base64,${photo}`;
 }
 
-function getVideoSrc(v: VideoItem | string): string {
-  if (typeof v === "string") return v;
-  if (v && v.url) return v.url;
-  if (v && v.data_b64) return `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
+function makeOfflineId(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getVideoSrc(v: VideoItem | string, previews: Record<string, string> = {}): string {
+  const url = typeof v === "string" ? v : v?.url;
+  if (url?.startsWith("offline:")) return previews[url.slice("offline:".length)] || "";
+  if (url) return url;
+  if (typeof v !== "string" && v?.data_b64) return `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
   return "";
 }
 
@@ -119,6 +128,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
   const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
+  const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
+  const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
@@ -127,8 +138,15 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
-        const formData = new FormData();
         const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+        if (!navigator.onLine) {
+          const id = makeOfflineId();
+          setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+          uploaded.push(`offline:${id}`);
+          continue;
+        }
+        const formData = new FormData();
         formData.append("file", new File([compressed], photoName, { type: "image/jpeg" }));
         formData.append("folder", "photos");
         const response = await withTimeout(
@@ -140,6 +158,19 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
         uploaded.push(result.url);
       } catch (error) {
+        if (!navigator.onLine) {
+          try {
+            const compressed = await compressImage(f);
+            const id = makeOfflineId();
+            const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+            setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+            uploaded.push(`offline:${id}`);
+            continue;
+          } catch {
+            // Genel hata aşağıda gösterilir.
+          }
+        }
         const message = error instanceof Error ? error.message : "Bilinmeyen hata";
         toast.error(`${f.name} yüklenemedi: ${message}`);
       }
@@ -155,14 +186,28 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         toast.error(`'${f.name}' çok büyük (en fazla 100MB).`);
         continue;
       }
+      if (!navigator.onLine) {
+        const id = makeOfflineId();
+        setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
+        setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+        setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
+        continue;
+      }
       try {
         const url = await withTimeout(
           uploadVideoChunked(f),
-          180_000,
+          600_000,
           "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
         );
         setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
       } catch (err: any) {
+        if (!navigator.onLine) {
+          const id = makeOfflineId();
+          setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
+          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+          setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
+          continue;
+        }
         console.error("Video yükleme hatası:", err);
         toast.error(`${f.name} yüklenemedi: ${err?.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
       }
@@ -173,17 +218,25 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   async function save() {
     setBusy(true);
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
+    const payload = {
+      hour_at_completion: Number(hours),
+      technician_note: techNote,
+      photos,
+      videos,
+      pressure_reading: pressure !== "" ? Number(pressure) : undefined,
+    };
     try {
+      if (!navigator.onLine || offlineMedia.length > 0) {
+        await queueRecord(payload, offlineMedia, { method: "PATCH", endpoint: `/api/records/${record._id}` });
+        toast.dismiss(loadingToast);
+        toast.success(navigator.onLine ? "Güncelleme senkronizasyon kuyruğuna alındı." : "İnternet yok. Güncelleme güvenle kuyruğa alındı.");
+        onSaved();
+        return;
+      }
       const res = await fetch(`/api/records/${record._id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hour_at_completion: Number(hours),
-          technician_note: techNote,
-          photos,
-          videos,
-          pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
@@ -229,17 +282,22 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         />
       )}
 
+      {offlineMedia.length > 0 && (
+        <div className="rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-2 text-[10.5px] text-amber">
+          {offlineMedia.length} medya bağlantı gelince yüklenecek; kaydettiğinde güncelleme kuyruğa alınır.
+        </div>
+      )}
       {photos.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           {photos.map((p, idx) => (
             <div key={idx} className="relative">
               <button
                 type="button"
-                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p))}
+                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p, offlinePreviews))}
                 className="block hover:scale-105 transition-transform"
                 aria-label="Fotoğrafı büyüt"
               >
-                <img src={getPhotoSrc(p)} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+                <img src={getPhotoSrc(p, offlinePreviews)} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
               </button>
               <button
                 onClick={() => setPhotos((ph) => ph.filter((_, i) => i !== idx))}
@@ -314,6 +372,7 @@ export default function KayitlarPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; filename: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
 
   async function load(requestedPage = 1) {
     const params = new URLSearchParams({ page: String(requestedPage), page_size: "25" });
@@ -367,6 +426,11 @@ export default function KayitlarPage() {
   async function openEdit(record: MaintenanceRecord) {
     const detail = await loadRecordMedia(record);
     if (detail) setEditingId(detail._id);
+  }
+
+  async function openDetails(record: MaintenanceRecord) {
+    const detail = await loadRecordMedia(record);
+    if (detail) setSelectedRecord(detail);
   }
 
   async function doDelete(id: string) {
@@ -498,7 +562,7 @@ export default function KayitlarPage() {
                           className="hover:scale-105 transition-transform"
                           aria-label="Fotoğrafı büyüt"
                         >
-                          <img src={`data:image/jpeg;base64,${p}`} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                          <img src={getPhotoSrc(p)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
                         </button>
                       ))}
                     </div>
@@ -534,39 +598,47 @@ export default function KayitlarPage() {
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
 
-                  {canEdit && (
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => editingId === r._id ? setEditingId(null) : openEdit(r)}
-                        className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
-                      >
-                        ✏️ Düzenle
-                      </button>
-                      {confirmDeleteId === r._id ? (
-                        <>
-                          <button
-                            onClick={() => doDelete(r._id)}
-                            className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition"
-                          >
-                            Evet, Sil
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition"
-                          >
-                            Vazgeç
-                          </button>
-                        </>
-                      ) : (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => void openDetails(r)}
+                      className="text-[11px] font-bold text-amber border border-amber/40 rounded-lg px-2.5 py-1.5 hover:bg-amber/10 transition"
+                    >
+                      🔎 Detay
+                    </button>
+                    {canEdit && (
+                      <>
                         <button
-                          onClick={() => setConfirmDeleteId(r._id)}
-                          className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition"
+                          onClick={() => editingId === r._id ? setEditingId(null) : void openEdit(r)}
+                          className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
                         >
-                          🗑️ Sil
+                          ✏️ Düzenle
                         </button>
-                      )}
-                    </div>
-                  )}
+                        {confirmDeleteId === r._id ? (
+                          <>
+                            <button
+                              onClick={() => doDelete(r._id)}
+                              className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition"
+                            >
+                              Evet, Sil
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition"
+                            >
+                              Vazgeç
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(r._id)}
+                            className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition"
+                          >
+                            🗑️ Sil
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   {editingId === r._id && (
                     <EditForm
@@ -607,6 +679,44 @@ export default function KayitlarPage() {
           </>
         )}
       </div>
+
+      {/* Bakım Kaydı Detay Modalı */}
+      {selectedRecord && (
+        <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/75 backdrop-blur-sm p-0 md:p-4" role="dialog" aria-modal="true" aria-label="Bakım kaydı detayı">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl md:rounded-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in">
+            <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
+              <div>
+                <div className="text-base font-extrabold text-text">{selectedRecord.type_label}</div>
+                <div className="mt-0.5 text-[11px] text-muted">{selectedRecord.engine_name} · {new Date(selectedRecord.created_at).toLocaleDateString("tr-TR")}</div>
+              </div>
+              <button type="button" onClick={() => setSelectedRecord(null)} className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Detayı kapat">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Teknisyen</div><div className="mt-0.5 font-semibold text-text">{selectedRecord.technician_name || "—"}</div></div>
+            </div>
+            {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
+            {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}
+            {((selectedRecord.photos || selectedRecord.photos_b64 || []).length > 0 || (selectedRecord.videos || []).length > 0) && (
+              <div className="mt-4">
+                <div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">Medya</div>
+                <div className="flex flex-wrap gap-2">
+                  {(selectedRecord.photos || selectedRecord.photos_b64 || []).map((photo, index) => (
+                    <button type="button" key={`detail-photo-${index}`} onClick={() => setSelectedPhoto(getPhotoSrc(photo))} className="overflow-hidden rounded-lg border border-border hover:scale-105 transition-transform">
+                      <img src={getPhotoSrc(photo)} className="h-20 w-20 object-cover" alt={`Bakım fotoğrafı ${index + 1}`} />
+                    </button>
+                  ))}
+                  {(selectedRecord.videos || []).map((video, index) => {
+                    const src = getVideoSrc(video);
+                    return src ? <button type="button" key={`detail-video-${index}`} onClick={() => setSelectedVideo({ src, filename: video.filename || "Video" })} className="flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-black text-2xl text-white">▶</button> : null;
+                  })}
+                </div>
+              </div>
+            )}
+            <button type="button" onClick={() => setSelectedRecord(null)} className="mt-4 w-full rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Kapat</button>
+          </div>
+        </div>
+      )}
 
       {/* Video Oynatıcı Modal */}
       {selectedVideo && (
