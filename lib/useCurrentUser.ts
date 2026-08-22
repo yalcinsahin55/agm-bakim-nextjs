@@ -7,8 +7,10 @@ interface CurrentUser {
   _id: string;
   full_name: string;
   email?: string;
+  phone?: string;
   role: string;
   active?: boolean;
+  approved?: boolean;
 }
 
 export function useCurrentUser() {

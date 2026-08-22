@@ -5,10 +5,13 @@ export type Role = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";
 export interface User {
   _id: string;
   full_name: string;
-  email: string;
+  email?: string;
+  phone?: string;
+  phone_normalized?: string;
   password_hash: string;
   role: Role;
   active: boolean;
+  approved?: boolean;
   created_at: Date | string;
 }
 

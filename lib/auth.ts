@@ -55,7 +55,8 @@ export async function getCurrentUser(
   if (!userId) return null;
 
   const user = await usersCol.findOne({ _id: userId });
-  if (!user || user.active === false) return null;
+  // Eski kullanıcı belgelerinde approved alanı yoksa mevcut hesaplar geriye dönük onaylı kabul edilir.
+  if (!user || user.active === false || user.approved === false) return null;
 
   return user;
 }

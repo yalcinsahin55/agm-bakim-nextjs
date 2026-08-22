@@ -1,35 +1,47 @@
 import { z, type ZodError } from "zod";
 
-// 🔐 Giriş validasyonu
+// 🔐 Giriş validasyonu. `email` alanı eski istemcilerle geriye dönük uyumludur.
 export const loginSchema = z.object({
-  email: z
-    .string({ required_error: "E-posta gereklidir." })
-    .trim()
-    .email("Geçerli bir e-posta adresi girin.")
-    .max(254, "E-posta adresi çok uzun."),
+  identifier: z.string().trim().min(3, "Telefon numarası veya e-posta gereklidir.").max(254).optional(),
+  email: z.string().trim().max(254).optional(),
+  phone: z.string().trim().max(30).optional(),
   password: z
     .string({ required_error: "Şifre gereklidir." })
     .min(6, "Şifre en az 6 karakter olmalıdır.")
     .max(128, "Şifre çok uzun."),
+}).refine((data) => Boolean(data.identifier || data.email || data.phone), {
+  message: "Telefon numarası veya e-posta gereklidir.",
+  path: ["identifier"],
 });
 
-// 👤 Kayıt validasyonu
+// 👤 İlk kurulum kaydı. Sistem kurulduktan sonra bu endpoint yeni kayıtları kapatır.
 export const registerSchema = z.object({
   full_name: z
     .string({ required_error: "Ad Soyad gereklidir." })
     .trim()
     .min(2, "Ad Soyad en az 2 karakter olmalı.")
     .max(100, "Ad Soyad çok uzun."),
-  email: z
-    .string({ required_error: "E-posta gereklidir." })
-    .trim()
-    .email("Geçerli bir e-posta adresi girin.")
-    .max(254, "E-posta adresi çok uzun."),
+  phone: z.string().trim().max(30).optional(),
+  email: z.string().trim().email("Geçerli bir e-posta adresi girin.").max(254).optional(),
   password: z
     .string({ required_error: "Şifre gereklidir." })
     .min(6, "Şifre en az 6 karakter olmalıdır.")
     .max(128, "Şifre çok uzun."),
+}).refine((data) => Boolean(data.phone || data.email), {
+  message: "Telefon numarası veya e-posta gereklidir.",
+  path: ["phone"],
 });
+
+export const adminUserSchema = z.object({
+  full_name: z.string().trim().min(2, "Ad Soyad en az 2 karakter olmalı.").max(100),
+  phone: z.string().trim().min(5, "Telefon numarası gereklidir.").max(30),
+  password: z.string().min(6, "Şifre en az 6 karakter olmalıdır.").max(128),
+  role: z.enum(["yonetici", "planlamaci", "teknisyen", "goruntuleyici"]).default("teknisyen"),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type AdminUserInput = z.infer<typeof adminUserSchema>;
 
 // 📋 Bakım kaydı validasyonu
 export const recordSchema = z.object({
@@ -98,8 +110,6 @@ export const recordSchema = z.object({
 });
 
 // 🔍 Schema'lardan türetilen tipler (TypeScript'in gücü burada!)
-export type LoginInput = z.infer<typeof loginSchema>;
-export type RegisterInput = z.infer<typeof registerSchema>;
 export type RecordInput = z.infer<typeof recordSchema>;
 
 // Zod hatalarını tek okunabilir mesajda birleştir

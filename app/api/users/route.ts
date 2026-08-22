@@ -3,6 +3,9 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
+import { writeAuditLog } from "@/lib/audit";
+import { adminUserSchema, formatZodError } from "@/lib/schemas";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +19,8 @@ export async function GET(req: NextRequest) {
 
     const users = await usersCol.find().toArray();
     return NextResponse.json(users.map((u: any) => ({
-      id: u._id, full_name: u.full_name, email: u.email, role: u.role, active: u.active !== false, created_at: u.created_at,
+      id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
+      active: u.active !== false, approved: u.approved !== false, created_at: u.created_at,
     })));
   } catch (error) {
     console.error("Kullanıcılar getirilirken hata:", error);
@@ -32,27 +36,35 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
 
-    const { full_name, email, password, role } = await req.json();
-
-    // E-posta ve şifre kontrolü
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!full_name || !email || !emailRegex.test(email)) {
-      return NextResponse.json({ error: "Lütfen geçerli bir isim ve e-posta adresi girin." }, { status: 400 });
+    const parsed = adminUserSchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    if (!password || password.length < 6) {
-      return NextResponse.json({ error: "Şifre en az 6 karakter olmalıdır." }, { status: 400 });
+    const { full_name, phone, password, role } = parsed.data;
+    try {
+      await usersCol.createIndex({ phone_normalized: 1 }, { unique: true, sparse: true, name: "users_phone_normalized_unique" });
+    } catch (indexError) {
+      console.warn("Telefon benzersiz indeksi oluşturulamadı; mevcut kayıtlar korunuyor.", indexError);
+    }
+    if (!isValidPhone(phone)) {
+      return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin (05xx xxx xx xx)." }, { status: 400 });
     }
 
-    const id = email.toLowerCase().trim();
-    const existing = await usersCol.findOne({ _id: id });
-    if (existing) return NextResponse.json({ error: "Bu e-posta zaten kayıtlı." }, { status: 409 });
+    const normalizedPhone = normalizePhone(phone);
+    const existing = await usersCol.findOne({ $or: [{ _id: normalizedPhone }, { phone_normalized: normalizedPhone }, { phone: normalizedPhone }] });
+    if (existing) return NextResponse.json({ error: "Bu telefon numarası zaten kayıtlı." }, { status: 409 });
 
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
-      _id: id, full_name: full_name.trim(), email: id, password_hash: passwordHash,
-      role: role || "teknisyen", active: true, created_at: new Date(),
+      _id: normalizedPhone, full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
+      password_hash: passwordHash, role, active: true, approved: false, created_at: new Date(),
     });
-    return NextResponse.json({ ok: true });
+    await writeAuditLog(db, {
+      user, action: "create", entity: "user", entityId: normalizedPhone,
+      summary: `${full_name.trim()} kullanıcısı oluşturuldu; yönetici onayı bekliyor.`,
+      after: { full_name: full_name.trim(), phone: normalizedPhone, role, active: true, approved: false },
+    });
+    return NextResponse.json({ ok: true, approved: false });
   } catch (error) {
     console.error("Kullanıcı eklenirken hata:", error);
     return NextResponse.json({ error: "Kullanıcı eklenirken bir hata oluştu." }, { status: 500 });

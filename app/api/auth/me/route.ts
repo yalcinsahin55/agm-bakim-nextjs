@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     id: user._id,
     full_name: user.full_name,
-    email: user.email,
+    email: user.email || "",
+    phone: user.phone || user.phone_normalized || "",
     role: user.role,
+    approved: user.approved !== false,
   });
 }

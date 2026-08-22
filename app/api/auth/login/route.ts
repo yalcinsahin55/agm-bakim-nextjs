@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { verifyPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { loginSchema, formatZodError } from "@/lib/schemas";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -24,24 +25,32 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { email, password } = parsed.data;
+    const { password } = parsed.data;
+    const identifier = parsed.data.identifier || parsed.data.phone || parsed.data.email || "";
+    const normalizedIdentifier = isValidPhone(identifier) ? normalizePhone(identifier) : identifier.toLowerCase().trim();
 
     const db = await getDb();
     const usersCol = db.collection("users") as any;
-    const user = await usersCol.findOne({ _id: email.toLowerCase() });
+    const user = await usersCol.findOne({
+      $or: [{ _id: normalizedIdentifier }, { email: normalizedIdentifier }, { phone_normalized: normalizedIdentifier }, { phone: normalizedIdentifier }],
+    });
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
-      return NextResponse.json({ error: "E-posta veya şifre hatalı." }, { status: 401 });
+      return NextResponse.json({ error: "Telefon numarası/e-posta veya şifre hatalı." }, { status: 401 });
     }
 
-    if (!user.active) {
+    if (user.approved === false) {
+      return NextResponse.json({ error: "Hesabınız yönetici onayı bekliyor. Onay verildiğinde giriş yapabilirsiniz." }, { status: 403 });
+    }
+
+    if (user.active === false) {
       return NextResponse.json({ error: "Hesabınız pasif durumda. Yöneticinizle iletişime geçin." }, { status: 403 });
     }
 
     const token = await createSessionToken(user._id);
     const res = NextResponse.json({
       ok: true,
-      user: { id: user._id, full_name: user.full_name, role: user.role },
+      user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role },
     });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,

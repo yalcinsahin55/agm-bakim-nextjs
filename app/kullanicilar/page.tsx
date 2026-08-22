@@ -28,7 +28,7 @@ export default function KullanicilarPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "teknisyen" });
+  const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen" });
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -52,7 +52,7 @@ export default function KullanicilarPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success("Kullanıcı eklendi! 👥");
-        setForm({ full_name: "", email: "", password: "", role: "teknisyen" });
+        setForm({ full_name: "", phone: "", password: "", role: "teknisyen" });
         setShowForm(false);
         load();
       } else {
@@ -158,11 +158,12 @@ export default function KullanicilarPage() {
         {showForm && (
           <div className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 flex flex-col gap-2 animate-fade-in">
             <input placeholder="👤 Adı Soyadı" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-            <input type="email" placeholder="✉️ E-posta" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+            <input type="tel" inputMode="tel" placeholder="📱 Telefon (05xx xxx xx xx)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
             <input type="password" placeholder="🔒 Şifre" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
+            <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz.</p>
             <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
@@ -183,11 +184,23 @@ export default function KullanicilarPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-bold text-text truncate">{u.full_name}</div>
-                  <div className="text-[11px] text-faint truncate">{u.email}</div>
+                  <div className="text-[11px] text-faint truncate">{u.phone || u.email || "Telefon tanımlanmamış"}</div>
                 </div>
                 <span className={`text-[9.5px] font-extrabold px-2 py-1 rounded-full border flex-shrink-0 ${ROLE_COLORS[u.role] || ROLE_COLORS.goruntuleyici}`}>
                   {ROLE_LABELS[u.role] || u.role}
                 </span>
+              </div>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className={`rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${u.approved ? "border-green/30 bg-green/10 text-green" : "border-amber/30 bg-amber/10 text-amber"}`}>
+                  {u.approved ? "Onaylı erişim" : "Onay bekliyor"}
+                </span>
+                <button onClick={() => updateUser(u.id, { approved: !u.approved })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${u.approved ? "border-border text-muted hover:bg-panel2" : "border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
+                  {u.approved ? "Onayı kaldır" : "Onayla"}
+                </button>
+              </div>
+              <div className="mb-2 flex gap-2 items-center">
+                <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item))} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
+                <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
               </div>
               <div className="flex gap-2 items-center">
                 <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value })} className="flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition">

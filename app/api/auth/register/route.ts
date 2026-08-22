@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { hashPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { registerSchema, formatZodError } from "@/lib/schemas";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +25,22 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { full_name, email, password } = parsed.data;
+    const { full_name, email, phone, password } = parsed.data;
+    const normalizedPhone = phone ? normalizePhone(phone) : "";
+    const normalizedEmail = email ? email.toLowerCase().trim() : "";
+    if (phone && !isValidPhone(phone)) {
+      return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin." }, { status: 400 });
+    }
 
     const db = await getDb();
     const usersCol = db.collection("users") as any;
-    const id = email.toLowerCase();
+    const id = normalizedPhone || normalizedEmail;
 
-    const existing = await usersCol.findOne({ _id: id });
+    const existing = await usersCol.findOne({
+      $or: [{ _id: id }, { phone: normalizedPhone }, { email: normalizedEmail }],
+    });
     if (existing) {
-      return NextResponse.json({ error: "Bu e-posta adresi zaten kullanılıyor." }, { status: 409 });
+      return NextResponse.json({ error: "Bu telefon numarası veya e-posta zaten kullanılıyor." }, { status: 409 });
     }
 
     // 🔐 GÜVENLİK: Sistemde kullanıcı varken halka açık kayıt KAPALIDIR.
@@ -48,12 +56,13 @@ export async function POST(req: NextRequest) {
     // İlk kurulum: ilk kullanıcı yönetici olur
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
-      _id: id, full_name, email: id, password_hash: passwordHash,
-      role: "yonetici", active: true, created_at: new Date(),
+      _id: id, full_name: full_name.trim(), email: normalizedEmail,
+      ...(normalizedPhone ? { phone: phone?.trim(), phone_normalized: normalizedPhone } : {}),
+      password_hash: passwordHash, role: "yonetici", active: true, approved: true, created_at: new Date(),
     });
 
     const token = await createSessionToken(id);
-    const res = NextResponse.json({ ok: true, user: { id, full_name, role: "yonetici" } });
+    const res = NextResponse.json({ ok: true, user: { id, full_name, phone: normalizedPhone, email: normalizedEmail, role: "yonetici" } });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
