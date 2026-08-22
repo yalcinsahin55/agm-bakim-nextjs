@@ -18,8 +18,9 @@ declare global {
 if (!global._mongoClientPromise) {
   const client = new MongoClient(uri, {
     maxPoolSize: 10,
-    minPoolSize: 2,
+    minPoolSize: 0,
     maxIdleTimeMS: 60000,
+    serverSelectionTimeoutMS: 8000,
   });
 
   global._mongoClientPromise = client.connect();

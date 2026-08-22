@@ -14,10 +14,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const doc = await (db.collection("oil_analyses") as any).findOne(
     { _id: new ObjectId(params.id) },
-    { projection: { pdf_b64: 1, pdf_filename: 1 } },
+    { projection: { pdf_url: 1, pdf_b64: 1, pdf_filename: 1 } },
   );
-  if (!doc?.pdf_b64) return NextResponse.json({ error: "PDF bulunamadı." }, { status: 404 });
-  return NextResponse.json({ pdf_b64: doc.pdf_b64, pdf_filename: doc.pdf_filename || "analiz.pdf" });
+  if (!doc?.pdf_url && !doc?.pdf_b64) return NextResponse.json({ error: "PDF bulunamadı." }, { status: 404 });
+  return NextResponse.json({ pdf_url: doc.pdf_url, pdf_b64: doc.pdf_b64, pdf_filename: doc.pdf_filename || "analiz.pdf" });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

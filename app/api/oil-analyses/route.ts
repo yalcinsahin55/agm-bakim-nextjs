@@ -35,30 +35,36 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (user.role === "goruntuleyici") return NextResponse.json({ error: "Görüntüleyici rolü rapor ekleyemez." }, { status: 403 });
 
-    const { engine_id, analysis_date, result, note, pdf_b64, pdf_filename } = await req.json();
-    if (!engine_id || !pdf_b64) {
+    const { engine_id, analysis_date, result, note, pdf_url, pdf_b64, pdf_filename } = await req.json();
+    if (!engine_id || (!pdf_url && !pdf_b64)) {
       return NextResponse.json({ error: "Motor ve PDF dosyası gerekli." }, { status: 400 });
     }
-
-    // Base64 boyut kontrolü (10MB sınır)
-    if (pdf_b64.length > 10 * 1024 * 1024 * 1.4) {
-      return NextResponse.json({ error: "Dosya 10MB sınırını aşıyor. Lütfen daha küçük bir dosya yükleyin." }, { status: 400 });
+    if (pdf_url && typeof pdf_url !== "string") {
+      return NextResponse.json({ error: "Geçersiz PDF bağlantısı." }, { status: 400 });
     }
-
-    // Base64 formatı kontrolü
-    if (!pdf_b64.startsWith("data:application/pdf;base64,")) {
-      return NextResponse.json({ error: "Geçersiz PDF formatı. Lütfen sadece PDF dosyası yükleyin." }, { status: 400 });
+    if (pdf_b64 && (typeof pdf_b64 !== "string" || pdf_b64.length > 10 * 1024 * 1024 * 1.4)) {
+      return NextResponse.json({ error: "Dosya 10MB sınırını aşıyor." }, { status: 400 });
+    }
+    if (pdf_b64 && !pdf_b64.startsWith("data:application/pdf;base64,")) {
+      return NextResponse.json({ error: "Geçersiz PDF formatı." }, { status: 400 });
     }
 
     const engine = await (db.collection("engines") as any).findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
-    const doc = {
-      engine_id, engine_name: engine.name,
+    const doc: Record<string, unknown> = {
+      engine_id,
+      engine_name: engine.name,
       analysis_date: analysis_date ? new Date(analysis_date) : new Date(),
-      result: result || "İyi", note: note || "", pdf_b64, pdf_filename: pdf_filename || "analiz.pdf",
-      uploaded_by: user.full_name, uploaded_by_id: user._id, created_at: new Date(),
+      result: result || "İyi",
+      note: note || "",
+      pdf_filename: pdf_filename || "analiz.pdf",
+      uploaded_by: user.full_name,
+      uploaded_by_id: user._id,
+      created_at: new Date(),
     };
+    if (pdf_url) doc.pdf_url = pdf_url;
+    else doc.pdf_b64 = pdf_b64;
     const res = await (db.collection("oil_analyses") as any).insertOne(doc);
     return NextResponse.json({ ok: true, id: res.insertedId });
   } catch (error) {

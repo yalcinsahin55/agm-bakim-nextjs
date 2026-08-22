@@ -23,6 +23,7 @@ interface OilAnalysis {
   analysis_date: string;
   result: string;
   note?: string;
+  pdf_url?: string;
   pdf_b64?: string;
   pdf_filename: string;
   uploaded_by: string;
@@ -31,15 +32,6 @@ interface OilAnalysis {
 }
 
 const RESULT_ICON: Record<string, string> = { "İyi": "🟢", "Dikkat": "", "Kötü": "🔴" };
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function YagAnalizleriPage() {
   const router = useRouter();
@@ -80,10 +72,16 @@ export default function YagAnalizleriPage() {
     setSaving(true);
     const loadingToast = toast.loading("Rapor yükleniyor...");
     try {
-      const pdf_b64 = await fileToBase64(file);
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("folder", "oil-analyses");
+      const uploadRes = await fetch("/api/blob/upload-server", { method: "POST", body: uploadData });
+      const uploadResult = await uploadRes.json() as { url?: string; error?: string };
+      if (!uploadRes.ok || !uploadResult.url) throw new Error(uploadResult.error || "PDF yüklenemedi.");
+
       const res = await fetch("/api/oil-analyses", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ engine_id: engineId, analysis_date: date, result, note, pdf_b64, pdf_filename: file.name }),
+        body: JSON.stringify({ engine_id: engineId, analysis_date: date, result, note, pdf_url: uploadResult.url, pdf_filename: file.name }),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
@@ -95,9 +93,9 @@ export default function YagAnalizleriPage() {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Rapor kaydedilemedi.");
       }
-    } catch {
+    } catch (error) {
       toast.dismiss(loadingToast);
-      toast.error("Sunucu hatası.");
+      toast.error(error instanceof Error ? error.message : "Sunucu hatası.");
     } finally {
       setSaving(false);
     }
@@ -108,7 +106,12 @@ export default function YagAnalizleriPage() {
       const res = await fetch(`/api/oil-analyses/${analysis._id}`);
       if (!res.ok) throw new Error("PDF yüklenemedi");
       const data = await res.json();
-      return { ...analysis, pdf_b64: data.pdf_b64, pdf_filename: data.pdf_filename || analysis.pdf_filename };
+      return {
+        ...analysis,
+        pdf_url: data.pdf_url || analysis.pdf_url,
+        pdf_b64: data.pdf_b64 || analysis.pdf_b64,
+        pdf_filename: data.pdf_filename || analysis.pdf_filename,
+      };
     } catch {
       toast.error("PDF yüklenemedi.");
       return null;
@@ -122,9 +125,12 @@ export default function YagAnalizleriPage() {
 
   async function downloadPdf(analysis: OilAnalysis) {
     const detail = await loadPdf(analysis);
-    if (!detail?.pdf_b64) return;
+    const source = detail?.pdf_url || (detail?.pdf_b64 ? `data:application/pdf;base64,${detail.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : null);
+    if (!source) return;
     const link = document.createElement("a");
-    link.href = `data:application/pdf;base64,${detail.pdf_b64}`;
+    link.href = source;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
     link.download = detail.pdf_filename;
     link.click();
   }
@@ -275,7 +281,7 @@ export default function YagAnalizleriPage() {
               </button>
             </div>
             <iframe
-              src={preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64}` : undefined}
+              src={preview.pdf_url || (preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : undefined)}
               title={preview.pdf_filename}
               className="w-full h-[calc(100%-3rem)] rounded-xl border border-border bg-white"
             />
