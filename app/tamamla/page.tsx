@@ -115,7 +115,11 @@ export default function TamamlaPage() {
 
   async function loadPanel() {
     const res = await fetch("/api/maintenance-types/panel");
-    if (res.status === 401) { router.push("/login"); return; }
+    if (res.status === 401) {
+      const redirect = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
+      return;
+    }
     const data = await res.json();
     setItems(data.items);
     setEngines(data.engines);
