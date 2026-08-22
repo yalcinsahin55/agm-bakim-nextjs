@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      engine_id, type_key, type_label, hour_at_completion, note, technician_note,
+      client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
     } = parsed.data as RecordInput;
 
@@ -112,11 +112,17 @@ export async function POST(req: NextRequest) {
     const typesCol = db.collection("maintenance_types") as any;
     const recordsCol = db.collection("maintenance_records") as any;
 
+    if (client_request_id) {
+      const existing = await recordsCol.findOne({ client_request_id }, { projection: { type_label: 1, group_id: 1 } });
+      if (existing) return NextResponse.json({ ok: true, duplicate: true, completed: [existing.type_label], group_id: existing.group_id });
+    }
+
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
+    if (client_request_id) await recordsCol.createIndex({ client_request_id: 1 }, { unique: true, sparse: true });
 
     async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean) {
       const rec: any = {
@@ -128,6 +134,7 @@ export async function POST(req: NextRequest) {
         photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
         technician_id: user._id, technician_name: user.full_name,
+        client_request_id: client_request_id || undefined,
         created_at: createdAt, backdated: !!backdated,
         group_id: groupId, grouped_with: isPrimary ? null : tLabel,
       };

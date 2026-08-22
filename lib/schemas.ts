@@ -33,6 +33,7 @@ export const registerSchema = z.object({
 
 // 📋 Bakım kaydı validasyonu
 export const recordSchema = z.object({
+  client_request_id: z.string().min(8).max(100).optional(),
   engine_id: z.string().min(1, "Motor seçimi zorunludur."),
   type_key: z.string().min(1, "Bakım türü zorunludur."),
   type_label: z.string().min(1, "Bakım türü adı zorunludur."),

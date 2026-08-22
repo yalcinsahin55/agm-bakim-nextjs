@@ -66,6 +66,8 @@ export function isOfflinePlaceholder(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(OFFLINE_PREFIX);
 }
 
+let activeSync: Promise<{ synced: number; remaining: number; error?: string }> | null = null;
+
 export async function queueRecord(
   payload: Record<string, unknown>,
   media: QueuedMedia[],
@@ -73,12 +75,13 @@ export async function queueRecord(
 ): Promise<string> {
   const database = await openDatabase();
   const id = makeId();
+  const jobPayload = { ...payload, client_request_id: id };
   const job: QueuedRecordJob = {
     id,
     createdAt: new Date().toISOString(),
     method: options.method || "POST",
     endpoint: options.endpoint || "/api/records",
-    payload,
+    payload: jobPayload,
     media,
     retryCount: 0,
   };
@@ -153,7 +156,7 @@ function replaceVideoPlaceholder(videos: unknown, id: string, url: string): unkn
   }) : [];
 }
 
-export async function syncOfflineQueue(): Promise<{ synced: number; remaining: number; error?: string }> {
+async function runOfflineSync(): Promise<{ synced: number; remaining: number; error?: string }> {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     return { synced: 0, remaining: await getPendingOfflineCount(), error: "İnternet bağlantısı yok." };
   }
@@ -162,7 +165,11 @@ export async function syncOfflineQueue(): Promise<{ synced: number; remaining: n
   let synced = 0;
   let lastError: string | undefined;
   for (const originalJob of jobs) {
-    const job: QueuedRecordJob = { ...originalJob, payload: { ...originalJob.payload }, media: [...originalJob.media] };
+    const job: QueuedRecordJob = {
+      ...originalJob,
+      payload: { ...originalJob.payload, client_request_id: originalJob.payload.client_request_id || originalJob.id },
+      media: [...originalJob.media],
+    };
     try {
       for (const media of job.media) {
         const storedBlob = media.blob;
@@ -201,4 +208,9 @@ export async function syncOfflineQueue(): Promise<{ synced: number; remaining: n
   }
 
   return { synced, remaining: await getPendingOfflineCount(), error: lastError };
+}
+
+export function syncOfflineQueue(): Promise<{ synced: number; remaining: number; error?: string }> {
+  if (!activeSync) activeSync = runOfflineSync().finally(() => { activeSync = null; });
+  return activeSync;
 }
