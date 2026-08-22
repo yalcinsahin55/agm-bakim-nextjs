@@ -30,7 +30,8 @@ const GROUPS = [
     title: "Bilgi & Rapor",
     items: [
       { href: "/motor-bilgi", icon: "🛠️", label: "Motor Bilgi Kartı", desc: "Kaver, filtre, eşanjör referansları" },
-     { href: "/excel", icon: "📊", label: "Excel", desc: "Çok sayfalı rapor ve içe aktarma" },
+      { href: "/qr-etiketleri", icon: "▣", label: "QR Etiketleri", desc: "Motor QR kodlarını yazdır ve PDF al" },
+      { href: "/excel", icon: "📊", label: "Excel", desc: "Çok sayfalı rapor ve içe aktarma" },
       { href: "/rapor", icon: "📄", label: "Motor Bakım Raporu", desc: "Yazdırılabilir bakım geçmişi raporu" },
       { href: "/istatistik", icon: "📈", label: "İstatistikler", desc: "Aylık bakım istatistikleri" },
     ],

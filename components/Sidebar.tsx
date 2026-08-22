@@ -15,6 +15,7 @@ interface MenuItem {
 const ITEMS: MenuItem[] = [
   { href: "/dashboard", label: "Özet", icon: "📊" },
   { href: "/motorlar", label: "Motorlar", icon: "⚙️" },
+  { href: "/qr-etiketleri", label: "QR Etiketleri", icon: "▣" },
   { href: "/tamamla", label: "Bakım Tamamla", icon: "✅" },
   { href: "/saat-guncelle", label: "Saat Güncelle", icon: "🕒" },
   { href: "/karter-basinci", label: "Karter Basıncı", icon: "📈" },
