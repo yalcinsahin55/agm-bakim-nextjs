@@ -45,6 +45,17 @@ const STATUS_LABEL_TO_KEY: Record<string, StatusKey> = {
   "Yaklaşıyor": "yaklasiyor",
   "Normal": "normal",
 };
+const ENGINE_STATUS_PRIORITY: StatusKey[] = ["gecikmis", "kritik", "yaklasiyor", "normal"];
+const ENGINE_STATUS_VIEW: Record<StatusKey, { label: string; dot: string; bar: string; text: string }> = {
+  gecikmis: { label: "Gecikmiş", dot: "bg-red", bar: "from-red to-[#ff7a7f]", text: "text-red" },
+  kritik: { label: "Kritik", dot: "bg-orange", bar: "from-orange to-[#ffc078]", text: "text-orange" },
+  yaklasiyor: { label: "Yaklaşıyor", dot: "bg-amber", bar: "from-amber to-[#ffe08a]", text: "text-amber" },
+  normal: { label: "Normal", dot: "bg-green", bar: "from-green to-[#79e7b5]", text: "text-green" },
+};
+
+function engineStatus(items: PanelItem[]): StatusKey {
+  return ENGINE_STATUS_PRIORITY.find((status) => items.some((item) => item.status === status)) || "normal";
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -120,7 +131,27 @@ export default function DashboardPage() {
   }, [items]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
-  const engineChartRows = useMemo(() => analytics.byEngine.slice(0, 12), [analytics.byEngine]);
+  const engineStatusById = useMemo(() => {
+    const result: Record<string, { status: StatusKey; attention: number }> = {};
+    sortedEngines.forEach((engine) => {
+      const engineItems = items.filter((item) => item.engine_id === engine._id);
+      result[engine._id] = {
+        status: engineStatus(engineItems),
+        attention: engineItems.filter((item) => item.status !== "normal").length,
+      };
+    });
+    return result;
+  }, [items, sortedEngines]);
+  const engineStatusSummary = useMemo(() => {
+    const summary: Record<StatusKey, number> = { gecikmis: 0, kritik: 0, yaklasiyor: 0, normal: 0 };
+    Object.values(engineStatusById).forEach(({ status }) => { summary[status] += 1; });
+    return summary;
+  }, [engineStatusById]);
+  const engineChartRows = useMemo(() => analytics.byEngine.slice(0, 12).map((row) => ({
+    ...row,
+    status: row.engine_id ? engineStatusById[row.engine_id]?.status || "normal" : "normal",
+    attention: row.engine_id ? engineStatusById[row.engine_id]?.attention || 0 : 0,
+  })), [analytics.byEngine, engineStatusById]);
   const maxEngineMaintenance = useMemo(() => Math.max(...engineChartRows.map((row) => row.count), 1), [engineChartRows]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
   const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
@@ -265,10 +296,12 @@ export default function DashboardPage() {
                     {engineChartRows.map((row) => {
                       const height = Math.max((row.count / maxEngineMaintenance) * 92, 8);
                       const href = row.engine_id ? `/motorlar?engine_id=${encodeURIComponent(row.engine_id)}` : "/motorlar";
-                      return <Link key={row.engine_id || row.engine} href={href} className="group flex h-full min-w-[42px] flex-1 flex-col items-center justify-end gap-1 rounded-md px-0.5 outline-none transition hover:bg-amber/10 focus-visible:ring-2 focus-visible:ring-amber" title={`${row.engine}: ${row.count} bakım kaydı`} aria-label={`${row.engine} motorunun ${row.count} bakım kaydı var; detayları aç`}><span className="text-[10px] font-mono font-bold text-text">{row.count}</span><div className="w-full max-w-12 rounded-t bg-gradient-to-t from-amber to-[#f7c66a] transition-all group-hover:brightness-110" style={{ height: `${height}px` }} /><span className="max-w-14 truncate text-[9px] text-faint">{row.engine}</span></Link>;
+                      const statusView = ENGINE_STATUS_VIEW[row.status];
+                      return <Link key={row.engine_id || row.engine} href={href} className="group flex h-full min-w-[42px] flex-1 flex-col items-center justify-end gap-1 rounded-md px-0.5 outline-none transition hover:bg-amber/10 focus-visible:ring-2 focus-visible:ring-amber" title={`${row.engine}: ${row.count} bakım kaydı · Durum: ${statusView.label}${row.attention ? ` · ${row.attention} uyarı` : ""}`} aria-label={`${row.engine} motorunun ${row.count} bakım kaydı var; durum ${statusView.label}; detayları aç`}><span className={`text-[10px] font-mono font-bold ${statusView.text}`}>{row.count}</span><div className={`w-full max-w-12 rounded-t bg-gradient-to-t ${statusView.bar} transition-all group-hover:brightness-110`} style={{ height: `${height}px` }} /><span className="max-w-14 truncate text-[9px] text-faint">{row.engine}</span><span className={`h-1.5 w-1.5 rounded-full ${statusView.dot}`} aria-hidden="true" /></Link>;
                     })}
                   </div>
                 )}
+                {!analyticsLoading && Object.values(engineStatusSummary).some((count) => count > 0) && <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 text-[9px]">{ENGINE_STATUS_PRIORITY.map((status) => <span key={status} className="inline-flex items-center gap-1 text-faint"><span className={`h-1.5 w-1.5 rounded-full ${ENGINE_STATUS_VIEW[status].dot}`} aria-hidden="true" />{ENGINE_STATUS_VIEW[status].label}: {engineStatusSummary[status]}</span>)}</div>}
               </div>
             )}
           </div>
