@@ -32,9 +32,14 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [actionFilter, setActionFilter] = useState("Tümü");
+  const [entityFilter, setEntityFilter] = useState("Tümü");
 
-  async function load(nextPage = page) {
-    const res = await fetch(`/api/audit-logs?page=${nextPage}&page_size=30`);
+  async function load(nextPage = 1) {
+    const params = new URLSearchParams({ page: String(nextPage), page_size: "30" });
+    if (actionFilter !== "Tümü") params.set("action", actionFilter);
+    if (entityFilter !== "Tümü") params.set("entity", entityFilter);
+    const res = await fetch(`/api/audit-logs?${params.toString()}`);
     if (res.status === 401) return router.push("/login");
     if (res.status === 403) return router.push("/dashboard");
     const data = await res.json();
@@ -44,7 +49,7 @@ export default function AuditLogPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(1); }, [actionFilter, entityFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <><TopBar title="İşlem Geçmişi" subtitle="Yükleniyor..." /><div className="p-4"><Skeleton className="h-20 rounded-card" /></div><BottomNav /></>;
 
@@ -52,6 +57,19 @@ export default function AuditLogPage() {
     <div>
       <TopBar title="İşlem Geçmişi" subtitle="Yönetici denetim kaydı" />
       <main className="px-4 py-4">
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+            <option value="Tümü">Tüm eylemler</option>
+            {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+            <option value="Tümü">Tüm kayıt türleri</option>
+            <option value="maintenance_record">Bakım kayıtları</option>
+            <option value="engine">Motorlar</option>
+            <option value="oil_analysis">Yağ analizleri</option>
+            <option value="user">Kullanıcılar</option>
+          </select>
+        </div>
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="rounded-card border border-border bg-panel p-8 text-center text-muted">Henüz işlem kaydı bulunmuyor.</div>

@@ -22,6 +22,8 @@ interface DashboardEngine {
 interface AnalyticsSummary {
   monthly: Array<{ month: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
+  thisCount: number;
+  lastCount: number;
 }
 
 interface PanelResponse {
@@ -29,7 +31,7 @@ interface PanelResponse {
   engines: DashboardEngine[];
 }
 
-const EMPTY_ANALYTICS: AnalyticsSummary = { monthly: [], byEngine: [] };
+const EMPTY_ANALYTICS: AnalyticsSummary = { monthly: [], byEngine: [], thisCount: 0, lastCount: 0 };
 const STATUS_LABEL_TO_KEY: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis",
   "Kritik": "kritik",
@@ -72,6 +74,8 @@ export default function DashboardPage() {
         setAnalytics({
           monthly: Array.isArray(summary.monthly) ? summary.monthly : [],
           byEngine: Array.isArray(summary.byEngine) ? summary.byEngine : [],
+          thisCount: Number(summary.thisCount || 0),
+          lastCount: Number(summary.lastCount || 0),
         });
       } catch (analyticsError) {
         console.warn("Dashboard analytics yüklenemedi:", analyticsError);
@@ -237,6 +241,29 @@ export default function DashboardPage() {
                 {analytics.byEngine.length === 0 ? <span className="text-[11px] text-faint">Henüz veri yok.</span> : analytics.byEngine.slice(0, 5).map((row) => <div key={row.engine} className="flex items-center gap-2"><span className="w-16 truncate text-[10px] text-muted">{row.engine}</span><div className="h-2 flex-1 rounded-full bg-panel2"><div className="h-2 rounded-full bg-amber" style={{ width: `${Math.min(row.count * 12, 100)}%` }} /></div><span className="w-5 text-right text-[10px] font-mono text-text">{row.count}</span></div>)}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-card border border-border bg-panel p-3.5">
+            <div className="mb-2 text-[11px] font-bold uppercase text-muted">Bakım Karşılaştırması</div>
+            <div className="flex items-end justify-between gap-3">
+              <div><div className="font-mono text-2xl font-extrabold text-amber">{analytics.thisCount}</div><div className="text-[10px] text-faint">Bu ay</div></div>
+              <div className="pb-1 text-xl text-faint">vs.</div>
+              <div className="text-right"><div className="font-mono text-2xl font-extrabold text-text">{analytics.lastCount}</div><div className="text-[10px] text-faint">Geçen ay</div></div>
+            </div>
+            {!analyticsLoading && <div className={`mt-2 text-[10.5px] font-bold ${analytics.thisCount >= analytics.lastCount ? "text-green" : "text-amber"}`}>
+              {analytics.thisCount === analytics.lastCount ? "Geçen ay ile aynı sayıda bakım." : `${Math.abs(analytics.thisCount - analytics.lastCount)} bakım ${analytics.thisCount > analytics.lastCount ? "arttı" : "azaldı"}.`}
+            </div>}
+          </div>
+          <div className="rounded-card border border-border bg-panel p-3.5">
+            <div className="mb-2 text-[11px] font-bold uppercase text-muted">Hatırlatma Özeti</div>
+            <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+              <div className="rounded-lg bg-red/10 p-2"><div className="font-mono text-lg font-extrabold text-red">{counts.gecikmis}</div><div className="text-faint">Gecikmiş</div></div>
+              <div className="rounded-lg bg-orange/10 p-2"><div className="font-mono text-lg font-extrabold text-orange">{counts.kritik}</div><div className="text-faint">Kritik</div></div>
+              <div className="rounded-lg bg-amber/10 p-2"><div className="font-mono text-lg font-extrabold text-amber">{counts.yaklasiyor}</div><div className="text-faint">Yaklaşıyor</div></div>
+            </div>
+            <Link href="/bildirimler" className="mt-2 block text-center text-[10.5px] font-bold text-teal hover:underline">Bildirimleri aç →</Link>
           </div>
         </div>
 
