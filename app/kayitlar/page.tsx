@@ -124,9 +124,10 @@ interface EditFormProps {
   onCancel: () => void;
   onSaved: () => void;
   onPhotoClick: (src: string) => void;
+  isAdmin: boolean;
 }
 
-function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
+function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditFormProps) {
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
@@ -135,6 +136,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.other_technician_ids || []);
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
@@ -282,6 +284,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       other_technician_ids: otherTechnicianIds,
+      responsible_technician_id: isAdmin ? responsibleTechnicianId : undefined,
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -316,6 +319,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
 
   return (
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
+      {isAdmin && <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
+        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu Teknisyen</label>
+        <p className="mt-0.5 text-[10px] text-faint">Yalnızca aktif ve onaylı teknisyenler seçilebilir.</p>
+        <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
+          {!technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
+          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+        </select>
+      </div>}
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
       <input
         type="number"
@@ -341,10 +352,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         />
       )}
 
-      {technicians.filter((technician) => technician.id !== record.technician_id).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
+      {technicians.filter((technician) => technician.id !== responsibleTechnicianId).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
         <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında bakıma katılanları seç.</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== record.technician_id).map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id))} />{technician.full_name}</label>)}</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== responsibleTechnicianId).map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id))} />{technician.full_name}</label>)}</div>
       </div>}
 
       {offlineMedia.length > 0 && (
@@ -716,6 +727,7 @@ export default function KayitlarPage() {
                         setEditingId(null);
                         load(page);
                       }}
+                      isAdmin={user?.role === "yonetici"}
                     />
                   )}
                 </div>

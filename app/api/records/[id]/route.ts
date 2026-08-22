@@ -41,20 +41,38 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id } = body;
 
   const update: Record<string, any> = {};
+  let nextResponsibleId = record.technician_id;
+  let nextResponsibleName = record.technician_name;
+  if (typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id) {
+    if (user.role !== "yonetici") {
+      return NextResponse.json({ error: "Sorumlu teknisyeni yalnızca yöneticiler değiştirebilir." }, { status: 403 });
+    }
+    const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
+    if (!resolvedResponsible || resolvedResponsible.length !== 1) {
+      return NextResponse.json({ error: "Seçilen sorumlu teknisyen aktif veya onaylı değil." }, { status: 400 });
+    }
+    nextResponsibleId = resolvedResponsible[0].id;
+    nextResponsibleName = resolvedResponsible[0].full_name;
+    update.technician_id = nextResponsibleId;
+    update.technician_name = nextResponsibleName;
+  }
+
   let effectiveOtherTechnicians: Array<{ id: string; full_name: string }> = Array.isArray(record.other_technicians)
     ? record.other_technicians.filter((technician: any) => technician && typeof technician.id === "string" && typeof technician.full_name === "string")
     : [];
   if (Array.isArray(other_technician_ids)) {
     const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
-    if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === record.technician_id)) {
+    if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
       return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
     }
     effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
     update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
     update.other_technicians = effectiveOtherTechnicians;
+  } else if (nextResponsibleId !== record.technician_id && effectiveOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
+    return NextResponse.json({ error: "Yeni sorumlu teknisyen yardımcı listesinde bulunamaz." }, { status: 400 });
   }
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
@@ -116,7 +134,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         type_key: ex.type_key, type_label: ex.type_label,
         hour_at_completion: finalHour, note: "", technician_note: "",
         photos_b64: [], photos: [], videos: [],
-        technician_id: user._id, technician_name: user.full_name,
+        technician_id: nextResponsibleId, technician_name: nextResponsibleName,
         other_technician_ids: effectiveOtherTechnicians.map((technician) => technician.id),
         other_technicians: effectiveOtherTechnicians,
         created_at: record.created_at, backdated: !!record.backdated,
