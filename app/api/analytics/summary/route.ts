@@ -29,14 +29,12 @@ export async function GET(req: NextRequest) {
         ? new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
         : null;
   const records = db.collection("maintenance_records") as any;
-  const activeTechnicians = await listActiveTechnicians(db);
-  const technicianById = new Map(activeTechnicians.map((technician) => [technician.id, technician]));
-  const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
+  const activeTechniciansPromise = listActiveTechnicians(db);
 
   const dateMatch = engineSince ? [{ $match: { created_at: { $gte: engineSince } } }] : [];
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
-  const [monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([
+  const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
     records.aggregate([
       { $match: { created_at: { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$created_at" } }, count: { $sum: 1 } } },
@@ -91,6 +89,8 @@ export async function GET(req: NextRequest) {
       },
     ]).toArray(),
   ]);
+  const technicianById = new Map(activeTechnicians.map((technician) => [technician.id, technician]));
+  const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
 
   const totalRow = totals[0] || { total: 0, thisCount: 0, lastCount: 0 };
   const periodRow = periodTotals[0] || { total: 0, total_duration_minutes: 0, technician_duration_minutes: 0, missing_duration: 0, technician_tasks: 0 };
