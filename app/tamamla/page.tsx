@@ -16,6 +16,7 @@ import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -89,6 +90,7 @@ export default function TamamlaPage() {
   const { user } = useCurrentUser();
   const quickMode = searchParams.get("mode") === "quick";
   const qrEngineId = searchParams.get("engine_id");
+  const qrTypeKey = searchParams.get("type_key");
   const [items, setItems] = useState([]);
   const [engines, setEngines] = useState([]);
   const [types, setTypes] = useState([]);
@@ -98,6 +100,8 @@ export default function TamamlaPage() {
   const [typeKey, setTypeKey] = useState("");
   const [primaryPeriod, setPrimaryPeriod] = useState(1000);
   const [hours, setHours] = useState(0);
+  const [maintenanceStartAt, setMaintenanceStartAt] = useState("");
+  const [maintenanceEndAt, setMaintenanceEndAt] = useState("");
   const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10));
   const [pressure, setPressure] = useState("");
   const [techNote, setTechNote] = useState("");
@@ -209,6 +213,17 @@ export default function TamamlaPage() {
   }, [engineList, engineId, quickMode, qrEngineId, router]);
 
   useEffect(() => {
+    if (!qrTypeKey || !allTypesSorted.length) return;
+    const matched = allTypesSorted.find((type) => type.key === qrTypeKey || type._id === qrTypeKey);
+    if (matched) {
+      setTypeKey(matched.key);
+    } else {
+      toast.error("QR kodundaki bakım türü bulunamadı.");
+      router.replace("/tamamla");
+    }
+  }, [allTypesSorted, qrTypeKey, router]);
+
+  useEffect(() => {
     if (!engineId) return;
     const eng = engines.find((e) => e._id === engineId);
     if (eng) setHours(eng.hours);
@@ -238,6 +253,8 @@ export default function TamamlaPage() {
 
   const otherTypes = allTypesSorted.filter((t) => t.key !== typeKey);
   const checklistComplete = checklistItems.length > 0 && checklistItems.every((item) => checklist[item] === true);
+  const maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt);
+  const timeTrackingReady = maintenanceDurationMinutes !== null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0;
 
   async function handlePhotos(e) {
@@ -383,6 +400,10 @@ export default function TamamlaPage() {
       toast.error("Bakımı tamamlamadan önce kontrol listesindeki tüm maddeleri işaretleyin.");
       return;
     }
+    if (!timeTrackingReady) {
+      toast.error("Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin.");
+      return;
+    }
     if (!evidenceReady) {
       toast.error("Bakım kanıtı için en az bir not, fotoğraf veya video ekleyin.");
       return;
@@ -405,6 +426,9 @@ export default function TamamlaPage() {
     const payload = {
       engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
       hour_at_completion: Number(hours), technician_note: techNote,
+      time_tracking_version: TIME_TRACKING_VERSION,
+      maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
+      maintenance_end_at: new Date(maintenanceEndAt).toISOString(),
       photos,
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
@@ -485,7 +509,7 @@ export default function TamamlaPage() {
         {quickMode && (
           <div className="mb-2 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2.5 text-[11px] text-teal" role="status">
             <div className="font-bold">QR ile Hızlı Bakım Modu</div>
-            <div className="mt-0.5 text-[10px] text-muted">Motor QR koddan seçildi ve kilitlendi. Yalnızca yapılan bakımları işaretleyip kaydı tamamlayın.</div>
+            <div className="mt-0.5 text-[10px] text-muted">{qrEngineId && qrTypeKey ? "Motor ve bakım türü QR koddan seçildi ve kilitlendi." : qrEngineId ? "Motor QR koddan seçildi ve kilitlendi." : qrTypeKey ? "Bakım türü QR koddan seçildi ve kilitlendi; şimdi motoru seç." : "QR ile hızlı bakım başlatıldı."}</div>
           </div>
         )}
         {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
@@ -501,15 +525,16 @@ export default function TamamlaPage() {
         <select
           value={engineId}
           onChange={(e) => setEngineId(e.target.value)}
-          disabled={quickMode}
-          className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode ? "cursor-not-allowed opacity-80" : ""}`}
-          aria-label={quickMode ? "QR ile seçilen motor" : "Motor seçimi"}
+          disabled={Boolean(quickMode && qrEngineId)}
+          className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode && qrEngineId ? "cursor-not-allowed opacity-80" : ""}`}
+          aria-label={quickMode && qrEngineId ? "QR ile seçilen motor" : "Motor seçimi"}
         >
           {engineList.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
         </select>
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Türü</label>
-        <select value={typeKey} onChange={(e) => setTypeKey(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2">
+                <select
+          value={typeKey} onChange={(e) => setTypeKey(e.target.value)} disabled={Boolean(quickMode && qrTypeKey)} className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode && qrTypeKey ? "cursor-not-allowed opacity-80" : ""}`}>
           {allTypesSorted.map((t) => {
             const it = engItems.find((i) => i.type_key === t.key);
             const label = it
@@ -544,6 +569,20 @@ export default function TamamlaPage() {
         <p className="text-[11px] text-faint mb-2 leading-relaxed">
           Bu değer motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu bakım kaydına yazılır.
         </p>
+
+        <div className="mb-2 rounded-xl border border-amber/30 bg-amber/5 p-3">
+          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bakım Başlangıç ve Bitiş Zamanı</div>
+          <div className="mt-0.5 text-[10.5px] text-faint">Bakım birden fazla gün sürebilir; gerçek başlangıç ve bitiş tarih-saatini seçin.</div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="text-[10.5px] font-bold text-muted">Başlangıç
+              <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
+            </label>
+            <label className="text-[10.5px] font-bold text-muted">Bitiş
+              <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
+            </label>
+          </div>
+          <div className={`mt-2 rounded-lg px-2.5 py-2 text-[10.5px] ${timeTrackingReady ? "bg-green/10 text-green" : "bg-red/10 text-red"}`} role="status">{timeTrackingReady ? `Toplam bakım süresi: ${formatMaintenanceDuration(maintenanceDurationMinutes)}` : "Geçerli bir başlangıç ve bitiş zamanı girin."}</div>
+        </div>
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Tarihi</label>
         <input
@@ -668,7 +707,7 @@ export default function TamamlaPage() {
 
         {!evidenceReady && <div className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu veya fotoğraf/video kanıtı ekleyin.</div>}
         <button
-          onClick={submit} disabled={submitting || videoBusy || !chosenType || !checklistComplete || !evidenceReady}
+          onClick={submit} disabled={submitting || videoBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady}
           className="mt-2 py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50"
         >
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}

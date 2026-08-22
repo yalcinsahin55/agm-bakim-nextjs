@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { buildItems, STATUS_LABELS, engineSortKey } from "@/lib/status";
+import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,9 @@ export async function GET(req: NextRequest) {
     "MOTOR": record.engine_name || "",
     "BAKIM TÜRÜ": record.type_label || "",
     "MOTOR SAATİ": record.hour_at_completion || 0,
+    "BAŞLANGIÇ": record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
+    "BİTİŞ": record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
+    "TOPLAM SÜRE": formatMaintenanceDuration(record.maintenance_duration_minutes),
     "SORUMLU TEKNİSYEN": record.technician_name || "",
     "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
     "NOT": record.technician_note || "",

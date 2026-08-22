@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
+import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 
 const INFO_FIELDS = [
   ["kaver_tipi", "Kaver Tipi"],
@@ -37,6 +38,9 @@ interface ReportRecord {
   _id: string;
   type_label: string;
   hour_at_completion: number;
+  maintenance_start_at?: string | Date;
+  maintenance_end_at?: string | Date;
+  maintenance_duration_minutes?: number;
   technician_name?: string;
   other_technicians?: Array<{ id: string; full_name: string }>;
   created_at: string | Date;
@@ -46,6 +50,7 @@ interface ReportSummary {
   first_date: string | Date | null;
   last_date: string | Date | null;
   avg_days: number;
+  total_duration_minutes?: number;
 }
 
 interface ReportResponse {
@@ -63,7 +68,7 @@ export default function RaporPage() {
   const [infoList, setInfoList] = useState<EquipmentInfo[]>([]);
   const [records, setRecords] = useState<ReportRecord[]>([]);
   const [reportTotal, setReportTotal] = useState(0);
-  const [reportSummary, setReportSummary] = useState<ReportSummary>({ first_date: null, last_date: null, avg_days: 0 });
+  const [reportSummary, setReportSummary] = useState<ReportSummary>({ first_date: null, last_date: null, avg_days: 0, total_duration_minutes: 0 });
   const [reportAll, setReportAll] = useState(false);
   const [reportTruncated, setReportTruncated] = useState(false);
   const [engineId, setEngineId] = useState("");
@@ -97,7 +102,7 @@ export default function RaporPage() {
       const data = await res.json() as ReportResponse;
       setRecords(data.records || []);
       setReportTotal(data.total || 0);
-      setReportSummary(data.summary || { first_date: null, last_date: null, avg_days: 0 });
+      setReportSummary(data.summary || { first_date: null, last_date: null, avg_days: 0, total_duration_minutes: 0 });
       setReportAll(Boolean(data.all));
       setReportTruncated(Boolean(data.truncated));
       return data;
@@ -174,10 +179,10 @@ export default function RaporPage() {
 
             {info && <div className="mb-5"><div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Teknik Bilgiler</div><div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-[10.5px]">{INFO_FIELDS.map(([key, label]) => info[key as InfoKey] ? <div key={key}><span className="text-gray-500">{label}:</span> <b>{info[key as InfoKey]}</b></div> : null)}{info.not && <div className="col-span-2 md:col-span-3"><span className="text-gray-500">Not:</span> {info.not}</div>}</div></div>}
 
-            <div className="mb-5 text-[10.5px] text-gray-700"><div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Özet</div>{stats.last ? <p>Bu motor için kayıtlı <b>{stats.total}</b> bakım bulunmaktadır. Son bakım <b>{new Date(stats.last.created_at).toLocaleDateString("tr-TR")}</b> tarihinde (<b>{stats.last.type_label}</b>) yapılmıştır. Bakımlar arası ortalama süre <b>{stats.avgDays} gün</b>dür.</p> : <p>Bu motor için henüz bakım kaydı bulunmamaktadır.</p>}</div>
+            <div className="mb-5 text-[10.5px] text-gray-700"><div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Özet</div>{stats.last ? <p>Bu motor için kayıtlı <b>{stats.total}</b> bakım bulunmaktadır. Son bakım <b>{new Date(stats.last.created_at).toLocaleDateString("tr-TR")}</b> tarihinde (<b>{stats.last.type_label}</b>) yapılmıştır. Bakımlar arası ortalama süre <b>{stats.avgDays} gün</b>dür. Kayıtlı toplam bakım süresi <b>{formatMaintenanceDuration(reportSummary.total_duration_minutes)}</b>dir.</p> : <p>Bu motor için henüz bakım kaydı bulunmamaktadır.</p>}</div>
 
             <div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Bakım Geçmişi</div>
-            {stats.sortedDesc.length === 0 ? <p className="text-[10.5px] text-gray-500">Gösterilecek kayıt yok.</p> : <table className="w-full text-[10px] border-collapse"><thead><tr className="bg-gray-100"><th className="border border-gray-300 px-1.5 py-1 text-left">#</th><th className="border border-gray-300 px-1.5 py-1 text-left">Tarih</th><th className="border border-gray-300 px-1.5 py-1 text-left">Bakım Türü</th><th className="border border-gray-300 px-1.5 py-1 text-right">Saat</th><th className="border border-gray-300 px-1.5 py-1 text-left">Sorumlu Teknisyen</th><th className="border border-gray-300 px-1.5 py-1 text-left">Diğer Teknisyenler</th></tr></thead><tbody>{stats.sortedDesc.map((record, index) => <tr key={record._id} className={index % 2 === 1 ? "bg-gray-50" : ""}><td className="border border-gray-300 px-1.5 py-1 text-gray-500">{index + 1}</td><td className="border border-gray-300 px-1.5 py-1">{new Date(record.created_at).toLocaleDateString("tr-TR")}</td><td className="border border-gray-300 px-1.5 py-1 font-semibold">{record.type_label}</td><td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{record.hour_at_completion.toLocaleString("tr-TR")}</td><td className="border border-gray-300 px-1.5 py-1">{record.technician_name || "—"}</td><td className="border border-gray-300 px-1.5 py-1">{record.other_technicians?.map((technician) => technician.full_name).join(", ") || "—"}</td></tr>)}</tbody></table>}
+            {stats.sortedDesc.length === 0 ? <p className="text-[10.5px] text-gray-500">Gösterilecek kayıt yok.</p> : <table className="w-full text-[10px] border-collapse"><thead><tr className="bg-gray-100"><th className="border border-gray-300 px-1.5 py-1 text-left">#</th><th className="border border-gray-300 px-1.5 py-1 text-left">Tarih</th><th className="border border-gray-300 px-1.5 py-1 text-left">Bakım Türü</th><th className="border border-gray-300 px-1.5 py-1 text-right">Saat</th><th className="border border-gray-300 px-1.5 py-1 text-left">Başlangıç</th><th className="border border-gray-300 px-1.5 py-1 text-left">Bitiş</th><th className="border border-gray-300 px-1.5 py-1 text-left">Süre</th><th className="border border-gray-300 px-1.5 py-1 text-left">Sorumlu Teknisyen</th><th className="border border-gray-300 px-1.5 py-1 text-left">Diğer Teknisyenler</th></tr></thead><tbody>{stats.sortedDesc.map((record, index) => <tr key={record._id} className={index % 2 === 1 ? "bg-gray-50" : ""}><td className="border border-gray-300 px-1.5 py-1 text-gray-500">{index + 1}</td><td className="border border-gray-300 px-1.5 py-1">{new Date(record.created_at).toLocaleDateString("tr-TR")}</td><td className="border border-gray-300 px-1.5 py-1 font-semibold">{record.type_label}</td><td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{record.hour_at_completion.toLocaleString("tr-TR")}</td><td className="border border-gray-300 px-1.5 py-1">{record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "—"}</td><td className="border border-gray-300 px-1.5 py-1">{record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "—"}</td><td className="border border-gray-300 px-1.5 py-1">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</td><td className="border border-gray-300 px-1.5 py-1">{record.technician_name || "—"}</td><td className="border border-gray-300 px-1.5 py-1">{record.other_technicians?.map((technician) => technician.full_name).join(", ") || "—"}</td></tr>)}</tbody></table>}
             {reportTruncated && <p className="mt-3 text-[10px] text-red-700">Bu yazdırma çıktısı en fazla 5.000 kayıt içerir.</p>}
             {!reportAll && reportTotal > records.length && <p className="mt-3 text-[10px] text-gray-500">Önizleme: en yeni {records.length} kayıt gösteriliyor. Tam geçmiş yazdırma sırasında yüklenir.</p>}
             <div className="grid grid-cols-2 gap-8 mt-10 text-[10px] text-gray-600"><div className="border-t border-gray-400 pt-1 text-center">Hazırlayan</div><div className="border-t border-gray-400 pt-1 text-center">Onaylayan</div></div>

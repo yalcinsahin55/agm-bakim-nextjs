@@ -11,6 +11,7 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 interface Engine {
   _id: string;
@@ -40,6 +41,10 @@ interface MaintenanceRecord {
   type_key: string;
   type_label: string;
   hour_at_completion: number;
+  time_tracking_version?: 2;
+  maintenance_start_at?: string | Date;
+  maintenance_end_at?: string | Date;
+  maintenance_duration_minutes?: number;
   technician_note?: string;
   photos_b64?: string[];
   photos?: string[];
@@ -119,6 +124,12 @@ function getVideoSrc(v: VideoItem | string, previews: Record<string, string> = {
   return "";
 }
 
+function toLocalDateTimeInput(value: string | Date | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? formatDateTimeLocal(date) : "";
+}
+
 interface EditFormProps {
   record: MaintenanceRecord;
   onCancel: () => void;
@@ -129,6 +140,8 @@ interface EditFormProps {
 
 function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditFormProps) {
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
+  const [maintenanceStartAt, setMaintenanceStartAt] = useState(toLocalDateTimeInput(record.maintenance_start_at));
+  const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
   const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
@@ -275,10 +288,19 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   }
 
   async function save() {
+    const maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt);
+    if (!maintenanceDurationMinutes) {
+      toast.error("Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin.");
+      return;
+    }
     setBusy(true);
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
     const payload = {
       hour_at_completion: Number(hours),
+      time_tracking_version: TIME_TRACKING_VERSION,
+      maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
+      maintenance_end_at: new Date(maintenanceEndAt).toISOString(),
+      maintenance_duration_minutes: maintenanceDurationMinutes,
       technician_note: techNote,
       photos,
       videos,
@@ -334,6 +356,20 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         onChange={(e) => setHours(e.target.value)}
         className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
       />
+      <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
+        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım Başlangıç ve Bitiş Zamanı</div>
+        <div className="mt-0.5 text-[10px] text-faint">Haftalar süren bakımlar için tarih ve saati birlikte seçin.</div>
+        {(!record.maintenance_start_at || !record.maintenance_end_at) && <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu eski kayıtta zaman bilgisi bulunmuyor. Kaydedebilmek için başlangıç ve bitiş tarih-saatini tamamlayın.</div>}
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="text-[10px] font-bold text-muted">Başlangıç
+            <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
+          </label>
+          <label className="text-[10px] font-bold text-muted">Bitiş
+            <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
+          </label>
+        </div>
+        <div className={`mt-2 rounded-lg px-2 py-1.5 text-[10px] ${calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ? "bg-green/10 text-green" : "bg-red/10 text-red"}`} role="status">{formatMaintenanceDuration(calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt)) !== "—" ? `Toplam süre: ${formatMaintenanceDuration(calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt))}` : "Geçerli bir başlangıç ve bitiş zamanı girin."}</div>
+      </div>
       <textarea
         value={techNote}
         onChange={(e) => setTechNote(e.target.value)}
@@ -672,6 +708,7 @@ export default function KayitlarPage() {
                   <div className="text-[11px] text-faint mt-0.5">
                     {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {r.technician_name}
                   </div>
+                  {(r.maintenance_start_at || r.maintenance_end_at || r.maintenance_duration_minutes != null) && <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] text-teal"><span>Başlangıç: {r.maintenance_start_at ? new Date(r.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {r.maintenance_end_at ? new Date(r.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>Süre: {formatMaintenanceDuration(r.maintenance_duration_minutes)}</span></div>}
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
                   {r.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {r.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
@@ -772,7 +809,12 @@ export default function KayitlarPage() {
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
-              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Teknisyen</div><div className="mt-0.5 font-semibold text-text">{selectedRecord.technician_name || "—"}</div></div>
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{selectedRecord.technician_name || "—"}</div></div>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 text-[11px]">
+              <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Başlangıç</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_start_at ? new Date(selectedRecord.maintenance_start_at).toLocaleString("tr-TR") : "—"}</div></div>
+              <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Bitiş</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_end_at ? new Date(selectedRecord.maintenance_end_at).toLocaleString("tr-TR") : "—"}</div></div>
+              <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(selectedRecord.maintenance_duration_minutes)}</div></div>
             </div>
             {selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}

@@ -6,12 +6,13 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
+import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
 
 const MAX_ROWS = 5_000;
-const COLUMN_WIDTHS = [55, 75, 125, 50, 80, 78, 60];
-const COLUMN_LABELS = ["Tarih", "Motor", "Bakım Türü", "Saat", "Sorumlu", "Ekip", "Not"];
+const COLUMN_WIDTHS = [40, 55, 75, 38, 52, 52, 45, 52, 52, 62];
+const COLUMN_LABELS = ["Tarih", "Motor", "Bakım Türü", "Saat", "Başlangıç", "Bitiş", "Süre", "Sorumlu", "Ekip", "Not"];
 
 function makeDate(value: string | null, endOfDay = false): Date | undefined {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
@@ -111,6 +112,9 @@ async function createPdf(req: NextRequest) {
         record.engine_name || "",
         record.type_label || "",
         record.hour_at_completion !== undefined && record.hour_at_completion !== null ? Number(record.hour_at_completion).toLocaleString("tr-TR") : "",
+        record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
+        record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
+        formatMaintenanceDuration(record.maintenance_duration_minutes),
         record.technician_name || "",
         Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
         record.technician_note || "",

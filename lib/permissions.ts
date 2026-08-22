@@ -51,6 +51,7 @@ const TECHNICIAN_ROUTES = [
   "/saat-gecmisi",
   "/yag-analizleri",
   "/araliklar",
+  "/teknisyen-raporu",
 ];
 
 const VIEWER_ROUTES = [
@@ -67,6 +68,7 @@ const VIEWER_ROUTES = [
   "/excel",
   "/rapor",
   "/istatistik",
+  "/teknisyen-raporu",
   "/bakim-turleri",
   "/tahmin",
 ];

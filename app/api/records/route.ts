@@ -9,6 +9,7 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
 import { resolveTechnicianOptions } from "@/lib/technicians";
+import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +101,8 @@ async function postRecord(req: NextRequest) {
     const {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
-      other_technician_ids, checklist, completion_confirmation,
+      other_technician_ids, checklist, completion_confirmation, time_tracking_version,
+      maintenance_start_at, maintenance_end_at,
     } = parsed.data as RecordInput;
 
     const enginesCol = db.collection("engines") as any;
@@ -113,6 +115,20 @@ async function postRecord(req: NextRequest) {
       if (!checklistComplete || !hasEvidence) {
         return NextResponse.json({ error: "Bakım kaydı için kontrol listesi ve en az bir bakım kanıtı gereklidir." }, { status: 400 });
       }
+    }
+
+    let maintenanceStartAt: Date | undefined;
+    let maintenanceEndAt: Date | undefined;
+    let maintenanceDurationMinutes: number | null = null;
+    if (time_tracking_version === 2) {
+      maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenance_start_at, maintenance_end_at);
+      const start = maintenance_start_at ? new Date(maintenance_start_at) : null;
+      const end = maintenance_end_at ? new Date(maintenance_end_at) : null;
+      if (!maintenanceDurationMinutes || !start || !end || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+        return NextResponse.json({ error: "Bakım başlangıç ve bitiş tarih-saatleri geçerli olmalı; bitiş başlangıçtan sonra olmalıdır." }, { status: 400 });
+      }
+      maintenanceStartAt = start;
+      maintenanceEndAt = end;
     }
 
     if (client_request_id) {
@@ -136,6 +152,12 @@ async function postRecord(req: NextRequest) {
       const rec: any = {
         engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
         hour_at_completion,
+        ...(maintenanceStartAt && maintenanceEndAt && maintenanceDurationMinutes ? {
+          time_tracking_version: 2,
+          maintenance_start_at: maintenanceStartAt,
+          maintenance_end_at: maintenanceEndAt,
+          maintenance_duration_minutes: maintenanceDurationMinutes,
+        } : {}),
         note: isPrimary ? (note || "") : "",
         technician_note: isPrimary ? (technician_note || "") : "",
         photos_b64: isPrimary ? (photos_b64 || []) : [],
@@ -196,7 +218,7 @@ async function postRecord(req: NextRequest) {
       entity: "maintenance_record",
       entityId: groupId,
       summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true },
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     return NextResponse.json({ ok: true, completed: completedLabels });
   } catch (error) {

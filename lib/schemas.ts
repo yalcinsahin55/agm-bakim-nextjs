@@ -55,6 +55,11 @@ export const recordSchema = z.object({
     .nonnegative("Saat negatif olamaz.")
     .max(5000000, "Saat değeri mantık dışı büyük."),
 
+  // Yeni bakım formları için UTC ISO tarih-saatleri. Eski offline kayıtlar bu alanlar olmadan da kabul edilir.
+  time_tracking_version: z.literal(2).optional(),
+  maintenance_start_at: z.string().datetime({ offset: true }).optional(),
+  maintenance_end_at: z.string().datetime({ offset: true }).optional(),
+
   technician_note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   other_technician_ids: z.array(z.string().min(1).max(100)).max(20, "En fazla 20 yardımcı teknisyen seçilebilir.").optional(),

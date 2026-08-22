@@ -17,7 +17,7 @@ interface AnalyticsSummary {
   lastCount: number;
   byType: Array<{ type: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
-  byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number }>;
+  byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
 }
 
 const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [] };
@@ -108,7 +108,7 @@ export default function IstatistikPage() {
             {topTechnicians.length ? <div className="flex flex-col gap-3">{topTechnicians.map((item) => <div key={item.technician_id}>
               <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{item.technician}</span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
               <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(item.responsible_count / maxTechnicianWork) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(item.support_count / maxTechnicianWork) * 100}%` }} /></div>
-              <div className="mt-1 flex gap-3 text-[9.5px] text-faint"><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal" />Sorumlu: {item.responsible_count}</span><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber" />Destek: {item.support_count}</span></div>
+              <div className="mt-1 flex flex-wrap gap-3 text-[9.5px] text-faint"><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal" />Sorumlu: {item.responsible_count}</span><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber" />Destek: {item.support_count}</span><span>Süre: {item.total_duration_minutes ? `${Math.floor(item.total_duration_minutes / 60)} sa ${item.total_duration_minutes % 60 ? `${item.total_duration_minutes % 60} dk` : ""}` : "—"}</span></div>
             </div>)}</div> : <p className="text-[11px] text-faint">Henüz teknisyen çalışma verisi yok.</p>}
           </div>
         </div>

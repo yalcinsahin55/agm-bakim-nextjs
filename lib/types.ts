@@ -57,6 +57,10 @@ export interface MaintenanceRecord {
   type_key: string;
   type_label: string;
   hour_at_completion: number;
+  time_tracking_version?: 2;
+  maintenance_start_at?: Date | string;
+  maintenance_end_at?: Date | string;
+  maintenance_duration_minutes?: number;
   note?: string;
   technician_note?: string;
   photos_b64?: string[];

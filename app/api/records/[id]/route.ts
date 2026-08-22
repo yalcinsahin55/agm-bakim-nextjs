@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { resolveTechnicianOptions } from "@/lib/technicians";
+import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +42,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
 
   const update: Record<string, any> = {};
+  let nextStartAt: Date | undefined = record.maintenance_start_at ? new Date(record.maintenance_start_at) : undefined;
+  let nextEndAt: Date | undefined = record.maintenance_end_at ? new Date(record.maintenance_end_at) : undefined;
+  let nextDurationMinutes: number | null = typeof record.maintenance_duration_minutes === "number" ? record.maintenance_duration_minutes : calculateMaintenanceDurationFromDates(nextStartAt, nextEndAt);
+  if (time_tracking_version === 2) {
+    const duration = calculateMaintenanceDurationFromDates(maintenance_start_at, maintenance_end_at);
+    const start = maintenance_start_at ? new Date(maintenance_start_at) : null;
+    const end = maintenance_end_at ? new Date(maintenance_end_at) : null;
+    if (!duration || !start || !end || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+      return NextResponse.json({ error: "Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin; bitiş başlangıçtan sonra olmalıdır." }, { status: 400 });
+    }
+    nextStartAt = start;
+    nextEndAt = end;
+    nextDurationMinutes = duration;
+    update.time_tracking_version = 2;
+    update.maintenance_start_at = start;
+    update.maintenance_end_at = end;
+    update.maintenance_duration_minutes = duration;
+  }
   let nextResponsibleId = record.technician_id;
   let nextResponsibleName = record.technician_name;
   if (typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id) {
@@ -132,7 +151,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       await recordsCol.insertOne({
         engine_id: record.engine_id, engine_name: record.engine_name,
         type_key: ex.type_key, type_label: ex.type_label,
-        hour_at_completion: finalHour, note: "", technician_note: "",
+        hour_at_completion: finalHour,
+        ...(nextStartAt && nextEndAt && nextDurationMinutes ? {
+          time_tracking_version: 2,
+          maintenance_start_at: nextStartAt,
+          maintenance_end_at: nextEndAt,
+          maintenance_duration_minutes: nextDurationMinutes,
+        } : {}),
+        note: "", technician_note: "",
         photos_b64: [], photos: [], videos: [],
         technician_id: nextResponsibleId, technician_name: nextResponsibleName,
         other_technician_ids: effectiveOtherTechnicians.map((technician) => technician.id),

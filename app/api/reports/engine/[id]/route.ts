@@ -50,6 +50,7 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
                 _id: null,
                 first_date: { $min: "$created_at" },
                 last_date: { $max: "$created_at" },
+                total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
               },
             },
           ],
@@ -64,6 +65,9 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
                 engine_name: 1,
                 type_label: 1,
                 hour_at_completion: 1,
+                maintenance_start_at: 1,
+                maintenance_end_at: 1,
+                maintenance_duration_minutes: 1,
                 technician_name: 1,
                 other_technicians: 1,
                 created_at: 1,
@@ -92,6 +96,7 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
         first_date: range?.first_date || null,
         last_date: range?.last_date || null,
         avg_days: avgDays,
+        total_duration_minutes: Number(range?.total_duration_minutes || 0),
       },
     });
   } catch (error) {
