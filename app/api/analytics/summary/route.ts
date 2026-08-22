@@ -4,7 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { listActiveTechnicians, normalizeTechnicianName } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
   const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
 
   const dateMatch = engineSince ? [{ $match: { created_at: { $gte: engineSince } } }] : [];
+  const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
+  const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
   const [monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([
     records.aggregate([
       { $match: { created_at: { $gte: since } } },
@@ -64,11 +66,13 @@ export async function GET(req: NextRequest) {
     ]).toArray(),
     records.aggregate([
       ...dateMatch,
+      ...technicianRecordMatch,
       { $group: { _id: "$technician_id", technician: { $first: "$technician_name" }, responsible_count: { $sum: 1 }, responsible_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
       { $sort: { responsible_count: -1, technician: 1 } },
     ]).toArray(),
     records.aggregate([
       ...dateMatch,
+      ...technicianRecordMatch,
       { $unwind: "$other_technicians" },
       { $group: { _id: "$other_technicians.id", technician: { $first: "$other_technicians.full_name" }, support_count: { $sum: 1 }, support_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
       { $sort: { support_count: -1, technician: 1 } },
@@ -80,9 +84,9 @@ export async function GET(req: NextRequest) {
           _id: null,
           total: { $sum: 1 },
           total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
-          technician_duration_minutes: { $sum: { $multiply: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] }] } },
-          missing_duration: { $sum: { $cond: [{ $gt: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, 0] }, 0, 1] } },
-          technician_tasks: { $sum: { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] } },
+          technician_duration_minutes: { $sum: { $cond: [internalTechnicianExpr, { $multiply: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] }] }, 0] } },
+          missing_duration: { $sum: { $cond: [internalTechnicianExpr, { $cond: [{ $gt: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, 0] }, 0, 1] }, 0] } },
+          technician_tasks: { $sum: { $cond: [internalTechnicianExpr, { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] }, 0] } },
         },
       },
     ]).toArray(),
