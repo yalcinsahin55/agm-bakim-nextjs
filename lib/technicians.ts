@@ -7,6 +7,13 @@ export interface TechnicianOption {
 
 const TECHNICIAN_ROLES = ["teknisyen", "planlamaci"];
 
+/** Aynı kişinin büyük-küçük harf, Unicode ve fazla boşluk farklarını tek anahtarda birleştirir. */
+export function normalizeTechnicianName(value: unknown): string {
+  return typeof value === "string"
+    ? value.normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("tr-TR")
+    : "";
+}
+
 export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]> {
   const users = await db.collection("users").find(
     {
