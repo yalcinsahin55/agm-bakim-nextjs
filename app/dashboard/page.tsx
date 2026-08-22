@@ -74,6 +74,7 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [enginePeriod, setEnginePeriod] = useState<EnginePeriod>("all");
+  const [selectedHealthEngineId, setSelectedHealthEngineId] = useState("");
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [statusFilter, setStatusFilter] = useState("Tümü");
@@ -159,8 +160,10 @@ export default function DashboardPage() {
     const engineItems = items.filter((item) => item.engine_id === engine._id);
     const penalty = engineItems.reduce((sum, item) => sum + (item.status === "gecikmis" ? 25 : item.status === "kritik" ? 15 : item.status === "yaklasiyor" ? 5 : 0), 0);
     const score = Math.max(0, Math.min(100, 100 - penalty));
-    return { engine, score, attention: engineItems.filter((item) => item.status !== "normal").length };
+    return { engine, score, status: engineStatus(engineItems), attention: engineItems.filter((item) => item.status !== "normal").length };
   }), [items, sortedEngines]);
+  const selectedHealthEngine = sortedEngines.find((engine) => engine._id === selectedHealthEngineId) || null;
+  const selectedHealthItems = useMemo(() => items.filter((item) => item.engine_id === selectedHealthEngineId).sort((a, b) => a.remaining - b.remaining), [items, selectedHealthEngineId]);
 
   const filteredRows = useMemo(() => {
     let rows = items;
@@ -335,16 +338,33 @@ export default function DashboardPage() {
         <LoadCards engines={sortedEngines} />
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
+        <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
-          {healthRows.map(({ engine, score, attention }) => {
-            const tone = score >= 80 ? "text-green" : score >= 55 ? "text-amber" : "text-red";
-            return <div key={engine._id} className="rounded-xl border border-border bg-panel p-3">
-              <div className="flex items-center justify-between gap-2"><span className="truncate text-[12px] font-bold text-text">{engine.name}</span><span className={`font-mono text-lg font-extrabold ${tone}`}>%{score}</span></div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel2"><div className={`h-full rounded-full ${score >= 80 ? "bg-green" : score >= 55 ? "bg-amber" : "bg-red"}`} style={{ width: `${score}%` }} /></div>
-              <div className="mt-1 text-[10px] text-faint">{attention ? `${attention} bakım maddesi dikkat istiyor` : "Tüm bakım maddeleri normal"}</div>
-            </div>;
+          {healthRows.map(({ engine, score, status, attention }) => {
+            const statusView = ENGINE_STATUS_VIEW[status];
+            const selected = selectedHealthEngineId === engine._id;
+            return <button key={engine._id} type="button" onClick={() => setSelectedHealthEngineId(selected ? "" : engine._id)} aria-expanded={selected} className={`rounded-xl border bg-panel p-3 text-left transition hover:border-amber/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber shadow-lg shadow-amber/10" : "border-border"}`}>
+              <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-bold text-text"><span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusView.dot}`} aria-hidden="true" />{engine.name}</span><span className={`font-mono text-lg font-extrabold ${statusView.text}`}>%{score}</span></div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel2"><div className={`h-full rounded-full bg-gradient-to-r ${statusView.bar}`} style={{ width: `${score}%` }} /></div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[10px]"><span className={statusView.text}>{statusView.label}</span><span className="text-faint">{attention ? `${attention} bakım maddesi dikkat istiyor` : "Tüm bakım maddeleri normal"}</span></div>
+            </button>;
           })}
         </div>
+        {selectedHealthEngine && <div className="mb-5 rounded-card border border-amber/30 bg-panel p-4 animate-fade-in">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div><div className="text-[13px] font-bold text-text">{selectedHealthEngine.name} bakım detayları</div><div className="mt-0.5 text-[10.5px] text-muted">Güncel motor saati: <b className="font-mono text-text">{selectedHealthEngine.hours.toLocaleString("tr-TR")} sa</b></div></div>
+            <button type="button" onClick={() => setSelectedHealthEngineId("")} className="rounded-lg border border-border px-2.5 py-1 text-[10px] font-bold text-muted hover:text-text">Kapat</button>
+          </div>
+          {selectedHealthItems.length === 0 ? <div className="rounded-lg bg-panel2 p-3 text-[11px] text-faint">Bu motor için tanımlı bakım türü bulunamadı.</div> : <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{selectedHealthItems.map((item) => {
+            const statusView = ENGINE_STATUS_VIEW[item.status];
+            const workedHours = item.engine_hours - item.last_hour;
+            return <div key={`${item.engine_id}-${item.type_key}`} className="rounded-lg border border-border bg-panel2 p-3">
+              <div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11.5px] font-bold text-text">{item.type_label}</div><div className="mt-0.5 text-[9.5px] text-faint">Periyot: {item.period.toLocaleString("tr-TR")} sa</div></div><span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${statusView.text} bg-white/5`}>{statusView.label}</span></div>
+              <div className="mt-3 grid grid-cols-2 gap-2"><div><div className="text-[9px] uppercase text-faint">Kalan</div><div className={`font-mono text-base font-extrabold ${statusView.text}`}>{item.remaining <= 0 ? `${Math.abs(Math.round(item.remaining)).toLocaleString("tr-TR")} sa gecikme` : `${Math.round(item.remaining).toLocaleString("tr-TR")} sa`}</div></div><div><div className="text-[9px] uppercase text-faint">Çalışılan</div><div className="font-mono text-base font-extrabold text-text">{Math.max(0, Math.round(workedHours)).toLocaleString("tr-TR")} sa</div></div></div>
+              <div className="mt-2 text-[9.5px] text-faint">Son bakım: {item.last_hour.toLocaleString("tr-TR")} sa · Mevcut: {item.engine_hours.toLocaleString("tr-TR")} sa</div>
+            </div>;
+          })}</div>}
+        </div>}
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
         <div className="flex flex-wrap gap-2 mb-3">{typeOptions.map((option) => <button key={option} onClick={() => setTypeFilter(option)} className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${typeFilter === option ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>

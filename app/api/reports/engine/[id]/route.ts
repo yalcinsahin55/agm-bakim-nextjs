@@ -26,8 +26,19 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
     const { all, page, pageSize, skip } = parseParams(req);
+    const searchParams = new URL(req.url).searchParams;
+    const typeLabel = searchParams.get("type_label");
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
+    const match: Record<string, unknown> = { engine_id: params.id };
+    if (typeLabel) match.type_label = typeLabel;
+    if (from || to) {
+      match.created_at = {
+        ...(from ? { $gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+        ...(to ? { $lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+      };
+    }
     const recordsCol = db.collection("maintenance_records") as any;
-    const match = { engine_id: params.id };
     const [result] = await recordsCol.aggregate([
       { $match: match },
       {

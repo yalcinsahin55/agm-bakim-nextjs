@@ -43,15 +43,16 @@ export default function ExcelPage() {
     }).catch(() => {});
   }, [router]);
 
-  const reportUrl = useMemo(() => {
+  const reportParams = useMemo(() => {
     const params = new URLSearchParams();
     if (reportEngine) params.set("engine_id", reportEngine);
     if (reportType) params.set("type_label", reportType);
     if (reportFrom) params.set("from", reportFrom);
     if (reportTo) params.set("to", reportTo);
-    const query = params.toString();
-    return query ? `/api/export/excel?${query}` : "/api/export/excel";
+    return params.toString();
   }, [reportEngine, reportType, reportFrom, reportTo]);
+  const reportUrl = reportParams ? `/api/export/excel?${reportParams}` : "/api/export/excel";
+  const pdfReportUrl = reportParams ? `/api/export/pdf?${reportParams}` : "/api/export/pdf";
 
   async function doImport() {
     if (!importFile) {
@@ -114,9 +115,15 @@ export default function ExcelPage() {
             <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Başlangıç tarihi" />
             <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
           </div>
-          <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13.5px] hover:brightness-110 active:scale-[.98] transition">
-            📥 Filtreli Excel indir (.xlsx)
-          </a>
+          <div className="grid grid-cols-2 gap-2">
+            <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
+              📥 Excel indir
+            </a>
+            <a href={pdfReportUrl} className="block text-center py-3 rounded-xl border border-amber/50 bg-amber/10 text-amber font-extrabold text-[13px] hover:bg-amber/20 active:scale-[.98] transition">
+              📄 PDF indir
+            </a>
+          </div>
+          <p className="mt-2 text-[10px] text-faint">Seçtiğin motor, bakım türü ve tarih filtreleri her iki çıktıya da uygulanır. Büyük geçmişlerde en fazla 5.000 kayıt dışa aktarılır.</p>
         </div>
 
         {canImport && (
