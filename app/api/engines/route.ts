@@ -16,9 +16,28 @@ async function getEngines(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const includeHistory = new URL(req.url).searchParams.get("include_history") === "true";
+    const searchParams = new URL(req.url).searchParams;
+    const includeHistory = searchParams.get("include_history") === "true";
+    const includeMaintenanceCounts = searchParams.get("include_maintenance_counts") === "true";
     const projection = includeHistory ? undefined : { history: 0 };
-    const engines = await (db.collection("engines") as any).find({}, projection).toArray();
+    const enginesCol = db.collection("engines") as any;
+    const recordsCol = db.collection("maintenance_records") as any;
+    const [engines, countRows] = await Promise.all([
+      enginesCol.find({}, projection).toArray(),
+      includeMaintenanceCounts
+        ? recordsCol.aggregate([
+            { $group: { _id: "$engine_id", count: { $sum: 1 } } },
+          ]).toArray()
+        : Promise.resolve([]),
+    ]);
+    if (includeMaintenanceCounts) {
+      const countByEngine = new Map<string, number>(
+        countRows.map((row: any) => [String(row._id), Number(row.count) || 0]),
+      );
+      for (const engine of engines) {
+        engine.maintenance_count = countByEngine.get(String(engine._id)) || 0;
+      }
+    }
     engines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
     return NextResponse.json(engines);
   } catch (error) {

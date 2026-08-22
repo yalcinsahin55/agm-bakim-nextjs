@@ -35,7 +35,7 @@ export default function MotorlarPage() {
   const canAdd = user?.role === "yonetici";
 
   async function load() {
-    const engRes = await fetch("/api/engines");
+    const engRes = await fetch("/api/engines?include_maintenance_counts=true");
     if (engRes.status === 401) { router.push("/login"); return; }
     if (!engRes.ok) throw new Error("Motorlar yüklenemedi");
     setEngines(await engRes.json());
@@ -236,7 +236,7 @@ export default function MotorlarPage() {
                   <div className="flex-1 min-w-0">
                     <div className="text-[13.5px] font-bold text-text truncate">{e.name}</div>
                     <div className="text-[10.5px] text-faint mt-0.5">
-                      {recs.length} bakım kaydı
+                      {(typeof e.maintenance_count === "number" ? e.maintenance_count : recs.length)} bakım kaydı
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
