@@ -109,6 +109,8 @@ export default function DashboardPage() {
   }, [items]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
+  const engineChartRows = useMemo(() => analytics.byEngine.slice(0, 12), [analytics.byEngine]);
+  const maxEngineMaintenance = useMemo(() => Math.max(...engineChartRows.map((row) => row.count), 1), [engineChartRows]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
   const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
   const healthRows = useMemo(() => sortedEngines.map((engine) => {
@@ -241,10 +243,20 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="rounded-card border border-border bg-panel p-3.5">
-            <div className="mb-3 text-[11px] font-bold uppercase text-muted">Motor Bazlı Bakımlar</div>
-            {analyticsLoading ? <div className="space-y-2"><div className="h-2 animate-pulse rounded bg-panel2" /><div className="h-2 animate-pulse rounded bg-panel2" /><div className="h-2 animate-pulse rounded bg-panel2" /></div> : (
-              <div className="flex flex-col gap-2">
-                {analytics.byEngine.length === 0 ? <span className="text-[11px] text-faint">Henüz veri yok.</span> : analytics.byEngine.slice(0, 5).map((row) => <div key={row.engine} className="flex items-center gap-2"><span className="w-16 truncate text-[10px] text-muted">{row.engine}</span><div className="h-2 flex-1 rounded-full bg-panel2"><div className="h-2 rounded-full bg-amber" style={{ width: `${Math.min(row.count * 12, 100)}%` }} /></div><span className="w-5 text-right text-[10px] font-mono text-text">{row.count}</span></div>)}
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="text-[11px] font-bold uppercase text-muted">Motor Bazlı Bakım Sayıları</div>
+              {!analyticsLoading && engineChartRows.length > 0 && <div className="text-[9px] text-faint">Toplam kayıt</div>}
+            </div>
+            {analyticsLoading ? <div className="flex h-36 items-end gap-2 px-1"><div className="h-16 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-24 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-20 flex-1 animate-pulse rounded-t bg-panel2" /><div className="h-28 flex-1 animate-pulse rounded-t bg-panel2" /></div> : (
+              <div>
+                {engineChartRows.length === 0 ? <span className="text-[11px] text-faint">Henüz bakım kaydı yok.</span> : (
+                  <div className="flex h-36 items-end gap-1.5 overflow-x-auto px-1 pb-5 pt-2" aria-label="Motorlara göre bakım kayıt sayıları">
+                    {engineChartRows.map((row) => {
+                      const height = Math.max((row.count / maxEngineMaintenance) * 92, 8);
+                      return <div key={row.engine} className="flex h-full min-w-[42px] flex-1 flex-col items-center justify-end gap-1" title={`${row.engine}: ${row.count} bakım kaydı`}><span className="text-[10px] font-mono font-bold text-text">{row.count}</span><div className="w-full max-w-12 rounded-t bg-gradient-to-t from-amber to-[#f7c66a] transition-all" style={{ height: `${height}px` }} /><span className="max-w-14 truncate text-[9px] text-faint">{row.engine}</span></div>;
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
