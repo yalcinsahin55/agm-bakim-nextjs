@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
-import { upload } from "@vercel/blob/client";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -51,7 +50,7 @@ interface MaintenanceRecord {
   group_id?: string | null;
 }
 
-function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<string> {
+function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -69,18 +68,28 @@ function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<string
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
-        } else {
-          reject(new Error("Canvas context not available"));
-        }
+        if (!ctx) return reject(new Error("Fotoğraf işlenemedi."));
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error("Fotoğraf sıkıştırılamadı."));
+          resolve(blob);
+        }, "image/jpeg", quality);
       };
-      img.onerror = reject;
+      img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
       img.src = e.target?.result as string;
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
     reader.readAsDataURL(file);
+  });
+}
+
+function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   });
 }
 
@@ -88,11 +97,6 @@ function getPhotoSrc(photo: string): string {
   return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
     ? photo
     : `data:image/jpeg;base64,${photo}`;
-}
-
-function base64ToFile(base64: string, filename: string, mime: string): File {
-  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-  return new File([bytes], filename, { type: mime });
 }
 
 function getVideoSrc(v: VideoItem | string): string {
@@ -123,13 +127,21 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
-        const blob = await upload(`photos/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, base64ToFile(compressed, f.name, "image/jpeg"), {
-          access: "public",
-          handleUploadUrl: "/api/blob/upload",
-        });
-        uploaded.push(blob.url);
-      } catch {
-        toast.error(`${f.name} yüklenemedi.`);
+        const formData = new FormData();
+        const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+        formData.append("file", new File([compressed], photoName, { type: "image/jpeg" }));
+        formData.append("folder", "photos");
+        const response = await withTimeout(
+          fetch("/api/blob/upload-server", { method: "POST", body: formData }),
+          60_000,
+          "Fotoğraf yükleme zaman aşımına uğradı.",
+        );
+        const result = await response.json() as { url?: string; error?: string };
+        if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
+        uploaded.push(result.url);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+        toast.error(`${f.name} yüklenemedi: ${message}`);
       }
     }
     setPhotos((p) => [...p, ...uploaded]);
@@ -144,7 +156,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
         continue;
       }
       try {
-        const url = await uploadVideoChunked(f);
+        const url = await withTimeout(
+          uploadVideoChunked(f),
+          180_000,
+          "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
+        );
         setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
       } catch (err: any) {
         console.error("Video yükleme hatası:", err);
@@ -332,7 +348,7 @@ export default function KayitlarPage() {
   const filteredRecords = records;
 
   async function loadRecordMedia(record: MaintenanceRecord) {
-    if (record.photos || record.photos_b64 || record.videos) return record;
+    if (record.videos !== undefined && (record.photos !== undefined || record.photos_b64 !== undefined)) return record;
     setMediaLoadingId(record._id);
     try {
       const res = await fetch(`/api/records/${record._id}`);

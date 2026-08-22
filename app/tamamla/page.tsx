@@ -164,7 +164,7 @@ export default function TamamlaPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // ✨ YENİ: Videolar doğrudan Vercel Blob'a yüklenir (boyut sınırı yok)
+  // Videolar küçük parçalara bölünerek uygulama API’sine gönderilir ve Blob’a yazılır.
   async function handleVideos(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -184,7 +184,7 @@ export default function TamamlaPage() {
       try {
       const url = await withTimeout(
           uploadVideoChunked(f),
-          120_000,
+          600_000,
           "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
         );
         setVideos((v) => [...v, { url, filename: f.name }]);  
@@ -441,7 +441,7 @@ export default function TamamlaPage() {
         )}
 
         <button
-          onClick={submit} disabled={submitting || !chosenType}
+          onClick={submit} disabled={submitting || videoBusy || !chosenType}
           className="mt-2 py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50"
         >
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}
