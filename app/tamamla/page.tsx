@@ -25,21 +25,21 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
         const canvas = document.createElement("canvas");
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Fotoğraf işlenemedi."));
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error("Fotoğraf sıkıştırılamadı."));
+          resolve(blob);
+        }, "image/jpeg", quality);
       };
-      img.onerror = reject;
+      img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
       img.src = e.target.result;
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
     reader.readAsDataURL(file);
   });
 }
 
-function base64ToFile(base64, filename, mime) {
-  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-  return new File([bytes], filename, { type: mime });
-}
 
 function getPhotoSrc(photo) {
   return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
@@ -139,7 +139,9 @@ export default function TamamlaPage() {
       try {
         const compressed = await compressImage(f);
         const formData = new FormData();
-        formData.append("file", base64ToFile(compressed, f.name, "image/jpeg"));
+        const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+        formData.append("file", new File([compressed], photoName, { type: "image/jpeg" }));
+        formData.append("folder", "photos");
         const response = await withTimeout(
           fetch("/api/blob/upload-server", { method: "POST", body: formData }),
           60_000,
@@ -148,8 +150,9 @@ export default function TamamlaPage() {
         const result = await response.json();
         if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
         uploaded.push(result.url);
-      } catch {
-        toast.error(`${f.name} yüklenemedi.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+        toast.error(`${f.name} yüklenemedi: ${message}`);
       }
     }
     setPhotos((prev) => [...prev, ...uploaded]);
