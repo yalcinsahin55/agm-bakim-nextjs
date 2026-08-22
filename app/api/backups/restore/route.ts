@@ -50,8 +50,12 @@ export async function POST(req: NextRequest) {
         const document = clean(raw) as Record<string, unknown>;
         const identity = getIdentity(document);
         if (identity) {
-          document._id = identity;
-          await (db.collection(name) as any).replaceOne({ _id: identity }, document, { upsert: true });
+          delete document._id;
+          await (db.collection(name) as any).updateOne(
+            { _id: identity },
+            { $set: document, $setOnInsert: { _id: identity } },
+            { upsert: true },
+          );
         } else {
           delete document._id;
           await (db.collection(name) as any).insertOne(document);
