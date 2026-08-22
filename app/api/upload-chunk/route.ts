@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 
   // 🎬 Birleştir ve Blob'a yaz
   const { upload_id, filename, mime, total } = body;
-  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
-  if (!token) return NextResponse.json({ error: "Blob depolama yapılandırılmamış." }, { status: 503 });
+  // Vercel Production’da bağlı Blob mağazası OIDC ile otomatik yetkilendirilir.
+  const token = process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
   const chunks = await col.find({ upload_id }).sort({ index: 1 }).toArray();
   if (chunks.length !== total) {
     return NextResponse.json({ error: "Parçalar eksik, tekrar deneyin" }, { status: 400 });
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const blob = await put(`videos/${safeName}`, buffer, {
     access: "public",
     contentType: mime || "video/mp4",
-    token,
+    ...(token ? { token } : {}),
   });
 
   await col.deleteMany({ upload_id });

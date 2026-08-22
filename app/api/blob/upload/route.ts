@@ -24,8 +24,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
 
   try {
+    const token = process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
     const jsonResponse = await handleUpload({
-      token: process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN,
+      ...(token ? { token } : {}),
       body,
       request,
       onBeforeGenerateToken: async (pathname) => ({
