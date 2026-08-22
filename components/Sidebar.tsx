@@ -76,7 +76,7 @@ export default function Sidebar() {
       </div>
 
       {/* Menü */}
-      <nav className="flex-1 overflow-y-auto py-3 px-3">
+      <nav className="min-h-0 flex-1 overflow-y-auto py-3 px-3">
         <div className="text-[9px] font-bold text-faint uppercase tracking-wider px-2 mb-2">Ana Menü</div>
         <div className="flex flex-col gap-0.5">
           {ITEMS.filter((item) => canAccessRoute(user?.role, item.href)).map((item) => {
@@ -110,7 +110,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Çıkış */}
-      <div className="p-3 border-t border-border">
+      <div className="shrink-0 p-3 border-t border-border">
         <button
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[12px] font-semibold text-muted hover:text-red hover:bg-red/10 border border-border hover:border-red/30 transition-all"

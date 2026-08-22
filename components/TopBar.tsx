@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import NotificationBell from "@/components/NotificationBell";
+import LogoutButton from "@/components/LogoutButton";
 
 interface TopBarProps {
   title: string;
@@ -24,6 +25,7 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
         <div className="flex items-center gap-2">
           <NotificationBell />
           {right}
+          <LogoutButton />
         </div>
       </div>
     </div>
