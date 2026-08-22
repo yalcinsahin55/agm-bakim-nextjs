@@ -43,6 +43,15 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+self.addEventListener("sync", (event) => {
+  if (event.tag !== "agm-offline-sync") return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      clientList.forEach((client) => client.postMessage({ type: "AGM_OFFLINE_SYNC" }));
+    }),
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const href = event.notification.data?.href || "/bildirimler";

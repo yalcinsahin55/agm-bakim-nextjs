@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { getPendingOfflineCount, queueRecord, syncOfflineQueue, type QueuedMedia } from "@/lib/offlineQueue";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -41,10 +42,17 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
 }
 
 
-function getPhotoSrc(photo) {
+function getPhotoSrc(photo, previews = {}) {
+  if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
   return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
     ? photo
     : `data:image/jpeg;base64,${photo}`;
+}
+
+function makeOfflineId() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function withTimeout(promise, milliseconds, message) {
@@ -77,6 +85,10 @@ export default function TamamlaPage() {
   const [videos, setVideos] = useState([]);
   const [videoBusy, setVideoBusy] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
+  const [offlinePreviews, setOfflinePreviews] = useState({});
+  const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
   
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,7 +102,21 @@ export default function TamamlaPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadPanel(); }, []); // eslint-disable-line
+  useEffect(() => {
+    loadPanel();
+    setIsOnline(navigator.onLine);
+    const updateConnection = () => setIsOnline(navigator.onLine);
+    const updateQueue = () => { void getPendingOfflineCount().then(setPendingOfflineCount).catch(() => {}); };
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    window.addEventListener("offline-queue:changed", updateQueue);
+    updateQueue();
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+      window.removeEventListener("offline-queue:changed", updateQueue);
+    };
+  }, []);
 
   const engineList = useMemo(
     () => [...engines].sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })),
@@ -138,8 +164,15 @@ export default function TamamlaPage() {
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
-        const formData = new FormData();
         const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+        if (!navigator.onLine) {
+          const id = makeOfflineId();
+          setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+          uploaded.push(`offline:${id}`);
+          continue;
+        }
+        const formData = new FormData();
         formData.append("file", new File([compressed], photoName, { type: "image/jpeg" }));
         formData.append("folder", "photos");
         const response = await withTimeout(
@@ -151,6 +184,19 @@ export default function TamamlaPage() {
         if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
         uploaded.push(result.url);
       } catch (error) {
+        if (!navigator.onLine) {
+          try {
+            const compressed = await compressImage(f);
+            const id = makeOfflineId();
+            const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+            setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(compressed) }));
+            uploaded.push(`offline:${id}`);
+            continue;
+          } catch {
+            // Aşağıdaki genel hata kullanıcıya gösterilir.
+          }
+        }
         const message = error instanceof Error ? error.message : "Bilinmeyen hata";
         toast.error(`${f.name} yüklenemedi: ${message}`);
       }
@@ -161,6 +207,17 @@ export default function TamamlaPage() {
   }
 
   function removePhoto(idx) {
+    const photo = photos[idx];
+    if (photo && photo.startsWith("offline:")) {
+      const id = photo.slice("offline:".length);
+      setOfflineMedia((current) => current.filter((media) => media.id !== id));
+      setOfflinePreviews((current) => {
+        if (current[id]) URL.revokeObjectURL(current[id]);
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
@@ -177,21 +234,35 @@ export default function TamamlaPage() {
     setVideoBusy(true);
     try {
       for (const f of files) {
-      if (f.size > 100 * 1024 * 1024) {
-        toast.error(`${f.name} çok büyük (en fazla 100MB).`);
-        continue;
-      }
-      try {
-      const url = await withTimeout(
-          uploadVideoChunked(f),
-          600_000,
-          "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
-        );
-        setVideos((v) => [...v, { url, filename: f.name }]);  
-      } catch (err) {
-        console.error("Video yükleme hatası:", err);
-        toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
-      }
+        if (f.size > 100 * 1024 * 1024) {
+          toast.error(`${f.name} çok büyük (en fazla 100MB).`);
+          continue;
+        }
+        if (!navigator.onLine) {
+          const id = makeOfflineId();
+          setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
+          setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+          setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
+          continue;
+        }
+        try {
+          const url = await withTimeout(
+            uploadVideoChunked(f),
+            600_000,
+            "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
+          );
+          setVideos((current) => [...current, { url, filename: f.name }]);
+        } catch (err) {
+          if (!navigator.onLine) {
+            const id = makeOfflineId();
+            setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
+            setOfflinePreviews((current) => ({ ...current, [id]: URL.createObjectURL(f) }));
+            setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
+            continue;
+          }
+          console.error("Video yükleme hatası:", err);
+          toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
+        }
       }
     } finally {
       setVideoBusy(false);
@@ -200,6 +271,17 @@ export default function TamamlaPage() {
   }
 
   function removeVideo(idx) {
+    const video = videos[idx];
+    if (video?.url?.startsWith("offline:")) {
+      const id = video.url.slice("offline:".length);
+      setOfflineMedia((current) => current.filter((media) => media.id !== id));
+      setOfflinePreviews((current) => {
+        if (current[id]) URL.revokeObjectURL(current[id]);
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }
     setVideos((prev) => prev.filter((_, i) => i !== idx));
   }
 
@@ -231,20 +313,30 @@ export default function TamamlaPage() {
     });
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
+    const payload = {
+      engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
+      hour_at_completion: Number(hours), technician_note: techNote,
+      photos,
+      videos,
+      pressure_reading: pressure !== "" ? Number(pressure) : undefined,
+      backdated: isBackdated, record_date: recordDate,
+      period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
+    };
 
     try {
+      if (!navigator.onLine || offlineMedia.length > 0) {
+        await queueRecord(payload, offlineMedia);
+        toast.dismiss(loadingToast);
+        toast.success(navigator.onLine ? "Kayıt senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt güvenle kuyruğa alındı.");
+        if (navigator.onLine) void syncOfflineQueue();
+        router.push("/dashboard");
+        return;
+      }
+
       const res = await fetch("/api/records", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
-          hour_at_completion: Number(hours), technician_note: techNote,
-          photos,
-          videos: videos,
-          pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-          backdated: isBackdated, record_date: recordDate,
-          period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -294,6 +386,15 @@ export default function TamamlaPage() {
     <div>
       <TopBar title="Bakım Tamamla" subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""} />
       <div className="px-4 py-4 flex flex-col gap-1">
+        {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
+          <div className="mb-2 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
+            <div className="font-bold">{!isOnline ? "Çevrimdışı çalışma açık." : "Senkronizasyon bekleyen kayıt var."}</div>
+            <div className="mt-0.5 text-[10px] text-muted">
+              {!isOnline ? "Kayıt ve seçtiğiniz medya cihazda tutulur; bağlantı gelince gönderilir." : `${pendingOfflineCount} kayıt bağlantı üzerinden gönderilmeyi bekliyor.`}
+            </div>
+            {isOnline && pendingOfflineCount > 0 && <button type="button" onClick={() => { window.dispatchEvent(new Event("offline-queue:sync")); }} className="mt-2 rounded-lg border border-amber/40 px-2.5 py-1.5 text-[10px] font-bold text-amber">Şimdi senkronize et</button>}
+          </div>
+        )}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Motor</label>
         <select value={engineId} onChange={(e) => setEngineId(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2">
           {engineList.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
@@ -406,11 +507,11 @@ export default function TamamlaPage() {
               <div key={idx} className="relative">
                 <button
                   type="button"
-                  onClick={() => setSelectedPhoto(getPhotoSrc(p))}
+                  onClick={() => setSelectedPhoto(getPhotoSrc(p, offlinePreviews))}
                   className="block hover:scale-105 transition-transform"
                   aria-label="Fotoğrafı büyüt"
                 >
-                  <img src={getPhotoSrc(p)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                  <img src={getPhotoSrc(p, offlinePreviews)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
                 </button>
                 <button onClick={() => removePhoto(idx)} className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5">✕</button>
               </div>
@@ -428,7 +529,7 @@ export default function TamamlaPage() {
           <div className="flex gap-1.5 mb-2 flex-wrap">
             {videos.map((v, idx) => (
               <div key={idx} className="relative">
-                <video src={v.url} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" />
+                <video src={v.url?.startsWith("offline:") ? offlinePreviews[v.url.slice("offline:".length)] : v.url} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" controls={false} />
                 <button 
                   onClick={() => removeVideo(idx)} 
                   className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5 text-red"
