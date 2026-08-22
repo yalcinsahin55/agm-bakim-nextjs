@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { cachedFetch } from "@/lib/apiCache";
+import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 
 interface MenuItem {
   href: string;
@@ -39,6 +39,7 @@ export default function BottomNav() {
     const loadingToast = toast.loading("Çıkış yapılıyor...");
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+      invalidateCachedFetch("/api/auth/me");
       toast.dismiss(loadingToast);
       toast.success("Güvenli çıkış yapıldı 👋");
       router.push("/login");

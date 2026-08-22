@@ -1,8 +1,13 @@
 import EngineBadge from "./EngineBadge";
-import type { Engine } from "@/lib/types";
+interface LoadEngine {
+  _id: string;
+  name: string;
+  hours: number;
+  load_kw?: number;
+}
 
 interface LoadCardsProps {
-  engines: Engine[];
+  engines: LoadEngine[];
 }
 
 export default function LoadCards({ engines }: LoadCardsProps) {

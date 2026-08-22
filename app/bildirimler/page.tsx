@@ -45,15 +45,28 @@ export default function NotificationsPage() {
   useEffect(() => { load().catch(() => setLoading(false)); }, [load]);
 
   async function markRead(id: string) {
-    await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-    setNotifications((current) => current.map((item) => item._id === id ? { ...item, read_at: new Date().toISOString() } : item));
+    try {
+      const response = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+      if (!response.ok) throw new Error("Bildirim okunamadı");
+      setNotifications((current) => current.map((item) => item._id === id ? { ...item, read_at: new Date().toISOString() } : item));
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch {
+      // Okundu işaretleme başarısızsa listeyi değiştirme.
+    }
   }
 
   async function markAllRead() {
     setBusy(true);
-    await fetch("/api/notifications/read-all", { method: "PATCH" });
-    setNotifications((current) => current.map((item) => ({ ...item, read_at: new Date().toISOString() })));
-    setBusy(false);
+    try {
+      const response = await fetch("/api/notifications/read-all", { method: "PATCH" });
+      if (!response.ok) throw new Error("Bildirimler okunamadı");
+      setNotifications((current) => current.map((item) => ({ ...item, read_at: new Date().toISOString() })));
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch {
+      // Hata durumunda butonun kilitlenmemesi için finally kullanılır.
+    } finally {
+      setBusy(false);
+    }
   }
 
   const unreadCount = notifications.filter((item) => !item.read_at).length;

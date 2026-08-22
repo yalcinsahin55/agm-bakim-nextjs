@@ -4,7 +4,22 @@ type CacheEntry<T> = {
   time: number;
 };
 
+export class ApiFetchError extends Error {
+  status: number;
+
+  constructor(status: number, message = `HTTP ${status}`) {
+    super(message);
+    this.name = "ApiFetchError";
+    this.status = status;
+  }
+}
+
 const cache = new Map<string, CacheEntry<unknown>>();
+
+export function invalidateCachedFetch(url?: string): void {
+  if (url) cache.delete(url);
+  else cache.clear();
+}
 
 /** Basit istek önbelleği: Aynı API çağrısı kısa süre içinde birden fazla
  *  component tarafından yapılırsa TEK istek atılır, sonuç paylaşılır.
@@ -25,7 +40,7 @@ export async function cachedFetch<T = unknown>(url: string, ttlMs = 30000): Prom
 
   const promise = fetch(url)
     .then(async (res) => {
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) throw new ApiFetchError(res.status);
       const data = (await res.json()) as T;
       cache.set(url, { data, time: Date.now(), promise: null });
       return data;

@@ -17,8 +17,9 @@ export default function MotorlarPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
   const [engines, setEngines] = useState([]);
-  const [records, setRecords] = useState([]);
+  const [recordsByEngine, setRecordsByEngine] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadingEngineId, setLoadingEngineId] = useState(null);
   const [openId, setOpenId] = useState(null);
 
   const [showAdd, setShowAdd] = useState(false);
@@ -30,13 +31,10 @@ export default function MotorlarPage() {
   const canAdd = user && ["yonetici", "planlamaci"].includes(user.role);
 
   async function load() {
-    const [engRes, recRes] = await Promise.all([
-      fetch("/api/engines"),
-      fetch("/api/records?limit=1000"),
-    ]);
+    const engRes = await fetch("/api/engines");
     if (engRes.status === 401) { router.push("/login"); return; }
+    if (!engRes.ok) throw new Error("Motorlar yüklenemedi");
     setEngines(await engRes.json());
-    setRecords(recRes.ok ? await recRes.json() : []);
     setLoading(false);
   }
 
@@ -47,13 +45,26 @@ export default function MotorlarPage() {
     [engines]
   );
 
-  const recordsByEngine = useMemo(() => {
-    const map = {};
-    records.forEach((r) => {
-      (map[r.engine_id] = map[r.engine_id] || []).push(r);
-    });
-    return map;
-  }, [records]);
+  async function toggleEngine(engineId) {
+    if (openId === engineId) {
+      setOpenId(null);
+      return;
+    }
+    setOpenId(engineId);
+    if (recordsByEngine[engineId]) return;
+    setLoadingEngineId(engineId);
+    try {
+      const response = await fetch(`/api/records?engine_id=${encodeURIComponent(engineId)}&page=1&page_size=20`);
+      if (!response.ok) throw new Error("Bakım geçmişi yüklenemedi");
+      const data = await response.json();
+      setRecordsByEngine((current) => ({ ...current, [engineId]: Array.isArray(data) ? data : (data.records || []) }));
+    } catch {
+      toast.error("Motor bakım geçmişi yüklenemedi.");
+      setRecordsByEngine((current) => ({ ...current, [engineId]: [] }));
+    } finally {
+      setLoadingEngineId(null);
+    }
+  }
 
   async function addEngine(e) {
     e.preventDefault();
@@ -157,13 +168,14 @@ export default function MotorlarPage() {
               .slice()
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             const open = openId === e._id;
+            const recordsLoading = loadingEngineId === e._id;
             return (
               <div
                 key={e._id}
                 className="bg-panel border border-border rounded-card overflow-hidden hover:border-borderlt transition-all"
               >
                 <button
-                  onClick={() => setOpenId(open ? null : e._id)}
+                  onClick={() => void toggleEngine(e._id)}
                   className="w-full flex items-center gap-3 p-3 text-left"
                 >
                   <EngineBadge name={e.name} size={36} />
@@ -199,7 +211,9 @@ export default function MotorlarPage() {
                       </div>
                     </div>
 
-                    {recs.length === 0 ? (
+                    {recordsLoading ? (
+                      <div className="text-center text-[11px] text-muted py-4">Bakım geçmişi yükleniyor...</div>
+                    ) : recs.length === 0 ? (
                       <div className="text-center text-[11px] text-faint py-4">
                         Henüz bakım kaydı yok.
                       </div>

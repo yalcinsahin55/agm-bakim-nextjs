@@ -16,7 +16,12 @@ export async function GET(req: NextRequest) {
   since.setMonth(since.getMonth() - 5, 1);
   since.setHours(0, 0, 0, 0);
   const records = db.collection("maintenance_records") as any;
-  const [monthly, byEngine] = await Promise.all([
+  const previousMonth = new Date(since);
+  previousMonth.setMonth(previousMonth.getMonth() - 1);
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const [monthly, byEngine, byType, totals] = await Promise.all([
     records.aggregate([
       { $match: { created_at: { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$created_at" } }, count: { $sum: 1 } } },
@@ -27,10 +32,30 @@ export async function GET(req: NextRequest) {
       { $sort: { count: -1, _id: 1 } },
       { $limit: 12 },
     ]).toArray(),
+    records.aggregate([
+      { $group: { _id: "$type_label", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: 12 },
+    ]).toArray(),
+    records.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          thisCount: { $sum: { $cond: [{ $gte: ["$created_at", monthStart] }, 1, 0] } },
+          lastCount: { $sum: { $cond: [{ $and: [{ $gte: ["$created_at", previousMonth] }, { $lt: ["$created_at", monthStart] }] }, 1, 0] } },
+        },
+      },
+    ]).toArray(),
   ]);
 
+  const totalRow = totals[0] || { total: 0, thisCount: 0, lastCount: 0 };
   return NextResponse.json({
     monthly: monthly.map((row: any) => ({ month: row._id, count: row.count })),
     byEngine: byEngine.map((row: any) => ({ engine: row._id || "Bilinmeyen", count: row.count })),
+    byType: byType.map((row: any) => ({ type: row._id || "Bilinmeyen", count: row.count })),
+    total: totalRow.total || 0,
+    thisCount: totalRow.thisCount || 0,
+    lastCount: totalRow.lastCount || 0,
   });
 }

@@ -276,14 +276,6 @@ export default function YagAnalizleriPage() {
               <div className="min-w-0 flex-1 text-[12px] font-bold text-text truncate">📄 {preview.pdf_filename}</div>
               <div className="flex items-center gap-1.5 ml-2">
                 <a
-                  href={`${preview.pdf_url || ""}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg border border-teal/40 px-2 py-1 text-[10px] font-bold text-teal"
-                >
-                  Yeni sekme
-                </a>
-                <a
                   href={`${preview.pdf_url || ""}?download=1`}
                   className="rounded-lg border border-amber/40 px-2 py-1 text-[10px] font-bold text-amber"
                 >
@@ -303,6 +295,7 @@ export default function YagAnalizleriPage() {
               src={preview.pdf_url || (preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : undefined)}
               title={preview.pdf_filename}
               className="w-full h-[calc(100%-3rem)] rounded-xl border border-border bg-white"
+              aria-label={`${preview.pdf_filename} PDF önizlemesi`}
             />
           </div>
         </div>

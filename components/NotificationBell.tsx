@@ -2,27 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { cachedFetch } from "@/lib/apiCache";
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    const load = async () => {
+    const load = async (force = false) => {
       try {
-        const response = await fetch("/api/notifications", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await cachedFetch<{ unreadCount?: number }>("/api/notifications", force ? 0 : 30_000);
         if (alive) setUnreadCount(Number(data.unreadCount || 0));
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
       }
     };
-    load();
-    const timer = window.setInterval(load, 60000);
+    const handleChanged = () => { void load(true); };
+    void load();
+    const timer = window.setInterval(load, 60_000);
+    window.addEventListener("notifications:changed", handleChanged);
     return () => {
       alive = false;
       window.clearInterval(timer);
+      window.removeEventListener("notifications:changed", handleChanged);
     };
   }, []);
 
