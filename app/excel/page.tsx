@@ -3,7 +3,7 @@
 // JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
 // @ts-nocheck
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -23,6 +23,32 @@ export default function ExcelPage() {
   const [importFile, setImportFile] = useState(null);
   const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
+  const [engines, setEngines] = useState([]);
+  const [types, setTypes] = useState([]);
+  const [reportEngine, setReportEngine] = useState("");
+  const [reportType, setReportType] = useState("");
+  const [reportFrom, setReportFrom] = useState("");
+  const [reportTo, setReportTo] = useState("");
+
+  useEffect(() => {
+    Promise.all([fetch("/api/engines"), fetch("/api/maintenance-types")]).then(async ([engineResponse, typeResponse]) => {
+      if (engineResponse.status === 401) { router.push("/login"); return; }
+      const engineData = await engineResponse.json();
+      const typeData = await typeResponse.json();
+      setEngines(Array.isArray(engineData) ? engineData : []);
+      setTypes(Array.isArray(typeData) ? typeData : []);
+    }).catch(() => {});
+  }, [router]);
+
+  const reportUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (reportEngine) params.set("engine_id", reportEngine);
+    if (reportType) params.set("type_label", reportType);
+    if (reportFrom) params.set("from", reportFrom);
+    if (reportTo) params.set("to", reportTo);
+    const query = params.toString();
+    return query ? `/api/export/excel?${query}` : "/api/export/excel";
+  }, [reportEngine, reportType, reportFrom, reportTo]);
 
   async function doImport() {
     if (!importFile) {
@@ -71,8 +97,22 @@ export default function ExcelPage() {
               </p>
             </div>
           </div>
-          <a href="/api/export/excel" className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13.5px] hover:brightness-110 active:scale-[.98] transition">
-            📥 İndir (.xlsx)
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <select value={reportEngine} onChange={(e) => setReportEngine(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <option value="">Tüm motorlar</option>
+              {engines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
+            </select>
+            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <option value="">Tüm bakım türleri</option>
+              {types.map((type) => <option key={type.key || type._id} value={type.label}>{type.label}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Başlangıç tarihi" />
+            <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
+          </div>
+          <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13.5px] hover:brightness-110 active:scale-[.98] transition">
+            📥 Filtreli Excel indir (.xlsx)
           </a>
         </div>
 

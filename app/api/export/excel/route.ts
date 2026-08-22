@@ -12,6 +12,21 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req, usersCol);
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
 
+  const { searchParams } = new URL(req.url);
+  const engineFilter = searchParams.get("engine_id");
+  const typeFilter = searchParams.get("type_label");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const recordQuery: Record<string, unknown> = {};
+  if (engineFilter) recordQuery.engine_id = engineFilter;
+  if (typeFilter) recordQuery.type_label = typeFilter;
+  if (from || to) {
+    recordQuery.created_at = {
+      ...(from ? { $gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+      ...(to ? { $lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+    };
+  }
+
   const engines = await (db.collection("engines") as any).find().toArray();
   engines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
   const types = await (db.collection("maintenance_types") as any).find().toArray();
@@ -43,6 +58,19 @@ export async function GET(req: NextRequest) {
     const safeName = label.replace(/[\\/?*[\]:]/g, "").slice(0, 31);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetRows), safeName);
   });
+
+  const history = await (db.collection("maintenance_records") as any).find(recordQuery, {
+    projection: { photos_b64: 0, photos: 0, videos: 0 },
+  }).sort({ created_at: -1 }).limit(5000).toArray();
+  const historyRows = history.map((record: any) => ({
+    "TARİH": record.created_at ? new Date(record.created_at).toLocaleDateString("tr-TR") : "",
+    "MOTOR": record.engine_name || "",
+    "BAKIM TÜRÜ": record.type_label || "",
+    "MOTOR SAATİ": record.hour_at_completion || 0,
+    "TEKNİSYEN": record.technician_name || "",
+    "NOT": record.technician_note || "",
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historyRows), "Bakım Geçmişi");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const filename = `AGM_Motor_Bakim_Raporu_${new Date().toISOString().slice(0, 10)}.xlsx`;
