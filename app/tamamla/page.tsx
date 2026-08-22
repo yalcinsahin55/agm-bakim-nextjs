@@ -15,6 +15,7 @@ import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -85,6 +86,7 @@ function withTimeout(promise, milliseconds, message) {
 export default function TamamlaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useCurrentUser();
   const quickMode = searchParams.get("mode") === "quick";
   const qrEngineId = searchParams.get("engine_id");
   const [items, setItems] = useState([]);
@@ -101,6 +103,8 @@ export default function TamamlaPage() {
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
+  const [technicians, setTechnicians] = useState([]);
+  const [otherTechnicianIds, setOtherTechnicianIds] = useState([]);
   const [checklist, setChecklist] = useState({});
   
   const [photos, setPhotos] = useState([]);
@@ -159,6 +163,9 @@ export default function TamamlaPage() {
 
   useEffect(() => {
     loadPanel();
+    fetch("/api/users/technicians")
+      .then(async (response) => { if (response.ok) setTechnicians(await response.json()); })
+      .catch(() => {});
     setIsOnline(navigator.onLine);
     const updateConnection = () => setIsOnline(navigator.onLine);
     const updateQueue = (event?: Event) => {
@@ -230,6 +237,8 @@ export default function TamamlaPage() {
   }, [isPrimaryNew, chosenType, checklistItems]);
 
   const otherTypes = allTypesSorted.filter((t) => t.key !== typeKey);
+  const checklistComplete = checklistItems.length > 0 && checklistItems.every((item) => checklist[item] === true);
+  const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0;
 
   async function handlePhotos(e) {
     const files = Array.from(e.target.files || []);
@@ -358,9 +367,24 @@ export default function TamamlaPage() {
     }
   }
 
+  function toggleOtherTechnician(id, checked) {
+    setOtherTechnicianIds((current) => checked ? [...new Set([...current, id])] : current.filter((currentId) => currentId !== id));
+  }
+
+  const currentUserId = user?._id || user?.id || "";
+  const selectableTechnicians = technicians.filter((technician) => technician.id !== currentUserId);
+
   async function submit() {
     if (!chosenType) {
       toast.error("Lütfen bir bakım türü seçin.");
+      return;
+    }
+    if (!checklistComplete) {
+      toast.error("Bakımı tamamlamadan önce kontrol listesindeki tüm maddeleri işaretleyin.");
+      return;
+    }
+    if (!evidenceReady) {
+      toast.error("Bakım kanıtı için en az bir not, fotoğraf veya video ekleyin.");
       return;
     }
     
@@ -386,7 +410,9 @@ export default function TamamlaPage() {
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       backdated: isBackdated, record_date: recordDate,
       period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
+      other_technician_ids: otherTechnicianIds,
       checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
+      completion_confirmation: true,
     };
 
     try {
@@ -542,12 +568,21 @@ export default function TamamlaPage() {
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
         />
 
+        {selectableTechnicians.length > 0 && <div className="mb-2 rounded-xl border border-teal/30 bg-teal/5 p-3">
+          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
+          <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında bakıma katılan ekip üyelerini seçebilirsin.</div>
+          <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {selectableTechnicians.map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name}</label>)}
+          </div>
+        </div>}
+
         <div className="mb-2 rounded-xl border border-border bg-panel p-3">
           <div className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-muted">Kontrol Listesi</div>
           <div className="mb-2 text-[10.5px] text-faint">Standart maddeleri işaretleyerek bakımın tamamlandığını doğrula.</div>
           <div className="flex flex-col gap-1.5">
             {checklistItems.map((item) => <label key={item} className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(e) => setChecklist((current) => ({ ...current, [item]: e.target.checked }))} />{item}</label>)}
           </div>
+          <div className={`mt-2 rounded-lg p-2 text-[10.5px] ${checklistComplete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{checklistComplete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div>
         </div>
 
         {otherTypes.length > 0 && (
@@ -631,8 +666,9 @@ export default function TamamlaPage() {
           </div>
         )}
 
+        {!evidenceReady && <div className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu veya fotoğraf/video kanıtı ekleyin.</div>}
         <button
-          onClick={submit} disabled={submitting || videoBusy || !chosenType}
+          onClick={submit} disabled={submitting || videoBusy || !chosenType || !checklistComplete || !evidenceReady}
           className="mt-2 py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50"
         >
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}

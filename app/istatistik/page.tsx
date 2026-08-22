@@ -17,9 +17,10 @@ interface AnalyticsSummary {
   lastCount: number;
   byType: Array<{ type: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
+  byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number }>;
 }
 
-const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [] };
+const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [] };
 
 function BarList({ items, color }: { items: BarItem[]; color: string }) {
   const max = Math.max(...items.map((item) => item.count), 1);
@@ -55,6 +56,7 @@ export default function IstatistikPage() {
         lastCount: Number(data.lastCount || 0),
         byType: Array.isArray(data.byType) ? data.byType : [],
         byEngine: Array.isArray(data.byEngine) ? data.byEngine : [],
+        byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
       });
     } catch (loadError) {
       console.error("İstatistikler yüklenemedi:", loadError);
@@ -83,6 +85,8 @@ export default function IstatistikPage() {
   const diff = summary.thisCount - summary.lastCount;
   const topTypes: BarItem[] = summary.byType.slice(0, 6).map((item) => ({ label: item.type, count: item.count }));
   const topEngines: BarItem[] = summary.byEngine.slice(0, 6).map((item) => ({ label: item.engine, count: item.count }));
+  const topTechnicians = summary.byTechnician.slice(0, 12);
+  const maxTechnicianWork = Math.max(...topTechnicians.map((item) => item.total_count), 1);
 
   return (
     <div>
@@ -98,6 +102,15 @@ export default function IstatistikPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">🔧 En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
           <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">⚙️ En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
+            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1">👥 Teknisyen Çalışma Özeti</h2>
+            <p className="mb-3 text-[10.5px] text-faint">Sorumlu olarak tamamlanan ve ekip desteği verilen bakım görevleri birlikte gösterilir.</p>
+            {topTechnicians.length ? <div className="flex flex-col gap-3">{topTechnicians.map((item) => <div key={item.technician_id}>
+              <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{item.technician}</span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
+              <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(item.responsible_count / maxTechnicianWork) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(item.support_count / maxTechnicianWork) * 100}%` }} /></div>
+              <div className="mt-1 flex gap-3 text-[9.5px] text-faint"><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal" />Sorumlu: {item.responsible_count}</span><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber" />Destek: {item.support_count}</span></div>
+            </div>)}</div> : <p className="text-[11px] text-faint">Henüz teknisyen çalışma verisi yok.</p>}
+          </div>
         </div>
       </div>
       <BottomNav />

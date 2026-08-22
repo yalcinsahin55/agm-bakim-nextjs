@@ -57,6 +57,9 @@ export const recordSchema = z.object({
 
   technician_note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
+  other_technician_ids: z.array(z.string().min(1).max(100)).max(20, "En fazla 20 yardımcı teknisyen seçilebilir.").optional(),
+  checklist: z.array(z.object({ label: z.string().min(1).max(200), completed: z.boolean() })).max(20).optional(),
+  completion_confirmation: z.boolean().optional(),
 
   photos_b64: z.array(z.string()).max(10, "En fazla 10 fotoğraf.").optional(),
   photos: z.array(z.string().url("Geçerli bir medya URL’si gerekli.")).max(10, "En fazla 10 fotoğraf.").optional(),

@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+
+interface BackupSummary {
+  generated_at: string;
+  collections: Record<string, number>;
+  latest_maintenance_at: string | null;
+}
+
+const COLLECTION_LABELS: Record<string, string> = {
+  users: "Kullanıcı",
+  engines: "Motor",
+  maintenance_types: "Bakım türü",
+  maintenance_records: "Bakım kaydı",
+  oil_analyses: "Yağ analizi",
+  notifications: "Bildirim",
+  audit_logs: "İşlem günlüğü",
+};
 
 export default function YedeklemePage() {
   const router = useRouter();
@@ -12,6 +28,18 @@ export default function YedeklemePage() {
   const [restoreConfirm, setRestoreConfirm] = useState("");
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState("");
+  const [summary, setSummary] = useState<BackupSummary | null>(null);
+  const [archiveMonth, setArchiveMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    fetch("/api/backups/summary")
+      .then(async (response) => { if (response.ok) setSummary(await response.json() as BackupSummary); })
+      .catch(() => {});
+  }, []);
+
+  const archiveFrom = `${archiveMonth}-01`;
+  const archiveTo = new Date(Date.UTC(Number(archiveMonth.slice(0, 4)), Number(archiveMonth.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  const archiveQuery = `?from=${archiveFrom}&to=${archiveTo}`;
 
   async function restoreBackup() {
     if (!restoreFile || restoreConfirm !== "RESTORE") return;
@@ -67,6 +95,17 @@ export default function YedeklemePage() {
           <div className="text-[15px] font-bold text-text">Uygulama verilerini indir</div>
           <p className="mt-1 text-[11px] leading-5 text-muted">Kullanıcılar, motorlar, bakım türleri, bakım kayıtları, bildirimler ve işlem geçmişi JSON olarak dışa aktarılır. Şifreler, VAPID private key ve büyük medya base64 alanları güvenlik ve boyut nedeniyle dışarıda bırakılır.</p>
           <button onClick={downloadBackup} disabled={busy} className="mt-4 w-full rounded-lg bg-amber py-2.5 text-[12px] font-extrabold text-[#161006] disabled:opacity-50">{busy ? "Yedek hazırlanıyor..." : "JSON yedeğini indir"}</button>
+        </section>
+        {summary && <section className="mt-4 rounded-card border border-border bg-panel p-4">
+          <div className="text-[13px] font-bold text-text">Yedek kapsamı</div>
+          <p className="mt-1 text-[10.5px] leading-5 text-muted">Son kontrol: {new Date(summary.generated_at).toLocaleString("tr-TR")}{summary.latest_maintenance_at ? ` · Son bakım: ${new Date(summary.latest_maintenance_at).toLocaleString("tr-TR")}` : ""}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">{Object.entries(summary.collections).map(([name, count]) => <div key={name} className="rounded-lg bg-panel2 px-2.5 py-2"><div className="text-[9.5px] text-faint">{COLLECTION_LABELS[name] || name}</div><div className="mt-0.5 font-mono text-sm font-bold text-text">{count.toLocaleString("tr-TR")}</div></div>)}</div>
+        </section>}
+        <section className="mt-4 rounded-card border border-teal/30 bg-teal/5 p-4">
+          <div className="text-[13px] font-bold text-text">Aylık bakım arşivi</div>
+          <p className="mt-1 text-[10.5px] leading-5 text-muted">Seçilen ayın bakım geçmişini Excel veya PDF olarak indirerek aylık arşiv oluşturabilirsin.</p>
+          <input type="month" value={archiveMonth} onChange={(event) => setArchiveMonth(event.target.value)} className="mt-3 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" aria-label="Arşiv ayı" />
+          <div className="mt-2 grid grid-cols-2 gap-2"><a href={`/api/export/excel${archiveQuery}`} className="rounded-lg bg-teal py-2.5 text-center text-[11.5px] font-extrabold text-[#06181b] hover:brightness-110">Excel arşivi</a><a href={`/api/export/pdf${archiveQuery}`} className="rounded-lg border border-teal/40 py-2.5 text-center text-[11.5px] font-extrabold text-teal hover:bg-teal/10">PDF arşivi</a></div>
         </section>
         <section className="mt-4 rounded-card border border-red/30 bg-red/5 p-4 text-[11px] leading-5 text-muted">
           <div className="text-[13px] font-bold text-text">Güvenli yedekten geri yükle</div>

@@ -65,6 +65,7 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
                 type_label: 1,
                 hour_at_completion: 1,
                 technician_name: 1,
+                other_technicians: 1,
                 created_at: 1,
               },
             },

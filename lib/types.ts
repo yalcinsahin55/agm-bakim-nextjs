@@ -65,6 +65,10 @@ export interface MaintenanceRecord {
   pressure_reading?: number;
   technician_id: string;
   technician_name: string;
+  other_technician_ids?: string[];
+  other_technicians?: Array<{ id: string; full_name: string }>;
+  checklist?: Array<{ label: string; completed: boolean }>;
+  completion_confirmed_at?: Date | string;
   created_at: Date | string;
   backdated?: boolean;
   group_id?: string;

@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
     "MOTOR": record.engine_name || "",
     "BAKIM TÜRÜ": record.type_label || "",
     "MOTOR SAATİ": record.hour_at_completion || 0,
-    "TEKNİSYEN": record.technician_name || "",
+    "SORUMLU TEKNİSYEN": record.technician_name || "",
+    "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
     "NOT": record.technician_note || "",
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historyRows), "Bakım Geçmişi");

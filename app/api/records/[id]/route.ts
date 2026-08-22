@@ -7,6 +7,7 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { resolveTechnicianOptions } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids } = body;
 
   const update: Record<string, any> = {};
+  let effectiveOtherTechnicians: Array<{ id: string; full_name: string }> = Array.isArray(record.other_technicians)
+    ? record.other_technicians.filter((technician: any) => technician && typeof technician.id === "string" && typeof technician.full_name === "string")
+    : [];
+  if (Array.isArray(other_technician_ids)) {
+    const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
+    if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === record.technician_id)) {
+      return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
+    }
+    effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
+    update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
+    update.other_technicians = effectiveOtherTechnicians;
+  }
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
   if (typeof technician_note === "string") update.technician_note = technician_note;
@@ -104,6 +117,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         hour_at_completion: finalHour, note: "", technician_note: "",
         photos_b64: [], photos: [], videos: [],
         technician_id: user._id, technician_name: user.full_name,
+        other_technician_ids: effectiveOtherTechnicians.map((technician) => technician.id),
+        other_technicians: effectiveOtherTechnicians,
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,
       });

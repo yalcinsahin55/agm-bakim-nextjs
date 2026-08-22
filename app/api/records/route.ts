@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
+import { resolveTechnicianOptions } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -99,11 +100,20 @@ async function postRecord(req: NextRequest) {
     const {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
+      other_technician_ids, checklist, completion_confirmation,
     } = parsed.data as RecordInput;
 
     const enginesCol = db.collection("engines") as any;
     const typesCol = db.collection("maintenance_types") as any;
     const recordsCol = db.collection("maintenance_records") as any;
+
+    if (completion_confirmation === true) {
+      const checklistComplete = Array.isArray(checklist) && checklist.length > 0 && checklist.every((entry) => entry.completed === true);
+      const hasEvidence = Boolean((technician_note || "").trim() || (photos_b64?.length || photos?.length || videos?.length));
+      if (!checklistComplete || !hasEvidence) {
+        return NextResponse.json({ error: "Bakım kaydı için kontrol listesi ve en az bir bakım kanıtı gereklidir." }, { status: 400 });
+      }
+    }
 
     if (client_request_id) {
       const existing = await recordsCol.findOne({ client_request_id }, { projection: { type_label: 1, group_id: 1 } });
@@ -112,6 +122,12 @@ async function postRecord(req: NextRequest) {
 
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
+
+    const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
+    if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === user._id)) {
+      return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
+    }
+    const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
 
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
@@ -125,7 +141,11 @@ async function postRecord(req: NextRequest) {
         photos_b64: isPrimary ? (photos_b64 || []) : [],
         photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
+        checklist: isPrimary ? (checklist || []) : [],
+        completion_confirmed_at: isPrimary && completion_confirmation === true ? new Date() : undefined,
         technician_id: user._id, technician_name: user.full_name,
+        other_technician_ids: otherTechnicians.map((technician) => technician.id),
+        other_technicians: otherTechnicians,
         client_request_id: client_request_id || undefined,
         created_at: createdAt, backdated: !!backdated,
         group_id: groupId, grouped_with: isPrimary ? null : tLabel,
@@ -176,7 +196,7 @@ async function postRecord(req: NextRequest) {
       entity: "maintenance_record",
       entityId: groupId,
       summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels },
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true },
     });
     return NextResponse.json({ ok: true, completed: completedLabels });
   } catch (error) {

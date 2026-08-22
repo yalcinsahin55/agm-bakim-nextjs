@@ -48,6 +48,10 @@ interface MaintenanceRecord {
   created_at: string;
   technician_name: string;
   technician_id: string;
+  other_technician_ids?: string[];
+  other_technicians?: Array<{ id: string; full_name: string }>;
+  checklist?: Array<{ label: string; completed: boolean }>;
+  completion_confirmed_at?: string;
   group_id?: string | null;
 }
 
@@ -130,6 +134,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
+  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.other_technician_ids || []);
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
 
@@ -154,6 +160,12 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
   useEffect(() => () => {
     Object.values(previewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     previewUrlsRef.current = {};
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/users/technicians")
+      .then(async (response) => { if (response.ok) setTechnicians(await response.json() as Array<{ id: string; full_name: string }>); })
+      .catch(() => {});
   }, []);
 
   function removePhoto(index: number): void {
@@ -269,6 +281,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
       photos,
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
+      other_technician_ids: otherTechnicianIds,
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -327,6 +340,12 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick }: EditFormProps) {
           className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition"
         />
       )}
+
+      {technicians.filter((technician) => technician.id !== record.technician_id).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
+        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
+        <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında bakıma katılanları seç.</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== record.technician_id).map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id))} />{technician.full_name}</label>)}</div>
+      </div>}
 
       {offlineMedia.length > 0 && (
         <div className="rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-2 text-[10.5px] text-amber">
@@ -644,6 +663,7 @@ export default function KayitlarPage() {
                   </div>
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
+                  {r.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {r.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
 
                   <div className="flex gap-2 mt-2">
                     <button
@@ -742,6 +762,8 @@ export default function KayitlarPage() {
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Teknisyen</div><div className="mt-0.5 font-semibold text-text">{selectedRecord.technician_name || "—"}</div></div>
             </div>
+            {selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
+            {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
             {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}
             {((selectedRecord.photos || selectedRecord.photos_b64 || []).length > 0 || (selectedRecord.videos || []).length > 0) && (
