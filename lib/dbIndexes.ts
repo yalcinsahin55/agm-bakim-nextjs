@@ -35,6 +35,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(records, { engine_id: 1, type_key: 1, created_at: 1 }, { name: "records_engine_type_created_at" }),
       createIndexSafely(records, { engine_id: 1, type_key: 1, hour_at_completion: -1 }, { name: "records_engine_type_hour_desc" }),
       createIndexSafely(records, { technician_id: 1, created_at: -1 }, { name: "records_technician_created_at" }),
+      createIndexSafely(records, { technician_source: 1, technician_id: 1, created_at: -1 }, { name: "records_technician_source_id_created_at" }),
       createIndexSafely(records, { client_request_id: 1 }, { unique: true, sparse: true }),
       createIndexSafely(notifications, { user_id: 1, read_at: 1, created_at: -1 }),
       createIndexSafely(notifications, { dedupe_key: 1 }, { unique: true, sparse: true }),
