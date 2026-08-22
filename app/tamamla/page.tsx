@@ -124,7 +124,14 @@ export default function TamamlaPage() {
     loadPanel();
     setIsOnline(navigator.onLine);
     const updateConnection = () => setIsOnline(navigator.onLine);
-    const updateQueue = () => { void getPendingOfflineCount().then(setPendingOfflineCount).catch(() => {}); };
+    const updateQueue = (event?: Event) => {
+      const remaining = (event as CustomEvent<{ remaining?: number }> | undefined)?.detail?.remaining;
+      if (typeof remaining === "number") {
+        setPendingOfflineCount(remaining);
+        return;
+      }
+      void getPendingOfflineCount().then(setPendingOfflineCount).catch(() => {});
+    };
     window.addEventListener("online", updateConnection);
     window.addEventListener("offline", updateConnection);
     window.addEventListener("offline-queue:changed", updateQueue);

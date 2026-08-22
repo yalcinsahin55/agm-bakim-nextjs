@@ -47,8 +47,10 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-function dispatchChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("offline-queue:changed"));
+function dispatchChanged(remaining?: number): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("offline-queue:changed", { detail: { remaining } }));
+  }
 }
 
 async function requestBackgroundSync(): Promise<void> {
@@ -92,7 +94,7 @@ export async function queueRecord(
     transaction.onerror = () => reject(transaction.error || new Error("Çevrimdışı kayıt saklanamadı."));
   });
   database.close();
-  dispatchChanged();
+  void getPendingOfflineCount().then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
   void requestBackgroundSync();
   return id;
 }
@@ -196,18 +198,21 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
       if (!response.ok) throw new Error(data.error || `Kayıt gönderilemedi (HTTP ${response.status}).`);
       await removeQueuedRecord(job.id);
       synced += 1;
-      dispatchChanged();
+      const remaining = await getPendingOfflineCount();
+      dispatchChanged(remaining);
     } catch (error) {
       job.retryCount += 1;
       job.lastError = error instanceof Error ? error.message : "Bilinmeyen senkronizasyon hatası.";
       await updateQueuedRecord(job);
       lastError = job.lastError;
-      dispatchChanged();
+      void getPendingOfflineCount().then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
       break;
     }
   }
 
-  return { synced, remaining: await getPendingOfflineCount(), error: lastError };
+  const remaining = await getPendingOfflineCount();
+  dispatchChanged(remaining);
+  return { synced, remaining, error: lastError };
 }
 
 export function syncOfflineQueue(): Promise<{ synced: number; remaining: number; error?: string }> {
