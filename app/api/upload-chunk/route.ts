@@ -6,13 +6,6 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// 🔑 Yedek anahtar (Vercel değişkeni olmasa da sistem çalışır)
-const FALLBACK_BLOB_TOKEN = "vercel_blob_rw_QYyuJntX1bdYnage_oywzsJRuVR4YSGoe0rmCORIyTXrxgl";
-
-if (!process.env.BLOB_READ_WRITE_TOKEN) {
-  process.env.BLOB_READ_WRITE_TOKEN = FALLBACK_BLOB_TOKEN;
-}
-
 export async function POST(req: NextRequest) {
   const db = await getDb();
   const usersCol = db.collection("users") as any;
@@ -38,6 +31,8 @@ export async function POST(req: NextRequest) {
 
   // 🎬 Birleştir ve Blob'a yaz
   const { upload_id, filename, mime, total } = body;
+  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
+  if (!token) return NextResponse.json({ error: "Blob depolama yapılandırılmamış." }, { status: 503 });
   const chunks = await col.find({ upload_id }).sort({ index: 1 }).toArray();
   if (chunks.length !== total) {
     return NextResponse.json({ error: "Parçalar eksik, tekrar deneyin" }, { status: 400 });
@@ -49,6 +44,7 @@ export async function POST(req: NextRequest) {
   const blob = await put(`videos/${safeName}`, buffer, {
     access: "public",
     contentType: mime || "video/mp4",
+    token,
   });
 
   await col.deleteMany({ upload_id });

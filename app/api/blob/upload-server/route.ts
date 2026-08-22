@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fotoğraf 4 MB’tan küçük olmalıdır." }, { status: 413 });
     }
 
-    const token = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+    // Vercel Blob entegrasyonunun güncel değişkeni önceliklidir; eski özel isim geriye dönük desteklenir.
+    const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
     if (!token) return NextResponse.json({ error: "Blob depolama yapılandırılmamış." }, { status: 503 });
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -49,6 +50,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error("Sunucu dosya yükleme hatası:", error);
-    return NextResponse.json({ error: "Dosya Blob’a yüklenemedi." }, { status: 502 });
+    return NextResponse.json({ error: "Blob depolama isteği başarısız oldu. Vercel Production Blob token’ını kontrol edin." }, { status: 502 });
   }
 }
