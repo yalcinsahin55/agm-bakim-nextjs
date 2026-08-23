@@ -15,6 +15,11 @@ export interface AssistantDateRange {
   to: string;
 }
 
+export type AssistantTechnicianRole = "responsible" | "support" | "any";
+export type AssistantSourceFilter = "internal" | "external_service" | "any";
+export type AssistantEvidenceFilter = "photo" | "video" | "note" | "checklist";
+export type AssistantStatusFilter = "overdue" | "critical" | "upcoming" | "normal";
+
 export type AssistantIntent =
   | "summary"
   | "overdue"
@@ -35,7 +40,16 @@ export interface AssistantQuery {
   intent: AssistantIntent;
   period: AssistantPeriod;
   engineQuery?: string;
+  maintenanceTypeQuery?: string;
+  serviceQuery?: string;
   dateRange?: AssistantDateRange;
+  technicianRole?: AssistantTechnicianRole;
+  sourceFilter?: AssistantSourceFilter;
+  evidenceFilter?: AssistantEvidenceFilter;
+  statusFilter?: AssistantStatusFilter;
+  hourRange?: { min?: number; max?: number };
+  durationRange?: { min?: number; max?: number };
+  teamOnly?: boolean;
 }
 
 export interface AssistantPolicyResult {
@@ -87,6 +101,9 @@ const EXTERNAL_SERVICE_PATTERNS = [
   /harici\s+servis/iu,
   /garanti/iu,
   /dış\s+servis/iu,
+  /servisten\s+hizmet/iu,
+  /servis\s+firması/iu,
+  /servisi?\s+(?:hangi|kaç|nerede|tarafından)/iu,
 ];
 
 const TECHNICIAN_PATTERNS = [
@@ -108,6 +125,9 @@ const OVERDUE_PATTERNS = [
   /gecikme/iu,
   /vadesi\s+geç/iu,
   /acil\s+bakım/iu,
+  /kritik\s+(?:bakım|motor)/iu,
+  /yaklaşan\s+(?:bakım|bakımlar)/iu,
+  /normal\s+(?:bakım|durum)/iu,
 ];
 
 const ENGINE_HISTORY_PATTERNS = [
@@ -123,9 +143,78 @@ const SUMMARY_PATTERNS = [
   /istatistik/iu,
   /en\s+fazla/iu,
   /bakım\s+sayısı/iu,
+  /hangi\s+bakımlar?/iu,
+  /bakımlar?\s+(?:hangileri|nelerdir)/iu,
+  /en\s+(?:uzun|kısa)\s+süren/iu,
   /hangi\s+bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
   /bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
+  /hangi\s+motorlarda?\s+(?:bakım|çalışma|iş)/iu,
+  /hangi\s+motorlarda?\s+.{2,80}\s+bakım/iu,
+  /(?:yapılan|yapılmış)\s+motorlar?/iu,
+  /bakım\s+türü\s*[:=-]/iu,
 ];
+
+const INTERNAL_SOURCE_PATTERNS = [
+  /iç\s+(ekip|kaynak|bakım)/iu,
+  /kayıtlı\s+teknisyen/iu,
+  /dış\s+hizmet\s+(olmayan|hariç)/iu,
+];
+
+function parseNumber(value: string): number {
+  const normalized = value.replace(/\./g, "").replace(",", ".");
+  return Number(normalized);
+}
+
+function parseRange(question: string, unitPattern: string): { min?: number; max?: number } | undefined {
+  const range = question.match(new RegExp(`(\\d[\\d.,]*)\\s*${unitPattern}?\\s*(?:ile|-|–)\\s*(\\d[\\d.,]*)\\s*${unitPattern}`, "iu"));
+  if (range) {
+    const first = parseNumber(range[1]);
+    const second = parseNumber(range[2]);
+    if (Number.isFinite(first) && Number.isFinite(second)) return first <= second ? { min: first, max: second } : { min: second, max: first };
+  }
+  const above = question.match(new RegExp(`(\\d[\\d.,]*)\\s*${unitPattern}?(?:den|dan|ten|tan)\\s+(?:fazla|uzun|üzeri)`, "iu"));
+  if (above) {
+    const min = parseNumber(above[1]);
+    if (Number.isFinite(min)) return { min };
+  }
+  const below = question.match(new RegExp(`(\\d[\\d.,]*)\\s*${unitPattern}?(?:den|dan|ten|tan)\\s+(?:az|kısa|altı)`, "iu"));
+  if (below) {
+    const max = parseNumber(below[1]);
+    if (Number.isFinite(max)) return { max };
+  }
+  return undefined;
+}
+
+function extractMaintenanceTypeQuery(question: string): string | undefined {
+  const explicit = question.match(/bakım\s+türü\s*[:=-]\s*(.+?)(?=\s+(?:\d{4}|dış\s+hizmet|iç\s+ekip|fotoğraflı|videolu|not\s+içeren|ekip|hangi\s+motorlarda|motorlarda|hangi\s+bakımlarda)|\?|$)/iu);
+  if (explicit?.[1]?.trim()) return explicit[1].trim();
+  const natural = question.match(/^(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+(?:hangi\s+motorlarda|nerede|kaç)/iu)
+    || question.match(/(?:hangi\s+motorlarda|motorlarda)\s+(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+(?:yapıldı|yapılmış|gerçekleşti|var)/iu)
+    || question.match(/^(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+yap(?:ıldı|ılan)\s+motorlar?/iu);
+  return natural?.[1]?.trim();
+}
+
+function extractServiceQuery(question: string): string | undefined {
+  const explicit = question.match(/(?:servis|firma)\s*(?:adı)?\s*[:=-]\s*([^;,?]+)/iu);
+  if (explicit?.[1]?.trim()) return explicit[1].trim();
+  const namedService = question.match(/\b([a-zçğıöşü0-9][a-zçğıöşü0-9 ._-]{1,60}?)\s+servisi?\b/iu);
+  if (namedService && !/^(dış|harici)$/iu.test(namedService[1].trim())) return namedService[1].trim();
+  return undefined;
+}
+
+function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "hourRange" | "durationRange" | "teamOnly"> {
+  const technicianRole: AssistantTechnicianRole | undefined = /yardımcı|destek|ekip\s+üyesi/iu.test(question) ? "support" : /sorumlu|yetkili/iu.test(question) ? "responsible" : undefined;
+  const sourceFilter: AssistantSourceFilter | undefined = INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) ? "internal" : EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) ? "external_service" : undefined;
+  const evidenceFilter: AssistantEvidenceFilter | undefined = /fotoğraf|fotoğraflı/iu.test(question) ? "photo" : /video|videolu/iu.test(question) ? "video" : /notu|notlu|not\s+içeren/iu.test(question) ? "note" : /kontrol\s+listesi/iu.test(question) ? "checklist" : undefined;
+  const statusFilter: AssistantStatusFilter | undefined = /gecikmiş|geciken|vadesi\s+geç/iu.test(question) ? "overdue" : /kritik/iu.test(question) ? "critical" : /yaklaşan|yaklaşıyor/iu.test(question) ? "upcoming" : /normal\s+durum/iu.test(question) ? "normal" : undefined;
+  const durationQuestion = /süre|süren|dakika|saatten\s+(?:fazla|uzun)|uzun\s+süren/iu.test(question);
+  const hourRange = !durationQuestion && (/motor\s+saati|çalışma\s+saati|motor\s+saatinde|\d[\d.,]*\s*saat\s*(?:ile|-|–)\s*\d[\d.,]*\s*saat/iu.test(question)) ? parseRange(question, "saat(?:i)?") : undefined;
+  const rawDurationRange = durationQuestion ? parseRange(question, "(?:dakika|saat)") : undefined;
+  const durationInHours = Boolean(rawDurationRange && /saat/iu.test(question) && !/motor\s+saati|çalışma\s+saati/iu.test(question));
+  const durationRange = rawDurationRange ? Object.fromEntries(Object.entries(rawDurationRange).map(([key, value]) => [key, durationInHours ? Number(value) * 60 : value])) as { min?: number; max?: number } : undefined;
+  const teamOnly = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question) ? true : undefined;
+  return { maintenanceTypeQuery: extractMaintenanceTypeQuery(question), serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, hourRange, durationRange, teamOnly };
+}
 
 function cleanQuestion(value: string): string {
   return value.normalize("NFC").trim().replace(/\s+/g, " ");
@@ -227,7 +316,7 @@ function periodFromQuestion(question: string): AssistantPeriod {
 }
 
 function extractEngineQuery(question: string): string | undefined {
-  const match = question.match(/\bmotor\s*(?:no|numarası|#)?\s*([a-z0-9][a-z0-9._-]*)/iu);
+  const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([a-z0-9][a-z0-9._-]*)/iu);
   if (!match) return undefined;
   const candidate = match[1].trim();
   if (/^(bakım|bakımları|geçmişi|durumu|sayısı|istatistiği|raporu|için|hangileri|var|larda|larda)$/iu.test(candidate)) return undefined;
@@ -236,10 +325,12 @@ function extractEngineQuery(question: string): string | undefined {
 
 function inferIntent(question: string): AssistantIntent {
   if (QUESTION_HELP_PATTERNS.some((pattern) => pattern.test(question))) return "help";
-  if (EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
+  const engineQuery = extractEngineQuery(question);
+  if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
+  if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
   if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question))) return "technician_performance";
   if (OVERDUE_PATTERNS.some((pattern) => pattern.test(question))) return "overdue";
-  if (ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
+  if (engineQuery && ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
   if (SUMMARY_PATTERNS.some((pattern) => pattern.test(question))) return "summary";
   return "help";
 }
@@ -299,6 +390,7 @@ export function evaluateAssistantQuestion(value: unknown): AssistantPolicyResult
       period: periodFromQuestion(question),
       engineQuery: extractEngineQuery(question),
       dateRange: parseDateRange(question),
+      ...parseFilters(question),
     },
   };
 }

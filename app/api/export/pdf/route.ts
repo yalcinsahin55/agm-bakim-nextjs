@@ -7,18 +7,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
+import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
 
 export const dynamic = "force-dynamic";
 
 const MAX_ROWS = 5_000;
 const COLUMN_WIDTHS = [40, 55, 75, 38, 52, 52, 45, 52, 52, 62];
 const COLUMN_LABELS = ["Tarih", "Motor", "Bakım Türü", "Saat", "Başlangıç", "Bitiş", "Süre", "Sorumlu", "Ekip", "Not"];
-
-function makeDate(value: string | null, endOfDay = false): Date | undefined {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
-  return new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
-}
 
 function pdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -38,21 +33,7 @@ async function createPdf(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
-  const typeFilter = searchParams.get("type_label");
-  const sourceFilter = searchParams.get("source");
-  const technicianFilter = searchParams.get("technician_id");
-  const from = makeDate(searchParams.get("from"));
-  const to = makeDate(searchParams.get("to"), true);
-  const query: Record<string, unknown> = {};
-  if (engineFilter) query.engine_id = engineFilter;
-  if (typeFilter) query.type_label = typeFilter;
-  const sourceConditions: Record<string, unknown>[] = [];
-  if (sourceFilter === "external_service") sourceConditions.push({ technician_source: "external_service" }, { technician_id: EXTERNAL_SERVICE_TECHNICIAN_ID });
-  if (sourceFilter === "internal") sourceConditions.push({ technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } });
-  if (sourceConditions.length === 1) Object.assign(query, sourceConditions[0]);
-  if (sourceConditions.length > 1) query.$or = sourceConditions;
-  if (technicianFilter) query.$and = [{ $or: [{ technician_id: technicianFilter }, { "other_technicians.id": technicianFilter }] }];
-  if (from || to) query.created_at = { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) };
+  const query = buildMaintenanceRecordQuery(searchParams);
 
   const engines = await (db.collection("engines") as any).find({}, { projection: { _id: 1, name: 1 } }).toArray();
   const selectedEngine = engineFilter ? engines.find((engine: any) => engine._id === engineFilter || engine.name === engineFilter) : null;

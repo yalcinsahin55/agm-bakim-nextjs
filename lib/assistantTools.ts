@@ -2,7 +2,7 @@ import type { Db } from "mongodb";
 import { buildItems, type PanelItem } from "@/lib/status";
 import type { Engine, MaintenanceType } from "@/lib/types";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName } from "@/lib/technicians";
-import type { AssistantPeriod, AssistantQuery, AssistantIntent } from "@/lib/assistantPolicy";
+import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 
 export interface AssistantToolResponse {
   intent: AssistantIntent;
@@ -71,12 +71,64 @@ function externalExpression() {
   };
 }
 
-function internalRecordMatch(query: AssistantQuery): Record<string, unknown> {
+async function internalRecordMatch(db: Db, query: AssistantQuery, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const base = await buildRecordMatch(db, query, extra);
   return {
-    ...periodMatch(query),
-    technician_source: { $ne: "external_service" },
-    technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID },
+    $and: [
+      base,
+      { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } },
+    ],
   };
+}
+
+async function resolveMaintenanceType(db: Db, query: AssistantQuery) {
+  if (!query.maintenanceTypeQuery) return null;
+  const value = query.maintenanceTypeQuery.trim();
+  if (!value) return null;
+  const escaped = escapeRegex(value);
+  return db.collection("maintenance_types").findOne(
+    { $or: [{ key: value }, { label: { $regex: escaped, $options: "i" } }] },
+    { projection: { key: 1, label: 1 } },
+  );
+}
+
+async function statusPairs(db: Db, status: AssistantStatusFilter | undefined): Promise<Array<{ engine_id: string; type_key: string }>> {
+  if (!status) return [];
+  const [engines, types] = await Promise.all([
+    db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
+  ]);
+  const targetStatus = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
+  return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])
+    .filter((item) => item.status === targetStatus)
+    .map((item) => ({ engine_id: item.engine_id, type_key: item.type_key }));
+}
+
+async function buildRecordMatch(db: Db, query: AssistantQuery, extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const clauses: Array<Record<string, unknown>> = [];
+  const timeMatch = periodMatch(query);
+  if (Object.keys(timeMatch).length > 0) clauses.push(timeMatch);
+  if (Object.keys(extra).length > 0) clauses.push(extra);
+  if (query.engineQuery) {
+    const engine = await findEngine(db, query.engineQuery);
+    clauses.push({ engine_id: engine ? String(engine._id) : "__assistant_no_matching_engine__" });
+  }
+  if (query.sourceFilter === "external_service") clauses.push({ $or: [{ technician_source: "external_service" }, { technician_id: EXTERNAL_SERVICE_TECHNICIAN_ID }] });
+  if (query.sourceFilter === "internal") clauses.push({ technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } });
+  if (query.hourRange && (query.hourRange.min !== undefined || query.hourRange.max !== undefined)) clauses.push({ hour_at_completion: { ...(query.hourRange.min !== undefined ? { $gte: query.hourRange.min } : {}), ...(query.hourRange.max !== undefined ? { $lte: query.hourRange.max } : {}) } });
+  if (query.durationRange && (query.durationRange.min !== undefined || query.durationRange.max !== undefined)) clauses.push({ maintenance_duration_minutes: { ...(query.durationRange.min !== undefined ? { $gte: query.durationRange.min } : {}), ...(query.durationRange.max !== undefined ? { $lte: query.durationRange.max } : {}) } });
+  if (query.evidenceFilter === "photo") clauses.push({ $or: [{ "photos.0": { $exists: true } }, { "photos_b64.0": { $exists: true } }] });
+  if (query.evidenceFilter === "video") clauses.push({ "videos.0": { $exists: true } });
+  if (query.evidenceFilter === "note") clauses.push({ $or: [{ note: { $exists: true, $nin: [null, ""] } }, { technician_note: { $exists: true, $nin: [null, ""] } }] });
+  if (query.evidenceFilter === "checklist") clauses.push({ "checklist.0": { $exists: true } });
+  if (query.teamOnly) clauses.push({ $or: [{ "other_technicians.0": { $exists: true } }, { "other_technician_ids.0": { $exists: true } }] });
+  const type = await resolveMaintenanceType(db, query);
+  if (query.maintenanceTypeQuery) clauses.push(type ? { $or: [{ type_key: type.key }, { type_label: type.label }] } : { type_key: "__assistant_no_matching_type__" });
+  if (query.statusFilter) {
+    const pairs = await statusPairs(db, query.statusFilter);
+    clauses.push(pairs.length ? { $or: pairs } : { engine_id: "__assistant_no_matching_status__" });
+  }
+  return clauses.length ? { $and: clauses } : {};
 }
 
 function formatMinutes(value: number): string {
@@ -93,8 +145,10 @@ function formatMinutes(value: number): string {
 
 async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const records = db.collection("maintenance_records");
+  const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
+  const match = await buildRecordMatch(db, query);
   const [row] = await records.aggregate([
-    { $match: periodMatch(query) },
+    { $match: match },
     {
       $facet: {
         totals: [
@@ -108,12 +162,12 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
           },
         ],
         byEngine: [
-          { $group: { _id: "$engine_id", engine: { $first: "$engine_name" }, count: { $sum: 1 } } },
+          { $group: { _id: "$engine_id", engine: { $first: "$engine_name" }, count: { $sum: 1 }, types: { $addToSet: "$type_label" } } },
           { $sort: { count: -1, engine: 1 } },
           { $limit: 8 },
         ],
         byType: [
-          { $group: { _id: "$type_label", count: { $sum: 1 } } },
+          { $group: { _id: "$type_label", count: { $sum: 1 }, engines: { $addToSet: { engine_id: "$engine_id", engine: "$engine_name" } } } },
           { $sort: { count: -1, _id: 1 } },
           { $limit: 8 },
         ],
@@ -131,24 +185,29 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
     data: {
       period: query.period,
       date_range: query.dateRange || null,
+      filters: { engine: selectedEngine?.name || query.engineQuery || null, engine_id: selectedEngine ? String(selectedEngine._id) : null, maintenance_type: query.maintenanceTypeQuery || null, source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       total_records: total,
       external_service_records: external,
       recorded_duration_minutes: Number(totals.duration || 0),
       recorded_duration_text: formatMinutes(Number(totals.duration || 0)),
-      by_engine: (row?.byEngine || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0) })),
-      by_type: (row?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0) })),
+      by_engine: (row?.byEngine || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0), types: Array.isArray(item.types) ? item.types.filter(Boolean).sort((a: string, b: string) => a.localeCompare(b, "tr")) : [] })),
+      by_type: (row?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0), engines: Array.isArray(item.engines) ? item.engines.filter((engine: any) => engine && engine.engine_id).sort((a: any, b: any) => String(a.engine).localeCompare(String(b.engine), "tr")) : [] })),
     },
   };
 }
 
-async function getOverdueMaintenance(db: Db): Promise<AssistantToolResponse> {
+async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
     db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
   ]);
   const items = buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[]);
+  const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
+  const selectedType = await resolveMaintenanceType(db, query);
   const overdue = items
     .filter((item) => item.status === "gecikmis")
+    .filter((item) => !query.engineQuery || (selectedEngine && item.engine_id === String(selectedEngine._id)))
+    .filter((item) => !query.maintenanceTypeQuery || (selectedType && item.type_key === String(selectedType.key)))
     .sort((a, b) => a.remaining - b.remaining)
     .slice(0, 20);
   return {
@@ -158,6 +217,7 @@ async function getOverdueMaintenance(db: Db): Promise<AssistantToolResponse> {
     summary: overdue.length ? `${overdue.length} gecikmiş bakım bulundu.` : "Şu anda gecikmiş bakım bulunamadı.",
     data: {
       count: overdue.length,
+      filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: selectedType ? selectedType.label : query.maintenanceTypeQuery || null, status: "overdue" },
       items: overdue.map((item: PanelItem) => ({
         engine_id: item.engine_id,
         engine: item.engine_name,
@@ -194,8 +254,9 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
   if (!engine) {
     return { intent: "engine_history", period: query.period, title: "Motor bakım geçmişi", summary: `“${query.engineQuery}” ile eşleşen motor bulunamadı.`, data: { records: [] } };
   }
+  const match = await buildRecordMatch(db, query, { engine_id: String(engine._id) });
   const records = await db.collection("maintenance_records").find(
-        { engine_id: String(engine._id), ...periodMatch(query) },
+    match,
     {
       projection: {
         _id: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
@@ -222,7 +283,7 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     period: query.period,
     title: `${engine.name} bakım geçmişi`,
     summary: `${engine.name} için ${periodLabel(query)} döneminde ${safeRecords.length} bakım kaydı bulundu.`,
-    data: { engine_id: String(engine._id), engine: engine.name, current_hours: Number(engine.hours || 0), date_range: query.dateRange || null, records: safeRecords },
+    data: { engine_id: String(engine._id), engine: engine.name, current_hours: Number(engine.hours || 0), date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
   };
 }
 
@@ -231,21 +292,24 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
   const normalizedQuestion = normalizeTechnicianName(query.question);
   const selected = technicians.find((technician) => normalizedQuestion.includes(normalizeTechnicianName(technician.full_name)));
   const records = db.collection("maintenance_records");
-  const match = internalRecordMatch(query);
+  const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
+  const match = await internalRecordMatch(db, query, query.engineQuery ? { engine_id: selectedEngine ? String(selectedEngine._id) : "__assistant_no_matching_engine__" } : {});
+  const includeResponsible = query.technicianRole !== "support";
+  const includeSupport = query.technicianRole !== "responsible";
   const [responsible, support] = await Promise.all([
-    records.aggregate([
+    includeResponsible ? records.aggregate([
       { $match: match },
       { $group: { _id: "$technician_id", technician: { $first: "$technician_name" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
-    ]).toArray(),
-    records.aggregate([
+    ]).toArray() : Promise.resolve([]),
+    includeSupport ? records.aggregate([
       { $match: match },
       { $unwind: "$other_technicians" },
       { $group: { _id: "$other_technicians.id", technician: { $first: "$other_technicians.full_name" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
-    ]).toArray(),
+    ]).toArray() : Promise.resolve([]),
   ]);
   const rows = new Map<string, { technician_id: string; technician: string; responsible_count: number; support_count: number; duration_minutes: number; average_minutes: number }>();
   const merge = (item: any, kind: "responsible" | "support") => {
@@ -267,15 +331,12 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
   let activityByEngine: Array<Record<string, unknown>> = [];
   if (selected) {
     const selectedName = escapeRegex(selected.full_name);
-    const selectedMatch = {
-      ...match,
-      $or: [
-        { technician_id: selected.id },
-        { "other_technicians.id": selected.id },
-        { technician_name: { $regex: selectedName, $options: "i" } },
-        { "other_technicians.full_name": { $regex: selectedName, $options: "i" } },
-      ],
-    };
+    const participation = query.technicianRole === "support"
+      ? { $or: [{ "other_technicians.id": selected.id }, { "other_technicians.full_name": { $regex: selectedName, $options: "i" } }] }
+      : query.technicianRole === "responsible"
+        ? { $or: [{ technician_id: selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }] }
+        : { $or: [{ technician_id: selected.id }, { "other_technicians.id": selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }, { "other_technicians.full_name": { $regex: selectedName, $options: "i" } }] };
+    const selectedMatch = { $and: [match, participation] };
     const selectedRecords = await records.find(selectedMatch, {
       projection: { _id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
     }).sort({ created_at: -1 }).limit(50).toArray();
@@ -314,13 +375,15 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     summary: selected
       ? `${selected.full_name} için ${periodLabel(query)} döneminde ${totalTasks} görev ve ${formatMinutes(totalDuration)} katkı süresi bulundu. ${activityByType.length} farklı bakım türünde çalıştı.`
       : `${periodLabel(query)} ${totalTasks} teknisyen görevi ve ${formatMinutes(totalDuration)} toplam katkı süresi bulundu.${topTechnician ? ` En çok görev alan teknisyen: ${topTechnician.technician} (${topTechnician.responsible_count + topTechnician.support_count} görev).` : ""}`,
-    data: { period: query.period, date_range: query.dateRange || null, selected_technician: selected ? { id: selected.id, full_name: selected.full_name } : null, top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), activities, by_type: activityByType, by_engine: activityByEngine },
+    data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selected ? { id: selected.id, full_name: selected.full_name } : null, top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), activities, by_type: activityByType, by_engine: activityByEngine },
   };
 }
 
 async function getExternalServiceSummary(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
+  const serviceFilter = query.serviceQuery ? { $or: [{ external_service_name: { $regex: escapeRegex(query.serviceQuery), $options: "i" } }, { technician_name: { $regex: escapeRegex(query.serviceQuery), $options: "i" } }] } : {};
+  const match = await buildRecordMatch(db, query, { $and: [{ $or: [{ technician_source: "external_service" }, { technician_id: EXTERNAL_SERVICE_TECHNICIAN_ID }] }, serviceFilter] });
   const [row] = await db.collection("maintenance_records").aggregate([
-    { $match: { ...periodMatch(query), $or: [{ technician_source: "external_service" }, { technician_id: EXTERNAL_SERVICE_TECHNICIAN_ID }] } },
+    { $match: match },
     {
       $facet: {
         totals: [{ $group: { _id: null, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } }],
@@ -348,6 +411,7 @@ async function getExternalServiceSummary(db: Db, query: AssistantQuery): Promise
       duration_minutes: Number(totals.duration || 0),
       duration_text: formatMinutes(Number(totals.duration || 0)),
       services: (row?.services || []).map((item: any) => ({ service: item._id || "Harici servis", count: Number(item.count || 0), duration_minutes: Number(item.duration || 0) })),
+      filters: { service: query.serviceQuery || null, engine: query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, evidence: query.evidenceFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       engines: (row?.engines || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0) })),
     },
   };
@@ -355,7 +419,7 @@ async function getExternalServiceSummary(db: Db, query: AssistantQuery): Promise
 
 export async function runAssistantTool(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   if (query.intent === "summary") return getMaintenanceSummary(db, query);
-  if (query.intent === "overdue") return getOverdueMaintenance(db);
+  if (query.intent === "overdue") return getOverdueMaintenance(db, query);
   if (query.intent === "engine_history") return getEngineMaintenanceHistory(db, query);
   if (query.intent === "technician_performance") return getTechnicianPerformance(db, query);
   if (query.intent === "external_service") return getExternalServiceSummary(db, query);
