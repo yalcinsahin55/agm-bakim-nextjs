@@ -247,7 +247,7 @@ vercel.json                      # Cron zamanlaması
 
 ### Gereksinimler
 
-- Node.js 18.17 veya üzeri; geliştirme için Node.js 20 LTS önerilir.
+- Node.js 18.18 veya üzeri; geliştirme için Node.js 20 LTS önerilir.
 - MongoDB Atlas veya erişilebilir bir MongoDB sunucusu.
 - Fotoğraf/video üretim ortamı için Vercel Blob bağlantısı.
 - Web Push kullanılacaksa VAPID anahtarları.
@@ -287,6 +287,8 @@ Uygulama varsayılan olarak [http://localhost:3000](http://localhost:3000) adres
 | `VAPID_PUBLIC_KEY` | Web Push için | İstemci tarafında abonelik oluşturmak için kullanılan public anahtar. |
 | `VAPID_PRIVATE_KEY` | Web Push için | Yalnızca sunucuda tutulması gereken private anahtar. |
 | `CRON_SECRET` | Cron için | `/api/cron/refresh` endpoint’ini koruyan gizli değer. |
+| `PDF_ALLOWED_HOSTS` | İsteğe bağlı | Vercel Blob dışındaki, yönetici tarafından önceden onaylanmış HTTPS PDF hostlarını virgülle ayırarak ekler. Boş bırakılırsa yalnızca Vercel public Blob hostları kabul edilir. |
+| `PUSH_ALLOWED_HOSTS` | İsteğe bağlı | Varsayılan Web Push sağlayıcıları dışındaki, önceden onaylanmış HTTPS push endpoint hostlarını virgülle ayırarak ekler. |
 
 Web Push anahtarlarını üretmek için:
 
@@ -305,7 +307,7 @@ npx web-push generate-vapid-keys
 5. GitHub’ın `main` dalına yapılan push’larda otomatik deployment başlatılır.
 6. Deployment tamamlandıktan sonra Vercel’de durumun **Ready** olduğunu, Production domain’in doğru olduğunu ve login sayfasının açıldığını kontrol edin.
 
-Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı veritabanı veya Blob değerleri tanımlanması önerilir. Yerel build sırasında üretim veritabanına yazmamak için ayrı bir test veritabanı kullanın.
+Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı veritabanı veya Blob değerleri tanımlanması önerilir. `PDF_ALLOWED_HOSTS` ve `PUSH_ALLOWED_HOSTS` yalnızca gerçekten kullanılan, güvenilir HTTPS hostları için doldurulmalıdır; bu allowlist’ler SSRF riskini azaltmak amacıyla sunucu tarafında doğrulanır. Yerel build sırasında üretim veritabanına yazmamak için ayrı bir test veritabanı kullanın.
 
 ## Bildirimler ve otomatik yenileme
 
