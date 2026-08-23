@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   }
 
   const { key } = params;
-  const { label, default_period_hours, apply_period_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
+  const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
 
   const typesCol = db.collection("maintenance_types") as any;
   const type = await typesCol.findOne({ _id: key });
@@ -46,6 +46,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
       set[`engine_states.${engId}.tracking_source`] = "manual";
       if (Object.keys(set).length) await typesCol.updateOne({ _id: key }, { $set: set });
     }
+  }
+
+  const removeEngineIds = Array.isArray(remove_engine_ids)
+    ? [...new Set(remove_engine_ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0))]
+    : [];
+  if (removeEngineIds.length > 0) {
+    const unset: Record<string, ""> = {};
+    removeEngineIds.forEach((engineId) => { unset[`engine_states.${engineId}`] = ""; });
+    // Bir motor elle kapsamdan çıkarıldığında "all" kapsamı artık geçerli değildir.
+    // explicit kapsam, yalnızca engine_states içinde bırakılan motorları gösterir.
+    await typesCol.updateOne({ _id: key }, { $unset: unset, $set: { engine_scope: "explicit" } });
   }
 
   if (label && label.trim() !== type.label) {

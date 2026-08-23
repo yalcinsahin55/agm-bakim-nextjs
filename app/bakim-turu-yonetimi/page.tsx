@@ -14,6 +14,7 @@ import type { Engine, MaintenanceType, WorkDomain } from "@/lib/types";
 interface EngineRowState {
   last: string;
   period: string;
+  included: boolean;
 }
 
 const WORK_DOMAINS: WorkDomain[] = ["mechanical", "electrical", "commissioning"];
@@ -62,12 +63,12 @@ export default function BakimTuruYonetimiPage() {
   const sortedTypes = useMemo(() => [...types].sort((a, b) => (a.label || "").localeCompare(b.label || "", "tr")), [types]);
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
-  function setAddRow(id: string, field: keyof EngineRowState, value: string) {
-    setAddRows((prev) => ({ ...prev, [id]: { last: "", period: "", ...prev[id], [field]: value } }));
+  function setAddRow(id: string, field: "last" | "period", value: string) {
+    setAddRows((prev) => ({ ...prev, [id]: { last: "", period: "", included: true, ...prev[id], [field]: value } }));
   }
 
-  function setEditRow(id: string, field: keyof EngineRowState, value: string) {
-    setEditRows((prev) => ({ ...prev, [id]: { last: "", period: "", ...prev[id], [field]: value } }));
+  function setEditRow(id: string, field: "last" | "period", value: string) {
+    setEditRows((prev) => ({ ...prev, [id]: { last: "", period: "", included: false, ...prev[id], [field]: value } }));
   }
 
   function toggleDomain(domains: WorkDomain[], setter: (next: WorkDomain[]) => void, domain: WorkDomain) {
@@ -85,9 +86,10 @@ export default function BakimTuruYonetimiPage() {
       const engine_states: Record<string, { last_maintenance_hour: number; period_hours: number }> = {};
       sortedEngines.forEach((e) => {
         const row = addRows[e._id];
+        if (!row?.included) return;
         engine_states[e._id] = {
-          last_maintenance_hour: row && row.last !== "" ? Number(row.last) || 0 : (e.hours ?? 0),
-          period_hours: row && row.period !== "" ? Number(row.period) || 0 : defPeriod,
+          last_maintenance_hour: row.last !== "" ? Number(row.last) || 0 : (e.hours ?? 0),
+          period_hours: row.period !== "" ? Number(row.period) || 0 : defPeriod,
         };
       });
       const res = await fetch("/api/maintenance-types", {
@@ -126,6 +128,7 @@ export default function BakimTuruYonetimiPage() {
       r[e._id] = {
         last: st ? String(st.last_maintenance_hour ?? "") : "",
         period: st ? String(st.period_hours ?? "") : "",
+        included: t.engine_scope === "all" || Boolean(st),
       };
     });
     setEditRows(r);
@@ -136,17 +139,24 @@ export default function BakimTuruYonetimiPage() {
     const loadingToast = toast.loading("Kaydediliyor...");
     try {
       const engine_states: Record<string, { period_hours?: number; last_maintenance_hour?: number }> = {};
+      const editingType = types.find((type) => type.key === key);
       sortedEngines.forEach((e) => {
         const row = editRows[e._id];
-        if (!row) return;
+        if (!row?.included) return;
         const st: { period_hours?: number; last_maintenance_hour?: number } = {};
         if (row.period !== "") st.period_hours = Number(row.period) || 0;
         if (row.last !== "") st.last_maintenance_hour = Number(row.last) || 0;
+        const wasIncluded = editingType?.engine_scope === "all" || Boolean(editingType?.engine_states?.[e._id]);
+        if (Object.keys(st).length === 0 && !wasIncluded) {
+          st.last_maintenance_hour = e.hours ?? 0;
+          st.period_hours = Number(editPeriod) || 0;
+        }
         if (Object.keys(st).length) engine_states[e._id] = st;
       });
+      const remove_engine_ids = sortedEngines.filter((engine) => !editRows[engine._id]?.included).map((engine) => engine._id);
       const res = await fetch(`/api/maintenance-types/${key}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: editLabel.trim(), default_period_hours: Number(editPeriod) || 0, engine_states, work_domains: editWorkDomains, allow_electromechanical_support: editAllowElectromechanicalSupport, allow_electromechanical_responsible: editAllowElectromechanicalResponsible }),
+        body: JSON.stringify({ label: editLabel.trim(), default_period_hours: Number(editPeriod) || 0, engine_states, remove_engine_ids, work_domains: editWorkDomains, allow_electromechanical_support: editAllowElectromechanicalSupport, allow_electromechanical_responsible: editAllowElectromechanicalResponsible }),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
@@ -229,7 +239,7 @@ export default function BakimTuruYonetimiPage() {
           onClick={() => {
             if (!showAdd) {
               const r: Record<string, EngineRowState> = {};
-              sortedEngines.forEach((e) => { r[e._id] = { last: String(e.hours ?? 0), period: "" }; });
+              sortedEngines.forEach((e) => { r[e._id] = { last: String(e.hours ?? 0), period: "", included: true }; });
               setAddRows(r);
             }
             setShowAdd((s) => !s);
@@ -262,12 +272,14 @@ export default function BakimTuruYonetimiPage() {
               <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={newAllowElectromechanicalSupport} onChange={(e) => setNewAllowElectromechanicalSupport(e.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={newAllowElectromechanicalResponsible} onChange={(e) => setNewAllowElectromechanicalResponsible(e.target.checked)} />Elektromekanik sorumlu olabilir</label></div>
               <p className="mt-1.5 text-[10px] text-faint">Eski bakım türleri mekanik kabul edilir. Elektromekanik çalışanları ilgili alanda kullanmak için destek seçeneğini açın.</p>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
-              <span>Motor</span><span>İlk Bakım Saati</span><span>Periyot</span>
+                              <div className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
+              <span>Dahil</span><span>Motor</span><span>İlk Bakım Saati</span><span>Periyot</span>
             </div>
+
             <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
               {sortedEngines.map((e) => (
-                <div key={e._id} className="grid grid-cols-3 gap-1.5 items-center">
+                <div key={e._id} className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 items-center">
+                  <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={addRows[e._id]?.included ?? true} onChange={(event) => setAddRows((prev) => ({ ...prev, [e._id]: { last: "", period: "", ...prev[e._id], included: event.target.checked } }))} /></label>
                   <span className="text-[11.5px] font-semibold text-text">{e.name}</span>
                   <input
                     type="number"
@@ -286,7 +298,7 @@ export default function BakimTuruYonetimiPage() {
                 </div>
               ))}
             </div>
-            <p className="text-[10.5px] text-faint">Boş bırakılan satırlar: mevcut motor saati + varsayılan periyot kullanılır.</p>
+            <p className="text-[10.5px] text-faint">İşaretli motorlar kapsama alınır. İşareti kaldırılan motor için bakım kartı oluşturulmaz.</p>
             <button
               onClick={addType}
               disabled={saving || !newLabel.trim()}
@@ -347,12 +359,13 @@ export default function BakimTuruYonetimiPage() {
                         className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition"
                       />
                       <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div><div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => toggleDomain(editWorkDomains, setEditWorkDomains, domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${editWorkDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{editWorkDomains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div><div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalSupport} onChange={(e) => setEditAllowElectromechanicalSupport(e.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalResponsible} onChange={(e) => setEditAllowElectromechanicalResponsible(e.target.checked)} />Elektromekanik sorumlu olabilir</label></div></div>
-                      <div className="grid grid-cols-3 gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
-                        <span>Motor</span><span>Son Bakım Saati</span><span>Periyot</span>
+                      <div className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
+                        <span>Dahil</span><span>Motor</span><span>Son Bakım Saati</span><span>Periyot</span>
                       </div>
                       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
                         {sortedEngines.map((e) => (
-                          <div key={e._id} className="grid grid-cols-3 gap-1.5 items-center">
+                          <div key={e._id} className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 items-center">
+                            <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={editRows[e._id]?.included ?? false} onChange={(event) => setEditRows((prev) => ({ ...prev, [e._id]: { last: "", period: "", ...prev[e._id], included: event.target.checked } }))} /></label>
                             <span className="text-[11.5px] font-semibold text-text">{e.name}</span>
                             <input
                               type="number"
@@ -371,7 +384,7 @@ export default function BakimTuruYonetimiPage() {
                           </div>
                         ))}
                       </div>
-                      <p className="text-[10.5px] text-faint">Yalnızca değiştirdiğin alanlar kaydedilir — boş bırakılanlar korunur.</p>
+                      <p className="text-[10.5px] text-faint">İşareti kaldırılan motor kapsamdan çıkarılır. Boş bırakılan saat alanları mevcut değerini korur.</p>
                       <div className="flex gap-2">
                         <button onClick={() => setEditingKey(null)} className="flex-1 py-2 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">Vazgeç</button>
                         <button onClick={() => saveEdit(t.key)} disabled={savingEdit} className="flex-1 py-2 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">

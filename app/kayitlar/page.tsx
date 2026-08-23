@@ -11,6 +11,7 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, getMaintenanceRecordDate, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
@@ -361,6 +362,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success("Kayıt güncellendi! ✅");
+        invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         onSaved();
       } else {
@@ -630,6 +632,7 @@ export default function KayitlarPage() {
       toast.dismiss(loadingToast);
       if (res.ok) {
         toast.success("Kayıt silindi! 🗑️");
+        invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         setConfirmDeleteId(null);
         load(page);
