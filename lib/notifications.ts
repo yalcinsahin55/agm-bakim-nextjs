@@ -31,13 +31,12 @@ async function loadActionableItems(db: Db): Promise<PanelItem[]> {
   return buildItems(engines as any, types as any).filter((item) => item.status !== "normal");
 }
 
-export async function listUserNotifications(db: Db, userId: string, limit = 50): Promise<Notification[]> {
-  const notifications = await db.collection("notifications")
+export async function listUserNotifications(db: Db, userId: string, limit?: number): Promise<Notification[]> {
+  const cursor = db.collection("notifications")
     .find({ user_id: userId })
-    .sort({ read_at: 1, created_at: -1 })
-    .limit(limit)
-    .toArray();
-  return notifications as unknown as Notification[];
+    .sort({ read_at: 1, created_at: -1 });
+  const notifications = (typeof limit === "number" ? cursor.limit(limit) : cursor).toArray();
+  return (await notifications) as unknown as Notification[];
 }
 
 async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[], listAfterSync = true): Promise<Notification[] | null> {
