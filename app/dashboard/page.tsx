@@ -58,12 +58,45 @@ function engineStatus(items: PanelItem[]): StatusKey {
   return ENGINE_STATUS_PRIORITY.find((status) => items.some((item) => item.status === status)) || "normal";
 }
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 6) return "İyi geceler";
-  if (h < 12) return "Günaydın";
-  if (h < 18) return "İyi günler";
-  return "İyi akşamlar";
+function greetingPresentation(hour: number) {
+  if (hour < 6 || hour >= 20) {
+    return {
+      title: "İyi geceler",
+      icon: "🌙",
+      description: "Gece bakım durumunu sakin bir özetle kontrol et.",
+      panelClass: "border-teal/30 bg-panel2",
+      iconClass: "border-teal/30 bg-teal/10 text-teal",
+      titleClass: "text-teal",
+    };
+  }
+  if (hour < 12) {
+    return {
+      title: "Günaydın",
+      icon: "☀️",
+      description: "Bugünkü bakım planına hızlıca göz at.",
+      panelClass: "border-amber/30 bg-panel2",
+      iconClass: "border-amber/30 bg-amber/10 text-amber",
+      titleClass: "text-amber",
+    };
+  }
+  if (hour < 18) {
+    return {
+      title: "İyi günler",
+      icon: "☀️",
+      description: "Motor ve bakım durumlarını güncel tut.",
+      panelClass: "border-teal/30 bg-panel2",
+      iconClass: "border-teal/30 bg-teal/10 text-teal",
+      titleClass: "text-teal",
+    };
+  }
+  return {
+    title: "İyi akşamlar",
+    icon: "🌆",
+    description: "Günün bakım durumunu gözden geçir.",
+    panelClass: "border-amber/30 bg-panel2",
+    iconClass: "border-amber/30 bg-amber/10 text-amber",
+    titleClass: "text-amber",
+  };
 }
 
 interface EngineHealthDetailsProps {
@@ -175,13 +208,8 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [typeFilter, setTypeFilter] = useState("Tümü");
   const [statusFilter, setStatusFilter] = useState("Tümü");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const maintenanceTypeSectionRef = useRef<HTMLHeadingElement | null>(null);
-
-  function showOverdueMaintenance() {
-    setStatusFilter("Gecikmiş");
-    setTypeFilter("Tümü");
-    window.setTimeout(() => maintenanceTypeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  }
 
   async function loadAnalytics(period: EnginePeriod = enginePeriod) {
     setAnalyticsLoading(true);
@@ -222,6 +250,11 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const counts = useMemo(() => {
@@ -285,10 +318,11 @@ export default function DashboardPage() {
     badgeName: row.engine_name,
   }));
 
-  const todayStr = new Date().toLocaleDateString("tr-TR", {
+  const todayStr = currentTime.toLocaleDateString("tr-TR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
   const firstName = user?.full_name ? user.full_name.split(" ")[0] : "";
+  const greetingView = greetingPresentation(currentTime.getHours());
   const viewerMode = user?.role === "goruntuleyici";
   const managementMode = isAdmin(user?.role);
   const quickAccess = [
@@ -346,19 +380,24 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="bg-gradient-to-br from-amber/15 via-panel to-panel border border-amber/20 rounded-card p-4 mb-4 animate-fade-in">
-          <div className="text-[15px] font-bold text-text">{greeting()}{firstName ? `, ${firstName}` : ""} 👋</div>
-          <div className="text-[11px] text-muted mt-0.5">{viewerMode ? "Motor bakım durumunu salt okunur olarak incele." : "Motor bakım durumuna hızlı bir bakış at."}</div>
+        <div className={`mb-4 rounded-card border p-4 animate-fade-in ${greetingView.panelClass}`}>
+          <div className="flex items-center gap-3">
+            <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-xl ${greetingView.iconClass}`} aria-hidden="true">{greetingView.icon}</div>
+            <div className="min-w-0">
+              <div className={`text-[15px] font-bold ${greetingView.titleClass}`}>{greetingView.title}{firstName ? `, ${firstName}` : ""}</div>
+              <div className="mt-0.5 text-[11px] text-muted">{greetingView.description}</div>
+            </div>
+          </div>
           {counts.gecikmis > 0 ? (
-            <div className="mt-2 text-[11.5px] text-red font-semibold">⏰ {counts.gecikmis} bakım gecikmiş durumda — hemen göz at!</div>
+            <div className="mt-3 text-[11.5px] font-semibold text-red">⏰ {counts.gecikmis} bakım gecikmiş durumda.</div>
           ) : counts.kritik > 0 ? (
-            <div className="mt-2 text-[11.5px] text-orange font-semibold">⚠️ {counts.kritik} bakım kritik seviyede.</div>
+            <div className="mt-3 text-[11.5px] font-semibold text-orange">⚠️ {counts.kritik} bakım kritik seviyede.</div>
           ) : (
-            <div className="mt-2 text-[11.5px] text-green font-semibold">✅ Tüm bakımlar yolunda görünüyor.</div>
+            <div className="mt-3 text-[11.5px] font-semibold text-green">✅ Tüm bakımlar yolunda görünüyor.</div>
           )}
-          {managementMode && <div className="flex gap-2 mt-3">
-            <Link href="/tamamla" className="flex-1 py-2 rounded-lg bg-amber text-[#161006] text-[11.5px] font-extrabold text-center hover:brightness-110 active:scale-[.98] transition">✅ Bakım Tamamla</Link>
-            <Link href="/saat-guncelle" className="flex-1 py-2 rounded-lg border border-border text-muted text-[11.5px] font-bold text-center hover:bg-panel2 transition">🕒 Saat Güncelle</Link>
+          {managementMode && <div className="mt-3 flex gap-2">
+            <Link href="/tamamla" className="flex-1 rounded-lg bg-amber py-2 text-center text-[11.5px] font-extrabold text-[#161006] transition hover:brightness-110 active:scale-[.98]">✅ Bakım Tamamla</Link>
+            <Link href="/saat-guncelle" className="flex-1 rounded-lg border border-border py-2 text-center text-[11.5px] font-bold text-muted transition hover:bg-panel2">🕒 Saat Güncelle</Link>
           </div>}
         </div>
 
@@ -371,41 +410,6 @@ export default function DashboardPage() {
         )}
 
         <DashboardAssistant />
-
-        <section className="mb-4 rounded-card border border-border bg-panel p-3.5" aria-labelledby="engine-working-info-title">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 id="engine-working-info-title" className="text-[14px] font-extrabold text-text">Motor çalışma bilgileri</h2>
-            <span className="text-[10px] text-faint">{sortedEngines.length} motor</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6">
-            {sortedEngines.map((engine) => (
-              <Link key={engine._id} href={`/motorlar?engine_id=${encodeURIComponent(engine._id)}`} className="min-w-0 rounded-lg border border-border bg-panel2 px-1.5 py-2 text-center transition hover:border-teal/50 hover:bg-teal/5">
-                <div className="truncate text-[10px] font-bold text-text">{engine.name}</div>
-                <div className="mt-1 truncate font-mono text-[8.5px] text-muted">{(engine.hours || 0).toLocaleString("tr-TR")} sa</div>
-                <div className="truncate font-mono text-[8.5px] text-teal">{(engine.load_kw || 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} kW</div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-4 rounded-card border border-border bg-panel p-3.5" aria-labelledby="engine-maintenance-info-title">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 id="engine-maintenance-info-title" className="text-[14px] font-extrabold text-text">Motor bazlı bakım bilgileri</h2>
-            <span className="rounded-md border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-muted">Bu yıl</span>
-          </div>
-          {engineChartRows.length === 0 ? <div className="text-[11px] text-faint">Henüz motor bazlı bakım kaydı yok.</div> : (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {engineChartRows.slice(0, 6).map((row) => (
-                <Link key={row.engine_id || row.engine} href={row.engine_id ? `/motorlar?engine_id=${encodeURIComponent(row.engine_id)}` : "/motorlar"} className="min-w-[112px] rounded-lg border border-border bg-panel2 px-2.5 py-2.5 transition hover:border-teal/50 hover:bg-teal/5">
-                  <div className="truncate text-[10.5px] font-bold text-text">{row.engine}</div>
-                  <div className="mt-1 font-mono text-lg font-extrabold text-teal">{row.count}</div>
-                  <div className="text-[9px] text-faint">bakım kaydı</div>
-                </Link>
-              ))}
-            </div>
-          )}
-          <Link href="/istatistik" className="mt-3 block text-center text-[10.5px] font-bold text-teal hover:underline">Detaylı gör →</Link>
-        </section>
 
         <StatCards counts={counts} />
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Hızlı erişim">
