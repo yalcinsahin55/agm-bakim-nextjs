@@ -3,6 +3,8 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { canAccessRoute, defaultRouteForRole } from "@/lib/permissions";
+import { invalidateCachedFetch } from "@/lib/apiCache";
 
 interface LoginForm {
   identifier: string;
@@ -39,9 +41,20 @@ export default function LoginPage() {
         toast.error(data.error || "Giriş yapılamadı.");
         return;
       }
+      // Aynı tarayıcıda rol değiştirirken önceki kullanıcının /api/auth/me cevabı
+      // 30 saniyelik cache'ten gelmesin; menü ve RoleGuard yeni hesabı görsün.
+      invalidateCachedFetch("/api/auth/me");
       toast.success("Giriş başarılı, hoş geldiniz.");
-      const destination = redirectPath === "/dashboard" && ["teknisyen", "planlamaci"].includes(data.user?.role) ? "/tamamla" : redirectPath;
-      router.push(destination);
+
+      const role = typeof data.user?.role === "string" ? data.user.role : undefined;
+      const roleDefault = defaultRouteForRole(role);
+      const requestedDestination = redirectPath;
+      const isSharedLanding = requestedDestination === "/dashboard" || requestedDestination === "/tamamla";
+      const destination = !isSharedLanding && canAccessRoute(role, requestedDestination)
+        ? requestedDestination
+        : roleDefault;
+
+      router.replace(destination);
       router.refresh();
     } catch {
       toast.error("Sunucuya ulaşılamadı. Lütfen tekrar deneyin.");

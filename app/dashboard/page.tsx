@@ -11,6 +11,7 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch } from "@/lib/apiCache";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
+import { canAccessRoute, isAdmin } from "@/lib/permissions";
 
 interface DashboardEngine {
   _id: string;
@@ -288,6 +289,14 @@ export default function DashboardPage() {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
   const firstName = user?.full_name ? user.full_name.split(" ")[0] : "";
+  const viewerMode = user?.role === "goruntuleyici";
+  const managementMode = isAdmin(user?.role);
+  const quickAccess = [
+    { href: "/kayitlar", icon: "📋", label: "Bakım Kayıtları" },
+    { href: "/istatistik", icon: "📊", label: "İstatistikler" },
+    { href: "/yag-analizleri", icon: "🧪", label: "Yağ Analizleri" },
+    { href: managementMode ? "/takvim" : "/qr-etiketleri", icon: managementMode ? "📅" : "▣", label: managementMode ? "Bakım Takvimi" : "QR Etiketleri" },
+  ].filter((action) => canAccessRoute(user?.role, action.href));
 
   if (loading) {
     return (
@@ -339,7 +348,7 @@ export default function DashboardPage() {
 
         <div className="bg-gradient-to-br from-amber/15 via-panel to-panel border border-amber/20 rounded-card p-4 mb-4 animate-fade-in">
           <div className="text-[15px] font-bold text-text">{greeting()}{firstName ? `, ${firstName}` : ""} 👋</div>
-          <div className="text-[11px] text-muted mt-0.5">Motor bakım durumuna hızlı bir bakış at.</div>
+          <div className="text-[11px] text-muted mt-0.5">{viewerMode ? "Motor bakım durumunu salt okunur olarak incele." : "Motor bakım durumuna hızlı bir bakış at."}</div>
           {counts.gecikmis > 0 ? (
             <div className="mt-2 text-[11.5px] text-red font-semibold">⏰ {counts.gecikmis} bakım gecikmiş durumda — hemen göz at!</div>
           ) : counts.kritik > 0 ? (
@@ -347,10 +356,10 @@ export default function DashboardPage() {
           ) : (
             <div className="mt-2 text-[11.5px] text-green font-semibold">✅ Tüm bakımlar yolunda görünüyor.</div>
           )}
-          <div className="flex gap-2 mt-3">
+          {managementMode && <div className="flex gap-2 mt-3">
             <Link href="/tamamla" className="flex-1 py-2 rounded-lg bg-amber text-[#161006] text-[11.5px] font-extrabold text-center hover:brightness-110 active:scale-[.98] transition">✅ Bakım Tamamla</Link>
             <Link href="/saat-guncelle" className="flex-1 py-2 rounded-lg border border-border text-muted text-[11.5px] font-bold text-center hover:bg-panel2 transition">🕒 Saat Güncelle</Link>
-          </div>
+          </div>}
         </div>
 
         {counts.gecikmis > 0 && (
@@ -365,12 +374,7 @@ export default function DashboardPage() {
 
         <StatCards counts={counts} />
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Hızlı erişim">
-          {[
-            { href: "/kayitlar", icon: "📋", label: "Bakım Kayıtları" },
-            { href: "/istatistik", icon: "📊", label: "İstatistikler" },
-            { href: "/yag-analizleri", icon: "🧪", label: "Yağ Analizleri" },
-            { href: "/takvim", icon: "📅", label: "Bakım Takvimi" },
-          ].map((action) => (
+          {quickAccess.map((action) => (
             <Link key={action.href} href={action.href} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-center text-[10.5px] font-bold text-muted transition hover:border-amber/40 hover:text-amber active:scale-[.98]">
               <span className="mr-1 text-sm" aria-hidden="true">{action.icon}</span>{action.label}
             </Link>
@@ -431,7 +435,7 @@ export default function DashboardPage() {
               <div className="rounded-lg bg-orange/10 p-2"><div className="font-mono text-lg font-extrabold text-orange">{counts.kritik}</div><div className="text-faint">Kritik</div></div>
               <div className="rounded-lg bg-amber/10 p-2"><div className="font-mono text-lg font-extrabold text-amber">{counts.yaklasiyor}</div><div className="text-faint">Yaklaşıyor</div></div>
             </div>
-            <Link href="/bildirimler" className="mt-2 block text-center text-[10.5px] font-bold text-teal hover:underline">Bildirimleri aç →</Link>
+            {canAccessRoute(user?.role, "/bildirimler") && <Link href="/bildirimler" className="mt-2 block text-center text-[10.5px] font-bold text-teal hover:underline">Bildirimleri aç →</Link>}
           </div>
         </div>
 

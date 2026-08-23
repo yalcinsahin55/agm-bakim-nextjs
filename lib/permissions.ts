@@ -50,6 +50,7 @@ const TECHNICIAN_ROUTES = [
 export function defaultRouteForRole(role: Role | string | undefined): string {
   const normalized = normalizeRole(role);
   if (normalized === "teknisyen") return "/tamamla";
+  if (normalized === "yonetici" || normalized === "goruntuleyici") return "/dashboard";
   return "/dashboard";
 }
 
