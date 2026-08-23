@@ -1,7 +1,4 @@
-// @ts-nocheck
 "use client";
-// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
-// @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,16 +9,58 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 
-function fileToBase64(file) {
+interface PressureEngine {
+  _id: string;
+  name: string;
+  hours?: number;
+  load_kw?: number;
+}
+
+interface PressureReading {
+  _id: string;
+  engine_id: string;
+  reading_date: string | Date;
+  load_kw?: number | null;
+  pressure_bar?: number | null;
+  status?: string;
+  uploaded_by_id?: string;
+}
+
+interface PressureEntry {
+  maint?: boolean;
+  load_kw?: string;
+  pressure_bar?: string;
+}
+
+type PressureTab = "new" | "history" | "import";
+
+interface ChartPoint {
+  x?: number;
+  y: number;
+  label?: string;
+}
+
+interface ImportResult {
+  inserted?: number;
+  error?: string;
+}
+
+function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Dosya okunamadı."));
+        return;
+      }
+      resolve(reader.result.split(",")[1] || "");
+    };
+    reader.onerror = () => reject(reader.error || new Error("Dosya okunamadı."));
     reader.readAsDataURL(file);
   });
 }
 
-function MiniLineChart({ points, color = "#e8952f", label = "" }) {
+function MiniLineChart({ points, color = "#e8952f", label = "" }: { points: ChartPoint[]; color?: string; label?: string }) {
   if (points.length < 2) return null;
   const w = 400, h = 140, pad = 15;
   const ys = points.map((p) => p.y);
@@ -72,36 +111,38 @@ function MiniLineChart({ points, color = "#e8952f", label = "" }) {
 export default function KarterBasinciPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const [engines, setEngines] = useState([]);
-  const [readings, setReadings] = useState([]);
+  const [engines, setEngines] = useState<PressureEngine[]>([]);
+  const [readings, setReadings] = useState<PressureReading[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("new");
+  const [tab, setTab] = useState<PressureTab>("new");
 
   const [readingDate, setReadingDate] = useState(new Date().toISOString().slice(0, 10));
-  const [entries, setEntries] = useState({});
+  const [entries, setEntries] = useState<Record<string, PressureEntry>>({});
   const [saving, setSaving] = useState(false);
 
   const [historyEngine, setHistoryEngine] = useState("");
 
-  const [importFile, setImportFile] = useState(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
 
   async function load() {
     const [engRes, readRes] = await Promise.all([fetch("/api/engines"), fetch("/api/pressure-readings")]);
     if (engRes.status === 401) { router.push("/login"); return; }
-    const engData = await engRes.json();
-    const readData = await readRes.json();
-    setEngines(engData);
-    setReadings(readData);
+    const engData = await engRes.json() as unknown;
+    const readData = await readRes.json() as unknown;
+    const engineList = Array.isArray(engData) ? engData as PressureEngine[] : [];
+    const readingList = Array.isArray(readData) ? readData as PressureReading[] : [];
+    setEngines(engineList);
+    setReadings(readingList);
     setLoading(false);
-    if (engData.length && !historyEngine) setHistoryEngine(engData[0]._id);
+    if (engineList.length && !historyEngine) setHistoryEngine(engineList[0]._id);
   }
 
   useEffect(() => { load(); }, []);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
-  function updateEntry(engineId, field, value) {
+  function updateEntry(engineId: string, field: "maint" | "load_kw" | "pressure_bar", value: boolean | string) {
     setEntries((prev) => ({ ...prev, [engineId]: { ...prev[engineId], [field]: value } }));
   }
 
@@ -131,13 +172,13 @@ export default function KarterBasinciPage() {
         body: JSON.stringify({ reading_date: readingDate, entries: payload }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as ImportResult;
         toast.dismiss(loadingToast);
         toast.success(`${data.inserted} motor için ölçüm kaydedildi! 📊`);
         setEntries({});
         load();
       } else {
-        const data = await res.json();
+        const data = await res.json() as ImportResult;
         toast.dismiss(loadingToast);
         toast.error(data.error || "Kaydedilemedi.");
       }
@@ -149,7 +190,7 @@ export default function KarterBasinciPage() {
     }
   }
 
-  async function removeReading(id) {
+  async function removeReading(id: string) {
     const loadingToast = toast.loading("Siliniyor...");
     try {
       await fetch(`/api/pressure-readings/${id}`, { method: "DELETE" });
@@ -171,7 +212,7 @@ export default function KarterBasinciPage() {
       const res = await fetch("/api/pressure-readings/import", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64 }),
       });
-      const data = await res.json();
+      const data = await res.json() as ImportResult;
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.inserted} ölçüm kaydı eklendi! 📥`);
@@ -188,10 +229,13 @@ export default function KarterBasinciPage() {
     }
   }
 
-  const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date));
-  const numericHistory = engineHistory.filter((r) => r.pressure_bar !== null && r.pressure_bar !== undefined);
+  const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
+  const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
   const canWrite = user?.role !== "goruntuleyici";
   const visibleTab = canWrite ? tab : "history";
+  const tabs: Array<[PressureTab, string]> = canWrite
+    ? [["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]]
+    : [["history", "📈 Geçmiş"]];
 
   if (loading) {
     return (
@@ -218,7 +262,7 @@ export default function KarterBasinciPage() {
       <div className="px-4 py-4">
         {/* Modern Tab Butonları */}
         <div className="flex gap-1 bg-[#12161d] p-1 rounded-xl border border-border mb-4">
-          {(canWrite ? [["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]] : [["history", "📈 Geçmiş"]]).map(([key, label]) => (
+          {tabs.map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}

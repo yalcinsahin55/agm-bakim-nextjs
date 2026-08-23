@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const db = await getDb();
-    await syncMaintenanceNotificationsForAllUsers(db);
-    return NextResponse.json({ ok: true, refreshedAt: new Date().toISOString() });
+    const result = await syncMaintenanceNotificationsForAllUsers(db);
+    return NextResponse.json({ ok: true, ...result, refreshedAt: new Date().toISOString() });
   } catch (error) {
     console.error("Cron bildirim yenileme hatası:", error);
     return NextResponse.json({ error: "Bildirimler yenilenemedi." }, { status: 500 });

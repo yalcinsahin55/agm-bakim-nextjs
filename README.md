@@ -300,6 +300,8 @@ Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı 
 
 Web Push isteğe bağlıdır. Kullanıcı, Bildirimler ekranından tarayıcı bildirim izni verdiğinde abonelik bilgisi sunucuya kaydedilir. Bakım durumu değiştiğinde veya gecikmiş/kritik/yaklaşan bakım oluştuğunda uygun bildirimler gönderilebilir.
 
+Bildirim listesi endpoint’i artık sayfa açılışında bakım durumlarını yeniden üretmez; `/api/notifications` yalnızca mevcut bildirimleri okur. Böylece her Dashboard veya modül açılışında gereksiz bakım türü, motor ve bildirim yazma sorguları çalışmaz. Yeni gecikmiş/kritik/yaklaşan bakım bildirimleri zamanlanmış cron akışında hazırlanır.
+
 `vercel.json` dosyası aşağıdaki cron endpoint’ini her gün UTC 06:00’da çalıştırır:
 
 ```json
@@ -313,7 +315,9 @@ Web Push isteğe bağlıdır. Kullanıcı, Bildirimler ekranından tarayıcı bi
 }
 ```
 
-Cron endpoint’i `CRON_SECRET` ile korunur. Cron zamanları UTC’dir; Türkiye’de görüntülenen yerel saatle karıştırılmamalıdır. Cron yalnızca bakım durumu ve bildirim yenileme sürecini tetikler.
+Cron endpoint’i `CRON_SECRET` ile korunur. Cron zamanları UTC’dir; Türkiye’de görüntülenen yerel saatle karıştırılmamalıdır. Zamanlanmış akış aktif kullanıcıları ve gecikmiş/kritik/yaklaşan bakım listesini toplu olarak işler; her kullanıcı için gereksiz son bildirim listesi sorgusu çalıştırmaz. Manuel kayıt değişikliklerinden sonra istemci tarafındaki bakım paneli cache’i temizlenir.
+
+Bakım paneli, aynı istemci içinde 15 saniyelik istek birleştirme/cache katmanına ve sıcak sunucu instance’ında 10 saniyelik kısa cache’e sahiptir. Motor veya bakım türü değiştiğinde kısa süreli stale veri ihtimali azaltılmıştır; kayıt oluşturma, düzenleme, silme ve çevrimdışı senkronizasyon sonrasında istemci cache’i açıkça temizlenir.
 
 ## Yedekleme ve veri güvenliği
 
@@ -393,6 +397,16 @@ Script yalnızca `technician_source`, `technician_id`, `technician_name` ve `ext
 | `npm run start` | Production derlemesini çalıştırır. |
 | `npx tsc --noEmit --pretty false` | TypeScript tip kontrolü yapar. |
 | `git diff --check` | Boşluk ve patch kaynaklı diff sorunlarını kontrol eder. |
+| `BASE_URL=https://staging.example node scripts/staging-load-smoke.mjs` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
+
+Staging smoke/load kontrolü yalnızca test ortamında çalıştırılmalıdır. Script POST, PATCH veya DELETE göndermez; production alan adını açık onay olmadan reddeder. Yetkili staging oturumu ile test etmek için cookie değeri yalnızca yerel shell değişkeni olarak verilebilir:
+
+```bash
+BASE_URL=https://staging.example \
+AUTH_COOKIE='agm_session=staging-cookie' \
+CONCURRENCY=4 ROUNDS=3 \
+node scripts/staging-load-smoke.mjs
+```
 
 Yayın öncesi asgari doğrulama:
 

@@ -1,9 +1,6 @@
-// @ts-nocheck
 "use client";
-// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
-// @ts-nocheck
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
@@ -14,8 +11,10 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
-import { getMaintenancePanel, invalidateMaintenancePanel } from "@/lib/maintenancePanel";
-import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
+import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
+import type { MaintenanceType, VideoRef } from "@/lib/types";
+import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
@@ -27,7 +26,7 @@ const CHECKLIST_TEMPLATES = {
   default: ["Görsel genel kontrol", "Bakım işlemi tamamlandı", "Çalışma sonrası kontrol"],
 };
 
-function checklistForType(typeKey, label) {
+function checklistForType(typeKey: string, label?: string): string[] {
   const normalized = `${typeKey} ${label || ""}`.toLocaleLowerCase("tr");
   if (normalized.includes("yağ")) return CHECKLIST_TEMPLATES.yag;
   if (normalized.includes("krank")) return CHECKLIST_TEMPLATES.krank;
@@ -36,10 +35,11 @@ function checklistForType(typeKey, label) {
   return CHECKLIST_TEMPLATES.default;
 }
 
-function compressImage(file, maxDim = 720, quality = 0.65) {
+function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+          reader.onload = (e) => {
+
       const img = new Image();
       img.onload = () => {
         let { width, height } = img;
@@ -56,7 +56,12 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
         }, "image/jpeg", quality);
       };
       img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-      img.src = e.target.result;
+              if (typeof e.target?.result !== "string") {
+          reject(new Error("Fotoğraf okunamadı."));
+          return;
+        }
+        img.src = e.target.result;
+
     };
     reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
     reader.readAsDataURL(file);
@@ -64,25 +69,27 @@ function compressImage(file, maxDim = 720, quality = 0.65) {
 }
 
 
-function getPhotoSrc(photo, previews = {}) {
+function getPhotoSrc(photo: string, previews: Record<string, string> = {}): string {
   if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
   return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
     ? photo
     : `data:image/jpeg;base64,${photo}`;
 }
 
-function makeOfflineId() {
+function makeOfflineId(): string {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function withTimeout(promise, milliseconds, message) {
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
+function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
     timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
   });
-  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  });
 }
 
 export default function TamamlaPage() {
@@ -92,9 +99,9 @@ export default function TamamlaPage() {
   const quickMode = searchParams.get("mode") === "quick";
   const qrEngineId = searchParams.get("engine_id");
   const qrTypeKey = searchParams.get("type_key");
-  const [items, setItems] = useState([]);
-  const [engines, setEngines] = useState([]);
-  const [types, setTypes] = useState([]);
+  const [items, setItems] = useState<PanelItem[]>([]);
+  const [engines, setEngines] = useState<PanelEngine[]>([]);
+  const [types, setTypes] = useState<MaintenanceType[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [engineId, setEngineId] = useState("");
@@ -105,23 +112,23 @@ export default function TamamlaPage() {
   const [maintenanceEndAt, setMaintenanceEndAt] = useState("");
   const [pressure, setPressure] = useState("");
   const [techNote, setTechNote] = useState("");
-  const [extraKeys, setExtraKeys] = useState([]);
-  const [extraPeriods, setExtraPeriods] = useState({});
-  const [technicians, setTechnicians] = useState([]);
+  const [extraKeys, setExtraKeys] = useState<string[]>([]);
+  const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
+  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState("");
-  const [otherTechnicianIds, setOtherTechnicianIds] = useState([]);
-  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState({});
-  const [technicianSource, setTechnicianSource] = useState("internal");
+  const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>([]);
+  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, string | number>>({});
+  const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
-  const [checklist, setChecklist] = useState({});
-  
-  const [photos, setPhotos] = useState([]);
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+
+  const [photos, setPhotos] = useState<string[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideos] = useState<VideoRef[]>([]);
   const [videoBusy, setVideoBusy] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
-  const [offlinePreviews, setOfflinePreviews] = useState({});
+  const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const offlinePreviewUrlsRef = useRef<Record<string, string>>({});
@@ -261,7 +268,7 @@ export default function TamamlaPage() {
   const timeTrackingReady = maintenanceDurationMinutes !== null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0;
 
-  async function handlePhotos(e) {
+  async function handlePhotos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setPhotoBusy(true);
@@ -311,7 +318,7 @@ export default function TamamlaPage() {
     e.target.value = "";
   }
 
-  function removePhoto(idx) {
+  function removePhoto(idx: number) {
     const photo = photos[idx];
     if (photo && photo.startsWith("offline:")) {
       const id = photo.slice("offline:".length);
@@ -322,7 +329,7 @@ export default function TamamlaPage() {
   }
 
   // Videolar küçük parçalara bölünerek uygulama API’sine gönderilir ve Blob’a yazılır.
-  async function handleVideos(e) {
+  async function handleVideos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
@@ -370,7 +377,7 @@ export default function TamamlaPage() {
     }
   }
 
-  function removeVideo(idx) {
+  function removeVideo(idx: number) {
     const video = videos[idx];
     if (video?.url?.startsWith("offline:")) {
       const id = video.url.slice("offline:".length);
@@ -380,7 +387,7 @@ export default function TamamlaPage() {
     setVideos((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function toggleExtra(key, checked) {
+  function toggleExtra(key: string, checked: boolean) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
     if (checked && extraPeriods[key] === undefined) {
       const t = types.find((tt) => tt.key === key);
@@ -388,7 +395,7 @@ export default function TamamlaPage() {
     }
   }
 
-  function toggleOtherTechnician(id, checked) {
+  function toggleOtherTechnician(id: string, checked: boolean) {
     setOtherTechnicianIds((current) => checked ? [...new Set([...current, id])] : current.filter((currentId) => currentId !== id));
     setOtherTechnicianDurations((current) => {
       const next = { ...current };
@@ -398,7 +405,7 @@ export default function TamamlaPage() {
     });
   }
 
-  function changeTechnicianSource(source) {
+  function changeTechnicianSource(source: "internal" | "external_service") {
     setTechnicianSource(source);
     if (source === "external_service") setOtherTechnicianIds([]);
   }
@@ -594,7 +601,7 @@ export default function TamamlaPage() {
             </div>
             <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
             <input
-              type="number" value={primaryPeriod} onChange={(e) => setPrimaryPeriod(e.target.value)}
+              type="number" value={primaryPeriod} onChange={(e) => setPrimaryPeriod(Number(e.target.value) || 0)}
               className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono mt-1"
             />
           </div>
@@ -602,7 +609,7 @@ export default function TamamlaPage() {
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">O Anki Motor Çalışma Saati</label>
         <input
-          type="number" value={hours} onChange={(e) => setHours(e.target.value)}
+          type="number" value={hours} onChange={(e) => setHours(Number(e.target.value) || 0)}
           className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-amber mb-1"
         />
         <p className="text-[11px] text-faint mb-2 leading-relaxed">
@@ -636,7 +643,7 @@ export default function TamamlaPage() {
         {user?.role === "yonetici" && <div className="mb-2 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Dış servis veya garanti kapsamındaki bakımlarda kayıtlı teknisyen seçmeden kayıt oluşturabilirsin.</div>
-          <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
+          <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value as "internal" | "external_service")} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
             <option value="internal">Kayıtlı teknisyenler / benim hesabım</option>
             <option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
           </select>
@@ -700,7 +707,7 @@ export default function TamamlaPage() {
                         <label className="text-[10px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
                         <input
                           type="number" value={extraPeriods[t.key] ?? ""}
-                          onChange={(e) => setExtraPeriods((prev) => ({ ...prev, [t.key]: e.target.value }))}
+                          onChange={(e) => setExtraPeriods((prev) => ({ ...prev, [t.key]: Number(e.target.value) || 0 }))}
                           className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-1.5 text-[12.5px] font-mono mt-1"
                         />
                       </div>

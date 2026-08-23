@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { listUserNotifications, syncMaintenanceNotifications } from "@/lib/notifications";
+import { listUserNotifications } from "@/lib/notifications";
 import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +13,9 @@ async function getNotifications(req: NextRequest) {
     const user = await getCurrentUser(req, db.collection("users") as any);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const refresh = new URL(req.url).searchParams.get("refresh") === "1";
-    const notifications = refresh
-      ? await syncMaintenanceNotifications(db, user)
-      : await listUserNotifications(db, user._id);
+    // Bildirim üretimi bakım kayıtlarıyla birlikte her sayfa açılışında çalıştırılmaz.
+    // Güncel bakım uyarıları zamanlanmış cron akışında hazırlanır; bu endpoint yalnızca okur.
+    const notifications = await listUserNotifications(db, user._id);
     const unreadCount = notifications.filter((notification) => !notification.read_at).length;
     return NextResponse.json({ notifications, unreadCount });
   } catch (error) {

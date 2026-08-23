@@ -1,7 +1,4 @@
-// @ts-nocheck
 "use client";
-// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
-// @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,27 +9,50 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+type FieldKey = "kaver_tipi" | "hava_filtresi" | "krankcase" | "esanjor_tipi" | "dungs" | "radyator_tipi" | "not";
+type FieldValues = Record<FieldKey, string>;
+
+interface EquipmentInfo extends FieldValues {
+  _id: string;
+  engine_name: string;
 }
 
-const FIELDS = [
+interface EquipmentEngine {
+  _id: string;
+  name: string;
+}
+
+interface EquipmentResponse {
+  name?: string;
+  updated?: number;
+  error?: string;
+}
+
+const FIELDS: Array<[FieldKey, string]> = [
   ["kaver_tipi", "Kaver Tipi"], ["hava_filtresi", "Hava Filtresi"], ["krankcase", "Krankcase"],
   ["esanjor_tipi", "Eşanjör Tipi"], ["dungs", "Dungs"], ["radyator_tipi", "Radyatör Tipi"], ["not", "Not"],
 ];
 
-function EmptyForm() {
-  const f = {};
-  FIELDS.forEach(([key]) => { f[key] = ""; });
-  return f;
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Dosya okunamadı."));
+        return;
+      }
+      resolve(reader.result.split(",")[1] || "");
+    };
+    reader.onerror = () => reject(reader.error || new Error("Dosya okunamadı."));
+    reader.readAsDataURL(file);
+  });
 }
 
-function FieldInputs({ values, onChange }) {
+function EmptyForm(): FieldValues {
+  return Object.fromEntries(FIELDS.map(([key]) => [key, ""])) as FieldValues;
+}
+
+function FieldInputs({ values, onChange }: { values: FieldValues; onChange: (key: FieldKey, value: string) => void }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {FIELDS.map(([key, label]) => (
@@ -51,13 +71,13 @@ function FieldInputs({ values, onChange }) {
 export default function MotorBilgiPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const [items, setItems] = useState([]);
-  const [engines, setEngines] = useState([]);
+  const [items, setItems] = useState<EquipmentInfo[]>([]);
+  const [engines, setEngines] = useState<EquipmentEngine[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
   const [showImport, setShowImport] = useState(false);
-  const [importFile, setImportFile] = useState(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
@@ -65,7 +85,7 @@ export default function MotorBilgiPage() {
   const [newFields, setNewFields] = useState(EmptyForm());
   const [adding, setAdding] = useState(false);
 
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState(EmptyForm());
   const [saving, setSaving] = useState(false);
 
@@ -73,10 +93,10 @@ export default function MotorBilgiPage() {
     try {
       const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info"), fetch("/api/engines")]);
       if (infoRes.status === 401) { router.push("/login"); return; }
-      const infoData = await infoRes.json().catch(() => []);
-      const engData = await engRes.json().catch(() => []);
-      setItems(Array.isArray(infoData) ? infoData : []);
-      setEngines(Array.isArray(engData) ? engData : []);
+      const infoData = await infoRes.json().catch(() => []) as unknown;
+      const engData = await engRes.json().catch(() => []) as unknown;
+      setItems(Array.isArray(infoData) ? infoData as EquipmentInfo[] : []);
+      setEngines(Array.isArray(engData) ? engData as EquipmentEngine[] : []);
     } catch {
       toast.error("Veriler yüklenirken bir hata oluştu.");
     } finally {
@@ -112,7 +132,7 @@ export default function MotorBilgiPage() {
       const res = await fetch("/api/equipment-info/import", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64 }),
       });
-      const data = await res.json();
+      const data = await res.json() as EquipmentResponse;
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.updated} motor güncellendi! 📥`);
@@ -131,14 +151,14 @@ export default function MotorBilgiPage() {
     }
   }
 
-  function startEdit(item) {
+  function startEdit(item: EquipmentInfo) {
     setEditingId(item._id);
-    const f = {};
+    const f = EmptyForm();
     FIELDS.forEach(([key]) => { f[key] = item[key] || ""; });
     setEditFields(f);
   }
 
-  async function saveEdit(id) {
+  async function saveEdit(id: string) {
     setSaving(true);
     const loadingToast = toast.loading("Kaydediliyor...");
     try {

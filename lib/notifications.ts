@@ -40,7 +40,7 @@ export async function listUserNotifications(db: Db, userId: string, limit = 50):
   return notifications as unknown as Notification[];
 }
 
-async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[]): Promise<Notification[]> {
+async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[], listAfterSync = true): Promise<Notification[] | null> {
   const collection = db.collection("notifications");
   const now = new Date();
   const activeKeys = actionable.map((item) => `maintenance:${user._id}:${item.engine_id}:${item.type_key}`);
@@ -104,15 +104,16 @@ async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[]
     }
   }
 
-  return listUserNotifications(db, user._id);
+  return listAfterSync ? listUserNotifications(db, user._id) : null;
 }
 
 export async function syncMaintenanceNotifications(db: Db, user: User): Promise<Notification[]> {
   await ensureAppIndexes(db);
-  return syncUserNotifications(db, user, await loadActionableItems(db));
+  const notifications = await syncUserNotifications(db, user, await loadActionableItems(db), true);
+  return notifications || [];
 }
 
-export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<void> {
+export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<{ users: number; actionable: number }> {
   await ensureAppIndexes(db);
   const [users, actionable] = await Promise.all([
     db.collection("users").find(
@@ -122,8 +123,10 @@ export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<v
     loadActionableItems(db),
   ]);
   for (const user of users) {
-    await syncUserNotifications(db, user as unknown as User, actionable);
+    // Cron yalnızca üretim/güncelleme yapar; kullanıcı bildirim listesini ayrıca okumaz.
+    await syncUserNotifications(db, user as unknown as User, actionable, false);
   }
+  return { users: users.length, actionable: actionable.length };
 }
 
 export function statusLabel(status: Notification["status"]): string {

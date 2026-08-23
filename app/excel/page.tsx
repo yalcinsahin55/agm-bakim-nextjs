@@ -1,7 +1,4 @@
-// @ts-nocheck
 "use client";
-// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
-// @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,11 +7,33 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
-function fileToBase64(file) {
+interface ExcelEngine {
+  _id: string;
+  name: string;
+}
+
+interface ExcelMaintenanceType {
+  _id?: string;
+  key?: string;
+  label: string;
+}
+
+interface ImportResult {
+  updated?: number;
+  error?: string;
+}
+
+function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Dosya okunamadı."));
+        return;
+      }
+      resolve(reader.result.split(",")[1] || "");
+    };
+    reader.onerror = () => reject(reader.error || new Error("Dosya okunamadı."));
     reader.readAsDataURL(file);
   });
 }
@@ -23,11 +42,11 @@ export default function ExcelPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
   const canImport = user?.role === "yonetici";
-  const [importFile, setImportFile] = useState(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [importing, setImporting] = useState(false);
-  const [engines, setEngines] = useState([]);
-  const [types, setTypes] = useState([]);
+  const [engines, setEngines] = useState<ExcelEngine[]>([]);
+  const [types, setTypes] = useState<ExcelMaintenanceType[]>([]);
   const [reportEngine, setReportEngine] = useState("");
   const [reportType, setReportType] = useState("");
   const [reportFrom, setReportFrom] = useState("");
@@ -36,10 +55,10 @@ export default function ExcelPage() {
   useEffect(() => {
     Promise.all([fetch("/api/engines"), fetch("/api/maintenance-types")]).then(async ([engineResponse, typeResponse]) => {
       if (engineResponse.status === 401) { router.push("/login"); return; }
-      const engineData = await engineResponse.json();
-      const typeData = await typeResponse.json();
-      setEngines(Array.isArray(engineData) ? engineData : []);
-      setTypes(Array.isArray(typeData) ? typeData : []);
+      const engineData = await engineResponse.json() as unknown;
+      const typeData = await typeResponse.json() as unknown;
+      setEngines(Array.isArray(engineData) ? engineData as ExcelEngine[] : []);
+      setTypes(Array.isArray(typeData) ? typeData as ExcelMaintenanceType[] : []);
     }).catch(() => {});
   }, [router]);
 
@@ -67,7 +86,7 @@ export default function ExcelPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_b64, import_date: importDate }),
       });
-      const data = await res.json();
+      const data = await res.json() as ImportResult;
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.updated} motor güncellendi! 📊`);

@@ -1,7 +1,4 @@
-// @ts-nocheck
 "use client";
-// JavaScript kaynak dosyasından TypeScript'e taşındı; dinamik API/form verileri çalışma zamanında doğrulanıyor.
-// @ts-nocheck
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,16 +12,41 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 
+interface MotorEngine {
+  _id: string;
+  name: string;
+  hours?: number;
+  load_kw?: number;
+  updated_at?: string | Date;
+  maintenance_count?: number;
+}
+
+interface MotorMaintenanceRecord {
+  _id?: string;
+  group_id?: string;
+  type_key?: string;
+  type_label?: string;
+  hour_at_completion?: number;
+  technician_name?: string;
+  maintenance_start_at?: string | Date;
+  created_at?: string | Date;
+}
+
+interface EngineResponse {
+  name?: string;
+  error?: string;
+}
+
 export default function MotorlarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useCurrentUser();
-  const [engines, setEngines] = useState([]);
-  const [recordsByEngine, setRecordsByEngine] = useState({});
+  const [engines, setEngines] = useState<MotorEngine[]>([]);
+  const [recordsByEngine, setRecordsByEngine] = useState<Record<string, MotorMaintenanceRecord[]>>({});
   const [loading, setLoading] = useState(true);
-  const [loadingEngineId, setLoadingEngineId] = useState(null);
-  const [openId, setOpenId] = useState(null);
-  const [qrEngine, setQrEngine] = useState(null);
+  const [loadingEngineId, setLoadingEngineId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [qrEngine, setQrEngine] = useState<MotorEngine | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
   const [showAdd, setShowAdd] = useState(false);
@@ -39,7 +61,8 @@ export default function MotorlarPage() {
     const engRes = await fetch("/api/engines?include_maintenance_counts=true");
     if (engRes.status === 401) { router.push("/login"); return; }
     if (!engRes.ok) throw new Error("Motorlar yüklenemedi");
-    setEngines(await engRes.json());
+    const data = await engRes.json() as unknown;
+    setEngines(Array.isArray(data) ? data as MotorEngine[] : []);
     setLoading(false);
   }
 
@@ -59,8 +82,9 @@ export default function MotorlarPage() {
     fetch(`/api/records?engine_id=${encodeURIComponent(engine._id)}&page=1&page_size=20`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Bakım geçmişi yüklenemedi");
-        const data = await response.json();
-        setRecordsByEngine((current) => ({ ...current, [engine._id]: Array.isArray(data) ? data : (data.records || []) }));
+        const data = await response.json() as unknown;
+        const records = Array.isArray(data) ? data as MotorMaintenanceRecord[] : (data && typeof data === "object" && Array.isArray((data as { records?: unknown }).records) ? (data as { records: MotorMaintenanceRecord[] }).records : []);
+        setRecordsByEngine((current) => ({ ...current, [engine._id]: records }));
       })
       .catch(() => toast.error("QR ile motor geçmişi yüklenemedi."))
       .finally(() => setLoadingEngineId(null));
@@ -111,8 +135,9 @@ export default function MotorlarPage() {
     try {
       const response = await fetch(`/api/records?engine_id=${encodeURIComponent(engineId)}&page=1&page_size=20`);
       if (!response.ok) throw new Error("Bakım geçmişi yüklenemedi");
-      const data = await response.json();
-      setRecordsByEngine((current) => ({ ...current, [engineId]: Array.isArray(data) ? data : (data.records || []) }));
+      const data = await response.json() as unknown;
+      const records = Array.isArray(data) ? data as MotorMaintenanceRecord[] : (data && typeof data === "object" && Array.isArray((data as { records?: unknown }).records) ? (data as { records: MotorMaintenanceRecord[] }).records : []);
+      setRecordsByEngine((current) => ({ ...current, [engineId]: records }));
     } catch {
       toast.error("Motor bakım geçmişi yüklenemedi.");
       setRecordsByEngine((current) => ({ ...current, [engineId]: [] }));
@@ -121,7 +146,7 @@ export default function MotorlarPage() {
     }
   }
 
-  async function addEngine(e) {
+  async function addEngine(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!newName.trim()) { toast.error("Motor adı gerekli."); return; }
     setSaving(true);
@@ -136,7 +161,7 @@ export default function MotorlarPage() {
           load_kw: Number(newLoad) || 0,
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as EngineResponse;
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.name} eklendi! ⚙️`);
@@ -221,7 +246,7 @@ export default function MotorlarPage() {
           {sorted.map((e) => {
             const recs = (recordsByEngine[e._id] || [])
               .slice()
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
             const open = openId === e._id;
             const recordsLoading = loadingEngineId === e._id;
             return (
@@ -282,7 +307,8 @@ export default function MotorlarPage() {
                     ) : (
                       <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
                         {recs.slice(0, 20).map((r) => (
-                          <div key={r._id?.toString?.() || r.group_id} className="flex items-center justify-between bg-panel rounded-lg px-2.5 py-2 border border-border">
+                                                      <div key={r._id || r.group_id || `${e._id}-${r.type_key || r.type_label || "record"}`} className="flex items-center justify-between bg-panel rounded-lg px-2.5 py-2 border border-border">
+
                             <div className="min-w-0">
                               <div className="text-[11.5px] font-semibold text-text truncate">{r.type_label}</div>
                               <div className="text-[9.5px] text-faint">
