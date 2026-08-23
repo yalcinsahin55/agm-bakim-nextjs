@@ -5,6 +5,7 @@ import { hashPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { registerSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await getDb();
+    await ensureAppIndexes(db);
     const usersCol = db.collection("users") as any;
     const id = normalizedPhone || normalizedEmail;
 
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
     await usersCol.insertOne({
       _id: id, full_name: full_name.trim(), email: normalizedEmail,
       ...(normalizedPhone ? { phone: phone?.trim(), phone_normalized: normalizedPhone } : {}),
-      password_hash: passwordHash, role: "yonetici", active: true, approved: true, created_at: new Date(),
+      password_hash: passwordHash, role: "yonetici", active: true, approved: true, bootstrap_key: "first-user", created_at: new Date(),
     });
 
     const token = await createSessionToken(id);

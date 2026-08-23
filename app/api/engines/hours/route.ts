@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +23,30 @@ export async function PATCH(req: NextRequest) {
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
     }
+    const rateLimited = await enforceApiRateLimit(req, "engine-hours-update", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { updates } = await req.json();
     if (!Array.isArray(updates)) {
       return NextResponse.json({ error: "Geçersiz veri formatı." }, { status: 400 });
     }
 
-    if (updates.length === 0) {
-      return NextResponse.json({ error: "Güncellenecek veri bulunamadı." }, { status: 400 });
+    if (updates.length === 0 || updates.length > 100) {
+      return NextResponse.json({ error: "Güncellenecek motor sayısı 1 ile 100 arasında olmalıdır." }, { status: 400 });
+    }
+    for (const update of updates as unknown[]) {
+      if (!update || typeof update !== "object") {
+        return NextResponse.json({ error: "Geçersiz motor güncellemesi." }, { status: 400 });
+      }
+      const item = update as Partial<EngineUpdate>;
+      if (typeof item.engine_id !== "string" || !item.engine_id.trim() || item.engine_id.length > 120) {
+        return NextResponse.json({ error: "Geçerli bir motor kimliği gerekli." }, { status: 400 });
+      }
+      for (const value of [item.hours, item.load_kw]) {
+        if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 5_000_000)) {
+          return NextResponse.json({ error: "Motor saati ve yük değeri geçerli, negatif olmayan sayılar olmalıdır." }, { status: 400 });
+        }
+      }
     }
 
     const enginesCol = db.collection("engines") as any;
@@ -37,9 +54,9 @@ export async function PATCH(req: NextRequest) {
     let changed = 0;
 
     for (const u of updates as EngineUpdate[]) {
-      if (!u.engine_id) continue;
+      const engineId = u.engine_id.trim();
 
-      const existing = await enginesCol.findOne({ _id: u.engine_id });
+      const existing = await enginesCol.findOne({ _id: engineId });
       if (!existing) continue;
 
       const setFields: Record<string, any> = {};
@@ -69,7 +86,7 @@ export async function PATCH(req: NextRequest) {
           },
         };
       }
-      await enginesCol.updateOne({ _id: u.engine_id }, updateOp);
+      await enginesCol.updateOne({ _id: engineId }, updateOp);
       changed++;
     }
 

@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
+  const rateLimited = await enforceApiRateLimit(req, "pressure-reading-delete", 120, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Geçersiz ölçüm kaydı." }, { status: 400 });
   const col = db.collection("pressure_readings") as any;

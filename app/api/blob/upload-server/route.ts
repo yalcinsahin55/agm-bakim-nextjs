@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
     if (!allowedContentTypes.has(file.type)) {
       return NextResponse.json({ error: "Desteklenmeyen dosya türü." }, { status: 415 });
     }
+    if ((folder === "oil-analyses" && file.type !== "application/pdf") || (folder === "photos" && file.type === "application/pdf")) {
+      return NextResponse.json({ error: folder === "oil-analyses" ? "Yağ analizi klasörüne yalnızca PDF yüklenebilir." : "Fotoğraf klasörüne yalnızca görsel yüklenebilir." }, { status: 415 });
+    }
     if (!canWriteMaintenance(user.role)) {
       return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
     }

@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Geçersiz analiz kaydı." }, { status: 400 });
   if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
+  const rateLimited = await enforceApiRateLimit(req, "oil-analysis-delete", 60, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const col = db.collection("oil_analyses") as any;
   const doc = await col.findOne({ _id: new ObjectId(id) });

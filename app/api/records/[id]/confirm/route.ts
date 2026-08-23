@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bakım kayıtlarını yalnızca yöneticiler teyit edebilir." }, { status: 403 });
   }
+  const rateLimited = await enforceApiRateLimit(req, "record-confirm", 120, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
   if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Kayıt kimliği geçersiz." }, { status: 400 });
   }

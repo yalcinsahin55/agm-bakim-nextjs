@@ -50,17 +50,29 @@ export default function YagAnalizleriPage() {
   const [filterEngine, setFilterEngine] = useState("Tümü");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [preview, setPreview] = useState<OilAnalysis | null>(null);
-  const canWrite = user?.role !== "goruntuleyici";
+  const canWrite = user?.role === "yonetici";
+
+  const [loadError, setLoadError] = useState("");
 
   async function load() {
-    const [engRes, anaRes] = await Promise.all([fetch("/api/engines"), fetch("/api/oil-analyses")]);
-    if (engRes.status === 401) { router.push("/login"); return; }
-    const engData = await engRes.json() as Engine[];
-    const anaData = await anaRes.json() as OilAnalysis[];
-    setEngines(engData);
-    setAnalyses(anaData);
-    setLoading(false);
-    if (engData.length && !engineId) setEngineId(engData[0]._id);
+    try {
+      const [engRes, anaRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/oil-analyses", { cache: "no-store" })]);
+      if (engRes.status === 401 || anaRes.status === 401) { router.push("/login"); return; }
+      const engData = await engRes.json().catch(() => null) as unknown;
+      const anaData = await anaRes.json().catch(() => null) as unknown;
+      if (!engRes.ok || !Array.isArray(engData) || !anaRes.ok || !Array.isArray(anaData)) {
+        setLoadError((engData && typeof engData === "object" && "error" in engData ? String(engData.error) : null) || (anaData && typeof anaData === "object" && "error" in anaData ? String(anaData.error) : null) || "Yağ analizleri yüklenemedi.");
+        return;
+      }
+      setLoadError("");
+      setEngines(engData as Engine[]);
+      setAnalyses(anaData as OilAnalysis[]);
+      if (engData.length && !engineId) setEngineId((engData as Engine[])[0]._id);
+    } catch {
+      setLoadError("Yağ analizleri yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -171,6 +183,22 @@ export default function YagAnalizleriPage() {
             <Skeleton className="h-28 rounded-card" />
             <Skeleton className="h-28 rounded-card" />
             <Skeleton className="h-28 rounded-card" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <TopBar title="Yağ Analizleri" />
+        <div className="px-4 py-8 text-center">
+          <div className="rounded-card border border-red/30 bg-panel p-6">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="text-sm text-red">{loadError}</p>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />

@@ -29,6 +29,16 @@ const FAIL_CLOSED_SCOPES = new Set([
   "user-create",
   "user-update",
   "user-deactivate",
+  "engine-create",
+  "engine-hours-update",
+  "engine-history-update",
+  "equipment-info-create",
+  "equipment-info-update",
+  "oil-analysis-create",
+  "oil-analysis-delete",
+  "pressure-reading-create",
+  "pressure-reading-delete",
+  "record-confirm",
 ]);
 
 function getFailureMode(scope: string): RateLimitFailureMode {

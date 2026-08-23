@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { isAllowedPdfUrl } from "@/lib/pdfSecurity";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
+    const rateLimited = await enforceApiRateLimit(req, "oil-analysis-create", 30, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { engine_id, analysis_date, result, note, pdf_url, pdf_b64, pdf_filename } = await req.json();
     if (!engine_id || (!pdf_url && !pdf_b64)) {

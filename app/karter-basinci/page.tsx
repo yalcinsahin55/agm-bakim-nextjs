@@ -124,18 +124,29 @@ export default function KarterBasinciPage() {
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   async function load() {
-    const [engRes, readRes] = await Promise.all([fetch("/api/engines"), fetch("/api/pressure-readings")]);
-    if (engRes.status === 401) { router.push("/login"); return; }
-    const engData = await engRes.json() as unknown;
-    const readData = await readRes.json() as unknown;
-    const engineList = Array.isArray(engData) ? engData as PressureEngine[] : [];
-    const readingList = Array.isArray(readData) ? readData as PressureReading[] : [];
-    setEngines(engineList);
-    setReadings(readingList);
-    setLoading(false);
-    if (engineList.length && !historyEngine) setHistoryEngine(engineList[0]._id);
+    try {
+      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/pressure-readings", { cache: "no-store" })]);
+      if (engRes.status === 401 || readRes.status === 401) { router.push("/login"); return; }
+      const engData = await engRes.json().catch(() => null) as unknown;
+      const readData = await readRes.json().catch(() => null) as unknown;
+      if (!engRes.ok || !Array.isArray(engData) || !readRes.ok || !Array.isArray(readData)) {
+        setLoadError((engData && typeof engData === "object" && "error" in engData ? String(engData.error) : null) || (readData && typeof readData === "object" && "error" in readData ? String(readData.error) : null) || "Karter basıncı verileri yüklenemedi.");
+        return;
+      }
+      setLoadError("");
+      const engineList = engData as PressureEngine[];
+      const readingList = readData as PressureReading[];
+      setEngines(engineList);
+      setReadings(readingList);
+      if (engineList.length && !historyEngine) setHistoryEngine(engineList[0]._id);
+    } catch {
+      setLoadError("Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -193,13 +204,15 @@ export default function KarterBasinciPage() {
   async function removeReading(id: string) {
     const loadingToast = toast.loading("Siliniyor...");
     try {
-      await fetch(`/api/pressure-readings/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/pressure-readings/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Silinemedi.");
       toast.dismiss(loadingToast);
       toast.success("Kayıt silindi! 🗑️");
-      load();
-    } catch {
+      void load();
+    } catch (error) {
       toast.dismiss(loadingToast);
-      toast.error("Silinemedi.");
+      toast.error(error instanceof Error ? error.message : "Silinemedi.");
     }
   }
 
@@ -231,7 +244,7 @@ export default function KarterBasinciPage() {
 
   const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
   const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
-  const canWrite = user?.role !== "goruntuleyici";
+  const canWrite = user?.role === "yonetici";
   const visibleTab = canWrite ? tab : "history";
   const tabs: Array<[PressureTab, string]> = canWrite
     ? [["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]]
@@ -249,6 +262,22 @@ export default function KarterBasinciPage() {
             <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <TopBar title="Karter Fark Basıncı" />
+        <div className="px-4 py-8 text-center">
+          <div className="rounded-card border border-red/30 bg-panel p-6">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="text-sm text-red">{loadError}</p>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />

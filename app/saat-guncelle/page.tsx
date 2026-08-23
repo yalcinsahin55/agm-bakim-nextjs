@@ -17,15 +17,28 @@ export default function SaatGuncellePage() {
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const canEdit = user?.role === "yonetici";
 
   async function load() {
-    const res = await fetch("/api/engines");
-    if (res.status === 401) { router.push("/login"); return; }
-    const data = await res.json();
-    setEngines(data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/engines", { cache: "no-store" });
+      if (res.status === 401) { router.push("/login"); return; }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data)) {
+        setEngines([]);
+        setLoadError(data?.error || "Motor listesi yüklenemedi.");
+        return;
+      }
+      setLoadError("");
+      setEngines(data);
+    } catch {
+      setEngines([]);
+      setLoadError("Motor listesi yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -97,6 +110,22 @@ export default function SaatGuncellePage() {
           <Skeleton className="h-24 rounded-card" />
           <Skeleton className="h-24 rounded-card" />
           <Skeleton className="h-14 rounded-xl mt-2" />
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <TopBar title="Saat / Yük Güncelle" />
+        <div className="px-4 py-8 text-center">
+          <div className="rounded-card border border-red/30 bg-panel p-6">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="text-sm text-red">{loadError}</p>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+          </div>
         </div>
         <BottomNav />
       </div>

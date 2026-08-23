@@ -10,6 +10,12 @@ import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
 
+function parseMetric(value: unknown): number | null {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 5_000_000 ? parsed : null;
+}
+
 export async function POST(req: NextRequest) {
   const db = await getDb();
   const usersCol = db.collection("users") as any;
@@ -63,8 +69,8 @@ export async function POST(req: NextRequest) {
 
   for (const row of rows) {
     const name = String(row[nameCol] || "").trim();
-    const hours = Number(row[hourCol]);
-    if (!name || Number.isNaN(hours)) continue;
+    const hours = parseMetric(row[hourCol]);
+    if (!name || hours === null) continue;
 
     const existing = await enginesCol.findOne({ _id: name });
     if (!existing) continue;
@@ -73,9 +79,9 @@ export async function POST(req: NextRequest) {
     let hoursChanged = false;
     let loadChanged = false;
     if (hours !== existing.hours) { setFields.hours = hours; hoursChanged = true; }
-    if (loadCol && row[loadCol] !== null && !Number.isNaN(Number(row[loadCol]))) {
-      const newLoad = Number(row[loadCol]);
-      if (newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
+    if (loadCol) {
+      const newLoad = parseMetric(row[loadCol]);
+      if (newLoad !== null && newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
     }
     const updateOp: Record<string, any> = { $set: setFields };
     if (hoursChanged || loadChanged) {

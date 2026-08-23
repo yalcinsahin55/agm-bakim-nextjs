@@ -11,6 +11,7 @@ import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
 export const dynamic = "force-dynamic";
 
 function toNumber(v: unknown): number | null {
+  if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -51,7 +52,11 @@ export async function POST(req: NextRequest) {
   for (const worksheet of wb.worksheets) {
     const m = worksheet.name.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if (!m) continue;
-    const sheetDate = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    const sheetDate = new Date(year, month - 1, day);
+    if (sheetDate.getFullYear() !== year || sheetDate.getMonth() !== month - 1 || sheetDate.getDate() !== day) continue;
     const grid = worksheetToGrid(worksheet);
 
     let headerRow = -1;
@@ -84,14 +89,17 @@ export async function POST(req: NextRequest) {
 
         const loadVal = b.loadCol !== null ? row[b.loadCol] : null;
         const pressureVal = b.pressureCol !== null ? row[b.pressureCol] : null;
+        const loadKw = toNumber(loadVal);
+        const pressureBar = toNumber(pressureVal);
         let status: string | null = null;
         [loadVal, pressureVal].forEach((v) => {
-          if (v !== null && v !== undefined && toNumber(v) === null) status = String(v).trim().toUpperCase();
+          if (v !== null && v !== undefined && String(v).trim() !== "" && toNumber(v) === null) status = String(v).trim().toUpperCase();
         });
+        if (loadKw === null && pressureBar === null && !status) continue;
 
         docs.push({
           engine_id: engine, engine_name: engine, reading_date: sheetDate,
-          load_kw: toNumber(loadVal), pressure_bar: toNumber(pressureVal), status,
+          load_kw: loadKw, pressure_bar: pressureBar, status,
           new_type: false, note: null, uploaded_by: user.full_name, uploaded_by_id: user._id,
           created_at: new Date(),
         });

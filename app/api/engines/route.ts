@@ -7,8 +7,15 @@ import { engineSortKey } from "@/lib/status";
 import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
+
+function parseNonNegativeNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return 0;
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 5_000_000 ? parsed : null;
+}
 
 async function getEngines(req: NextRequest) {
   try {
@@ -57,6 +64,8 @@ async function postEngine(req: NextRequest) {
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
     }
+    const rateLimited = await enforceApiRateLimit(req, "engine-create", 30, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { name, hours, load_kw } = await req.json();
     const normalizedName = typeof name === "string" ? name.trim() : "";
@@ -65,6 +74,11 @@ async function postEngine(req: NextRequest) {
     }
     if (!isSafeMongoPathSegment(normalizedName)) {
       return NextResponse.json({ error: "Motor adında nokta, $ veya geçersiz karakter kullanılamaz." }, { status: 400 });
+    }
+    const parsedHours = parseNonNegativeNumber(hours);
+    const parsedLoadKw = parseNonNegativeNumber(load_kw);
+    if (parsedHours === null || parsedLoadKw === null) {
+      return NextResponse.json({ error: "Motor saati ve yük değeri geçerli, negatif olmayan sayılar olmalıdır." }, { status: 400 });
     }
 
     const enginesCol = db.collection("engines") as any;
@@ -77,10 +91,10 @@ async function postEngine(req: NextRequest) {
     const doc = {
       _id: normalizedName,
       name: normalizedName,
-      hours: Number(hours) || 0,
-      load_kw: Number(load_kw) || 0,
+      hours: parsedHours,
+      load_kw: parsedLoadKw,
       updated_at: now,
-      history: [{ date: now.toISOString(), hours: Number(hours) || 0 }],
+      history: [{ date: now.toISOString(), hours: parsedHours, load_kw: parsedLoadKw }],
     };
     await enginesCol.insertOne(doc);
     invalidateMaintenancePanelServerCache();

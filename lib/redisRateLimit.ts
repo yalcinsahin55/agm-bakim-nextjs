@@ -251,7 +251,7 @@ export async function checkDistributedRateLimitBatch(
       warnedAboutMissingRedis = true;
       console.warn("[RateLimit] Redis env vars are missing; using local fallback.");
     }
-    if (failureMode === "fail-closed") return infrastructureDecision(primary);
+    if (shouldFailClosed(failureMode)) return infrastructureDecision(primary);
     const result = checkRateLimitBatch(requests.map((request) => ({
       key: buildRedisKey(request.scope, request.identifier),
       limit: request.limit,
@@ -270,7 +270,7 @@ export async function checkDistributedRateLimitBatch(
     return parseReply(reply, primary);
   } catch (error) {
     console.error("[RateLimit] Redis composite check failed:", error instanceof Error ? error.message : "unknown error");
-    if (failureMode === "fail-closed") return infrastructureDecision(primary);
+    if (shouldFailClosed(failureMode)) return infrastructureDecision(primary);
     const result = checkRateLimitBatch(requests.map((request) => ({
       key: buildRedisKey(request.scope, request.identifier),
       limit: request.limit,

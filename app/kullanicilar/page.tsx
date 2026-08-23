@@ -35,13 +35,27 @@ export default function KullanicilarPage() {
   const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   async function load() {
-    const res = await fetch("/api/users");
-    if (res.status === 401) { router.push("/login"); return; }
-    if (res.status === 403) { setLoading(false); setUsers(null); return; }
-    setUsers(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch("/api/users", { cache: "no-store" });
+      if (res.status === 401) { router.push("/login"); return; }
+      if (res.status === 403) { setLoadError(""); setUsers(null); return; }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data)) {
+        setUsers([]);
+        setLoadError(data?.error || "Kullanıcı listesi yüklenemedi.");
+        return;
+      }
+      setLoadError("");
+      setUsers(data);
+    } catch {
+      setUsers([]);
+      setLoadError("Kullanıcı listesi yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, [router]);
@@ -124,6 +138,22 @@ export default function KullanicilarPage() {
             <Skeleton className="h-32 rounded-card" />
             <Skeleton className="h-32 rounded-card" />
             <Skeleton className="h-32 rounded-card" />
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <TopBar title="Kullanıcılar" />
+        <div className="px-4 py-4">
+          <div className="text-center py-12 bg-panel border border-red/30 rounded-card">
+            <div className="text-4xl mb-3">⚠️</div>
+            <p className="text-sm text-red">{loadError}</p>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />

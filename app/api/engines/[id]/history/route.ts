@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,8 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
     }
+    const rateLimited = await enforceApiRateLimit(req, "engine-history-update", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const enginesCol = db.collection("engines") as any;

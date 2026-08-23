@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
     }
+    const rateLimited = await enforceApiRateLimit(req, "equipment-info-create", 60, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const { engine_name, kaver_tipi, hava_filtresi, krankcase, esanjor_tipi, dungs, radyator_tipi, not: noteField } = body;

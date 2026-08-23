@@ -13,6 +13,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import { recordSchema, formatZodError } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -60,11 +61,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
-  const body = await req.json();
-  const clientRequestId = typeof body?.client_request_id === "string" && body.client_request_id.length >= 8 && body.client_request_id.length <= 100
-    ? body.client_request_id
-    : undefined;
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
+  const body = await req.json().catch(() => null);
+  const parsedBody = recordSchema.partial().safeParse(body);
+  if (!parsedBody.success) {
+    return NextResponse.json({ error: formatZodError(parsedBody.error) }, { status: 400 });
+  }
+  const safeBody = parsedBody.data;
+  const clientRequestId = safeBody.client_request_id;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
 
   if (legacyMediaTooLarge(photos_b64, videos)) {
     return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
@@ -172,6 +176,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
   const isExistingOwnerUpdate = user.role !== "yonetici" && record.technician_id === user._id && responsible_technician_id === undefined && !(Array.isArray(extra_types) && extra_types.length > 0);
+  const keepHistoricalResponsible = user.role === "yonetici" && responsible_technician_id === undefined && nextResponsibleId === record.technician_id;
   const responsibleSelectionChanged = typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id;
   if (!useExternalService && !isExistingOwnerUpdate && (user.role !== "yonetici" || responsibleSelectionChanged || (Array.isArray(extra_types) && extra_types.length > 0))) {
     if (!nextResponsibleOption && nextResponsibleId === user._id) {
@@ -181,7 +186,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const resolvedCurrentResponsible = await resolveTechnicianOptions(db, [nextResponsibleId]);
       nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions({}, nextResponsibleType) };
     }
-    if (!selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
+    if (!keepHistoricalResponsible && !selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
       return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }

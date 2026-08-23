@@ -183,7 +183,7 @@ Bakım tamamlama formu bağlantı olmadığında kaydı tarayıcıdaki IndexedDB
 
 Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır. Kayıt listeleri ve `GET /api/records/:id` varsayılan olarak ağır `photos_b64`/`videos` alanlarını taşımaz; kayıt detayında medya gerektiğinde `include_media=true` kullanılır.
 
-Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez. Çevrimdışı PATCH tekrarlarında ek bakım kayıtları deterministik idempotency anahtarıyla kontrol edilir; aynı ek bakım ikinci kez oluşturulmaz.
+Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez. Chunk kayıtları kullanıcı kimliğine bağlanır; bir kullanıcının yükleme parçaları başka bir kullanıcı tarafından okunamaz veya birleştirilemez. Çevrimdışı PATCH tekrarlarında ek bakım kayıtları deterministik idempotency anahtarıyla kontrol edilir; aynı ek bakım ikinci kez oluşturulmaz.
 
 Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOKEN` değerlerinin ilgili ortama tanımlanması gerekir. Token değerleri kaynak koda yazılmamalı ve GitHub’a gönderilmemelidir. Motor/bakım panelinin server cache’i 10 saniyelik üst sınırla çalışır; motor, bakım türü veya bakım kaydı mutation’ları başarılı olduğunda aynı runtime içindeki cache anında temizlenir. Farklı serverless instance’larında bu süre TTL ile sınırlıdır.
 
@@ -289,12 +289,14 @@ Uygulama varsayılan olarak [http://localhost:3000](http://localhost:3000) adres
 | `VAPID_PUBLIC_KEY` | Web Push için | İstemci tarafında abonelik oluşturmak için kullanılan public anahtar. |
 | `VAPID_PRIVATE_KEY` | Web Push için | Yalnızca sunucuda tutulması gereken private anahtar. |
 | `CRON_SECRET` | Cron için | `/api/cron/refresh` endpoint’ini koruyan gizli değer. |
-| `UPSTASH_REDIS_REST_URL` | Dağıtık rate limit için | Upstash Redis REST endpoint’i; yalnızca server-side environment variable olarak tutulur. |
-| `UPSTASH_REDIS_REST_TOKEN` | Dağıtık rate limit için | Redis REST token’ı; `NEXT_PUBLIC_` ile başlamamalı ve istemciye gönderilmemelidir. |
+| `UPSTASH_REDIS_REST_URL` veya `KV_REST_API_URL` | Dağıtık rate limit için | Upstash Redis REST endpoint’i; Vercel Marketplace bağlantısında `KV_REST_API_URL`, manuel kurulumda `UPSTASH_REDIS_REST_URL` kullanılır. |
+| `UPSTASH_REDIS_REST_TOKEN` veya `KV_REST_API_TOKEN` | Dağıtık rate limit için | Redis REST token’ı; `NEXT_PUBLIC_` ile başlamamalı ve istemciye gönderilmemelidir. Vercel entegrasyonu `KV_REST_API_TOKEN` ekler. |
 | `RATE_LIMIT_KEY_SECRET` | Dağıtık rate limit için | Redis anahtarlarındaki identifier HMAC’i için uzun, ayrı ve rastgele secret. |
 | `RATE_LIMIT_REDIS_TIMEOUT_MS` | İsteğe bağlı | Redis kontrol timeout’u; varsayılan 750 ms, 100–5000 ms aralığı kabul edilir. |
 | `PDF_ALLOWED_HOSTS` | İsteğe bağlı | Vercel Blob dışındaki, yönetici tarafından önceden onaylanmış HTTPS PDF hostlarını virgülle ayırarak ekler. Boş bırakılırsa yalnızca Vercel public Blob hostları kabul edilir. |
 | `PUSH_ALLOWED_HOSTS` | İsteğe bağlı | Varsayılan Web Push sağlayıcıları dışındaki, önceden onaylanmış HTTPS push endpoint hostlarını virgülle ayırarak ekler. |
+
+Dağıtık rate limit production ve Preview’da Redis erişimi olmadan fail-closed çalışır; local geliştirmede Redis değişkenleri yoksa yalnızca yerel instance fallback’i kullanılır. Bu fallback dağıtık koruma veya DDoS koruması değildir. Excel içe aktarma akışları `.xlsx` ve ExcelJS kullanır; boş saat/yük hücreleri mevcut motor değerini sıfırlamaz, geçerli dolu değerler işlenir.
 
 Web Push anahtarlarını üretmek için:
 
