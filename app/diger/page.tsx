@@ -36,6 +36,7 @@ const GROUPS = [
       { href: "/rapor", icon: "📄", label: "Motor Bakım Raporu", desc: "Yazdırılabilir bakım geçmişi raporu" },
       { href: "/istatistik", icon: "📈", label: "İstatistikler", desc: "Aylık bakım istatistikleri" },
       { href: "/teknisyen-raporu", icon: "👥", label: "Teknisyen Raporu", desc: "Ekip performansı ve çalışma süreleri" },
+      { href: "/asistan", icon: "✦", label: "Bakım Asistanı", desc: "Salt okunur rapor ve bakım özeti" },
     ],
   },
   {

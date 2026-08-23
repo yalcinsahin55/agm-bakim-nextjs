@@ -37,6 +37,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 | Dış servis | Garanti veya harici servis bakımlarının yönetici tarafından kaydedilmesi; bu kayıtların teknisyen performansından ayrılması |
 | QR workflow | Motor QR’ı, bakım türü QR’ı ve motor + bakım türü bağlantılarıyla mobil hızlı seçim |
 | Raporlama | Teknisyen performans raporu, motor bakım raporu, istatistikler, bakım türü ve motor dağılımları |
+| Bakım Asistanı | Salt okunur doğal dil rapor özeti; kayıt oluşturma, düzenleme ve silme yetkisi yoktur |
 | Dışa aktarma | Bakım geçmişinin Excel ve PDF olarak alınması; tarih, başlangıç, bitiş ve toplam süre sütunları |
 | Teknik modüller | Yağ analizleri, karter fark basıncı, bakım periyotları, tahmini bakım ve takvim |
 | Bildirimler | Uygulama içi bildirimler ve isteğe bağlı Web Push bildirimleri |
@@ -112,6 +113,12 @@ Mevcut motor QR bağlantıları korunur. Yeni bağlantılar örneğin `/tamamla?
 
 ## Raporlama ve dışa aktarma
 
+### Bakım Asistanı
+
+`/asistan` ekranı, AGM Bakım verileri hakkında salt okunur sorulara cevap verir. Bu ilk sürümde bakım özeti, gecikmiş bakımlar, motor bakım geçmişi, teknisyen performansı ve dış hizmet/garanti kayıtları sorgulanabilir. Asistan yalnızca önceden tanımlı okuma araçlarını çağırır; doğrudan MongoDB sorgusu çalıştırmaz ve hiçbir kayıt üzerinde yazma işlemi yapamaz.
+
+`lib/assistantPolicy.ts` soru uzunluğu, prompt injection, yazma talebi, hassas bilgi ve kesin arıza teşhisi isteklerini filtreler. `/api/assistant` oturum, rol, rate limit ve içerik boyutu kontrollerinden sonra yalnızca rapor verilerini döndürür. Ham medya, base64 içerik, şifre, token ve gereksiz kişisel bilgiler asistan cevabına aktarılmaz.
+
 ### Teknisyen raporu
 
 `/teknisyen-raporu` ekranı seçilen döneme göre aşağıdaki metrikleri sunar:
@@ -169,12 +176,13 @@ Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOK
 
 ```text
 app/
-├── api/                         # Auth, motor, kayıt, rapor, bildirim ve dışa aktarma API'leri
+├── api/                         # Auth, motor, kayıt, rapor, bildirim, asistan ve dışa aktarma API'leri
 ├── dashboard/                   # Ana kontrol paneli
 ├── tamamla/                     # Bakım tamamlama ve QR deep-link akışı
 ├── kayitlar/                    # Bakım listesi, detay ve düzenleme
 ├── motorlar/                    # Motor listesi, sağlık görünümü ve motor QR'ı
 ├── teknisyen-raporu/            # Teknisyen performans ve süre raporu
+├── asistan/                     # Salt okunur bakım raporu asistanı
 ├── rapor/                       # Motor bazlı yazdırılabilir rapor
 ├── qr-etiketleri/               # Toplu QR etiketi üretimi
 ├── istatistik/                  # İstatistik özetleri
