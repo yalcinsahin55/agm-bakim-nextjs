@@ -97,8 +97,10 @@ let warnedAboutMissingRedis = false;
 function getRedisClient(): Redis | null {
   if (redisClient !== undefined) return redisClient;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  // Upstash’s Vercel integration uses KV_REST_API_*; keep UPSTASH_* for
+  // explicit local/manual configuration and give it precedence when present.
+  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)?.trim();
+  const token = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim();
   if (!url || !token) {
     redisClient = null;
     return redisClient;
@@ -201,7 +203,9 @@ function validateRequest(request: RateLimitRequest): void {
 }
 
 export function isRedisRateLimitConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim());
+  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)?.trim();
+  const token = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim();
+  return Boolean(url && token);
 }
 
 export async function checkDistributedRateLimit(
