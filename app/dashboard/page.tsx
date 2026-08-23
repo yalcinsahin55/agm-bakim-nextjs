@@ -364,13 +364,48 @@ export default function DashboardPage() {
 
         {counts.gecikmis > 0 && (
           <div className="bg-red/10 border border-red/40 rounded-card p-4 mb-4 flex items-center gap-3 animate-fade-in">
-            <span className="text-2xl">🚨</span>
-            <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-red">{counts.gecikmis} bakım gecikmiş durumda!</div><div className="text-[11px] text-muted mt-0.5">Gecikmiş bakımlar motor ömrünü kısaltır, hemen planlayın.</div></div>
-            <button onClick={showOverdueMaintenance} className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition">Görüntüle</button>
+            <span className="text-2xl" aria-hidden="true">🚨</span>
+            <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-red">Geçmiş bakım bildirimi</div><div className="text-[11px] text-muted mt-0.5">{counts.gecikmis} bakım gecikmiş durumda.</div></div>
+            {canAccessRoute(user?.role, "/bildirimler") && <Link href="/bildirimler" className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition">Bildirimlere git →</Link>}
           </div>
         )}
 
         <DashboardAssistant />
+
+        <section className="mb-4 rounded-card border border-border bg-panel p-3.5" aria-labelledby="engine-working-info-title">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 id="engine-working-info-title" className="text-[14px] font-extrabold text-text">Motor çalışma bilgileri</h2>
+            <span className="text-[10px] text-faint">{sortedEngines.length} motor</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6">
+            {sortedEngines.map((engine) => (
+              <Link key={engine._id} href={`/motorlar?engine_id=${encodeURIComponent(engine._id)}`} className="min-w-0 rounded-lg border border-border bg-panel2 px-1.5 py-2 text-center transition hover:border-teal/50 hover:bg-teal/5">
+                <div className="truncate text-[10px] font-bold text-text">{engine.name}</div>
+                <div className="mt-1 truncate font-mono text-[8.5px] text-muted">{(engine.hours || 0).toLocaleString("tr-TR")} sa</div>
+                <div className="truncate font-mono text-[8.5px] text-teal">{(engine.load_kw || 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} kW</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-4 rounded-card border border-border bg-panel p-3.5" aria-labelledby="engine-maintenance-info-title">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 id="engine-maintenance-info-title" className="text-[14px] font-extrabold text-text">Motor bazlı bakım bilgileri</h2>
+            <span className="rounded-md border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-muted">Bu yıl</span>
+          </div>
+          {engineChartRows.length === 0 ? <div className="text-[11px] text-faint">Henüz motor bazlı bakım kaydı yok.</div> : (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {engineChartRows.slice(0, 6).map((row) => (
+                <Link key={row.engine_id || row.engine} href={row.engine_id ? `/motorlar?engine_id=${encodeURIComponent(row.engine_id)}` : "/motorlar"} className="min-w-[112px] rounded-lg border border-border bg-panel2 px-2.5 py-2.5 transition hover:border-teal/50 hover:bg-teal/5">
+                  <div className="truncate text-[10.5px] font-bold text-text">{row.engine}</div>
+                  <div className="mt-1 font-mono text-lg font-extrabold text-teal">{row.count}</div>
+                  <div className="text-[9px] text-faint">bakım kaydı</div>
+                </Link>
+              ))}
+            </div>
+          )}
+          <Link href="/istatistik" className="mt-3 block text-center text-[10.5px] font-bold text-teal hover:underline">Detaylı gör →</Link>
+        </section>
 
         <StatCards counts={counts} />
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Hızlı erişim">
@@ -439,9 +474,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Yükleri</h2>
+        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor yük özeti</h2>
         <div className="flex gap-4 text-xs text-muted mb-2"><span>Toplam <b className="text-text font-mono">{totalLoad.toLocaleString("tr-TR")}</b> kW</span><span>Ort. <b className="text-text font-mono">{avgLoad.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</b> kW</span></div>
         <LoadCards engines={sortedEngines} />
+
+        <h2 ref={maintenanceTypeSectionRef} id="maintenance-type-view" className="scroll-mt-20 font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
+        <div className="flex flex-wrap gap-2 mb-3">{typeOptions.map((option) => <button key={option} onClick={() => setTypeFilter(option)} className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${typeFilter === option ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
+        <div className="flex flex-wrap gap-2 mb-4">{["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((option) => <button key={option} onClick={() => setStatusFilter(option)} className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${statusFilter === option ? "bg-teal text-[#06181b] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
+        {cardRows.length > 0 && <div className="text-[11px] text-muted mb-2"><b className="text-text">{cardRows.length}</b> bakım kaydı gösteriliyor</div>}
+        <GaugeCardList rows={cardRows} />
+        {cardRows.length === 0 && <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in"><div className="text-4xl mb-3">🔍</div><p className="text-sm text-muted">Seçili filtrelere uygun bakım kaydı bulunamadı.</p><button onClick={() => { setTypeFilter("Tümü"); setStatusFilter("Tümü"); }} className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition">Filtreleri Temizle</button></div>}
 
         <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
         <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
@@ -460,13 +502,6 @@ export default function DashboardPage() {
             </div>;
           })}
         </div>
-
-        <h2 ref={maintenanceTypeSectionRef} id="maintenance-type-view" className="scroll-mt-20 font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Bakım Türüne Göre Görüntüle</h2>
-        <div className="flex flex-wrap gap-2 mb-3">{typeOptions.map((option) => <button key={option} onClick={() => setTypeFilter(option)} className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${typeFilter === option ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
-        <div className="flex flex-wrap gap-2 mb-4">{["Tümü", "Gecikmiş", "Kritik", "Yaklaşıyor", "Normal"].map((option) => <button key={option} onClick={() => setStatusFilter(option)} className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${statusFilter === option ? "bg-teal text-[#06181b] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}>{option}</button>)}</div>
-        {cardRows.length > 0 && <div className="text-[11px] text-muted mb-2"><b className="text-text">{cardRows.length}</b> bakım kaydı gösteriliyor</div>}
-        <GaugeCardList rows={cardRows} />
-        {cardRows.length === 0 && <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in"><div className="text-4xl mb-3">🔍</div><p className="text-sm text-muted">Seçili filtrelere uygun bakım kaydı bulunamadı.</p><button onClick={() => { setTypeFilter("Tümü"); setStatusFilter("Tümü"); }} className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition">Filtreleri Temizle</button></div>}
       </div>
       <BottomNav />
     </div>

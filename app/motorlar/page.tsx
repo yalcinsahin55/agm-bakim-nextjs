@@ -48,6 +48,7 @@ export default function MotorlarPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [qrEngine, setQrEngine] = useState<MotorEngine | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -123,6 +124,11 @@ export default function MotorlarPage() {
     () => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)),
     [engines]
   );
+  const visibleEngines = useMemo(() => {
+    const query = searchTerm.trim().toLocaleLowerCase("tr-TR");
+    if (!query) return sorted;
+    return sorted.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(query));
+  }, [searchTerm, sorted]);
 
   async function toggleEngine(engineId) {
     if (openId === engineId) {
@@ -211,6 +217,17 @@ export default function MotorlarPage() {
       />
 
       <div className="px-4 py-4">
+        <div className="mb-3 flex gap-2">
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Motor ara..."
+            aria-label="Motor ara"
+            className="min-w-0 flex-1 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[12px] text-text outline-none transition placeholder:text-faint focus:border-teal"
+          />
+          <div className="flex flex-shrink-0 items-center rounded-xl border border-border bg-panel2 px-2.5 text-[10px] font-bold text-muted">Sırala: Motor no</div>
+        </div>
+        <div className="mb-3 text-[11px] text-muted">{visibleEngines.length} / {sorted.length} motor gösteriliyor</div>
         {showAdd && (
           <form onSubmit={addEngine} className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
             <div className="text-[12px] font-bold text-teal mb-2">➕ Yeni Motor Ekle</div>
@@ -242,8 +259,8 @@ export default function MotorlarPage() {
           </form>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {sorted.map((e) => {
+        <div className="flex flex-col gap-1.5">
+          {visibleEngines.map((e) => {
             const recs = (recordsByEngine[e._id] || [])
               .slice()
               .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
@@ -257,12 +274,14 @@ export default function MotorlarPage() {
                 <button
                   onClick={() => void toggleEngine(e._id)}
                   className="w-full flex items-center gap-3 p-3 text-left"
+                  aria-expanded={open}
+                  aria-label={`${e.name} motor detaylarını ${open ? "kapat" : "aç"}`}
                 >
                   <EngineBadge name={e.name} size={36} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13.5px] font-bold text-text truncate">{e.name}</div>
                     <div className="text-[10.5px] text-faint mt-0.5">
-                      {(typeof e.maintenance_count === "number" ? e.maintenance_count : recs.length)} bakım kaydı
+                      {(typeof e.maintenance_count === "number" ? e.maintenance_count : recs.length)} bakım · {(e.load_kw || 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} kW
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -333,6 +352,13 @@ export default function MotorlarPage() {
           <div className="text-center py-12 bg-panel border border-border rounded-card">
             <div className="text-4xl mb-3">⚙️</div>
             <p className="text-sm text-muted">Henüz motor eklenmemiş.</p>
+          </div>
+        )}
+        {sorted.length > 0 && visibleEngines.length === 0 && (
+          <div className="text-center py-10 bg-panel border border-border rounded-card">
+            <div className="text-3xl mb-3">🔎</div>
+            <p className="text-sm text-muted">Aramanla eşleşen motor bulunamadı.</p>
+            <button type="button" onClick={() => setSearchTerm("")} className="mt-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[11px] font-bold text-teal">Aramayı temizle</button>
           </div>
         )}
       </div>
