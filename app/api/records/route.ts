@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
 import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { recomputeLastMaintenance } from "@/lib/maintenance";
+import { recomputeLastMaintenance, snapshotTrackingState } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
@@ -253,6 +253,7 @@ async function postRecord(req: NextRequest) {
       })),
     ];
     const primaryType = await typesCol.findOne({ _id: type_key }, { projection: { engine_states: 1 } });
+    const primaryPreviousTrackingState = snapshotTrackingState(primaryType?.engine_states?.[engine_id]);
     const primaryTrackingAutoCreated = typeof period === "number" && (!primaryType?.engine_states?.[engine_id] || primaryType.engine_states[engine_id]?.tracking_source === "record");
     const shouldConfirmOnCreate = user.role === "yonetici";
     const managerConfirmationStatus = shouldConfirmOnCreate ? "confirmed" : "pending";
@@ -261,7 +262,7 @@ async function postRecord(req: NextRequest) {
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
 
-    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false) {
+    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown) {
       const rec: any = {
         engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
         hour_at_completion,
@@ -297,6 +298,7 @@ async function postRecord(req: NextRequest) {
         created_at: createdAt, backdated: !!backdated,
         group_id: groupId, grouped_with: isPrimary ? null : tLabel,
         ...(trackingAutoCreated ? { auto_created_tracking: true } : {}),
+        ...(previousTrackingState ? { tracking_state_before: previousTrackingState } : {}),
       };
       if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
       await recordsCol.insertOne(rec);
@@ -310,12 +312,13 @@ async function postRecord(req: NextRequest) {
         { upsert: true }
       );
     }
-    await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated);
+    await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState);
 
     const completedLabels: string[] = [type_label];
     if (Array.isArray(extra_types)) {
       for (const ex of extra_types) {
         const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1 } });
+        const extraPreviousTrackingState = snapshotTrackingState(extraType?.engine_states?.[engine_id]);
         const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
         if (typeof ex.period === "number") {
           await typesCol.updateOne(
@@ -324,7 +327,7 @@ async function postRecord(req: NextRequest) {
             { upsert: true }
           );
         }
-        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated);
+        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated, extraPreviousTrackingState);
         completedLabels.push(ex.type_label);
       }
     }

@@ -3,7 +3,44 @@ import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 const MAX_RECOMPUTE_ATTEMPTS = 3;
 
-export async function recomputeLastMaintenance(db: Db, engineId: string, typeKey: string): Promise<void> {
+type TrackingState = {
+  last_maintenance_hour?: number;
+  period_hours?: number;
+  tracking_source?: "manual" | "record";
+};
+
+function normalizeTrackingState(state: unknown): TrackingState | null {
+  if (!state || typeof state !== "object") return null;
+  const candidate = state as Record<string, unknown>;
+  const normalized: TrackingState = {};
+  if (typeof candidate.last_maintenance_hour === "number" && Number.isFinite(candidate.last_maintenance_hour)) {
+    normalized.last_maintenance_hour = candidate.last_maintenance_hour;
+  }
+  if (typeof candidate.period_hours === "number" && Number.isFinite(candidate.period_hours)) {
+    normalized.period_hours = candidate.period_hours;
+  }
+  if (candidate.tracking_source === "manual" || candidate.tracking_source === "record") {
+    normalized.tracking_source = candidate.tracking_source;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+/**
+ * Kayıt oluşturulmadan önceki elle tanımlanmış motor-bakım durumunu güvenli
+ * biçimde saklar. Kayıt kaynaklı durumlar geri yüklenmez; silme sırasında onlar
+ * tamamen kaldırılmalıdır.
+ */
+export function snapshotTrackingState(state: unknown): TrackingState | undefined {
+  const normalized = normalizeTrackingState(state);
+  return normalized?.tracking_source === "record" ? undefined : normalized || undefined;
+}
+
+export async function recomputeLastMaintenance(
+  db: Db,
+  engineId: string,
+  typeKey: string,
+  fallbackState?: unknown,
+): Promise<void> {
   if (!isSafeMongoPathSegment(engineId) || !isSafeMongoPathSegment(typeKey)) return;
   const recordsCol = db.collection("maintenance_records") as any;
   const typesCol = db.collection("maintenance_types") as any;
@@ -27,16 +64,27 @@ export async function recomputeLastMaintenance(db: Db, engineId: string, typeKey
     if (!latest) {
       // Yalnızca kayıt oluşturulurken otomatik açılmış takip silinir. Eski veya
       // yönetici tarafından bilinçli tanımlanmış takipler geriye dönük bozulmaz.
+      const concurrentRecord = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
+      if (concurrentRecord) continue;
       if (currentState?.tracking_source === "record") {
-        const concurrentRecord = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
-        if (concurrentRecord) continue;
         await typesCol.updateOne(
           { _id: typeKey, [`${statePath}.tracking_source`]: "record" },
           { $unset: { [statePath]: "" } },
         );
-        const recordAfterUpdate = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
-        if (recordAfterUpdate) continue;
+      } else {
+        // Bir bakım kaydı, önceden elle tanımlanmış takibin son bakım saatini
+        // geçici olarak değiştirdiyse ve sonra silindiyse eski planı geri yükle.
+        // Snapshot yoksa eski veriyi varsayarak silmek yerine korumaya devam ederiz.
+        const previousState = normalizeTrackingState(fallbackState);
+        if (previousState) {
+          await typesCol.updateOne(
+            { _id: typeKey, [`${statePath}.tracking_source`]: { $ne: "record" } },
+            { $set: { [statePath]: previousState } },
+          );
+        }
       }
+      const recordAfterUpdate = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
+      if (recordAfterUpdate) continue;
       return;
     }
 

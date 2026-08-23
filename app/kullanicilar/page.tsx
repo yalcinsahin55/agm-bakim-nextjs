@@ -235,31 +235,31 @@ export default function KullanicilarPage() {
                   {u.approved ? "Onayı kaldır" : "Onayla"}
                 </button>
               </div>
-              <div className="mb-2 flex gap-2 items-center">
+              <div className="mb-2 flex min-w-0 items-center gap-2">
                 <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item))} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
-                <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
+                <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="shrink-0 whitespace-nowrap rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
               </div>
-              <div className="flex gap-2 items-center">
-                <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value })} className="flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition">
+              <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
                   {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
-                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value })} className="flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" aria-label={`${u.full_name} teknisyen türü`}>
+                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition sm:min-w-[180px] sm:flex-1" aria-label={`${u.full_name} teknisyen türü`}>
                   {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>}
-                <label className="flex items-center gap-1.5 text-[11px] text-muted flex-shrink-0 cursor-pointer">
+                <label className="flex min-h-10 items-center gap-1.5 text-[11px] text-muted cursor-pointer sm:shrink-0">
                   <input type="checkbox" checked={u.active} onChange={(e) => updateUser(u.id, { active: e.target.checked })} />
                   Aktif
                 </label>
                 {u.id === currentUser?.id ? (
-                  <button disabled className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed">Pasifleştir</button>
+                  <button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Pasifleştir</button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <button onClick={() => deactivateUser(u)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition">Evet</button>
-                    <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition">Vazgeç</button>
+                    <button onClick={() => deactivateUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet</button>
+                    <button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</button>
                   </>
                 ) : (
-                  <button onClick={() => setConfirmDeleteId(u.id)} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition">Pasifleştir</button>
+                  <button onClick={() => setConfirmDeleteId(u.id)} className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition sm:w-auto">Pasifleştir</button>
                 )}
               </div>
             </div>

@@ -63,13 +63,13 @@ export default function BottomNav() {
     <>
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
-        <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4">
+        <div className="mx-auto flex w-full max-w-lg min-w-0 bg-[#0f1319]/95 px-1 pb-4 pt-2 backdrop-blur-xl border-t border-border">
           {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
               <Link
                 key={item.href} href={item.href}
-                className={`relative flex-1 flex flex-col items-center gap-1 rounded-xl py-1 transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
+                className={`relative min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
               >
                 <span className="relative text-lg leading-none">
                   {item.icon}
@@ -79,7 +79,7 @@ export default function BottomNav() {
                     </span>
                   )}
                 </span>
-                <span className="text-[9.5px] font-bold">{item.label}</span>
+                <span className="max-w-full truncate text-[9.5px] font-bold">{item.label}</span>
                 {active && <span className="absolute bottom-0 w-6 h-0.5 rounded-full bg-amber" />}
               </Link>
             );
@@ -87,10 +87,10 @@ export default function BottomNav() {
           {/*  Mobil Çıkış */}
           <button
             onClick={handleLogout}
-            className="flex-1 flex flex-col items-center gap-1 rounded-xl py-1 text-faint hover:text-red transition"
+            className="min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
           >
             <span className="text-lg leading-none">🚪</span>
-            <span className="text-[9.5px] font-bold">Çıkış</span>
+            <span className="max-w-full truncate text-[9.5px] font-bold">Çıkış</span>
           </button>
         </div>
       </div>

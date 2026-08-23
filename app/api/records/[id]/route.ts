@@ -328,7 +328,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı silme yetkiniz yok." }, { status: 403 });
 
   await recordsCol.deleteOne({ _id: record._id });
-  await recomputeLastMaintenance(db, record.engine_id, record.type_key);
+  await recomputeLastMaintenance(db, record.engine_id, record.type_key, record.tracking_state_before);
   await writeAuditLog(db, {
     user,
     action: "delete",

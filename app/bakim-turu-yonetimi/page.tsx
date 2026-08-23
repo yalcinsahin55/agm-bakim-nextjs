@@ -19,6 +19,12 @@ interface EngineRowState {
 
 const WORK_DOMAINS: WorkDomain[] = ["mechanical", "electrical", "commissioning"];
 
+function refreshNotifications() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("notifications:refresh"));
+  }
+}
+
 export default function BakimTuruYonetimiPage() {
   const router = useRouter();
   const [types, setTypes] = useState<MaintenanceType[]>([]);
@@ -109,6 +115,7 @@ export default function BakimTuruYonetimiPage() {
         toast.success(`'${newLabel}' bakım türü eklendi! 🔧`);
         setNewLabel(""); setNewPeriod(1000); setNewWorkDomains(["mechanical"]); setNewAllowElectromechanicalSupport(false); setNewAllowElectromechanicalResponsible(false); setAddRows({}); setShowAdd(false);
         invalidateMaintenancePanel();
+        refreshNotifications();
         load();
       } else {
         const data = await res.json();
@@ -171,6 +178,7 @@ export default function BakimTuruYonetimiPage() {
         toast.success("Bakım türü güncellendi! ✅");
         setEditingKey(null);
         invalidateMaintenancePanel();
+        refreshNotifications();
         load();
       } else {
         const data = await res.json();
@@ -198,6 +206,7 @@ export default function BakimTuruYonetimiPage() {
         toast.dismiss(loadingToast);
         toast.success("Bakım türü yeniden aktifleştirildi.");
         invalidateMaintenancePanel();
+        refreshNotifications();
         await load();
       } else {
         const data = await res.json();
@@ -221,6 +230,7 @@ export default function BakimTuruYonetimiPage() {
         toast.success("Bakım türü gizlendi; geçmiş kayıtlar korundu.");
         setConfirmDeleteKey(null);
         invalidateMaintenancePanel();
+        refreshNotifications();
         load();
       } else {
         const data = await res.json();
