@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const types = await (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }).toArray();
+    const includeDeleted = req.nextUrl.searchParams.get("include_deleted") === "true";
+    const canIncludeDeleted = includeDeleted && user.role === "yonetici";
+    const typeFilter = canIncludeDeleted ? {} : { is_deleted: { $ne: true } };
+    const types = await (db.collection("maintenance_types") as any).find(typeFilter).toArray();
     return NextResponse.json(types);
   } catch (error) {
     console.error("Bakım türleri getirilirken hata:", error);

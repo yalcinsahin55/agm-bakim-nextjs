@@ -66,7 +66,7 @@ Aynı ekranda teknisyenin sorumlu olabilmesi, yardımcı olabilmesi ve çalışm
 
 ### Bakım türü silme ve veri güvenliği
 
-Bir bakım türü silindiğinde geçmiş bakım kayıtları fiziksel olarak silinmez. Tür `is_deleted` işaretiyle pasifleştirilir; aktif bakım panelleri, yeni kayıt formları, bildirimler ve sağlık filtreleri bu türü göstermeyi bırakır, ancak geçmiş kayıtlar ve rapor tarihçesi korunur. Böylece yanlış silme yüzünden yüzlerce bakım kaydının kaybolması engellenir. Yönetici motor kapsamını bakım türünü silmeden de **Dahil** seçeneğiyle motor bazında kaldırabilir.
+Bir bakım türü silindiğinde geçmiş bakım kayıtları fiziksel olarak silinmez. Tür `is_deleted` işaretiyle pasifleştirilir; aktif bakım panelleri, yeni kayıt formları, bildirimler ve sağlık filtreleri bu türü göstermeyi bırakır, ancak geçmiş kayıtlar ve rapor tarihçesi korunur. Böylece yanlış silme yüzünden yüzlerce bakım kaydının kaybolması engellenir. Yönetici, **Bakım Türü Yönetimi** ekranındaki **Arşivlenmiş bakım türleri** bölümünden gizlenen türü yeniden aktifleştirebilir; geri alma geçmiş kayıtları değiştirmez. Yönetici motor kapsamını bakım türünü silmeden de **Dahil** seçeneğiyle motor bazında kaldırabilir.
 
 Seed, yedek geri yükleme, içe aktarma, bakım kaydı ve medya yükleme endpoint’lerinde yönetici/kullanıcı yetkisi ve uygun rate limit kontrolleri bulunur. Yedek geri yükleme yalnızca izin verilen koleksiyonları işler; MongoDB özel anahtarları, hassas alanlar ve güvenli olmayan kimlikler temizlenir.
 

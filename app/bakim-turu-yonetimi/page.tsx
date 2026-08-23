@@ -22,6 +22,7 @@ const WORK_DOMAINS: WorkDomain[] = ["mechanical", "electrical", "commissioning"]
 export default function BakimTuruYonetimiPage() {
   const router = useRouter();
   const [types, setTypes] = useState<MaintenanceType[]>([]);
+  const [archivedTypes, setArchivedTypes] = useState<MaintenanceType[]>([]);
   const [engines, setEngines] = useState<Engine[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -47,13 +48,19 @@ export default function BakimTuruYonetimiPage() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [restoringKey, setRestoringKey] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/maintenance-types/panel");
+    const [res, allTypesRes] = await Promise.all([
+      fetch("/api/maintenance-types/panel"),
+      fetch("/api/maintenance-types?include_deleted=true"),
+    ]);
     if (res.status === 401) { router.push("/login"); return; }
     if (res.status === 403) { setForbidden(true); setLoading(false); return; }
     const data = await res.json();
+    const allTypes = allTypesRes.ok ? await allTypesRes.json() : [];
     setTypes(Array.isArray(data.types) ? data.types : []);
+    setArchivedTypes(Array.isArray(allTypes) ? allTypes.filter((type: MaintenanceType) => type.is_deleted === true) : []);
     setEngines(Array.isArray(data.engines) ? data.engines : []);
     setLoading(false);
   }
@@ -61,6 +68,7 @@ export default function BakimTuruYonetimiPage() {
   useEffect(() => { load(); }, []);
 
   const sortedTypes = useMemo(() => [...types].sort((a, b) => (a.label || "").localeCompare(b.label || "", "tr")), [types]);
+  const sortedArchivedTypes = useMemo(() => [...archivedTypes].sort((a, b) => (a.label || "").localeCompare(b.label || "", "tr")), [archivedTypes]);
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
   function setAddRow(id: string, field: "last" | "period", value: string) {
@@ -174,6 +182,33 @@ export default function BakimTuruYonetimiPage() {
       toast.error("Sunucu hatası.");
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  async function restoreType(key: string) {
+    setRestoringKey(key);
+    const loadingToast = toast.loading("Bakım türü geri alınıyor...");
+    try {
+      const res = await fetch(`/api/maintenance-types/${key}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restore: true }),
+      });
+      if (res.ok) {
+        toast.dismiss(loadingToast);
+        toast.success("Bakım türü yeniden aktifleştirildi.");
+        invalidateMaintenancePanel();
+        await load();
+      } else {
+        const data = await res.json();
+        toast.dismiss(loadingToast);
+        toast.error(data.error || "Geri alınamadı.");
+      }
+    } catch {
+      toast.dismiss(loadingToast);
+      toast.error("Sunucu hatası.");
+    } finally {
+      setRestoringKey(null);
     }
   }
 
@@ -397,6 +432,33 @@ export default function BakimTuruYonetimiPage() {
               );
             })}
           </div>
+        )}
+
+        {sortedArchivedTypes.length > 0 && (
+          <section className="mt-4 bg-panel border border-border rounded-card p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[13px] font-bold text-text">Arşivlenmiş bakım türleri</h2>
+              <span className="text-[10px] text-faint">{sortedArchivedTypes.length} gizli</span>
+            </div>
+            <p className="mt-1.5 text-[10.5px] text-faint">Silinen türler geçmiş kayıtlarıyla birlikte korunur. Geri aldığınızda aktif listelerde ve yeni bakım seçimlerinde yeniden görünür.</p>
+            <div className="mt-3 flex flex-col gap-2">
+              {sortedArchivedTypes.map((t) => (
+                <div key={t.key} className="flex items-center justify-between gap-3 border-t border-border pt-2 first:border-t-0 first:pt-0">
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-semibold text-text">{t.label}</div>
+                    <div className="text-[10px] text-faint">Varsayılan periyot: {t.default_period_hours ?? 0} sa</div>
+                  </div>
+                  <button
+                    onClick={() => restoreType(t.key)}
+                    disabled={restoringKey === t.key}
+                    className="flex-shrink-0 rounded-lg border border-teal/40 px-2.5 py-1.5 text-[11px] font-bold text-teal hover:bg-teal/10 disabled:opacity-50"
+                  >
+                    {restoringKey === t.key ? "Alınıyor..." : "Geri al"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
       </div>
       <BottomNav />
