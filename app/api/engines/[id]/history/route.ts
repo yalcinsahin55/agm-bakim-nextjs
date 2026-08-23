@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { withApiTiming } from "@/lib/performance";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
 
@@ -160,6 +161,7 @@ async function patchHistory(req: NextRequest, { params }: { params: { id: string
     }
 
     const update = await persistHistory(enginesCol, engine, nextHistory);
+    invalidateMaintenancePanelServerCache();
     return NextResponse.json({ ok: true, hours: update.hours ?? engine.hours });
   } catch (error) {
     console.error("Motor saat geçmişi güncellenirken hata:", error);

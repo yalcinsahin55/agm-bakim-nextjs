@@ -98,7 +98,7 @@ Tarih+saat değerleri API ve veritabanı katmanında UTC tabanlı saklanır; kul
 
 ## Ekip teknisyenleri ve dış hizmet bakımları
 
-Bir bakımın birincil sorumlu teknisyeni ile destek olan diğer teknisyenler ayrı alanlarda tutulur. Yönetici kullanıcıları oluştururken teknisyen hesabını **Mekanik teknisyen** veya **Elektromekanik teknisyen** olarak sınıflandırabilir. Elektromekanik çalışanlar genellikle elektriksel işler ve devreye alma desteği için yardımcı seçilir; istisnai olarak sorumlu seçilirse bu durum da kayıt üzerinde açıkça korunur. Her yardımcı teknisyenin o bakıma ayırdığı süre ayrıca girilebilir. Teknisyen performans raporu tür, rol ve kişi bazında görevleri ve katkı sürelerini ayrı gösterir.
+Bir bakımın birincil sorumlu teknisyeni ile destek olan diğer teknisyenler ayrı alanlarda tutulur. Yönetici kullanıcıları oluştururken teknisyen hesabını **Mekanik teknisyen** veya **Elektromekanik teknisyen** olarak sınıflandırabilir. Elektromekanik çalışanlar genellikle elektriksel işler ve devreye alma desteği için yardımcı seçilir; istisnai olarak sorumlu seçilirse bu durum da kayıt üzerinde açıkça korunur. Her yardımcı teknisyenin o bakıma ayırdığı süre ayrıca girilebilir; destek teknisyeni için **0 dakika** da geçerli bir katkı değeridir ve yalnızca boş/geçersiz girişlerde varsayılan süre kullanılır. Teknisyen performans raporu tür, rol ve kişi bazında görevleri ve katkı sürelerini ayrı gösterir.
 
 ### Dış hizmet veya garanti bakımı
 
@@ -179,11 +179,11 @@ Bakım tamamlama formu bağlantı olmadığında kaydı tarayıcıdaki IndexedDB
 
 ## Medya depolama
 
-Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır.
+Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır. Kayıt listeleri ve `GET /api/records/:id` varsayılan olarak ağır `photos_b64`/`videos` alanlarını taşımaz; kayıt detayında medya gerektiğinde `include_media=true` kullanılır.
 
-Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez.
+Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez. Çevrimdışı PATCH tekrarlarında ek bakım kayıtları deterministik idempotency anahtarıyla kontrol edilir; aynı ek bakım ikinci kez oluşturulmaz.
 
-Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOKEN` değerlerinin ilgili ortama tanımlanması gerekir. Token değerleri kaynak koda yazılmamalı ve GitHub’a gönderilmemelidir.
+Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOKEN` değerlerinin ilgili ortama tanımlanması gerekir. Token değerleri kaynak koda yazılmamalı ve GitHub’a gönderilmemelidir. Motor/bakım panelinin server cache’i 10 saniyelik üst sınırla çalışır; motor, bakım türü veya bakım kaydı mutation’ları başarılı olduğunda aynı runtime içindeki cache anında temizlenir. Farklı serverless instance’larında bu süre TTL ile sınırlıdır.
 
 ## Teknoloji ve proje yapısı
 

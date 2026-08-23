@@ -16,7 +16,7 @@ import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_T
 import type { MaintenanceType, VideoRef } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -414,7 +414,7 @@ export default function TamamlaPage() {
     setOtherTechnicianIds((current) => checked ? [...new Set([...current, id])] : current.filter((currentId) => currentId !== id));
     setOtherTechnicianDurations((current) => {
       const next = { ...current };
-      if (checked) next[id] = next[id] || maintenanceDurationMinutes || 60;
+      if (checked && next[id] === undefined) next[id] = normalizeTechnicianContributionDuration(undefined, maintenanceDurationMinutes ?? 60);
       else delete next[id];
       return next;
     });
@@ -497,7 +497,8 @@ export default function TamamlaPage() {
       backdated: isBackdated,
       period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
       other_technician_ids: otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)),
-      other_technician_durations: Object.fromEntries(otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)).map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes || 60])),
+      other_technician_durations: Object.fromEntries(otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)).map((id) => [id, normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 60)])
+),
       checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
       completion_confirmation: true,
     };
@@ -689,7 +690,7 @@ export default function TamamlaPage() {
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan ekip üyelerini seçebilirsin.</div>
           <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || maintenanceDurationMinutes || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
+            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi (dk)<input type="number" min="0" max={366 * 24 * 60} step="15" value={normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
           </div>
         </div>}
 

@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
     await (db.collection("maintenance_records") as any).updateMany({ type_key: key }, { $set: { type_label: label.trim() } });
   }
 
+  invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true });
 }
 
@@ -100,5 +102,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { key: stri
     { _id: key },
     { $set: { is_deleted: true, deleted_at: new Date() } },
   );
+  invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true, soft_deleted: true });
 }

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { engineSortKey } from "@/lib/status";
 import { withApiTiming } from "@/lib/performance";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,7 @@ async function postEngine(req: NextRequest) {
       history: [{ date: now.toISOString(), hours: Number(hours) || 0 }],
     };
     await enginesCol.insertOne(doc);
+    invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {
     console.error("Motor eklenirken hata:", error);

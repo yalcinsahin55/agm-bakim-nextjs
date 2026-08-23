@@ -33,8 +33,19 @@ export function calculateMaintenanceDurationFromDates(
   return duration > 0 && duration <= 366 * 24 * 60 ? duration : null;
 }
 
+/** Kullanıcı 0 dakika girdiyse bu değer geçerlidir; yalnızca boş/geçersiz değer fallback’e döner. */
+export function normalizeTechnicianContributionDuration(value: unknown, fallback: number | null | undefined = 60): number {
+  if (value !== undefined && value !== null && value !== "") {
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  const fallbackValue = Number(fallback);
+  return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 60;
+}
+
 export function formatMaintenanceDuration(minutes: number | undefined | null): string {
-  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return "—";
+  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) return "—";
+  if (minutes === 0) return "0 dk";
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   if (!hours) return `${remainingMinutes} dk`;

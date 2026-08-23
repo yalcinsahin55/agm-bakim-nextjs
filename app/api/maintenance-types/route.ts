@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,7 @@ export async function POST(req: NextRequest) {
       engine_states: engineStates,
     };
     await typesCol.insertOne(doc);
+    invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {
     console.error("Bakım türü eklenirken hata:", error);

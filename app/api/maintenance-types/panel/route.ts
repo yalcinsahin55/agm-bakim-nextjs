@@ -2,20 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { buildItems, type PanelItem } from "@/lib/status";
-import type { MaintenanceType } from "@/lib/types";
-import type { PanelEngine } from "@/lib/maintenancePanel";
+import { buildItems } from "@/lib/status";
+import { getMaintenancePanelServerCache, setMaintenancePanelServerCache, type ServerPanelPayload } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
-
-interface PanelPayload {
-  items: PanelItem[];
-  engines: PanelEngine[];
-  types: MaintenanceType[];
-}
-
-let panelCache: { payload: PanelPayload; expiresAt: number } | null = null;
-const PANEL_CACHE_TTL_MS = 10_000;
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -25,8 +15,9 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
   const now = Date.now();
-  if (panelCache && panelCache.expiresAt > now) {
-    return NextResponse.json(panelCache.payload, {
+  const cachedPayload = getMaintenancePanelServerCache(now);
+  if (cachedPayload) {
+    return NextResponse.json(cachedPayload, {
       headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=20" },
     });
   }
@@ -39,8 +30,8 @@ export async function GET(req: NextRequest) {
       projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 },
     }).toArray(),
   ]);
-  const payload: PanelPayload = { items: buildItems(engines, types), engines, types };
-  panelCache = { payload, expiresAt: now + PANEL_CACHE_TTL_MS };
+  const payload: ServerPanelPayload = { items: buildItems(engines, types), engines, types };
+  setMaintenancePanelServerCache(payload, now);
 
   return NextResponse.json(payload, {
     headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=20" },

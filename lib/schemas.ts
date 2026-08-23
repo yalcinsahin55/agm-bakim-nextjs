@@ -72,7 +72,7 @@ export const recordSchema = z.object({
   technician_note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   other_technician_ids: z.array(z.string().min(1).max(100)).max(20, "En fazla 20 yardımcı teknisyen seçilebilir.").optional(),
-  other_technician_durations: z.record(z.string().min(1).max(100), z.number().int().positive().max(366 * 24 * 60)).optional(),
+  other_technician_durations: z.record(z.string().min(1).max(100), z.number().int().nonnegative().max(366 * 24 * 60)).optional(),
   checklist: z.array(z.object({ label: z.string().min(1).max(200), completed: z.boolean() })).max(20).optional(),
   completion_confirmation: z.boolean().optional(),
 

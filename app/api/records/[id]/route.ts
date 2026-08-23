@@ -8,9 +8,10 @@ import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
-import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-  const record = await (db.collection("maintenance_records") as any).findOne({ _id: new ObjectId(params.id) });
+  const includeMedia = req.nextUrl.searchParams.get("include_media") === "true";
+  const record = await (db.collection("maintenance_records") as any).findOne(
+    { _id: new ObjectId(params.id) },
+    includeMedia ? undefined : { projection: { photos_b64: 0, videos: 0 } },
+  );
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   return NextResponse.json(record);
 }
@@ -46,6 +51,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
+  const clientRequestId = typeof body?.client_request_id === "string" && body.client_request_id.length >= 8 && body.client_request_id.length <= 100
+    ? body.client_request_id
+    : undefined;
   const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
 
   if (legacyMediaTooLarge(photos_b64, videos)) {
@@ -172,7 +180,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     ...effectiveOtherTechnicians.map((technician) => ({
       ...technician,
       contribution_role: "support",
-      duration_minutes: Number(other_technician_durations?.[technician.id]) || nextDurationMinutes || 0,
+      duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0),
     })),
   ];
   update.technician_contributions = technicianContributions;
@@ -225,13 +233,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
     const extraTechnicianContributions = useExternalService ? [] : [
       { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: nextDurationMinutes || 0 },
-      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support", duration_minutes: Number(other_technician_durations?.[technician.id]) || nextDurationMinutes || 0 })),
+      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support", duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0) })),
     ];
     const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
     const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
     const typesCol = db.collection("maintenance_types") as any;
 
     for (const ex of extra_types) {
+      const extraClientRequestId = `${clientRequestId || `record:${String(record._id)}`}:extra:${String(ex.type_key)}`;
+      const existingExtra = await recordsCol.findOne(
+        {
+          $or: [
+            { group_id: groupId, type_key: ex.type_key },
+            ...(extraClientRequestId ? [{ client_request_id: extraClientRequestId }] : []),
+          ],
+        },
+        { projection: { _id: 1 } },
+      );
+      if (existingExtra) continue;
       if (typeof ex.period === "number") {
         await typesCol.updateOne(
           { _id: ex.type_key },
@@ -263,6 +282,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
         other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
         technician_contributions: extraTechnicianContributions,
+        ...(extraClientRequestId ? { client_request_id: extraClientRequestId } : {}),
         technician_type: useExternalService ? undefined : nextResponsibleType,
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,
@@ -271,6 +291,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
+  invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true });
 }
 
@@ -299,5 +320,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     before: record,
   });
 
+  invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true });
 }
