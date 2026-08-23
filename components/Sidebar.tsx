@@ -27,11 +27,18 @@ const ITEMS: MenuItem[] = [
   { href: "/diger", label: "Diğer Menüler", icon: "☰" },
 ];
 
+const TECHNICIAN_ITEMS: MenuItem[] = [
+  { href: "/tamamla", label: "Bakım Tamamla", icon: "✅" },
+  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "📋" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [gecikmis, setGecikmis] = useState<number>(0);
   const { user } = useCurrentUser();
+  const isTechnicianAccount = user?.role === "teknisyen" || user?.role === "planlamaci";
+  const visibleItems = (isTechnicianAccount ? TECHNICIAN_ITEMS : ITEMS).filter((item) => canAccessRoute(user?.role, item.href));
 
   useEffect(() => {
     let alive = true;
@@ -79,7 +86,7 @@ export default function Sidebar() {
       <nav className="min-h-0 flex-1 overflow-y-auto py-3 px-3">
         <div className="text-[9px] font-bold text-faint uppercase tracking-wider px-2 mb-2">Ana Menü</div>
         <div className="flex flex-col gap-0.5">
-          {ITEMS.filter((item) => canAccessRoute(user?.role, item.href)).map((item) => {
+          {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
               <Link

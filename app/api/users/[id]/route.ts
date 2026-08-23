@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers, normalizeRole } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
-import { normalizeTechnicianType } from "@/lib/technicians";
+import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { db, usersCol, user, response } = await getAuthorizedAdmin(req);
   if (response) return response;
 
-  const { role, active, approved, phone, technician_type } = await req.json();
+  const { role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } = await req.json();
   if (user._id === params.id && (active === false || approved === false)) {
     return NextResponse.json({ error: "Kendi yönetici erişiminizi pasifleştiremez veya onayını kaldıramazsınız." }, { status: 400 });
   }
@@ -34,15 +34,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const normalizedRole = normalizeRole(role);
     if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });
     update.role = normalizedRole;
-    if (normalizedRole === "teknisyen") update.technician_type = normalizeTechnicianType(technician_type);
-    else unset.technician_type = "";
-  }
-  if (role === undefined && technician_type !== undefined) {
-    const target = await usersCol.findOne({ _id: params.id }, { projection: { role: 1 } });
-    if (!target || normalizeRole(target.role) !== "teknisyen") {
-      return NextResponse.json({ error: "Teknisyen alt türü yalnızca teknisyen hesaplarına atanabilir." }, { status: 400 });
+    if (normalizedRole === "teknisyen") {
+      const normalizedType = normalizeTechnicianType(technician_type);
+      update.technician_type = normalizedType;
+      Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible, can_be_support, allowed_work_domains }, normalizedType));
+    } else {
+      unset.technician_type = "";
+      unset.can_be_responsible = "";
+      unset.can_be_support = "";
+      unset.allowed_work_domains = "";
     }
-    update.technician_type = normalizeTechnicianType(technician_type);
+  }
+  if (role === undefined && (technician_type !== undefined || can_be_responsible !== undefined || can_be_support !== undefined || allowed_work_domains !== undefined)) {
+    const target = await usersCol.findOne({ _id: params.id }, { projection: { role: 1, technician_type: 1, can_be_responsible: 1, can_be_support: 1, allowed_work_domains: 1 } });
+    if (!target || normalizeRole(target.role) !== "teknisyen") {
+      return NextResponse.json({ error: "Teknisyen yetkileri yalnızca teknisyen hesaplarına atanabilir." }, { status: 400 });
+    }
+    const previousType = normalizeTechnicianType(target.technician_type);
+    const normalizedType = normalizeTechnicianType(technician_type ?? target.technician_type);
+    const typeChanged = technician_type !== undefined && normalizedType !== previousType;
+    update.technician_type = normalizedType;
+    Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible: can_be_responsible ?? (typeChanged ? undefined : target.can_be_responsible), can_be_support: can_be_support ?? (typeChanged ? undefined : target.can_be_support), allowed_work_domains: allowed_work_domains ?? (typeChanged ? undefined : target.allowed_work_domains) }, normalizedType));
   }
   if (typeof active === "boolean") update.active = active;
   if (typeof approved === "boolean") update.approved = approved;

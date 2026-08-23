@@ -8,12 +8,15 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
-import type { Engine, MaintenanceType } from "@/lib/types";
+import { WORK_DOMAIN_LABELS } from "@/lib/technicians";
+import type { Engine, MaintenanceType, WorkDomain } from "@/lib/types";
 
 interface EngineRowState {
   last: string;
   period: string;
 }
+
+const WORK_DOMAINS: WorkDomain[] = ["mechanical", "electrical", "commissioning"];
 
 export default function BakimTuruYonetimiPage() {
   const router = useRouter();
@@ -26,6 +29,9 @@ export default function BakimTuruYonetimiPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newPeriod, setNewPeriod] = useState(1000);
+  const [newWorkDomains, setNewWorkDomains] = useState<WorkDomain[]>(["mechanical"]);
+  const [newAllowElectromechanicalSupport, setNewAllowElectromechanicalSupport] = useState(false);
+  const [newAllowElectromechanicalResponsible, setNewAllowElectromechanicalResponsible] = useState(false);
   const [addRows, setAddRows] = useState<Record<string, EngineRowState>>({});
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +39,9 @@ export default function BakimTuruYonetimiPage() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [editPeriod, setEditPeriod] = useState(0);
+  const [editWorkDomains, setEditWorkDomains] = useState<WorkDomain[]>(["mechanical"]);
+  const [editAllowElectromechanicalSupport, setEditAllowElectromechanicalSupport] = useState(false);
+  const [editAllowElectromechanicalResponsible, setEditAllowElectromechanicalResponsible] = useState(false);
   const [editRows, setEditRows] = useState<Record<string, EngineRowState>>({});
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -61,6 +70,12 @@ export default function BakimTuruYonetimiPage() {
     setEditRows((prev) => ({ ...prev, [id]: { last: "", period: "", ...prev[id], [field]: value } }));
   }
 
+  function toggleDomain(domains: WorkDomain[], setter: (next: WorkDomain[]) => void, domain: WorkDomain) {
+    const next = domains.includes(domain) ? domains.filter((item) => item !== domain) : [...domains, domain];
+    if (next.length === 0) { toast.error("En az bir çalışma alanı seçilmelidir."); return; }
+    setter(next);
+  }
+
   async function addType() {
     if (!newLabel.trim()) { toast.error("Bakım türü adı gerekli."); return; }
     setSaving(true);
@@ -77,12 +92,12 @@ export default function BakimTuruYonetimiPage() {
       });
       const res = await fetch("/api/maintenance-types", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: newLabel.trim(), default_period_hours: defPeriod, engine_states }),
+        body: JSON.stringify({ label: newLabel.trim(), default_period_hours: defPeriod, engine_states, work_domains: newWorkDomains, allow_electromechanical_support: newAllowElectromechanicalSupport, allow_electromechanical_responsible: newAllowElectromechanicalResponsible }),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`'${newLabel}' bakım türü eklendi! 🔧`);
-        setNewLabel(""); setNewPeriod(1000); setAddRows({}); setShowAdd(false);
+        setNewLabel(""); setNewPeriod(1000); setNewWorkDomains(["mechanical"]); setNewAllowElectromechanicalSupport(false); setNewAllowElectromechanicalResponsible(false); setAddRows({}); setShowAdd(false);
         invalidateMaintenancePanel();
         load();
       } else {
@@ -102,6 +117,9 @@ export default function BakimTuruYonetimiPage() {
     setEditingKey(t.key);
     setEditLabel(t.label);
     setEditPeriod(t.default_period_hours ?? 0);
+    setEditWorkDomains(Array.isArray(t.work_domains) && t.work_domains.length ? t.work_domains : ["mechanical"]);
+    setEditAllowElectromechanicalSupport(t.allow_electromechanical_support === true);
+    setEditAllowElectromechanicalResponsible(t.allow_electromechanical_responsible === true);
     const r: Record<string, EngineRowState> = {};
     sortedEngines.forEach((e) => {
       const st = (t.engine_states || {})[e._id];
@@ -128,7 +146,7 @@ export default function BakimTuruYonetimiPage() {
       });
       const res = await fetch(`/api/maintenance-types/${key}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: editLabel.trim(), default_period_hours: Number(editPeriod) || 0, engine_states }),
+        body: JSON.stringify({ label: editLabel.trim(), default_period_hours: Number(editPeriod) || 0, engine_states, work_domains: editWorkDomains, allow_electromechanical_support: editAllowElectromechanicalSupport, allow_electromechanical_responsible: editAllowElectromechanicalResponsible }),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
@@ -238,6 +256,12 @@ export default function BakimTuruYonetimiPage() {
               onChange={(e) => setNewPeriod(Number(e.target.value))}
               className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
             />
+            <div className="rounded-xl border border-border bg-panel2 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div>
+              <div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => toggleDomain(newWorkDomains, setNewWorkDomains, domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${newWorkDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{newWorkDomains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div>
+              <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={newAllowElectromechanicalSupport} onChange={(e) => setNewAllowElectromechanicalSupport(e.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={newAllowElectromechanicalResponsible} onChange={(e) => setNewAllowElectromechanicalResponsible(e.target.checked)} />Elektromekanik sorumlu olabilir</label></div>
+              <p className="mt-1.5 text-[10px] text-faint">Eski bakım türleri mekanik kabul edilir. Elektromekanik çalışanları ilgili alanda kullanmak için destek seçeneğini açın.</p>
+            </div>
             <div className="grid grid-cols-3 gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
               <span>Motor</span><span>İlk Bakım Saati</span><span>Periyot</span>
             </div>
@@ -296,6 +320,7 @@ export default function BakimTuruYonetimiPage() {
                     </span>
                   </div>
                   <div className="text-[11px] text-faint mb-2">Varsayılan periyot: <span className="font-mono text-amber">{t.default_period_hours} sa</span></div>
+                  <div className="mb-2 flex flex-wrap gap-1"><span className="rounded-full border border-border px-2 py-0.5 text-[9px] text-muted">{(t.work_domains || ["mechanical"]).map((domain) => WORK_DOMAIN_LABELS[domain]).join(" + ")}</span>{t.allow_electromechanical_support === true && <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-2 py-0.5 text-[9px] text-purple-200">Elektromekanik destek</span>}</div>
                   <div className="flex gap-2">
                     <button onClick={() => startEdit(t)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition">✏️ Düzenle</button>
                     {confirmDeleteKey === t.key ? (
@@ -321,6 +346,7 @@ export default function BakimTuruYonetimiPage() {
                         onChange={(e) => setEditPeriod(Number(e.target.value))}
                         className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition"
                       />
+                      <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div><div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => toggleDomain(editWorkDomains, setEditWorkDomains, domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${editWorkDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{editWorkDomains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div><div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalSupport} onChange={(e) => setEditAllowElectromechanicalSupport(e.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalResponsible} onChange={(e) => setEditAllowElectromechanicalResponsible(e.target.checked)} />Elektromekanik sorumlu olabilir</label></div></div>
                       <div className="grid grid-cols-3 gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
                         <span>Motor</span><span>Son Bakım Saati</span><span>Periyot</span>
                       </div>

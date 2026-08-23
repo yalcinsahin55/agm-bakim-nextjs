@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { normalizeWorkDomains } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     }
 
-    const { label, default_period_hours, apply_to_all, engine_states } = await req.json();
+    const { label, default_period_hours, apply_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
+    const normalizedWorkDomains = normalizeWorkDomains(work_domains, "mekanik");
     if (!label || !label.trim()) {
       return NextResponse.json({ error: "Bakım türü adı gerekli." }, { status: 400 });
     }
@@ -76,6 +78,9 @@ export async function POST(req: NextRequest) {
       label: label.trim(),
       default_period_hours: Number(default_period_hours) || 0,
       engine_scope: apply_to_all ? "all" : "explicit",
+      work_domains: normalizedWorkDomains,
+      allow_electromechanical_support: allow_electromechanical_support === true,
+      allow_electromechanical_responsible: allow_electromechanical_responsible === true,
       engine_states: engineStates,
     };
     await typesCol.insertOne(doc);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
-import type { TechnicianType } from "@/lib/types";
+import type { TechnicianType, WorkDomain } from "@/lib/types";
 
 interface CurrentUser {
   id?: string;
@@ -11,6 +11,9 @@ interface CurrentUser {
   phone?: string;
   role: string;
   technician_type?: TechnicianType;
+  can_be_responsible?: boolean;
+  can_be_support?: boolean;
+  allowed_work_domains?: WorkDomain[];
   active?: boolean;
   approved?: boolean;
 }

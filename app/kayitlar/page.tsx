@@ -11,7 +11,7 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, getMaintenanceRecordDate, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 interface Engine {
@@ -26,6 +26,9 @@ interface MaintenanceType {
   key: string;
   label: string;
   default_period_hours: number;
+  work_domains?: Array<"mechanical" | "electrical" | "commissioning">;
+  allow_electromechanical_support?: boolean;
+  allow_electromechanical_responsible?: boolean;
 }
 
 interface VideoItem {
@@ -59,7 +62,9 @@ interface MaintenanceRecord {
   external_service_name?: string;
   other_technician_ids?: string[];
   other_technicians?: Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik" }>;
+  extra_types?: Array<{ type_key: string; type_label: string }>;
   technician_contributions?: Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik"; contribution_role: "responsible" | "support"; duration_minutes: number }>;
+
   checklist?: Array<{ label: string; completed: boolean }>;
   completion_confirmed_at?: string;
   manager_confirmation_status?: "pending" | "confirmed";
@@ -166,7 +171,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
-  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik" }>>([]);
+  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik"; can_be_responsible?: boolean; can_be_support?: boolean; allowed_work_domains?: Array<"mechanical" | "electrical" | "commissioning"> }>>([]);
+  const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
   const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
@@ -174,6 +180,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
+  const selectedMaintenanceTypes = maintenanceTypes.filter((type) => type.key === record.type_key || (record.extra_types || []).some((extra) => extra.type_key === type.key));
+  const canWorkOnSelectedTypes = (technician: any, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
+  const responsibleTechnicians = technicians.filter((technician) => canWorkOnSelectedTypes(technician, "responsible"));
+  const supportTechnicians = technicians.filter((technician) => technician.id !== responsibleTechnicianId && canWorkOnSelectedTypes(technician, "support"));
 
   function createOfflinePreview(id: string, blob: Blob): string {
     const url = URL.createObjectURL(blob);
@@ -200,7 +210,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
 
   useEffect(() => {
     fetch("/api/users/technicians")
-      .then(async (response) => { if (response.ok) setTechnicians(await response.json() as Array<{ id: string; full_name: string }>); })
+      .then(async (response) => { if (response.ok) setTechnicians(await response.json()); })
+      .catch(() => {});
+    fetch("/api/maintenance-types")
+      .then(async (response) => { if (response.ok) setMaintenanceTypes(await response.json()); })
       .catch(() => {});
   }, []);
 
@@ -326,8 +339,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       photos,
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-      other_technician_ids: technicianSource === "external_service" ? [] : otherTechnicianIds,
-      other_technician_durations: technicianSource === "external_service" ? {} : Object.fromEntries(otherTechnicianIds.map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes])),
+      other_technician_ids: technicianSource === "external_service" ? [] : otherTechnicianIds.filter((id) => supportTechnicians.some((technician) => technician.id === id)),
+      other_technician_durations: technicianSource === "external_service" ? {} : Object.fromEntries(otherTechnicianIds.filter((id) => supportTechnicians.some((technician) => technician.id === id)).map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes])),
       technician_source: technicianSource,
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
@@ -377,7 +390,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
           <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu kayıt teknisyen performansına dahil edilmez ve yalnızca yönetici tarafından düzenlenebilir.</div>
         </> : <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
           {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
-          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
+          {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</option>)}
         </select>}
       </div>}
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
@@ -419,10 +432,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         />
       )}
 
-      {technicianSource !== "external_service" && technicians.filter((technician) => technician.id !== responsibleTechnicianId).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
+      {technicianSource !== "external_service" && supportTechnicians.length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
-        <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında bakıma katılanları seç.</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== responsibleTechnicianId).map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: current[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60 } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
+        <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan kişileri seç.</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{supportTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: current[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60 } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
       </div>}
 
       {offlineMedia.length > 0 && (

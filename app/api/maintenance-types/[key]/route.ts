@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { normalizeWorkDomains } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   }
 
   const { key } = params;
-  const { label, default_period_hours, apply_period_to_all, engine_states } = await req.json();
+  const { label, default_period_hours, apply_period_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
 
   const typesCol = db.collection("maintenance_types") as any;
   const type = await typesCol.findOne({ _id: key });
@@ -24,6 +25,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   const update: Record<string, any> = {};
   if (label) update.label = label.trim();
   if (typeof default_period_hours === "number") update.default_period_hours = default_period_hours;
+  if (work_domains !== undefined) update.work_domains = normalizeWorkDomains(work_domains, "mekanik");
+  if (allow_electromechanical_support !== undefined) update.allow_electromechanical_support = allow_electromechanical_support === true;
+  if (allow_electromechanical_responsible !== undefined) update.allow_electromechanical_responsible = allow_electromechanical_responsible === true;
   if (Object.keys(update).length) await typesCol.updateOne({ _id: key }, { $set: update });
 
   if (apply_period_to_all && typeof default_period_hours === "number") {

@@ -15,7 +15,7 @@ import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
-import { EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
@@ -409,8 +409,21 @@ export default function TamamlaPage() {
   }
 
   const currentUserId = user?._id || user?.id || "";
+  const selectedMaintenanceTypes = [chosenType, ...extraKeys.map((key) => types.find((item) => item.key === key))].filter(Boolean);
+  const isEligibleForRole = (technician, role) => selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
+  const responsibleTechnicians = technicians.filter((technician) => isEligibleForRole(technician, "responsible"));
   const effectiveResponsibleTechnicianId = responsibleTechnicianId || currentUserId;
-  const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId);
+  const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && isEligibleForRole(technician, "support"));
+
+  useEffect(() => {
+    setOtherTechnicianIds((current) => {
+      const next = current.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
+      return next.length === current.length ? current : next;
+    });
+    if (responsibleTechnicianId && !responsibleTechnicians.some((technician) => technician.id === responsibleTechnicianId)) {
+      setResponsibleTechnicianId("");
+    }
+  }, [typeKey, extraKeys.join("|"), technicians.length, responsibleTechnicianId]);
 
   async function submit() {
     if (!chosenType) {
@@ -458,8 +471,8 @@ export default function TamamlaPage() {
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       backdated: isBackdated,
       period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
-      other_technician_ids: otherTechnicianIds,
-      other_technician_durations: Object.fromEntries(otherTechnicianIds.map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes || 60])),
+      other_technician_ids: otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)),
+      other_technician_durations: Object.fromEntries(otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)).map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes || 60])),
       checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
       completion_confirmation: true,
     };
@@ -635,7 +648,7 @@ export default function TamamlaPage() {
             <div className="mt-0.5 text-[10px] text-faint">Bu kayıt kimin sorumluluğunda tamamlandıysa onu seç. Elektromekanik ekip üyeleri genellikle destek rolünde takip edilir. Bu seçim yalnızca yöneticiye açıktır.</div>
             <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
               <option value="">Varsayılan: benim hesabım</option>
-              {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
+              {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
             </select>
           </div>}
         </div>}
@@ -648,7 +661,7 @@ export default function TamamlaPage() {
 
         {technicianSource !== "external_service" && selectableTechnicians.length > 0 && <div className="mb-2 rounded-xl border border-teal/30 bg-teal/5 p-3">
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
-          <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında bakıma katılan ekip üyelerini seçebilirsin.</div>
+          <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan ekip üyelerini seçebilirsin.</div>
           <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || maintenanceDurationMinutes || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
           </div>

@@ -8,7 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -159,6 +159,7 @@ async function postRecord(req: NextRequest) {
       ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
       : user.full_name;
     let responsibleTechnicianType = useExternalService ? undefined : normalizeTechnicianType(user.technician_type);
+    let responsibleTechnicianOption: any = useExternalService ? null : { id: user._id, full_name: user.full_name, technician_type: responsibleTechnicianType, ...normalizeTechnicianPermissions(user as any, responsibleTechnicianType) };
     if (!useExternalService && typeof responsible_technician_id === "string") {
       const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
       if (!resolvedResponsible || resolvedResponsible.length !== 1) {
@@ -167,10 +168,26 @@ async function postRecord(req: NextRequest) {
       responsibleTechnicianId = resolvedResponsible[0].id;
       responsibleTechnicianName = resolvedResponsible[0].full_name;
       responsibleTechnicianType = resolvedResponsible[0].technician_type;
+      responsibleTechnicianOption = resolvedResponsible[0];
+    }
+    const requestedTypeKeys = [...new Set([type_key, ...(extra_types || []).map((item) => item.type_key)])];
+    const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
+    const maintenanceTypeByKey = new Map(maintenanceTypes.map((item: any) => [String(item._id), item]));
+    const missingType = requestedTypeKeys.find((key) => !maintenanceTypeByKey.has(key));
+    if (missingType) return NextResponse.json({ error: "Seçilen bakım türü bulunamadı." }, { status: 404 });
+    const selectedTypes = requestedTypeKeys.map((key) => maintenanceTypeByKey.get(key));
+    if (!useExternalService) {
+      const validationRole = user.role === "yonetici" || typeof responsible_technician_id === "string" ? "responsible" : "support";
+      if (!selectedTypes.every((type) => canTechnicianWorkOnType(responsibleTechnicianOption, type, validationRole))) {
+        return NextResponse.json({ error: "Seçilen teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
+      }
     }
     const resolvedOtherTechnicians = useExternalService ? [] : await resolveTechnicianOptions(db, other_technician_ids);
     if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === responsibleTechnicianId)) {
       return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
+    }
+    if (!useExternalService && resolvedOtherTechnicians.some((technician) => !selectedTypes.every((type) => canTechnicianWorkOnType(technician, type, "support")))) {
+      return NextResponse.json({ error: "Seçilen yardımcı teknisyenlerden biri bu bakım türü için yetkili değil." }, { status: 403 });
     }
     const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
     const technicianContributions = useExternalService ? [] : [

@@ -1,10 +1,56 @@
 import type { Db } from "mongodb";
-import type { TechnicianType } from "@/lib/types";
+import type { TechnicianType, TechnicianPermissions, WorkDomain } from "@/lib/types";
 
 export const TECHNICIAN_TYPE_LABELS: Record<TechnicianType, string> = {
   mekanik: "Mekanik teknisyen",
   elektromekanik: "Elektromekanik teknisyen",
 };
+
+export const WORK_DOMAIN_LABELS: Record<WorkDomain, string> = {
+  mechanical: "Mekanik işler",
+  electrical: "Elektriksel işler",
+  commissioning: "Devreye alma",
+};
+
+const VALID_WORK_DOMAINS: WorkDomain[] = ["mechanical", "electrical", "commissioning"];
+
+export function normalizeWorkDomains(value: unknown, technicianType: TechnicianType): WorkDomain[] {
+  if (Array.isArray(value)) {
+    const domains = value.filter((domain): domain is WorkDomain => typeof domain === "string" && VALID_WORK_DOMAINS.includes(domain as WorkDomain));
+    if (domains.length) return [...new Set(domains)];
+  }
+  return technicianType === "elektromekanik" ? ["electrical", "commissioning"] : ["mechanical"];
+}
+
+export function defaultTechnicianPermissions(technicianType: TechnicianType): TechnicianPermissions {
+  return {
+    can_be_responsible: technicianType === "mekanik",
+    can_be_support: true,
+    allowed_work_domains: normalizeWorkDomains(undefined, technicianType),
+  };
+}
+
+export function normalizeTechnicianPermissions(value: Partial<TechnicianPermissions> | undefined, technicianType: TechnicianType): TechnicianPermissions {
+  const defaults = defaultTechnicianPermissions(technicianType);
+  return {
+    can_be_responsible: typeof value?.can_be_responsible === "boolean" ? value.can_be_responsible : defaults.can_be_responsible,
+    can_be_support: typeof value?.can_be_support === "boolean" ? value.can_be_support : defaults.can_be_support,
+    allowed_work_domains: normalizeWorkDomains(value?.allowed_work_domains, technicianType),
+  };
+}
+
+export function canTechnicianWorkOnType(technician: TechnicianOption, type: { work_domains?: WorkDomain[]; allow_electromechanical_support?: boolean; allow_electromechanical_responsible?: boolean }, role: "responsible" | "support"): boolean {
+  const permissions = normalizeTechnicianPermissions(technician, technician.technician_type);
+  if (role === "responsible" && !permissions.can_be_responsible) return false;
+  if (role === "support" && !permissions.can_be_support) return false;
+  if (technician.technician_type === "mekanik") return true;
+  if (technician.technician_type === "elektromekanik") {
+    if (role === "responsible" && type.allow_electromechanical_responsible !== true) return false;
+    if (role === "support" && type.allow_electromechanical_support !== true) return false;
+  }
+  const domains = Array.isArray(type.work_domains) && type.work_domains.length ? type.work_domains : ["mechanical"] as WorkDomain[];
+  return permissions.allowed_work_domains.some((domain) => domains.includes(domain));
+}
 
 export function normalizeTechnicianType(value: unknown): TechnicianType {
   return value === "elektromekanik" ? "elektromekanik" : "mekanik";
@@ -14,6 +60,9 @@ export interface TechnicianOption {
   id: string;
   full_name: string;
   technician_type: TechnicianType;
+  can_be_responsible: boolean;
+  can_be_support: boolean;
+  allowed_work_domains: WorkDomain[];
 }
 
 export const EXTERNAL_SERVICE_TECHNICIAN_ID = "__external_service__" as const;
@@ -35,12 +84,16 @@ export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]>
       active: { $ne: false },
       approved: { $ne: false },
     },
-    { projection: { _id: 1, full_name: 1, technician_type: 1 } },
+    { projection: { _id: 1, full_name: 1, technician_type: 1, can_be_responsible: 1, can_be_support: 1, allowed_work_domains: 1 } },
   ).toArray();
 
   return users
     .filter((user) => user._id != null && typeof user.full_name === "string" && user.full_name.trim())
-    .map((user) => ({ id: String(user._id), full_name: (user.full_name as string).trim(), technician_type: normalizeTechnicianType(user.technician_type) }))
+    .map((user) => {
+      const technician_type = normalizeTechnicianType(user.technician_type);
+      const permissions = normalizeTechnicianPermissions(user as Partial<TechnicianPermissions>, technician_type);
+      return { id: String(user._id), full_name: (user.full_name as string).trim(), technician_type, ...permissions };
+    })
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
 }
 

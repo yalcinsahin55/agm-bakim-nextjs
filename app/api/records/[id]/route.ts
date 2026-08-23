@@ -7,7 +7,7 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -69,12 +69,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler düzenleyebilir." }, { status: 403 });
   }
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
+  const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item: any) => item.type_key) : [];
+  const selectedTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys, ...(Array.isArray(extra_types) ? extra_types.map((item: any) => item.type_key) : [])])];
+  const selectedTypeDocs = await (db.collection("maintenance_types") as any).find({ _id: { $in: selectedTypeKeys } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } }).toArray();
+  if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı." }, { status: 404 });
   let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
   let nextResponsibleName = useExternalService
     ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
     : record.technician_name;
   let nextResponsibleType = useExternalService ? undefined : normalizeTechnicianType(record.technician_type);
-    let effectiveOtherTechnicians: Array<{ id: string; full_name: string; technician_type: "mekanik" | "elektromekanik" }> = [];
+  let nextResponsibleOption: any = null;
+  let effectiveOtherTechnicians: Array<{ id: string; full_name: string; technician_type: "mekanik" | "elektromekanik" }> = [];
   if (useExternalService) {
     if (Array.isArray(other_technician_ids) && other_technician_ids.length > 0) {
       return NextResponse.json({ error: "Dış hizmet kaydında kayıtlı yardımcı teknisyen seçilemez." }, { status: 400 });
@@ -102,6 +107,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       nextResponsibleId = resolvedResponsible[0].id;
       nextResponsibleName = resolvedResponsible[0].full_name;
       nextResponsibleType = resolvedResponsible[0].technician_type;
+      nextResponsibleOption = resolvedResponsible[0];
       update.technician_id = nextResponsibleId;
       update.technician_name = nextResponsibleName;
     }
@@ -117,11 +123,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
         return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
       }
+      const existingSupportIds = new Set((record.other_technician_ids || []).map((id: unknown) => String(id)));
+      if (resolvedOtherTechnicians.some((technician) => !existingSupportIds.has(technician.id) && !selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(technician, type, "support")))) {
+        return NextResponse.json({ error: "Seçilen yardımcı teknisyenlerden biri bu bakım türü için yetkili değil." }, { status: 403 });
+      }
       effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
       update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
       update.other_technicians = effectiveOtherTechnicians;
     } else if (nextResponsibleId !== record.technician_id && effectiveOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
       return NextResponse.json({ error: "Yeni sorumlu teknisyen yardımcı listesinde bulunamaz." }, { status: 400 });
+    }
+  }
+  const isExistingOwnerUpdate = user.role !== "yonetici" && record.technician_id === user._id && responsible_technician_id === undefined && !(Array.isArray(extra_types) && extra_types.length > 0);
+  const responsibleSelectionChanged = typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id;
+  if (!useExternalService && !isExistingOwnerUpdate && (user.role !== "yonetici" || responsibleSelectionChanged || (Array.isArray(extra_types) && extra_types.length > 0))) {
+    if (!nextResponsibleOption && nextResponsibleId === user._id) {
+      nextResponsibleOption = { id: user._id, full_name: user.full_name, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions(user as any, nextResponsibleType) };
+    }
+    if (!nextResponsibleOption) {
+      const resolvedCurrentResponsible = await resolveTechnicianOptions(db, [nextResponsibleId]);
+      nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions({}, nextResponsibleType) };
+    }
+    if (!selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
+      return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }
   const technicianContributions = useExternalService ? [] : [

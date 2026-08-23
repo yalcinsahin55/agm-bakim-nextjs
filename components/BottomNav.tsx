@@ -21,11 +21,18 @@ const ITEMS: MenuItem[] = [
   { href: "/diger", label: "Diğer", icon: "☰" },
 ];
 
+const TECHNICIAN_ITEMS: MenuItem[] = [
+  { href: "/tamamla", label: "Tamamla", icon: "✅" },
+  { href: "/kayitlar", label: "Kayıtlar", icon: "📋" },
+];
+
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [gecikmis, setGecikmis] = useState<number>(0);
   const { user } = useCurrentUser();
+  const isTechnicianAccount = user?.role === "teknisyen" || user?.role === "planlamaci";
+  const visibleItems = (isTechnicianAccount ? TECHNICIAN_ITEMS : ITEMS).filter((item) => canAccessRoute(user?.role, item.href));
 
   useEffect(() => {
     let alive = true;
@@ -57,7 +64,7 @@ export default function BottomNav() {
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
         <div className="max-w-lg mx-auto bg-[#0f1319]/95 backdrop-blur-xl border-t border-border flex px-1 pt-2 pb-4">
-          {ITEMS.filter((item) => canAccessRoute(user?.role, item.href)).map((item) => {
+          {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
               <Link

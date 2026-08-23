@@ -5,6 +5,7 @@ import { verifyPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { loginSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,12 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await createSessionToken(user._id);
+    const isTechnician = user.role === "teknisyen" || user.role === "planlamaci";
+    const technician_type = isTechnician ? normalizeTechnicianType(user.technician_type) : undefined;
+    const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type) : undefined;
     const res = NextResponse.json({
       ok: true,
-      user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role, technician_type: user.technician_type === "elektromekanik" ? "elektromekanik" : user.role === "teknisyen" || user.role === "planlamaci" ? "mekanik" : undefined },
+      user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role, technician_type, ...(technicianPermissions || {}) },
     });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,

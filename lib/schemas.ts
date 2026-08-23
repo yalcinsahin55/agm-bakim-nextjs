@@ -32,12 +32,17 @@ export const registerSchema = z.object({
   path: ["phone"],
 });
 
+const workDomainSchema = z.enum(["mechanical", "electrical", "commissioning"]);
+
 export const adminUserSchema = z.object({
   full_name: z.string().trim().min(2, "Ad Soyad en az 2 karakter olmalı.").max(100),
   phone: z.string().trim().min(5, "Telefon numarası gereklidir.").max(30),
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır.").max(128),
   role: z.enum(["yonetici", "teknisyen", "goruntuleyici"]).default("teknisyen"),
   technician_type: z.enum(["mekanik", "elektromekanik"]).optional(),
+  can_be_responsible: z.boolean().optional(),
+  can_be_support: z.boolean().optional(),
+  allowed_work_domains: z.array(workDomainSchema).max(3).optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -2,6 +2,13 @@
 
 export type Role = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";
 export type TechnicianType = "mekanik" | "elektromekanik";
+export type WorkDomain = "mechanical" | "electrical" | "commissioning";
+
+export interface TechnicianPermissions {
+  can_be_responsible: boolean;
+  can_be_support: boolean;
+  allowed_work_domains: WorkDomain[];
+}
 
 export interface User {
   _id: string;
@@ -14,6 +21,9 @@ export interface User {
   active: boolean;
   approved?: boolean;
   technician_type?: TechnicianType;
+  can_be_responsible?: boolean;
+  can_be_support?: boolean;
+  allowed_work_domains?: WorkDomain[];
   created_at: Date | string;
 }
 
@@ -44,6 +54,9 @@ export interface MaintenanceType {
   label: string;
   default_period_hours: number;
   engine_scope?: "explicit" | "all";
+  work_domains?: WorkDomain[];
+  allow_electromechanical_support?: boolean;
+  allow_electromechanical_responsible?: boolean;
   engine_states: Record<string, EngineState>;
 }
 

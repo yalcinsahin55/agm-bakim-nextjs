@@ -10,6 +10,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 
 - [Öne çıkan özellikler](#öne-çıkan-özellikler)
 - [Kullanıcı rolleri](#kullanıcı-rolleri)
+- [Teknisyen yetkilendirme](#teknisyen-yetkilendirme)
 - [Bakım kaydı iş akışı](#bakım-kaydı-iş-akışı)
 - [Tarih-saat ve süre takibi](#tarih-saat-ve-süre-takibi)
 - [Ekip teknisyenleri ve dış hizmet bakımları](#ekip-teknisyenleri-ve-dış-hizmet-bakımları)
@@ -51,11 +52,17 @@ Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur ve onaylar. Kullan
 | Rol | Yetki özeti |
 |---|---|
 | `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
-| `teknisyen` | Yalnızca Bakım Tamamlama ve Bakım Kayıtları ekranlarını kullanır. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
+| `teknisyen` | Yalnızca Bakım Tamamlama ve Bakım Kayıtları ekranlarını kullanır. Mobil ve masaüstü alt menüsünde yalnızca **Bakım Tamamla**, **Bakım Kayıtları** ve **Çıkış** bulunur. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
 | `goruntuleyici` | Dashboard, motorlar, bakım kayıtları, analiz ve takip, bilgi/rapor, bakım türleri ve tahmin modüllerini görüntüler; kayıt üzerinde değişiklik yapamaz. |
 | `planlamaci` | Eski hesaplarla geriye dönük uyumluluk için teknisyen davranışıyla değerlendirilir. Yeni kullanıcı arayüzünde ayrı bir planlamacı akışı bulunmaz. |
 
 Yetkilendirme iki katmanda uygulanır: menü ve sayfa görünürlüğü istemci tarafında, veri okuma/yazma ve kayıt sahipliği ise API tarafında kontrol edilir. İstemci arayüzünün değiştirilmesi API yetkilerini aşmaya yetmez.
+
+## Teknisyen yetkilendirme
+
+Yönetici, **Diğer Menüler → Yönetim → Teknisyen Yetkilendirme** ekranından aktif teknisyenleri **Mekanik** veya **Elektromekanik** olarak sınıflandırabilir. Mekanik teknisyenler tüm bakım türlerinde varsayılan olarak sorumlu veya yardımcı olabilir. Elektromekanik teknisyenler varsayılan olarak elektriksel işler ve devreye alma desteği için tanımlanır; sorumlu olarak seçilmeleri yönetici tarafından ayrıca açılır.
+
+Aynı ekranda teknisyenin sorumlu olabilmesi, yardımcı olabilmesi ve çalışma alanları yönetilir. Bakım Türü Yönetimi ekranındaki çalışma alanı ve elektromekanik destek ayarlarıyla birlikte, Bakım Tamamla ve Bakım Kayıtları formlarında yalnızca uyumlu teknisyenler listelenir. Bu seçimler API tarafında da tekrar doğrulanır; istemciden gönderilen yetkisiz bir teknisyen kaydı kabul edilmez. Eski hesaplar ve eski bakım kayıtları bozulmaz; yeni alanı olmayan teknisyenler mekanik varsayılanlarıyla çalışır.
 
 ## Bakım kaydı iş akışı
 

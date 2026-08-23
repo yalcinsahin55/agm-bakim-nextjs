@@ -6,7 +6,7 @@ import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { adminUserSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
-import { normalizeTechnicianType } from "@/lib/technicians";
+import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +20,16 @@ export async function GET(req: NextRequest) {
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu sayfa yalnızca yöneticiler içindir." }, { status: 403 });
 
     const users = await usersCol.find().toArray();
-    return NextResponse.json(users.map((u: any) => ({
-      id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
-      technician_type: (u.role === "teknisyen" || u.role === "planlamaci") ? normalizeTechnicianType(u.technician_type) : undefined,
-      active: u.active !== false, approved: u.approved !== false, created_at: u.created_at,
-    })));
+    return NextResponse.json(users.map((u: any) => {
+      const isTechnician = u.role === "teknisyen" || u.role === "planlamaci";
+      const technician_type = isTechnician ? normalizeTechnicianType(u.technician_type) : undefined;
+      const permissions = isTechnician ? normalizeTechnicianPermissions(u, technician_type) : undefined;
+      return {
+        id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
+        technician_type, ...(permissions || {}),
+        active: u.active !== false, approved: u.approved !== false, created_at: u.created_at,
+      };
+    }));
   } catch (error) {
     console.error("Kullanıcılar getirilirken hata:", error);
     return NextResponse.json({ error: "Kullanıcı listesi yüklenirken bir hata oluştu." }, { status: 500 });
@@ -44,8 +49,9 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { full_name, phone, password, role, technician_type } = parsed.data;
+    const { full_name, phone, password, role, technician_type, can_be_responsible, can_be_support, allowed_work_domains } = parsed.data;
     const normalizedTechnicianType = role === "teknisyen" ? normalizeTechnicianType(technician_type) : undefined;
+    const technicianPermissions = normalizedTechnicianType ? normalizeTechnicianPermissions({ can_be_responsible, can_be_support, allowed_work_domains }, normalizedTechnicianType) : undefined;
     if (!isValidPhone(phone)) {
       return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin (05xx xxx xx xx)." }, { status: 400 });
     }
@@ -57,12 +63,12 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
       _id: normalizedPhone, full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
-      password_hash: passwordHash, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType } : {}), active: true, approved: false, created_at: new Date(),
+      password_hash: passwordHash, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType, ...technicianPermissions } : {}), active: true, approved: false, created_at: new Date(),
     });
     await writeAuditLog(db, {
       user, action: "create", entity: "user", entityId: normalizedPhone,
       summary: `${full_name.trim()} kullanıcısı oluşturuldu; yönetici onayı bekliyor.`,
-      after: { full_name: full_name.trim(), phone: normalizedPhone, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType } : {}), active: true, approved: false },
+      after: { full_name: full_name.trim(), phone: normalizedPhone, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType, ...technicianPermissions } : {}), active: true, approved: false },
     });
     return NextResponse.json({ ok: true, approved: false });
   } catch (error) {

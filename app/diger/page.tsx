@@ -44,6 +44,7 @@ const GROUPS = [
     admin: true,
     items: [
       { href: "/kullanicilar", icon: "👥", label: "Kullanıcılar", desc: "Kullanıcı ekle, rol değiştir" },
+      { href: "/teknisyen-yetkilendirme", icon: "🛡️", label: "Teknisyen Yetkilendirme", desc: "Uzmanlık ve görev izinlerini yönet" },
       { href: "/bakim-turu-yonetimi", icon: "⚙️", label: "Bakım Türü Yönetimi", desc: "Tür ekle, düzenle, sil" },
       { href: "/audit-log", icon: "🧾", label: "İşlem Geçmişi", desc: "Kullanıcı ve veri değişiklikleri" },
       { href: "/yedekleme", icon: "💾", label: "Yedekleme", desc: "Güvenli JSON veri dışa aktarma" },
