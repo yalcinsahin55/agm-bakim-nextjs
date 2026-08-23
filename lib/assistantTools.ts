@@ -295,9 +295,9 @@ export async function runAssistantTool(db: Db, query: AssistantQuery): Promise<A
       examples: [
         "Bu ay kaç bakım yapıldı?",
         "Hangi bakımlar gecikmiş?",
-        "Motor 03'ün bakım geçmişi nedir?",
+        "Bir motorun bakım geçmişi nasıl görüntülenir?",
         "Yalçın Şahin'in son üç aylık performansı nasıl?",
-        "Garanti kapsamında dış servise giden motorlar hangileri?",
+        "Dış servisten hizmet alınan motorlar ve bakımlar hangileri?",
       ],
     },
   };

@@ -143,11 +143,11 @@ Bakım geçmişi Excel ve PDF olarak dışa aktarılabilir. Dışa aktarımlarda
 
 ## Bakım Asistanı sesli giriş ve hızlı dışa aktarma
 
-Asistan ekranındaki mikrofon düğmesi, destekleyen mobil ve masaüstü tarayıcılarda `SpeechRecognition` ile Türkçe konuşmayı soru kutusuna çevirir. Ses metne dönüştürüldükten sonra otomatik gönderilmez; kullanıcı metni kontrol edip düzenledikten sonra soruyu gönderir. Tarayıcı desteklemiyorsa normal metin kutusu çalışmaya devam eder ve ses kaydı AGM Bakım’a kaydedilmez.
+Asistan ekranındaki mikrofon düğmesi, destekleyen mobil ve masaüstü tarayıcılarda `SpeechRecognition` ile Türkçe konuşmayı soru kutusuna çevirir. Dinleme, mikrofon izni ve hata durumları ekranda görünür; ses metne dönüştürüldükten sonra otomatik gönderilmez ve kullanıcı metni kontrol edip düzenleyebilir. Tarayıcı desteklemiyorsa normal metin kutusu çalışmaya devam eder; mobil kullanıcılar cihaz klavyesinin mikrofonunu da kullanabilir. AGM Bakım ses kaydı yüklemez veya saklamaz.
 
 Asistan cevaplarının uygun olduğu yerlerde **PDF indir** ve **Excel indir** düğmeleri görünür. Bu düğmeler cevabın dönem, motor, teknisyen veya dış hizmet filtresini mevcut `/api/export/pdf` ve `/api/export/excel` endpointlerine taşır. Export işlemi de normal oturum ve rol kontrollerinden geçer; dış hizmet kayıtları için `source=external_service`, teknisyen raporu için `technician_id` filtresi kullanılabilir.
 
-Dashboard’da gecikmiş bakım uyarısının hemen altında asistanın üç hızlı soru kartı bulunur. Kart seçildiğinde `/asistan` ekranı açılır ve soru kutusu gönderim öncesi otomatik doldurulur. Bu alan yalnızca hızlı erişim sağlar; asistanın salt okunur policy sınırlarını değiştirmez.
+Dashboard’da gecikmiş bakım uyarısının hemen altında, sayfadan ayrılmadan soru yazılabilen **Bakım Asistanı** kutusu bulunur. Kutudaki hızlı sorular doğrudan aynı alanda yanıtlanır; ayrıca detaylı cevabı açan bağlantı soruyu yeniden yazmayı veya tekrar gönder düğmesine basmayı gerektirmez. Hızlı örnekler gerçek bir motor numarası varsaymaz ve dış hizmet sorusu “Dış servisten hizmet alınan motorlar ve bakımlar hangileri?” biçimindedir. Bu alan yalnızca hızlı erişim sağlar; asistanın salt okunur policy sınırlarını değiştirmez.
 
 ## Çevrimdışı çalışma
 
