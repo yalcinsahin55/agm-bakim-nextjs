@@ -80,7 +80,7 @@ const PROMPT_INJECTION_PATTERNS = [
 
 const SENSITIVE_DATA_PATTERNS = [
   /\b(şifre|parola|password|token|secret|api\s*key|private\s*key|vapid)\b/iu,
-  /\b(telefon numarası|e-?posta adresi|email adresi|kişisel veri|kimlik numarası)\b/iu,
+  /(?:telefon numarası|e-?posta adresi|email adresi|kişisel veri|kimlik numarası)/iu,
   /\b(audit log|işlem geçmişi kayıtlarının tamamı|ham medya|base64)\b/iu,
 ];
 
@@ -93,7 +93,7 @@ const UNSAFE_DIAGNOSIS_PATTERNS = [
 
 const QUESTION_HELP_PATTERNS = [
   /ne\s+yapabilirsin/iu,
-  /yardım/iu,
+  /\byardım\b/iu,
   /hangi\s+(sorular|sorgular)/iu,
   /nasıl\s+çalış/iu,
 ];
@@ -117,6 +117,7 @@ const TECHNICIAN_PATTERNS = [
   /hangi\s+bakımlarda?\s+(çalış|görev)/iu,
   /hangi\s+motorlarda?\s+(çalış|görev)/iu,
   /hangi\s+(bakım|motor|iş).*?(çalış|görev)/iu,
+  /(?:yardımcı|destek)\s+(?:olarak\s+)?çalış/iu,
   /['’](?:in|ın|ün|un|nin|nın|nün|nun)\s+.{0,80}\bbakım/iu,
   /en\s+(çok|fazla)\s+(çalış|görev)/iu,
   /kim\s+(en\s+çok\s+)?(çalıştı|çalışmış|görev\s+(aldı|yaptı))/iu,
@@ -330,9 +331,15 @@ function periodFromQuestion(question: string): AssistantPeriod {
 
 function extractEngineQuery(question: string): string | undefined {
   const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([^,?]+)/iu);
-  if (!match) return undefined;
-  let candidate = match[1].trim();
-  candidate = candidate.replace(/\s+(?:\d{4}[-.]\d{2}[-.]\d{2}).*$/iu, "");
+  const reverseMatch = !match ? question.match(/\b([a-zçğıöşü0-9][a-zçğıöşü0-9 _-]{1,60}?)\s+motor(?:u|un|unda|ünde|ında|inde|da|de|ta|te)?\b/iu) : null;
+  const rawCandidate = match?.[1] || reverseMatch?.[1];
+  if (!rawCandidate) return undefined;
+  let candidate = rawCandidate.trim();
+  if (reverseMatch && !match) {
+    candidate = candidate.replace(/^.*\barasında\s+/iu, "");
+    candidate = candidate.replace(/^.*\b(?:için|üzerinde|ile|ve)\s+/iu, "");
+  }
+  candidate = candidate.replace(/\s+(?:(?:\d{1,2}[./-]\d{1,2}[./-]\d{4})|(?:\d{4}[-.]\d{2}[-.]\d{2})).*$/iu, "");
   candidate = candidate.split(/\s+(?=ile\b|arasında\b|üzerinde\b|bak(?:ım|ımları|ımlarını|ımı)?\b|geçmiş(?:i|ine)?\b|durum(?:u)?\b|sayısı\b|istatistiği\b|raporu\b|için\b|hangileri\b|kaç\b|hangi\b|dağılımı\b)/iu)[0]?.trim() || candidate;
   if (/^(bakım|bakımları|geçmişi|durumu|sayısı|istatistiği|raporu|için|hangileri|var|larda|motorlar?|dağılımı)$/iu.test(candidate)) return undefined;
   return candidate;
@@ -343,6 +350,7 @@ function inferIntent(question: string): AssistantIntent {
   const engineQuery = extractEngineQuery(question);
   if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
   if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
+  if (/(?:\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen)/iu.test(question) && /bakım/iu.test(question)) return "summary";
   if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question))) return "technician_performance";
   const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
     || INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question))
