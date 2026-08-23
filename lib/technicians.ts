@@ -77,6 +77,22 @@ export function normalizeTechnicianName(value: unknown): string {
     : "";
 }
 
+const TECHNICIAN_PROJECTION = {
+  _id: 1,
+  full_name: 1,
+  technician_type: 1,
+  can_be_responsible: 1,
+  can_be_support: 1,
+  allowed_work_domains: 1,
+};
+
+function toTechnicianOption(user: any): TechnicianOption | null {
+  if (user?._id == null || typeof user.full_name !== "string" || !user.full_name.trim()) return null;
+  const technician_type = normalizeTechnicianType(user.technician_type);
+  const permissions = normalizeTechnicianPermissions(user as Partial<TechnicianPermissions>, technician_type);
+  return { id: String(user._id), full_name: user.full_name.trim(), technician_type, ...permissions };
+}
+
 export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]> {
   const users = await db.collection("users").find(
     {
@@ -84,16 +100,12 @@ export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]>
       active: { $ne: false },
       approved: { $ne: false },
     },
-    { projection: { _id: 1, full_name: 1, technician_type: 1, can_be_responsible: 1, can_be_support: 1, allowed_work_domains: 1 } },
+    { projection: TECHNICIAN_PROJECTION },
   ).toArray();
 
   return users
-    .filter((user) => user._id != null && typeof user.full_name === "string" && user.full_name.trim())
-    .map((user) => {
-      const technician_type = normalizeTechnicianType(user.technician_type);
-      const permissions = normalizeTechnicianPermissions(user as Partial<TechnicianPermissions>, technician_type);
-      return { id: String(user._id), full_name: (user.full_name as string).trim(), technician_type, ...permissions };
-    })
+    .map(toTechnicianOption)
+    .filter((technician): technician is TechnicianOption => technician !== null)
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
 }
 
@@ -101,9 +113,24 @@ export async function resolveTechnicianOptions(db: Db, ids: unknown): Promise<Te
   if (!Array.isArray(ids)) return [];
   const uniqueIds = [...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0))];
   if (uniqueIds.length > 20) return null;
+  if (uniqueIds.length === 0) return [];
 
-  const technicians = await listActiveTechnicians(db);
-  const byId = new Map(technicians.map((technician) => [technician.id, technician]));
+  // Kayıt oluşturma/düzenleme sırasında tüm teknisyen listesini tekrar okumak yerine
+  // yalnızca gönderilen kimlikleri doğrula; dropdown ekranları listActiveTechnicians kullanır.
+  const usersCol = db.collection("users") as any;
+  const users = await usersCol.find(
+    {
+      _id: { $in: uniqueIds },
+      role: { $in: TECHNICIAN_ROLES },
+      active: { $ne: false },
+      approved: { $ne: false },
+    },
+    { projection: TECHNICIAN_PROJECTION },
+  ).toArray();
+  const options: TechnicianOption[] = users
+    .map((user: any) => toTechnicianOption(user))
+    .filter((technician: TechnicianOption | null): technician is TechnicianOption => technician !== null);
+  const byId = new Map<string, TechnicianOption>(options.map((technician) => [technician.id, technician]));
   if (uniqueIds.some((id) => !byId.has(id))) return null;
   return uniqueIds.map((id) => byId.get(id)!);
 }

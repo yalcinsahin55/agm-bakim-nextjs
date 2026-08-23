@@ -14,7 +14,7 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
-import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { getMaintenancePanel, invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
@@ -498,6 +498,7 @@ export default function TamamlaPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(user?.role === "yonetici" || data.confirmed ? `${data.completed.join(", ")} bakımı kaydedildi ve teyit edildi.` : `${data.completed.join(", ")} bakımı kaydedildi. Yönetici teyidi bekleniyor.`);
+        invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         router.push("/dashboard");
       } else {

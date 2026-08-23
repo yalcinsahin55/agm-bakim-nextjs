@@ -1,6 +1,7 @@
 "use client";
 
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 
 const DB_NAME = "agm-bakim-offline";
 const DB_VERSION = 1;
@@ -213,6 +214,7 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
   const remaining = await getPendingOfflineCount();
   dispatchChanged(remaining);
   if (synced > 0 && typeof window !== "undefined") {
+    invalidateMaintenancePanel();
     window.dispatchEvent(new Event("notifications:refresh"));
   }
   return { synced, remaining, error: lastError };

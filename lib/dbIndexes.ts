@@ -47,6 +47,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(auditLogs, { entity: 1, created_at: -1 }),
       createIndexSafely(auditLogs, { entity: 1, entity_id: 1, created_at: -1 }),
       createIndexSafely(users, { phone_normalized: 1 }, { unique: true, sparse: true, name: "users_phone_normalized_unique" }),
+      createIndexSafely(users, { role: 1, active: 1, approved: 1 }, { name: "users_technician_lookup" }),
       createIndexSafely(pushSubscriptions, { endpoint: 1 }, { unique: true }),
       createIndexSafely(videoChunks, { upload_id: 1, index: 1 }, { name: "video_chunks_upload_index" }),
     ]).then(() => undefined);

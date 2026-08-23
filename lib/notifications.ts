@@ -55,32 +55,51 @@ async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[]
     await collection.deleteMany({ user_id: user._id, type: "maintenance" });
   }
 
-  for (const item of actionable) {
+  const existingRows = activeKeys.length > 0
+    ? await collection.find(
+      { dedupe_key: { $in: activeKeys } },
+      { projection: { dedupe_key: 1, status: 1 } },
+    ).toArray()
+    : [];
+  const existingByKey = new Map(existingRows.map((row: any) => [String(row.dedupe_key), row]));
+  const updates = actionable.map((item) => {
     const dedupeKey = `maintenance:${user._id}:${item.engine_id}:${item.type_key}`;
     const text = notificationText(item.status as "gecikmis" | "kritik" | "yaklasiyor", item.engine_name, item.type_label, item.remaining);
-    const existing = await collection.findOne({ dedupe_key: dedupeKey }, { projection: { status: 1 } });
-    await collection.updateOne(
-      { dedupe_key: dedupeKey },
-      {
-        $set: {
-          user_id: user._id,
-          type: "maintenance",
-          status: item.status,
-          title: text.title,
-          message: text.message,
-          href: "/dashboard",
-          updated_at: now,
+    return {
+      dedupeKey,
+      text,
+      status: item.status,
+      previous: existingByKey.get(dedupeKey),
+      update: {
+        updateOne: {
+          filter: { dedupe_key: dedupeKey },
+          update: {
+            $set: {
+              user_id: user._id,
+              type: "maintenance",
+              status: item.status,
+              title: text.title,
+              message: text.message,
+              href: "/dashboard",
+              updated_at: now,
+            },
+            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, read_at: null },
+          },
+          upsert: true,
         },
-        $setOnInsert: { dedupe_key: dedupeKey, created_at: now, read_at: null },
       },
-      { upsert: true },
-    );
-    if (!existing || existing.status !== item.status) {
+    };
+  });
+  if (updates.length > 0) {
+    await collection.bulkWrite(updates.map((item) => item.update), { ordered: false });
+  }
+  for (const item of updates) {
+    if (!item.previous || item.previous.status !== item.status) {
       await sendPushToUser(db, user._id, {
-        title: text.title,
-        body: text.message,
+        title: item.text.title,
+        body: item.text.message,
         href: "/bildirimler",
-        tag: dedupeKey,
+        tag: item.dedupeKey,
       });
     }
   }
