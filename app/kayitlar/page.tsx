@@ -60,6 +60,11 @@ interface MaintenanceRecord {
   other_technicians?: Array<{ id: string; full_name: string }>;
   checklist?: Array<{ label: string; completed: boolean }>;
   completion_confirmed_at?: string;
+  manager_confirmation_status?: "pending" | "confirmed";
+  manager_confirmed_at?: string;
+  manager_confirmed_by_id?: string;
+  manager_confirmed_by_name?: string;
+  manager_confirmed_by_role?: string;
   group_id?: string | null;
 }
 
@@ -505,12 +510,15 @@ export default function KayitlarPage() {
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; filename: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmationFilter, setConfirmationFilter] = useState<"all" | "pending">("all");
 
   async function load(requestedPage = 1) {
     const params = new URLSearchParams({ page: String(requestedPage), page_size: "25" });
     if (engineFilter !== "Tümü") params.set("engine_id", engineFilter);
     if (typeFilter !== "Tümü") params.set("type_label", typeFilter);
     if (search.trim()) params.set("search", search.trim());
+    if (user?.role === "yonetici" && confirmationFilter === "pending") params.set("confirmation_status", "pending");
     const requests: Promise<Response>[] = [fetch(`/api/records?${params}`)];
     if (engines.length === 0) requests.push(fetch("/api/engines"), fetch("/api/maintenance-types"));
     const [recRes, engRes, typeRes] = await Promise.all(requests);
@@ -531,7 +539,7 @@ export default function KayitlarPage() {
     const timer = window.setTimeout(() => { load(1); }, search.trim() ? 300 : 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engineFilter, typeFilter, search]);
+  }, [engineFilter, typeFilter, search, confirmationFilter]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
@@ -563,6 +571,37 @@ export default function KayitlarPage() {
   async function openDetails(record: MaintenanceRecord) {
     const detail = await loadRecordMedia(record);
     if (detail) setSelectedRecord(detail);
+  }
+
+  async function confirmRecord(record: MaintenanceRecord) {
+    if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending" || confirmingId === record._id) return;
+    if (!window.confirm("Bu bakım kaydını kontrol ettim ve yönetici olarak teyit etmek istiyorum.")) return;
+    setConfirmingId(record._id);
+    try {
+      const res = await fetch(`/api/records/${record._id}/confirm`, { method: "POST" });
+      const data = await res.json().catch(() => ({})) as { confirmed_at?: string; confirmed_by_name?: string; confirmed_ids?: string[]; error?: string };
+      if (!res.ok) {
+        toast.error(data.error || "Bakım kaydı teyit edilemedi.");
+        return;
+      }
+      const confirmedIds = new Set(data.confirmed_ids?.length ? data.confirmed_ids : [record._id]);
+      const applyConfirmation = (item: MaintenanceRecord): MaintenanceRecord => confirmedIds.has(item._id) ? {
+        ...item,
+        manager_confirmation_status: "confirmed",
+        manager_confirmed_at: data.confirmed_at || new Date().toISOString(),
+        manager_confirmed_by_id: user.id || user._id,
+        manager_confirmed_by_name: data.confirmed_by_name || user.full_name,
+        manager_confirmed_by_role: user.role,
+      } : item;
+      setRecords((current) => current.map(applyConfirmation));
+      setSelectedRecord((current) => current ? applyConfirmation(current) : current);
+      toast.success("Bakım kaydı teyit edildi.");
+      window.dispatchEvent(new Event("notifications:refresh"));
+    } catch {
+      toast.error("Teyit işlemi sırasında sunucu hatası oluştu.");
+    } finally {
+      setConfirmingId(null);
+    }
   }
 
   async function doDelete(id: string) {
@@ -647,16 +686,28 @@ export default function KayitlarPage() {
           </select>
         </div>
 
+        {user?.role === "yonetici" && <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmationFilter((current) => current === "pending" ? "all" : "pending")}
+            className={`rounded-xl border px-3 py-2 text-[11px] font-bold transition ${confirmationFilter === "pending" ? "border-amber/60 bg-amber/15 text-amber" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-amber"}`}
+          >
+            {confirmationFilter === "pending" ? "✓ Teyit kuyruğu açık" : "Teyit bekleyenleri göster"}
+          </button>
+          {confirmationFilter === "pending" && <span className="text-[10px] text-faint">Yalnızca yönetici incelemesi bekleyen yeni kayıtlar</span>}
+        </div>}
+
         {filteredRecords.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
             <div className="text-4xl mb-3">🔍</div>
             <p className="text-sm text-muted">Kayıt bulunamadı.</p>
-            {(search || engineFilter !== "Tümü" || typeFilter !== "Tümü") && (
+            {(search || engineFilter !== "Tümü" || typeFilter !== "Tümü" || confirmationFilter !== "all") && (
               <button
                 onClick={() => {
                   setSearch("");
                   setEngineFilter("Tümü");
                   setTypeFilter("Tümü");
+                  setConfirmationFilter("all");
                 }}
                 className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
               >
@@ -722,8 +773,9 @@ export default function KayitlarPage() {
                       })}
                     </div>
                   )}
-                  <div className="text-[13px] font-bold text-text">
-                    {r.type_label} · {r.engine_name}
+                  <div className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-text">
+                    <span>{r.type_label} · {r.engine_name}</span>
+                    {r.manager_confirmation_status === "confirmed" ? <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green">✓ Teyitli</span> : r.manager_confirmation_status === "pending" ? <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
                   </div>
                   <div className="text-[11px] text-faint mt-0.5">
                     {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
@@ -740,6 +792,14 @@ export default function KayitlarPage() {
                     >
                       🔎 Detay
                     </button>
+                    {user?.role === "yonetici" && r.manager_confirmation_status === "pending" && <button
+                      type="button"
+                      onClick={() => void confirmRecord(r)}
+                      disabled={confirmingId === r._id}
+                      className="text-[11px] font-bold text-[#071a12] bg-green rounded-lg px-2.5 py-1.5 hover:brightness-110 transition disabled:opacity-50"
+                    >
+                      {confirmingId === r._id ? "Teyit ediliyor..." : "✓ Teyit et"}
+                    </button>}
                     {canEdit && (
                       <>
                         <button
@@ -837,6 +897,7 @@ export default function KayitlarPage() {
               <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(selectedRecord.maintenance_duration_minutes)}</div></div>
             </div>
             {selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
+            {selectedRecord.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>✓ Yönetici teyidi:</b> {selectedRecord.manager_confirmed_by_name || "Yönetici"} · {selectedRecord.manager_confirmed_at ? new Date(selectedRecord.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : selectedRecord.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {user?.role === "yonetici" && <button type="button" onClick={() => void confirmRecord(selectedRecord)} disabled={confirmingId === selectedRecord._id} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-[#071a12] disabled:opacity-50">{confirmingId === selectedRecord._id ? "Teyit ediliyor..." : "✓ Kontrol ettim, teyit et"}</button>}</div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
             {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}

@@ -143,7 +143,7 @@ const ENGINE_HISTORY_PATTERNS = [
 const RECORD_FILTER_PATTERNS = [
   /geriye\s+dönük|sonradan\s+girilen|backdated/iu,
   /başlangıç.*(?:eksik|yok)|bitiş.*(?:eksik|yok)|zaman\s+bilgisi.*(?:eksik|yok)|saat\s+bilgisi.*(?:eksik|yok)/iu,
-  /teyit\s*(?:edilmemiş|bekleyen|yok)|onaylanmamış|doğrulanmamış/iu,
+  /(?:teyit|teyidi)\s*(?:edilmemiş|bekleyen|yok|olmayan)|onaylanmamış|doğrulanmamış/iu,
 ];
 
 const SUMMARY_PATTERNS = [
@@ -220,7 +220,7 @@ function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQu
   const recordFilters: AssistantRecordFilter[] = [];
   if (/geriye\s+dönük|sonradan\s+girilen|backdated/iu.test(question)) recordFilters.push("backdated");
   if (/başlangıç.*(?:eksik|yok)|bitiş.*(?:eksik|yok)|zaman\s+bilgisi.*(?:eksik|yok)|saat\s+bilgisi.*(?:eksik|yok)/iu.test(question)) recordFilters.push("missing_time");
-  if (/teyit\s*(?:edilmemiş|bekleyen|yok)|onaylanmamış|doğrulanmamış/iu.test(question)) recordFilters.push("unconfirmed");
+  if (/(?:teyit|teyidi)\s*(?:edilmemiş|bekleyen|yok|olmayan)|onaylanmamış|doğrulanmamış/iu.test(question)) recordFilters.push("unconfirmed");
   const durationQuestion = /süre|süren|dakika|saatten\s+(?:fazla|uzun)|uzun\s+süren/iu.test(question);
   const hourRange = !durationQuestion && (/motor\s+saati|çalışma\s+saati|motor\s+saatinde|\d[\d.,]*\s*saat\s*(?:ile|-|–)\s*\d[\d.,]*\s*saat/iu.test(question)) ? parseRange(question, "saat(?:i)?") : undefined;
   const rawDurationRange = durationQuestion ? parseRange(question, "(?:dakika|saat)") : undefined;

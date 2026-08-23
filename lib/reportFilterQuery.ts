@@ -68,7 +68,7 @@ export async function buildMaintenanceRecordQuery(db: Db, searchParams: URLSearc
   const recordFilters = new Set((searchParams.get("record_filter") || "").split(",").map((value) => value.trim()));
   if (recordFilters.has("backdated")) clauses.push({ backdated: true });
   if (recordFilters.has("missing_time")) clauses.push({ $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }, { maintenance_end_at: { $exists: false } }, { maintenance_end_at: null }] });
-  if (recordFilters.has("unconfirmed")) clauses.push({ $or: [{ completion_confirmed_at: { $exists: false } }, { completion_confirmed_at: null }] });
+  if (recordFilters.has("unconfirmed")) clauses.push({ manager_confirmation_status: "pending" });
   const healthPairs = await healthStatusPairs(db, searchParams.get("status"));
   if (searchParams.get("status") && ["overdue", "critical", "upcoming", "normal"].includes(searchParams.get("status") || "")) {
     clauses.push(healthPairs.length ? { $or: healthPairs } : { engine_id: "__assistant_no_matching_health_status__" });

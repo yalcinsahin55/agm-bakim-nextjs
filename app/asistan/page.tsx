@@ -26,7 +26,7 @@ const QUICK_QUESTIONS = [
   "Hangi bakımlar gecikmiş?",
   "Kritik ve geriye dönük bakımlar hangileri?",
   "Başlangıç veya bitiş saati eksik bakımlar hangileri?",
-  "Teyit bekleyen bakımlar hangileri?",
+  "Yönetici teyidi bekleyen bakımlar hangileri?",
   "Bakım istatistiklerinin özeti nedir?",
   "En çok hangi teknisyen görev aldı?",
   "Bu ay fotoğraflı bakımlar hangileri?",
@@ -235,7 +235,7 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
   const statusLabels: Record<string, string> = { overdue: "Gecikmiş", critical: "Kritik", upcoming: "Yaklaşan", normal: "Normal" };
   if (typeof filters.evidence === "string" && filters.evidence) items.push(`Kanıt: ${evidenceLabels[filters.evidence] || filters.evidence}`);
   if (typeof filters.status === "string" && filters.status) items.push(`Durum: ${statusLabels[filters.status] || filters.status}`);
-  const recordLabels: Record<string, string> = { backdated: "Geriye dönük kayıt", missing_time: "Eksik başlangıç/bitiş", unconfirmed: "Teyit bekliyor" };
+  const recordLabels: Record<string, string> = { backdated: "Geriye dönük kayıt", missing_time: "Eksik başlangıç/bitiş", unconfirmed: "Yönetici teyidi bekliyor" };
   const recordFilters = Array.isArray(filters.record_filters) ? filters.record_filters.filter((value): value is string => typeof value === "string") : [];
   recordFilters.forEach((filter) => items.push(recordLabels[filter] || filter));
   if (filters.team_only === true) items.push("Ekip çalışması");

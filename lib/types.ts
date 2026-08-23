@@ -75,6 +75,11 @@ export interface MaintenanceRecord {
   other_technicians?: Array<{ id: string; full_name: string }>;
   checklist?: Array<{ label: string; completed: boolean }>;
   completion_confirmed_at?: Date | string;
+  manager_confirmation_status?: "pending" | "confirmed";
+  manager_confirmed_at?: Date | string;
+  manager_confirmed_by_id?: string;
+  manager_confirmed_by_name?: string;
+  manager_confirmed_by_role?: Role;
   created_at: Date | string;
   backdated?: boolean;
   group_id?: string;

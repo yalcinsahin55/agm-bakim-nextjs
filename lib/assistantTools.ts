@@ -129,7 +129,7 @@ async function buildRecordMatch(db: Db, query: AssistantQuery, extra: Record<str
     { maintenance_end_at: { $exists: false } },
     { maintenance_end_at: null },
   ] });
-  if (query.recordFilters?.includes("unconfirmed")) clauses.push({ $or: [{ completion_confirmed_at: { $exists: false } }, { completion_confirmed_at: null }] });
+  if (query.recordFilters?.includes("unconfirmed")) clauses.push({ manager_confirmation_status: "pending" });
   const type = await resolveMaintenanceType(db, query);
   if (query.maintenanceTypeQuery) clauses.push(type ? { $or: [{ type_key: type.key }, { type_label: type.label }] } : { type_key: "__assistant_no_matching_type__" });
   if (query.statusFilter) {

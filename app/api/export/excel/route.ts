@@ -66,6 +66,9 @@ export async function GET(req: NextRequest) {
     "SORUMLU TEKNİSYEN": record.technician_name || "",
     "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
     "NOT": record.technician_note || "",
+    "YÖNETİCİ TEYİDİ": record.manager_confirmation_status === "pending" ? "Teyit bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski kayıt",
+    "TEYİT EDEN YÖNETİCİ": record.manager_confirmed_by_name || "",
+    "TEYİT TARİHİ": record.manager_confirmed_at ? new Date(record.manager_confirmed_at).toLocaleString("tr-TR") : "",
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historyRows), "Bakım Geçmişi");
 

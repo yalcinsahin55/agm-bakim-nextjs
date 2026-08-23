@@ -12,8 +12,8 @@ import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
 export const dynamic = "force-dynamic";
 
 const MAX_ROWS = 5_000;
-const COLUMN_WIDTHS = [40, 55, 75, 38, 52, 52, 45, 52, 52, 62];
-const COLUMN_LABELS = ["Tarih", "Motor", "Bakım Türü", "Saat", "Başlangıç", "Bitiş", "Süre", "Sorumlu", "Ekip", "Not"];
+const COLUMN_WIDTHS = [38, 52, 64, 36, 46, 46, 42, 46, 46, 48, 59];
+const COLUMN_LABELS = ["Tarih", "Motor", "Bakım Türü", "Saat", "Başlangıç", "Bitiş", "Süre", "Sorumlu", "Ekip", "Not", "Teyit"];
 
 function pdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -108,6 +108,7 @@ async function createPdf(req: NextRequest) {
         record.technician_name || "",
         Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
         record.technician_note || "",
+        record.manager_confirmation_status === "pending" ? "Bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski",
       ], index % 2 === 1);
     });
   }

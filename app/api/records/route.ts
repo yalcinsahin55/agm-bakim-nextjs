@@ -26,6 +26,7 @@ async function getRecords(req: NextRequest) {
     const typeLabel = searchParams.get("type_label");
     const typeKey = searchParams.get("type_key");
     const search = searchParams.get("search")?.trim();
+    const confirmationStatus = searchParams.get("confirmation_status");
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
     const includeMedia = searchParams.get("include_media") === "true";
@@ -38,6 +39,9 @@ async function getRecords(req: NextRequest) {
     if (engineId) query.engine_id = engineId;
     if (typeLabel) query.type_label = typeLabel;
     if (typeKey) query.type_key = typeKey;
+    if (confirmationStatus === "pending" || confirmationStatus === "confirmed") {
+      query.manager_confirmation_status = confirmationStatus;
+    }
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
       query.$or = [
@@ -167,6 +171,9 @@ async function postRecord(req: NextRequest) {
       return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
     }
     const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
+    const shouldConfirmOnCreate = user.role === "yonetici";
+    const managerConfirmationStatus = shouldConfirmOnCreate ? "confirmed" : "pending";
+    const managerConfirmedAt = shouldConfirmOnCreate ? new Date() : undefined;
 
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
@@ -187,7 +194,14 @@ async function postRecord(req: NextRequest) {
         photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
         checklist: isPrimary ? (checklist || []) : [],
-        completion_confirmed_at: isPrimary && completion_confirmation === true ? new Date() : undefined,
+        ...(isPrimary && completion_confirmation === true ? { completion_confirmed_at: new Date() } : {}),
+        manager_confirmation_status: managerConfirmationStatus,
+        ...(shouldConfirmOnCreate && managerConfirmedAt ? {
+          manager_confirmed_at: managerConfirmedAt,
+          manager_confirmed_by_id: user._id,
+          manager_confirmed_by_name: user.full_name,
+          manager_confirmed_by_role: user.role,
+        } : {}),
         technician_id: responsibleTechnicianId,
         technician_name: responsibleTechnicianName,
         technician_source: useExternalService ? "external_service" : "internal",
@@ -243,10 +257,10 @@ async function postRecord(req: NextRequest) {
       action: "create",
       entity: "maintenance_record",
       entityId: groupId,
-      summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
+      summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu${shouldConfirmOnCreate ? " ve yönetici tarafından teyit edildi" : "; yönetici teyidi bekleniyor"}`,
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
-    return NextResponse.json({ ok: true, completed: completedLabels });
+    return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });
   } catch (error) {
     console.error("POST /api/records hatası:", error);
     return NextResponse.json({ error: "Bakım kaydı oluşturulurken bir hata oluştu." }, { status: 500 });

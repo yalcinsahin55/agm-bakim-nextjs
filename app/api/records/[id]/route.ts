@@ -167,6 +167,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       await recordsCol.updateOne({ _id: record._id }, { $set: { group_id: groupId } });
     }
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
+    const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
+    const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
     const typesCol = db.collection("maintenance_types") as any;
 
     for (const ex of extra_types) {
@@ -189,6 +191,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         } : {}),
         note: "", technician_note: "",
         photos_b64: [], photos: [], videos: [],
+        manager_confirmation_status: extraManagerConfirmationStatus,
+        ...(extraManagerConfirmedAt ? {
+          manager_confirmed_at: extraManagerConfirmedAt,
+          manager_confirmed_by_id: user._id,
+          manager_confirmed_by_name: user.full_name,
+          manager_confirmed_by_role: user.role,
+        } : {}),
         technician_id: nextResponsibleId, technician_name: nextResponsibleName,
         ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
         other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),

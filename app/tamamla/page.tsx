@@ -477,7 +477,7 @@ export default function TamamlaPage() {
 
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success(`${data.completed.join(", ")} bakımı başarıyla kaydedildi! 🎉`);
+        toast.success(user?.role === "yonetici" || data.confirmed ? `${data.completed.join(", ")} bakımı kaydedildi ve teyit edildi.` : `${data.completed.join(", ")} bakımı kaydedildi. Yönetici teyidi bekleniyor.`);
         window.dispatchEvent(new Event("notifications:refresh"));
         router.push("/dashboard");
       } else {
