@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ASSISTANT_POLICY_VERSION = "1.1" as const;
+export const ASSISTANT_POLICY_VERSION = "1.2" as const;
 export const MAX_ASSISTANT_QUESTION_LENGTH = 300;
 export const ASSISTANT_RATE_LIMIT = 20;
 export const ASSISTANT_RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -19,6 +19,7 @@ export type AssistantTechnicianRole = "responsible" | "support" | "any";
 export type AssistantSourceFilter = "internal" | "external_service" | "any";
 export type AssistantEvidenceFilter = "photo" | "video" | "note" | "checklist";
 export type AssistantStatusFilter = "overdue" | "critical" | "upcoming" | "normal";
+export type AssistantRecordFilter = "backdated" | "missing_time" | "unconfirmed";
 
 export type AssistantIntent =
   | "summary"
@@ -47,6 +48,7 @@ export interface AssistantQuery {
   sourceFilter?: AssistantSourceFilter;
   evidenceFilter?: AssistantEvidenceFilter;
   statusFilter?: AssistantStatusFilter;
+  recordFilters?: AssistantRecordFilter[];
   hourRange?: { min?: number; max?: number };
   durationRange?: { min?: number; max?: number };
   teamOnly?: boolean;
@@ -115,6 +117,7 @@ const TECHNICIAN_PATTERNS = [
   /hangi\s+bakımlarda?\s+(çalış|görev)/iu,
   /hangi\s+motorlarda?\s+(çalış|görev)/iu,
   /hangi\s+(bakım|motor|iş).*?(çalış|görev)/iu,
+  /['’](?:in|ın|ün|un|nin|nın|nün|nun)\s+.{0,80}\bbakım/iu,
   /en\s+(çok|fazla)\s+(çalış|görev)/iu,
   /kim\s+(en\s+çok\s+)?(çalıştı|çalışmış|görev\s+(aldı|yaptı))/iu,
 ];
@@ -134,6 +137,12 @@ const ENGINE_HISTORY_PATTERNS = [
   /son\s+bakım/iu,
   /bakım\s+geçmiş/iu,
   /motor\s+\S+/iu,
+];
+
+const RECORD_FILTER_PATTERNS = [
+  /geriye\s+dönük|sonradan\s+girilen|backdated/iu,
+  /başlangıç.*(?:eksik|yok)|bitiş.*(?:eksik|yok)|zaman\s+bilgisi.*(?:eksik|yok)|saat\s+bilgisi.*(?:eksik|yok)/iu,
+  /teyit\s*(?:edilmemiş|bekleyen|yok)|onaylanmamış|doğrulanmamış/iu,
 ];
 
 const SUMMARY_PATTERNS = [
@@ -202,18 +211,22 @@ function extractServiceQuery(question: string): string | undefined {
   return undefined;
 }
 
-function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "hourRange" | "durationRange" | "teamOnly"> {
+function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "recordFilters" | "hourRange" | "durationRange" | "teamOnly"> {
   const technicianRole: AssistantTechnicianRole | undefined = /yardımcı|destek|ekip\s+üyesi/iu.test(question) ? "support" : /sorumlu|yetkili/iu.test(question) ? "responsible" : undefined;
   const sourceFilter: AssistantSourceFilter | undefined = INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) ? "internal" : EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) ? "external_service" : undefined;
   const evidenceFilter: AssistantEvidenceFilter | undefined = /fotoğraf|fotoğraflı/iu.test(question) ? "photo" : /video|videolu/iu.test(question) ? "video" : /notu|notlu|not\s+içeren/iu.test(question) ? "note" : /kontrol\s+listesi/iu.test(question) ? "checklist" : undefined;
   const statusFilter: AssistantStatusFilter | undefined = /gecikmiş|geciken|vadesi\s+geç/iu.test(question) ? "overdue" : /kritik/iu.test(question) ? "critical" : /yaklaşan|yaklaşıyor/iu.test(question) ? "upcoming" : /normal\s+durum/iu.test(question) ? "normal" : undefined;
+  const recordFilters: AssistantRecordFilter[] = [];
+  if (/geriye\s+dönük|sonradan\s+girilen|backdated/iu.test(question)) recordFilters.push("backdated");
+  if (/başlangıç.*(?:eksik|yok)|bitiş.*(?:eksik|yok)|zaman\s+bilgisi.*(?:eksik|yok)|saat\s+bilgisi.*(?:eksik|yok)/iu.test(question)) recordFilters.push("missing_time");
+  if (/teyit\s*(?:edilmemiş|bekleyen|yok)|onaylanmamış|doğrulanmamış/iu.test(question)) recordFilters.push("unconfirmed");
   const durationQuestion = /süre|süren|dakika|saatten\s+(?:fazla|uzun)|uzun\s+süren/iu.test(question);
   const hourRange = !durationQuestion && (/motor\s+saati|çalışma\s+saati|motor\s+saatinde|\d[\d.,]*\s*saat\s*(?:ile|-|–)\s*\d[\d.,]*\s*saat/iu.test(question)) ? parseRange(question, "saat(?:i)?") : undefined;
   const rawDurationRange = durationQuestion ? parseRange(question, "(?:dakika|saat)") : undefined;
   const durationInHours = Boolean(rawDurationRange && /saat/iu.test(question) && !/motor\s+saati|çalışma\s+saati/iu.test(question));
   const durationRange = rawDurationRange ? Object.fromEntries(Object.entries(rawDurationRange).map(([key, value]) => [key, durationInHours ? Number(value) * 60 : value])) as { min?: number; max?: number } : undefined;
   const teamOnly = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question) ? true : undefined;
-  return { maintenanceTypeQuery: extractMaintenanceTypeQuery(question), serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, hourRange, durationRange, teamOnly };
+  return { maintenanceTypeQuery: extractMaintenanceTypeQuery(question), serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly };
 }
 
 function cleanQuestion(value: string): string {
@@ -331,6 +344,10 @@ function inferIntent(question: string): AssistantIntent {
   if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
   if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
   if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question))) return "technician_performance";
+  const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
+    || INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question))
+    || /fotoğraf|fotoğraflı|video|videolu|not\s+içeren|kontrol\s+listesi|\bekip\b/iu.test(question);
+  if (hasCombinedRecordFilter) return "summary";
   if (OVERDUE_PATTERNS.some((pattern) => pattern.test(question))) return "overdue";
   if (engineQuery && ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
   if (SUMMARY_PATTERNS.some((pattern) => pattern.test(question))) return "summary";

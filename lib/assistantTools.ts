@@ -122,6 +122,14 @@ async function buildRecordMatch(db: Db, query: AssistantQuery, extra: Record<str
   if (query.evidenceFilter === "note") clauses.push({ $or: [{ note: { $exists: true, $nin: [null, ""] } }, { technician_note: { $exists: true, $nin: [null, ""] } }] });
   if (query.evidenceFilter === "checklist") clauses.push({ "checklist.0": { $exists: true } });
   if (query.teamOnly) clauses.push({ $or: [{ "other_technicians.0": { $exists: true } }, { "other_technician_ids.0": { $exists: true } }] });
+  if (query.recordFilters?.includes("backdated")) clauses.push({ backdated: true });
+  if (query.recordFilters?.includes("missing_time")) clauses.push({ $or: [
+    { maintenance_start_at: { $exists: false } },
+    { maintenance_start_at: null },
+    { maintenance_end_at: { $exists: false } },
+    { maintenance_end_at: null },
+  ] });
+  if (query.recordFilters?.includes("unconfirmed")) clauses.push({ $or: [{ completion_confirmed_at: { $exists: false } }, { completion_confirmed_at: null }] });
   const type = await resolveMaintenanceType(db, query);
   if (query.maintenanceTypeQuery) clauses.push(type ? { $or: [{ type_key: type.key }, { type_label: type.label }] } : { type_key: "__assistant_no_matching_type__" });
   if (query.statusFilter) {
@@ -187,7 +195,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
     data: {
       period: query.period,
       date_range: query.dateRange || null,
-      filters: { engine: selectedEngine?.name || query.engineQuery || null, engine_id: selectedEngine ? String(selectedEngine._id) : null, maintenance_type: query.maintenanceTypeQuery || null, source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
+      filters: { engine: selectedEngine?.name || query.engineQuery || null, engine_id: selectedEngine ? String(selectedEngine._id) : null, maintenance_type: query.maintenanceTypeQuery || null, source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       total_records: total,
       external_service_records: external,
       recorded_duration_minutes: Number(totals.duration || 0),
@@ -219,7 +227,7 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
     summary: overdue.length ? `${overdue.length} gecikmiş bakım bulundu.` : "Şu anda gecikmiş bakım bulunamadı.",
     data: {
       count: overdue.length,
-      filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: selectedType ? selectedType.label : query.maintenanceTypeQuery || null, status: "overdue" },
+      filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: selectedType ? selectedType.label : query.maintenanceTypeQuery || null, status: "overdue", record_filters: query.recordFilters || [] },
       items: overdue.map((item: PanelItem) => ({
         engine_id: item.engine_id,
         engine: item.engine_name,
@@ -288,7 +296,7 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     period: query.period,
     title: `${engine.name} bakım geçmişi`,
     summary: `${engine.name} için ${periodLabel(query)} döneminde ${safeRecords.length} bakım kaydı bulundu.`,
-    data: { engine_id: String(engine._id), engine: engine.name, current_hours: Number(engine.hours || 0), date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
+    data: { engine_id: String(engine._id), engine: engine.name, current_hours: Number(engine.hours || 0), date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
   };
 }
 
@@ -346,7 +354,9 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       projection: { _id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
     }).sort({ created_at: -1 }).limit(50).toArray();
     const typeCounts = new Map<string, number>();
+    const typeEngineCounts = new Map<string, Map<string, { engine_id: string; engine: string; count: number }>>();
     const engineCounts = new Map<string, { engine_id: string; engine: string; count: number }>();
+    const engineTypeCounts = new Map<string, Map<string, number>>();
     activities = selectedRecords.map((record: any) => {
       const isResponsible = String(record.technician_id) === selected.id || normalizeTechnicianName(record.technician_name) === normalizeTechnicianName(selected.full_name);
       const type = record.type_label || "Bilinmeyen";
@@ -356,6 +366,14 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       const engineRow = engineCounts.get(engineKey) || { engine_id: engineKey, engine, count: 0 };
       engineRow.count += 1;
       engineCounts.set(engineKey, engineRow);
+      const typeEngines = typeEngineCounts.get(type) || new Map<string, { engine_id: string; engine: string; count: number }>();
+      const typeEngineRow = typeEngines.get(engineKey) || { engine_id: engineKey, engine, count: 0 };
+      typeEngineRow.count += 1;
+      typeEngines.set(engineKey, typeEngineRow);
+      typeEngineCounts.set(type, typeEngines);
+      const engineTypes = engineTypeCounts.get(engineKey) || new Map<string, number>();
+      engineTypes.set(type, (engineTypes.get(type) || 0) + 1);
+      engineTypeCounts.set(engineKey, engineTypes);
       return {
         id: String(record._id),
         engine_id: record.engine_id || null,
@@ -367,9 +385,25 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
         created_at: record.created_at || null,
       };
     });
-    activityByType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([type, count]) => ({ type, count }));
-    activityByEngine = [...engineCounts.values()].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr"));
+    activityByType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([type, count]) => ({ type, count, engines: [...(typeEngineCounts.get(type)?.values() || [])].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")) }));
+    activityByEngine = [...engineCounts.values()].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")).map((engine) => ({ ...engine, type_stats: [...(engineTypeCounts.get(engine.engine_id)?.entries() || [])].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count || a.type.localeCompare(b.type, "tr")) }));
   }
+  const technicianDetails = await Promise.all(resultRows.slice(0, 12).map(async (technician) => {
+    if (!technician.technician_id || technician.technician_id === "unknown") return { technician_id: technician.technician_id, by_type: [], by_engine: [] };
+    const detailMatch = { $and: [match, { $or: [{ technician_id: technician.technician_id }, { "other_technicians.id": technician.technician_id }] }] };
+    const [detail] = await records.aggregate([
+      { $match: detailMatch },
+      { $facet: {
+        byType: [{ $group: { _id: "$type_label", count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 20 }],
+        byEngine: [{ $group: { _id: { engine_id: "$engine_id", engine: "$engine_name" }, count: { $sum: 1 } } }, { $sort: { count: -1, "_id.engine": 1 } }, { $limit: 20 }],
+      } },
+    ]).toArray();
+    return {
+      technician_id: technician.technician_id,
+      by_type: (detail?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0) })),
+      by_engine: (detail?.byEngine || []).map((item: any) => ({ engine_id: item._id?.engine_id || null, engine: item._id?.engine || "Bilinmeyen", count: Number(item.count || 0) })),
+    };
+  }));
   const totalTasks = resultRows.reduce((sum, item) => sum + item.responsible_count + item.support_count, 0);
   const totalDuration = resultRows.reduce((sum, item) => sum + item.duration_minutes, 0);
   const topTechnician = resultRows[0];
@@ -380,7 +414,7 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     summary: selected
       ? `${selected.full_name} için ${periodLabel(query)} döneminde ${totalTasks} görev ve ${formatMinutes(totalDuration)} katkı süresi bulundu. ${activityByType.length} farklı bakım türünde çalıştı.`
       : `${periodLabel(query)} ${totalTasks} teknisyen görevi ve ${formatMinutes(totalDuration)} toplam katkı süresi bulundu.${topTechnician ? ` En çok görev alan teknisyen: ${topTechnician.technician} (${topTechnician.responsible_count + topTechnician.support_count} görev).` : ""}`,
-    data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selected ? { id: selected.id, full_name: selected.full_name } : null, top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), activities, by_type: activityByType, by_engine: activityByEngine },
+    data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selected ? { id: selected.id, full_name: selected.full_name } : null, top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), technician_details: technicianDetails, activities, by_type: activityByType, by_engine: activityByEngine },
   };
 }
 
@@ -416,7 +450,7 @@ async function getExternalServiceSummary(db: Db, query: AssistantQuery): Promise
       duration_minutes: Number(totals.duration || 0),
       duration_text: formatMinutes(Number(totals.duration || 0)),
       services: (row?.services || []).map((item: any) => ({ service: item._id || "Harici servis", count: Number(item.count || 0), duration_minutes: Number(item.duration || 0) })),
-      filters: { service: query.serviceQuery || null, engine: query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, evidence: query.evidenceFilter || null, hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
+      filters: { service: query.serviceQuery || null, engine: query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       engines: (row?.engines || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0) })),
     },
   };

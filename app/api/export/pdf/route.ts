@@ -33,7 +33,7 @@ async function createPdf(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
-  const query = buildMaintenanceRecordQuery(searchParams);
+  const query = await buildMaintenanceRecordQuery(db, searchParams);
 
   const engines = await (db.collection("engines") as any).find({}, { projection: { _id: 1, name: 1 } }).toArray();
   const selectedEngine = engineFilter ? engines.find((engine: any) => engine._id === engineFilter || engine.name === engineFilter) : null;

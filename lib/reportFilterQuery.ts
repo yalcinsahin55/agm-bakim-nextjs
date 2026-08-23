@@ -1,3 +1,6 @@
+import type { Db } from "mongodb";
+import { buildItems } from "@/lib/status";
+import type { Engine, MaintenanceType } from "@/lib/types";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 
 function escapeRegex(value: string): string {
@@ -16,7 +19,19 @@ function dateParam(value: string | null, endOfDay = false): Date | undefined {
   return Number.isFinite(date.getTime()) ? date : undefined;
 }
 
-export function buildMaintenanceRecordQuery(searchParams: URLSearchParams): Record<string, unknown> {
+async function healthStatusPairs(db: Db, status: string | null): Promise<Array<{ engine_id: string; type_key: string }>> {
+  if (!status || !["overdue", "critical", "upcoming", "normal"].includes(status)) return [];
+  const [engines, types] = await Promise.all([
+    db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
+  ]);
+  const target = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
+  return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])
+    .filter((item) => item.status === target)
+    .map((item) => ({ engine_id: item.engine_id, type_key: item.type_key }));
+}
+
+export async function buildMaintenanceRecordQuery(db: Db, searchParams: URLSearchParams): Promise<Record<string, unknown>> {
   const clauses: Record<string, unknown>[] = [];
   const engine = searchParams.get("engine_id")?.trim();
   const type = searchParams.get("type_label")?.trim();
@@ -50,6 +65,14 @@ export function buildMaintenanceRecordQuery(searchParams: URLSearchParams): Reco
   if (evidence === "note") clauses.push({ $or: [{ note: { $exists: true, $nin: [null, ""] } }, { technician_note: { $exists: true, $nin: [null, ""] } }] });
   if (evidence === "checklist") clauses.push({ "checklist.0": { $exists: true } });
   if (searchParams.get("team_only") === "true") clauses.push({ $or: [{ "other_technicians.0": { $exists: true } }, { "other_technician_ids.0": { $exists: true } }] });
+  const recordFilters = new Set((searchParams.get("record_filter") || "").split(",").map((value) => value.trim()));
+  if (recordFilters.has("backdated")) clauses.push({ backdated: true });
+  if (recordFilters.has("missing_time")) clauses.push({ $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }, { maintenance_end_at: { $exists: false } }, { maintenance_end_at: null }] });
+  if (recordFilters.has("unconfirmed")) clauses.push({ $or: [{ completion_confirmed_at: { $exists: false } }, { completion_confirmed_at: null }] });
+  const healthPairs = await healthStatusPairs(db, searchParams.get("status"));
+  if (searchParams.get("status") && ["overdue", "critical", "upcoming", "normal"].includes(searchParams.get("status") || "")) {
+    clauses.push(healthPairs.length ? { $or: healthPairs } : { engine_id: "__assistant_no_matching_health_status__" });
+  }
   const service = searchParams.get("service")?.trim();
   if (service) {
     const escaped = escapeRegex(service);

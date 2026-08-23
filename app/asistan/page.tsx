@@ -24,6 +24,9 @@ interface AssistantMessage {
 const QUICK_QUESTIONS = [
   "Bu ay kaç bakım yapıldı?",
   "Hangi bakımlar gecikmiş?",
+  "Kritik ve geriye dönük bakımlar hangileri?",
+  "Başlangıç veya bitiş saati eksik bakımlar hangileri?",
+  "Teyit bekleyen bakımlar hangileri?",
   "Bakım istatistiklerinin özeti nedir?",
   "En çok hangi teknisyen görev aldı?",
   "Bu ay fotoğraflı bakımlar hangileri?",
@@ -173,6 +176,9 @@ function buildExportQuery(intent: string | undefined, period: string | undefined
   if (typeof filters.maintenance_type === "string" && filters.maintenance_type) query.type_label = filters.maintenance_type;
   if (typeof filters.service === "string" && filters.service) query.service = filters.service;
   if (typeof filters.evidence === "string" && filters.evidence) query.evidence = filters.evidence;
+  if (typeof filters.status === "string" && filters.status) query.status = filters.status;
+  const recordFilters = Array.isArray(filters.record_filters) ? filters.record_filters.filter((value): value is string => typeof value === "string") : [];
+  if (recordFilters.length) query.record_filter = recordFilters.join(",");
   if (filters.team_only === true) query.team_only = "true";
   const hourRange = filters.hour_range && typeof filters.hour_range === "object" ? filters.hour_range as Record<string, unknown> : null;
   if (hourRange?.min !== undefined) query.hour_min = String(hourRange.min);
@@ -229,6 +235,9 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
   const statusLabels: Record<string, string> = { overdue: "Gecikmiş", critical: "Kritik", upcoming: "Yaklaşan", normal: "Normal" };
   if (typeof filters.evidence === "string" && filters.evidence) items.push(`Kanıt: ${evidenceLabels[filters.evidence] || filters.evidence}`);
   if (typeof filters.status === "string" && filters.status) items.push(`Durum: ${statusLabels[filters.status] || filters.status}`);
+  const recordLabels: Record<string, string> = { backdated: "Geriye dönük kayıt", missing_time: "Eksik başlangıç/bitiş", unconfirmed: "Teyit bekliyor" };
+  const recordFilters = Array.isArray(filters.record_filters) ? filters.record_filters.filter((value): value is string => typeof value === "string") : [];
+  recordFilters.forEach((filter) => items.push(recordLabels[filter] || filter));
   if (filters.team_only === true) items.push("Ekip çalışması");
   const hourRange = filters.hour_range && typeof filters.hour_range === "object" ? filters.hour_range as Record<string, unknown> : null;
   const durationRange = filters.duration_range && typeof filters.duration_range === "object" ? filters.duration_range as Record<string, unknown> : null;
@@ -241,6 +250,7 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
 function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent?: string }) {
   const [expandedEngineId, setExpandedEngineId] = useState<string | null>(null);
   const [expandedType, setExpandedType] = useState<string | null>(null);
+  const [expandedTechnicianId, setExpandedTechnicianId] = useState<string | null>(null);
   const overdueItems = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
   const records = Array.isArray(data.records) ? data.records as Array<Record<string, unknown>> : [];
   const technicians = Array.isArray(data.technicians) ? data.technicians as Array<Record<string, unknown>> : [];
@@ -250,6 +260,20 @@ function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent
   const activities = Array.isArray(data.activities) ? data.activities as Array<Record<string, unknown>> : [];
   const byType = Array.isArray(data.by_type) ? data.by_type as Array<Record<string, unknown>> : [];
   const topTechnician = data.top_technician && typeof data.top_technician === "object" ? data.top_technician as Record<string, unknown> : null;
+  const technicianDetails = Array.isArray(data.technician_details) ? data.technician_details as Array<Record<string, unknown>> : [];
+  const technicianDetailMap = new Map(technicianDetails.map((detail) => [String(detail.technician_id), detail]));
+  const topTechnicianId = topTechnician ? String(topTechnician.id || "") : "";
+  const topTechnicianDetail = topTechnicianId ? technicianDetailMap.get(topTechnicianId) : undefined;
+  const topTechnicianByType = topTechnicianDetail && Array.isArray(topTechnicianDetail.by_type) ? topTechnicianDetail.by_type as Array<Record<string, unknown>> : [];
+  const topTechnicianByEngine = topTechnicianDetail && Array.isArray(topTechnicianDetail.by_engine) ? topTechnicianDetail.by_engine as Array<Record<string, unknown>> : [];
+  const technicianRanking = <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Teknisyen sıralaması</div>{technicians.slice(0, 12).map((technician) => {
+    const technicianId = String(technician.technician_id || technician.technician || "");
+    const detail = technicianDetailMap.get(technicianId);
+    const detailByType = detail && Array.isArray(detail.by_type) ? detail.by_type as Array<Record<string, unknown>> : [];
+    const detailByEngine = detail && Array.isArray(detail.by_engine) ? detail.by_engine as Array<Record<string, unknown>> : [];
+    const expanded = expandedTechnicianId === technicianId;
+    return <div key={technicianId} className="border-b border-border last:border-0"><button type="button" onClick={() => setExpandedTechnicianId(expanded ? null : technicianId)} aria-expanded={expanded} className="flex w-full items-center justify-between gap-2 py-2 text-left hover:text-amber"><span className="truncate text-[10.5px] font-bold text-text">{stringValue(technician.technician)}</span><span className="flex-shrink-0 font-mono text-[10px] text-muted">{Number(technician.responsible_count || 0) + Number(technician.support_count || 0)} görev · {expanded ? "kapat ↑" : "detay →"}</span></button>{expanded && <div className="mb-2 grid gap-2 rounded-md border border-amber/20 bg-amber/5 px-2.5 py-2 sm:grid-cols-2"><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Bakım türleri</div>{detailByType.length ? detailByType.map((row) => <div key={String(row.type)} className="flex justify-between gap-2 border-b border-border/70 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.type)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Bakım türü detayı yok.</div>}</div><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Çalışılan motorlar</div>{detailByEngine.length ? detailByEngine.map((row) => <div key={String(row.engine_id)} className="flex justify-between gap-2 border-b border-border/70 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.engine)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Motor detayı yok.</div>}</div></div>}</div>;
+  })}</div>;
   const examples = Array.isArray(data.examples) ? data.examples.filter((item): item is string => typeof item === "string") : [];
   const breakdowns = <div className="mt-3 grid gap-2 sm:grid-cols-2">
     {byEngine.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Motor dağılımı</div>{byEngine.map((row) => {
@@ -280,16 +304,14 @@ function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent
 
   if (activities.length > 0 || technicians.length > 0 || (topTechnician && intent === "technician_performance")) {
     return <div className="mt-3 grid gap-2">
-      {topTechnician && intent === "technician_performance" && <div className="rounded-lg border border-amber/30 bg-amber/10 p-2.5"><div className="text-[9px] font-bold uppercase tracking-wide text-amber">En çok görev alan teknisyen</div><div className="mt-1 flex items-center justify-between gap-2"><span className="truncate text-[11.5px] font-bold text-text">{stringValue(topTechnician.full_name)}</span><span className="font-mono text-[10.5px] font-bold text-amber">{Number(topTechnician.total_tasks || 0)} görev</span></div></div>}
+      {topTechnician && intent === "technician_performance" && <div className="rounded-lg border border-amber/30 bg-amber/10 p-2.5"><button type="button" onClick={() => setExpandedTechnicianId(expandedTechnicianId === topTechnicianId ? null : topTechnicianId)} aria-expanded={expandedTechnicianId === topTechnicianId} className="w-full text-left"><div className="text-[9px] font-bold uppercase tracking-wide text-amber">En çok görev alan teknisyen</div><div className="mt-1 flex items-center justify-between gap-2"><span className="truncate text-[11.5px] font-bold text-text">{stringValue(topTechnician.full_name)}</span><span className="font-mono text-[10.5px] font-bold text-amber">{Number(topTechnician.total_tasks || 0)} görev · {expandedTechnicianId === topTechnicianId ? "kapat ↑" : "detay →"}</span></div></button>{expandedTechnicianId === topTechnicianId && <div className="mt-2 grid gap-2 border-t border-amber/20 pt-2 sm:grid-cols-2"><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Bakım türleri</div>{topTechnicianByType.length ? topTechnicianByType.map((row) => <div key={String(row.type)} className="flex justify-between gap-2 border-b border-amber/10 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.type)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Bakım türü detayı yok.</div>}</div><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Çalışılan motorlar</div>{topTechnicianByEngine.length ? topTechnicianByEngine.map((row) => <div key={String(row.engine_id)} className="flex justify-between gap-2 border-b border-amber/10 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.engine)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Motor detayı yok.</div>}</div></div>}</div>}
       {activities.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Çalışılan bakım ve motorlar</div>{activities.slice(0, 12).map((activity) => <div key={String(activity.id)} className="flex items-start justify-between gap-2 border-b border-border py-1.5 last:border-0"><div className="min-w-0"><div className="truncate text-[10.5px] font-bold text-text">{stringValue(activity.type)}</div><div className="truncate text-[9.5px] text-muted">{stringValue(activity.engine)} · {stringValue(activity.role)}</div></div><div className="flex-shrink-0 text-right text-[9px] text-faint">{formatDate(activity.created_at)}<br />{formatMinutes(activity.duration_minutes)}</div></div>)}</div>}
       {byEngine.length > 0 || byType.length > 0 ? breakdowns : null}
-      {technicians.length > 0 && !activities.length && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Teknisyen sıralaması</div>{technicians.slice(0, 12).map((technician) => <div key={String(technician.technician_id)} className="flex items-center justify-between gap-2 border-b border-border py-1.5 last:border-0"><span className="truncate text-[10.5px] font-bold text-text">{stringValue(technician.technician)}</span><span className="font-mono text-[10px] text-muted">{Number(technician.responsible_count || 0) + Number(technician.support_count || 0)} görev</span></div>)}</div>}
+      {technicians.length > 0 && !activities.length ? technicianRanking : null}
     </div>;
   }
 
-  if (technicians.length > 0) {
-    return <div className="mt-3 grid gap-2">{technicians.slice(0, 8).map((technician) => <div key={String(technician.technician_id)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="flex items-center justify-between gap-2"><div className="truncate text-[11px] font-bold text-text">{stringValue(technician.technician)}</div><div className="font-mono text-[10px] font-bold text-amber">{Number(technician.responsible_count || 0) + Number(technician.support_count || 0)} görev</div></div><div className="mt-1.5 grid grid-cols-3 gap-2 text-[9px] text-faint"><span>Sorumlu: <b className="text-muted">{Number(technician.responsible_count || 0)}</b></span><span>Destek: <b className="text-muted">{Number(technician.support_count || 0)}</b></span><span>Süre: <b className="text-muted">{formatMinutes(technician.duration_minutes)}</b></span></div></div>)}</div>;
-  }
+  if (technicians.length > 0) return <div className="mt-3">{technicianRanking}</div>;
 
   if (services.length > 0 || engines.length > 0) {
     return <div className="mt-3 grid gap-2">{services.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Servisler</div>{services.map((service) => <div key={String(service.service)} className="flex justify-between gap-2 border-b border-border py-1.5 last:border-0"><span className="truncate text-[10.5px] text-muted">{stringValue(service.service)}</span><span className="font-mono text-[10px] text-text">{Number(service.count || 0)} kayıt</span></div>)}</div>}{engines.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Motorlar</div>{engines.map((engine) => <div key={String(engine.engine_id)} className="flex justify-between gap-2 border-b border-border py-1.5 last:border-0"><span className="truncate text-[10.5px] text-muted">{stringValue(engine.engine)}</span><span className="font-mono text-[10px] text-text">{Number(engine.count || 0)} kayıt</span></div>)}</div>}</div>;

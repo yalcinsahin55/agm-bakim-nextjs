@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
   const typeFilter = searchParams.get("type_label");
-  const recordQuery = buildMaintenanceRecordQuery(searchParams);
+  const recordQuery = await buildMaintenanceRecordQuery(db, searchParams);
 
   const allEngines = await (db.collection("engines") as any).find().toArray();
   allEngines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
