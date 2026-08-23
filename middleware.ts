@@ -4,10 +4,11 @@ import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "agm_session";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/icon", "/manifest", "/fonts", "/sw.js"];
+const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/fonts", "/sw.js"];
+const PUBLIC_EXACT_PATHS = new Set(["/icon.svg", "/manifest.json", "/manifest.webmanifest"]);
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return PUBLIC_EXACT_PATHS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 function unauthorized(req: NextRequest, pathname: string): NextResponse {
