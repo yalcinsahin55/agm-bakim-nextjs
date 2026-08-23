@@ -316,10 +316,12 @@ function periodFromQuestion(question: string): AssistantPeriod {
 }
 
 function extractEngineQuery(question: string): string | undefined {
-  const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([a-z0-9][a-z0-9._-]*)/iu);
+  const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([^,?]+)/iu);
   if (!match) return undefined;
-  const candidate = match[1].trim();
-  if (/^(bakım|bakımları|geçmişi|durumu|sayısı|istatistiği|raporu|için|hangileri|var|larda|larda)$/iu.test(candidate)) return undefined;
+  let candidate = match[1].trim();
+  candidate = candidate.replace(/\s+(?:\d{4}[-.]\d{2}[-.]\d{2}).*$/iu, "");
+  candidate = candidate.split(/\s+(?=ile\b|arasında\b|üzerinde\b|bak(?:ım|ımları|ımlarını|ımı)?\b|geçmiş(?:i|ine)?\b|durum(?:u)?\b|sayısı\b|istatistiği\b|raporu\b|için\b|hangileri\b|kaç\b|hangi\b|dağılımı\b)/iu)[0]?.trim() || candidate;
+  if (/^(bakım|bakımları|geçmişi|durumu|sayısı|istatistiği|raporu|için|hangileri|var|larda|motorlar?|dağılımı)$/iu.test(candidate)) return undefined;
   return candidate;
 }
 

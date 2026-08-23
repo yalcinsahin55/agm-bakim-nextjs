@@ -162,12 +162,14 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
           },
         ],
         byEngine: [
-          { $group: { _id: "$engine_id", engine: { $first: "$engine_name" }, count: { $sum: 1 }, types: { $addToSet: "$type_label" } } },
+          { $group: { _id: { engine_id: "$engine_id", engine: "$engine_name", type: "$type_label" }, count: { $sum: 1 } } },
+          { $group: { _id: "$_id.engine_id", engine: { $first: "$_id.engine" }, count: { $sum: "$count" }, type_stats: { $push: { type: "$_id.type", count: "$count" } } } },
           { $sort: { count: -1, engine: 1 } },
           { $limit: 8 },
         ],
         byType: [
-          { $group: { _id: "$type_label", count: { $sum: 1 }, engines: { $addToSet: { engine_id: "$engine_id", engine: "$engine_name" } } } },
+          { $group: { _id: { type: "$type_label", engine_id: "$engine_id", engine: "$engine_name" }, count: { $sum: 1 } } },
+          { $group: { _id: "$_id.type", count: { $sum: "$count" }, engines: { $push: { engine_id: "$_id.engine_id", engine: "$_id.engine", count: "$count" } } } },
           { $sort: { count: -1, _id: 1 } },
           { $limit: 8 },
         ],
@@ -190,8 +192,8 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
       external_service_records: external,
       recorded_duration_minutes: Number(totals.duration || 0),
       recorded_duration_text: formatMinutes(Number(totals.duration || 0)),
-      by_engine: (row?.byEngine || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0), types: Array.isArray(item.types) ? item.types.filter(Boolean).sort((a: string, b: string) => a.localeCompare(b, "tr")) : [] })),
-      by_type: (row?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0), engines: Array.isArray(item.engines) ? item.engines.filter((engine: any) => engine && engine.engine_id).sort((a: any, b: any) => String(a.engine).localeCompare(String(b.engine), "tr")) : [] })),
+      by_engine: (row?.byEngine || []).map((item: any) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0), type_stats: Array.isArray(item.type_stats) ? item.type_stats.filter((type: any) => type && type.type).sort((a: any, b: any) => Number(b.count || 0) - Number(a.count || 0) || String(a.type).localeCompare(String(b.type), "tr")) : [] })),
+      by_type: (row?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0), engines: Array.isArray(item.engines) ? item.engines.filter((engine: any) => engine && engine.engine_id).sort((a: any, b: any) => Number(b.count || 0) - Number(a.count || 0) || String(a.engine).localeCompare(String(b.engine), "tr")) : [] })),
     },
   };
 }
@@ -234,10 +236,13 @@ async function findEngine(db: Db, engineQuery: string) {
   const value = engineQuery.trim();
   const escaped = escapeRegex(value);
   const engines = db.collection("engines") as any;
-  return engines.findOne(
-    { $or: [{ _id: value }, { name: { $regex: escaped, $options: "i" } }] },
-    { projection: { _id: 1, name: 1, hours: 1 } },
+  const projection = { projection: { _id: 1, name: 1, hours: 1 } };
+  const exact = await engines.findOne(
+    { $or: [{ _id: value }, { name: { $regex: `^${escaped}$`, $options: "i" } }] },
+    projection,
   );
+  if (exact) return exact;
+  return engines.findOne({ name: { $regex: escaped, $options: "i" } }, projection);
 }
 
 async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
