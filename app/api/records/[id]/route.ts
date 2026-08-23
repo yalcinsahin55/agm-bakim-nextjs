@@ -78,9 +78,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
   const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item: any) => item.type_key) : [];
-  const selectedTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys, ...(Array.isArray(extra_types) ? extra_types.map((item: any) => item.type_key) : [])])];
-  const selectedTypeDocs = await (db.collection("maintenance_types") as any).find({ _id: { $in: selectedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } }).toArray();
-  if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı." }, { status: 404 });
+  const historicalTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys])];
+  const historicalTypeKeySet = new Set(historicalTypeKeys);
+  const requestedExtraTypeKeys = Array.isArray(extra_types)
+    ? extra_types.map((item: any) => item?.type_key).filter((key: unknown): key is string => typeof key === "string" && key.length > 0)
+    : [];
+  const selectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
+  const allSelectedTypeDocs = await (db.collection("maintenance_types") as any).find(
+    { _id: { $in: selectedTypeKeys } },
+    { projection: { _id: 1, label: 1, is_deleted: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } },
+  ).toArray();
+  // Geçmiş kaydın mevcut türü artık arşivlenmiş olsa bile temel düzenlemeler engellenmez.
+  // Ancak yeni eklenmek istenen türler mutlaka aktif olmalıdır.
+  const selectedTypeDocs = allSelectedTypeDocs.filter((type: any) => type.is_deleted !== true || historicalTypeKeySet.has(String(type._id)));
+  if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı veya artık aktif değil." }, { status: 404 });
   let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
   let nextResponsibleName = useExternalService
     ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
