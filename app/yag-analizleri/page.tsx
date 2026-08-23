@@ -31,8 +31,6 @@ interface OilAnalysis {
   created_at: string;
 }
 
-const RESULT_ICON: Record<string, string> = { "İyi": "🟢", "Dikkat": "", "Kötü": "🔴" };
-
 export default function YagAnalizleriPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
@@ -48,6 +46,8 @@ export default function YagAnalizleriPage() {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [filterEngine, setFilterEngine] = useState("Tümü");
+  const [search, setSearch] = useState("");
+  const [resultFilter, setResultFilter] = useState<"Tümü" | "İyi" | "Dikkat" | "Kötü">("Tümü");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [preview, setPreview] = useState<OilAnalysis | null>(null);
   const canWrite = user?.role === "yonetici";
@@ -169,7 +169,13 @@ export default function YagAnalizleriPage() {
     }
   }
 
-  const filtered = filterEngine === "Tümü" ? analyses : analyses.filter((a) => a.engine_id === filterEngine);
+  const filtered = analyses.filter((analysis) => {
+    const matchesEngine = filterEngine === "Tümü" || analysis.engine_id === filterEngine;
+    const matchesResult = resultFilter === "Tümü" || analysis.result === resultFilter;
+    const needle = search.trim().toLocaleLowerCase("tr-TR");
+    const matchesSearch = !needle || [analysis.engine_name, analysis.pdf_filename, analysis.uploaded_by, analysis.note].filter(Boolean).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(needle));
+    return matchesEngine && matchesResult && matchesSearch;
+  });
 
   if (loading) {
     return (
@@ -208,7 +214,7 @@ export default function YagAnalizleriPage() {
 
   return (
     <div>
-      <TopBar title="Yağ Analizleri" subtitle={`${filtered.length} rapor listeleniyor`} />
+      <TopBar title="Yağ Analizleri" subtitle={`${filtered.length}/${analyses.length} rapor listeleniyor`} />
       <div className="px-4 py-4">
         {canWrite && (
           <button
@@ -237,7 +243,7 @@ export default function YagAnalizleriPage() {
               📄 {file ? file.name : "PDF raporu seç"}
               <input type="file" accept="application/pdf" onChange={(e: ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] || null)} className="hidden" />
             </label>
-            <button onClick={submit} disabled={saving} className="py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+            <button onClick={submit} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
@@ -248,10 +254,18 @@ export default function YagAnalizleriPage() {
           </div>
         )}
 
-        <select value={filterEngine} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterEngine(e.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition">
-          <option value="Tümü">Tüm Motorlar</option>
-          {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-        </select>
+        <div className="mb-3 rounded-card border border-border bg-panel p-3">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Motor veya numune ara..." aria-label="Motor veya numune ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <select value={filterEngine} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterEngine(e.target.value)} aria-label="Analiz motor filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal transition">
+              <option value="Tümü">Tüm motorlar</option>
+              {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
+            </select>
+            <select value={resultFilter} onChange={(event) => setResultFilter(event.target.value as "Tümü" | "İyi" | "Dikkat" | "Kötü")} aria-label="Analiz sonuç filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal transition">
+              <option value="Tümü">Tüm sonuçlar</option><option value="İyi">İyi</option><option value="Dikkat">Dikkat</option><option value="Kötü">Kötü</option>
+            </select>
+          </div>
+        </div>
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
@@ -262,36 +276,19 @@ export default function YagAnalizleriPage() {
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
             {filtered.map((a) => (
               <div key={a._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-lg" aria-hidden="true">🧪</div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-bold text-text truncate">{a.engine_name} · {RESULT_ICON[a.result] || "⚪"} {a.result}</div>
-                    <div className="text-[11px] text-faint mt-0.5">{new Date(a.analysis_date).toLocaleDateString("tr-TR")} · {a.uploaded_by}</div>
-                    {a.note && <div className="text-[11.5px] text-muted mt-1">📝 {a.note}</div>}
+                    <div className="truncate text-[13px] font-bold text-text">{a.engine_name}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-teal"><span className="h-1.5 w-1.5 rounded-full bg-teal" aria-hidden="true" />{a.result}</div>
+                    <div className="mt-1 text-[11px] text-faint">{new Date(a.analysis_date).toLocaleDateString("tr-TR")} · {a.uploaded_by}</div>
+                    {a.note && <div className="mt-1 text-[11px] text-muted">📝 {a.note}</div>}
                   </div>
+                  <button type="button" onClick={() => void openPreview(a)} className="flex-shrink-0 rounded-lg border border-teal/40 px-2.5 py-1.5 text-[10.5px] font-bold text-teal hover:bg-teal/10 transition" aria-label={`${a.engine_name} PDF önizlemesini aç`}>PDF’yi aç</button>
                 </div>
-                <div className="flex gap-2 mt-2.5">
-                  <button
-                    onClick={() => openPreview(a)}
-                    className="flex-1 text-[11px] font-bold text-amber border border-amber/40 rounded-lg px-2.5 py-1.5 hover:bg-amber/10 transition"
-                  >
-                    👁️ Görüntüle
-                  </button>
-                  <button
-                    onClick={() => downloadPdf(a)}
-                    className="flex-1 text-center text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
-                  >
-                    📄 İndir
-                  </button>
-                  {(user?.role === "yonetici" || user?._id === a.uploaded_by_id) && (
-                    confirmDeleteId === a._id ? (
-                      <>
-                        <button onClick={() => remove(a._id)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition">Evet</button>
-                        <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition">Vazgeç</button>
-                      </>
-                    ) : (
-                      <button onClick={() => setConfirmDeleteId(a._id)} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition">🗑️</button>
-                    )
-                  )}
+                <div className="mt-2.5 flex flex-wrap gap-2 border-t border-border pt-2.5">
+                  <button type="button" onClick={() => void downloadPdf(a)} className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted hover:border-teal/40 hover:text-teal transition">📄 İndir</button>
+                  {(user?.role === "yonetici" || user?._id === a.uploaded_by_id) && (confirmDeleteId === a._id ? <><button type="button" onClick={() => void remove(a._id)} className="rounded-lg bg-red px-2.5 py-1.5 text-[11px] font-bold text-white hover:brightness-110 transition">Evet</button><button type="button" onClick={() => setConfirmDeleteId(null)} className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted hover:bg-panel2 transition">Vazgeç</button></> : <button type="button" onClick={() => setConfirmDeleteId(a._id)} className="rounded-lg border border-red/40 px-2.5 py-1.5 text-[11px] font-bold text-red hover:bg-red/10 transition">Sil</button>)}
                 </div>
               </div>
             ))}

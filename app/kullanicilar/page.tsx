@@ -15,6 +15,19 @@ const TECHNICIAN_TYPES = [
   { value: "elektromekanik", label: "Elektromekanik teknisyen" },
 ];
 
+type UserRow = {
+  id: string;
+  full_name: string;
+  phone?: string;
+  email?: string;
+  role: string;
+  technician_type?: string;
+  approved?: boolean;
+  active?: boolean;
+};
+
+type UserStatusFilter = "all" | "active" | "inactive";
+
 const ROLE_COLORS = {
   yonetici: "text-amber bg-amber/10 border-amber/30",
   planlamaci: "text-teal bg-teal/10 border-teal/30",
@@ -29,8 +42,11 @@ function initials(name) {
 export default function KullanicilarPage() {
   const router = useRouter();
   const { user: currentUser } = useCurrentUser();
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<UserRow[] | null>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
   const [saving, setSaving] = useState(false);
@@ -49,7 +65,7 @@ export default function KullanicilarPage() {
         return;
       }
       setLoadError("");
-      setUsers(data);
+      setUsers(data as UserRow[]);
     } catch {
       setUsers([]);
       setLoadError("Kullanıcı listesi yüklenemedi. Lütfen tekrar deneyin.");
@@ -161,6 +177,14 @@ export default function KullanicilarPage() {
     );
   }
 
+  const visibleUsers = users?.filter((item) => {
+    const needle = search.trim().toLocaleLowerCase("tr-TR");
+    const matchesSearch = !needle || [item.full_name, item.phone, item.email].filter(Boolean).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(needle));
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? item.active !== false : item.active === false);
+    const matchesRole = roleFilter === "all" || item.role === roleFilter;
+    return matchesSearch && matchesStatus && matchesRole;
+  }) || [];
+
   if (users === null) {
     return (
       <div>
@@ -178,8 +202,20 @@ export default function KullanicilarPage() {
 
   return (
     <div>
-      <TopBar title="Kullanıcılar" subtitle={`${users.length} kullanıcı`} />
+      <TopBar title="Kullanıcılar" subtitle={`${visibleUsers.length}/${users.length} kullanıcı`} />
       <div className="px-4 py-4">
+        <div className="mb-3 rounded-card border border-border bg-panel p-3">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kullanıcı ara..." aria-label="Kullanıcı ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)} aria-label="Kullanıcı durum filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
+              <option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option>
+            </select>
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="Kullanıcı rol filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
+              <option value="all">Tüm roller</option>{ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+            </select>
+            <span className="col-span-2 self-center text-[10px] text-faint sm:col-span-1 sm:text-right">{visibleUsers.length} kayıt gösteriliyor</span>
+          </div>
+        </div>
         <button
           onClick={() => setShowForm((s) => !s)}
           className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
@@ -213,7 +249,7 @@ export default function KullanicilarPage() {
         )}
 
         <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
-          {users.map((u) => (
+          {visibleUsers.map((u) => (
             <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
@@ -266,10 +302,10 @@ export default function KullanicilarPage() {
           ))}
         </div>
 
-        {users.length === 0 && (
+        {visibleUsers.length === 0 && (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
             <div className="text-4xl mb-3">👥</div>
-            <p className="text-sm text-muted">Henüz kullanıcı yok.</p>
+            <p className="text-sm text-muted">{users.length === 0 ? "Henüz kullanıcı yok." : "Filtrelere uygun kullanıcı bulunamadı."}</p>
           </div>
         )}
       </div>

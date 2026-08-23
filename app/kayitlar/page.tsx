@@ -691,17 +691,19 @@ export default function KayitlarPage() {
     <div>
       <TopBar title="Bakım Kayıtları" subtitle={`${total.toLocaleString("tr-TR")} kayıt bulundu · Sayfa ${page}/${totalPages}`} />
       <div className="px-4 py-4">
-        <div className="relative mb-3">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm">🔍</span>
-          <input
-            value={search}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-            placeholder="Motor, tür veya teknisyen ara..."
-            className="w-full bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-          />
-        </div>
+        <div className="mb-3 rounded-card border border-border bg-panel p-3">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm" aria-hidden="true">🔍</span>
+            <input
+              value={search}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+              placeholder="Motor, tür veya teknisyen ara..."
+              aria-label="Bakım kaydı ara"
+              className="w-full min-w-0 bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <select
             value={engineFilter}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setEngineFilter(e.target.value)}
@@ -717,7 +719,7 @@ export default function KayitlarPage() {
           <select
             value={typeFilter}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}
-            className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
+            className="min-w-0 bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
           >
             <option value="Tümü">Tüm Türler</option>
             {typeLabels.map((l) => (
@@ -726,6 +728,7 @@ export default function KayitlarPage() {
               </option>
             ))}
           </select>
+        </div>
         </div>
 
         {user?.role === "yonetici" && <div className="mb-4 flex items-center gap-2">
@@ -759,7 +762,7 @@ export default function KayitlarPage() {
           </div>
         ) : (
           <>
-          <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
+          <div className="flex flex-col gap-2">
             {filteredRecords.map((r) => {
               const photos = r.photos || r.photos_b64 || [];
               const videos = r.videos || [];
@@ -815,9 +818,12 @@ export default function KayitlarPage() {
                       })}
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-text">
-                    <span>{r.type_label} · {r.engine_name}</span>
-                    {r.manager_confirmation_status === "confirmed" ? <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green">✓ Teyitli</span> : r.manager_confirmation_status === "pending" ? <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-bold text-text">{r.engine_name}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-teal">{r.type_label}</div>
+                    </div>
+                    {r.manager_confirmation_status === "confirmed" ? <span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green">✓ Teyitli</span> : r.manager_confirmation_status === "pending" ? <span className="flex-shrink-0 rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="flex-shrink-0 rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
                   </div>
                   <div className="text-[11px] text-faint mt-0.5">
                     {getMaintenanceRecordDate(r.maintenance_start_at, r.created_at)?.toLocaleDateString("tr-TR") || "—"} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
@@ -827,7 +833,7 @@ export default function KayitlarPage() {
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
                   {r.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {r.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
 
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2">
                     <button
                       onClick={() => void openDetails(r)}
                       className="text-[11px] font-bold text-amber border border-amber/40 rounded-lg px-2.5 py-1.5 hover:bg-amber/10 transition"

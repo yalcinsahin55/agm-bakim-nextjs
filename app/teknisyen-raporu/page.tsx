@@ -65,6 +65,7 @@ function StatCard({ label, value, hint, accent = "text-teal" }: { label: string;
 export default function TeknisyenRaporuPage() {
   const router = useRouter();
   const [period, setPeriod] = useState<PeriodKey>("month");
+  const [technicianTypeFilter, setTechnicianTypeFilter] = useState<"all" | "mekanik" | "elektromekanik">("all");
   const [summary, setSummary] = useState<AnalyticsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -101,7 +102,8 @@ export default function TeknisyenRaporuPage() {
   const totalDuration = Number(summary.periodTechnicianDurationMinutes ?? summary.periodDurationMinutes ?? 0);
   const totalTechnicianTasks = Number(summary.periodTechnicianTasks || 0);
   const averageDuration = totalTechnicianTasks ? Math.round(totalDuration / totalTechnicianTasks) : 0;
-  const maxWork = Math.max(...summary.byTechnician.map((item) => Number(item.total_count || 0)), 1);
+  const visibleTechnicians = summary.byTechnician.filter((item) => technicianTypeFilter === "all" || item.technician_type === technicianTypeFilter);
+  const maxWork = Math.max(...visibleTechnicians.map((item) => Number(item.total_count || 0)), 1);
   const maxType = Math.max(...summary.byType.map((item) => Number(item.count || 0)), 1);
   const maxEngine = Math.max(...summary.byEngine.map((item) => Number(item.count || 0)), 1);
 
@@ -113,9 +115,14 @@ export default function TeknisyenRaporuPage() {
     <TopBar title="Teknisyen Raporu" subtitle="Bakım performansı ve çalışma süreleri" />
     <main className="px-4 py-4 pb-24">
       <section className="mb-4 rounded-card border border-border bg-panel p-3.5">
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor dönemi</div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {PERIODS.map((item) => <button key={item.key} type="button" onClick={() => { setPeriod(item.key); void load(item.key); }} className={`rounded-lg border px-2.5 py-2 text-[11px] font-bold transition ${period === item.key ? "border-teal bg-teal/10 text-teal" : "border-border bg-panel2 text-muted hover:border-borderlt"}`}>{item.label}</button>)}
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor filtreleri</div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
+            {PERIODS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+          </select>
+          <select value={technicianTypeFilter} onChange={(event) => setTechnicianTypeFilter(event.target.value as "all" | "mekanik" | "elektromekanik")} aria-label="Teknisyen türü" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
+            <option value="all">Tüm teknisyen türleri</option><option value="mekanik">Mekanik teknisyen</option><option value="elektromekanik">Elektromekanik teknisyen</option>
+          </select>
         </div>
       </section>
 
@@ -139,11 +146,11 @@ export default function TeknisyenRaporuPage() {
       <section className="mb-4 rounded-card border border-border bg-panel p-4">
         <div className="mb-1 flex items-center justify-between gap-2"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide">Teknisyen çalışma özeti</h2><span className="text-[10px] text-faint">Yeşil: sorumlu · Sarı: destek</span></div>
         <p className="mb-4 text-[10.5px] text-faint">Her teknisyenin bakım sorumluluğu, ekip katkısı ve kayıtlı çalışma süresi birlikte gösterilir. Ekip bakımında aynı bakım süresi, seçilen her teknisyenin katkısına ayrı ayrı yansır.</p>
-        {summary.byTechnician.length ? <div className="flex flex-col gap-4">{summary.byTechnician.map((item) => <div key={item.technician_id}>
+        {visibleTechnicians.length ? <div className="flex flex-col gap-4">{visibleTechnicians.map((item) => <div key={item.technician_id}>
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-semibold text-muted">{item.technician} <span className="ml-1 rounded-full border border-border px-1.5 py-0.5 text-[9px] font-normal text-faint">{item.technician_type_label || (item.technician_type === "elektromekanik" ? "Elektromekanik teknisyen" : "Mekanik teknisyen")}</span></span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
           <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(item.responsible_count / maxWork) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(item.support_count / maxWork) * 100}%` }} /></div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[9.5px] text-faint"><span>Sorumlu: {item.responsible_count}</span><span>Destek: {item.support_count}</span><span>Süre: {formatMaintenanceDuration(item.total_duration_minutes)}</span><span>Ort.: {formatMaintenanceDuration(item.average_duration_minutes)}</span></div>
-        </div>)}</div> : <p className="text-[11px] text-faint">Bu dönem için teknisyen çalışma verisi bulunamadı.</p>}
+        </div>)}</div> : <p className="text-[11px] text-faint">Seçilen filtrelere uygun teknisyen çalışma verisi bulunamadı.</p>}
       </section>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

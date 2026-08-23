@@ -121,6 +121,7 @@ export default function KarterBasinciPage() {
   const [saving, setSaving] = useState(false);
 
   const [historyEngine, setHistoryEngine] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -242,6 +243,10 @@ export default function KarterBasinciPage() {
     }
   }
 
+  const historyEngines = sortedEngines.filter((engine) => {
+    const needle = historySearch.trim().toLocaleLowerCase("tr-TR");
+    return !needle || engine.name.toLocaleLowerCase("tr-TR").includes(needle);
+  });
   const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
   const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
   const canWrite = user?.role === "yonetici";
@@ -290,13 +295,13 @@ export default function KarterBasinciPage() {
       <TopBar title="Karter Fark Basıncı" />
       <div className="px-4 py-4">
         {/* Modern Tab Butonları */}
-        <div className="flex gap-1 bg-[#12161d] p-1 rounded-xl border border-border mb-4">
+        <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-xl border border-border mb-4">
           {tabs.map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               className={`flex-1 py-2 rounded-lg text-[11.5px] font-bold transition-all ${
-                visibleTab === key ? "bg-amber text-[#161006] shadow-lg" : "text-faint hover:text-muted"
+                visibleTab === key ? "bg-teal text-[#06181b] shadow-lg" : "text-faint hover:text-muted"
               }`}
             >
               {label}
@@ -306,13 +311,14 @@ export default function KarterBasinciPage() {
 
         {canWrite && visibleTab === "new" && (
           <div className="animate-fade-in">
-            <input
+                                <input
               type="date"
               value={readingDate}
               max={new Date().toISOString().slice(0, 10)}
               onChange={(e) => setReadingDate(e.target.value)}
               className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
             />
+
             <p className="text-[11px] text-faint mb-3">Her motor için yük ve fark basıncını girin, bakımda/yedek olanları işaretleyin.</p>
             <div className="flex flex-col gap-2 mb-40">
               {sortedEngines.map((e) => {
@@ -359,13 +365,12 @@ export default function KarterBasinciPage() {
 
         {visibleTab === "history" && (
           <div className="animate-fade-in">
-            <select
-              value={historyEngine}
-              onChange={(e) => setHistoryEngine(e.target.value)}
-              className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-            >
-              {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-            </select>
+            <div className="mb-3 rounded-card border border-border bg-panel p-3">
+              <input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Motor ara..." aria-label="Geçmişte motor ara" className="mb-2 w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+              <select value={historyEngine} onChange={(e) => setHistoryEngine(e.target.value)} aria-label="Geçmiş motoru seç" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[12px] font-bold text-text outline-none focus:border-teal transition">
+                {historyEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
+              </select>
+            </div>
 
             {numericHistory.length >= 2 && (
               <div className="mb-3">
@@ -438,7 +443,7 @@ export default function KarterBasinciPage() {
             <button
               onClick={doImport}
               disabled={importing || !importFile}
-              className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+              className="w-full py-3 rounded-xl bg-teal text-[#06181b] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
             >
               {importing ? (
                 <span className="inline-flex items-center gap-2">
@@ -460,7 +465,7 @@ export default function KarterBasinciPage() {
             <button
               onClick={saveReadings}
               disabled={saving}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+              className="w-full py-3.5 rounded-xl bg-teal text-[#06181b] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
