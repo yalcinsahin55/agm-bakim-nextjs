@@ -59,7 +59,7 @@ type AnalyticsResponse = {
 const EMPTY: AnalyticsResponse = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], byTechnicianType: [] };
 
 function StatCard({ label, value, hint, accent = "text-teal" }: { label: string; value: string | number; hint?: string; accent?: string }) {
-  return <div className="rounded-xl border border-border bg-panel p-3.5"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{label}</div><div className={`mt-1 font-mono text-xl font-bold ${accent}`}>{value}</div>{hint && <div className="mt-0.5 text-[9.5px] text-faint">{hint}</div>}</div>;
+  return <div className="relative overflow-hidden rounded-xl border border-border bg-panel p-3.5"><div className={`absolute inset-x-0 top-0 h-0.5 ${accent.replace("text-", "bg-")}`} /><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{label}</div><div className={`mt-1 font-mono text-xl font-bold ${accent}`}>{value}</div>{hint && <div className="mt-0.5 text-[9.5px] text-faint">{hint}</div>}</div>;
 }
 
 export default function TeknisyenRaporuPage() {
@@ -114,6 +114,10 @@ export default function TeknisyenRaporuPage() {
   return <div>
     <TopBar title="Teknisyen Raporu" subtitle="Bakım performansı ve çalışma süreleri" />
     <main className="px-4 py-4 pb-24">
+      <section className="mb-4 flex items-center gap-3 rounded-card border border-teal/30 bg-teal/5 p-4">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">👷</div>
+        <div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Ekip performansı</h1><p className="mt-0.5 text-[10.5px] text-muted">Sorumlu ve destek teknisyen katkılarını tek ekranda karşılaştır.</p></div>
+      </section>
       <section className="mb-4 rounded-card border border-border bg-panel p-3.5">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor filtreleri</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -146,8 +150,8 @@ export default function TeknisyenRaporuPage() {
       <section className="mb-4 rounded-card border border-border bg-panel p-4">
         <div className="mb-1 flex items-center justify-between gap-2"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide">Teknisyen çalışma özeti</h2><span className="text-[10px] text-faint">Yeşil: sorumlu · Sarı: destek</span></div>
         <p className="mb-4 text-[10.5px] text-faint">Her teknisyenin bakım sorumluluğu, ekip katkısı ve kayıtlı çalışma süresi birlikte gösterilir. Ekip bakımında aynı bakım süresi, seçilen her teknisyenin katkısına ayrı ayrı yansır.</p>
-        {visibleTechnicians.length ? <div className="flex flex-col gap-4">{visibleTechnicians.map((item) => <div key={item.technician_id}>
-          <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-semibold text-muted">{item.technician} <span className="ml-1 rounded-full border border-border px-1.5 py-0.5 text-[9px] font-normal text-faint">{item.technician_type_label || (item.technician_type === "elektromekanik" ? "Elektromekanik teknisyen" : "Mekanik teknisyen")}</span></span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
+        {visibleTechnicians.length ? <div className="flex flex-col gap-3">{visibleTechnicians.map((item) => <div key={item.technician_id} className="rounded-xl border border-border bg-panel2 p-3">
+          <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-semibold text-text">{item.technician} <span className="ml-1 rounded-full border border-border px-1.5 py-0.5 text-[9px] font-normal text-faint">{item.technician_type_label || (item.technician_type === "elektromekanik" ? "Elektromekanik teknisyen" : "Mekanik teknisyen")}</span></span><span className="flex-shrink-0 font-mono font-bold text-teal">{item.total_count} görev</span></div>
           <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(item.responsible_count / maxWork) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(item.support_count / maxWork) * 100}%` }} /></div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[9.5px] text-faint"><span>Sorumlu: {item.responsible_count}</span><span>Destek: {item.support_count}</span><span>Süre: {formatMaintenanceDuration(item.total_duration_minutes)}</span><span>Ort.: {formatMaintenanceDuration(item.average_duration_minutes)}</span></div>
         </div>)}</div> : <p className="text-[11px] text-faint">Seçilen filtrelere uygun teknisyen çalışma verisi bulunamadı.</p>}

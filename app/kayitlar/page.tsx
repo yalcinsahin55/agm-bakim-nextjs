@@ -173,6 +173,26 @@ function technicianLabel(record: MaintenanceRecord): string {
   return `${name} · ${TECHNICIAN_TYPE_LABELS[record.technician_type] || "Mekanik teknisyen"}`;
 }
 
+function maintenanceDayKey(record: MaintenanceRecord): string {
+  const date = getMaintenanceRecordDate(record.maintenance_start_at, record.created_at);
+  if (!date || !Number.isFinite(date.getTime())) return "unknown";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function maintenanceDayLabel(key: string): string {
+  if (key === "unknown") return "Tarihi bilinmeyen kayıtlar";
+  const [year, month, day] = key.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const difference = Math.round((startOfToday - date.getTime()) / 86_400_000);
+  if (difference === 0) return "Bugün";
+  if (difference === 1) return "Dün";
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
+}
+
 interface EditFormProps {
   record: MaintenanceRecord;
   onCancel: () => void;
@@ -586,6 +606,14 @@ export default function KayitlarPage() {
   const typeLabels = useMemo(() => [...types].map((t) => t.label).sort((a, b) => a.localeCompare(b, "tr")), [types]);
 
   const filteredRecords = records;
+  const recordGroups = useMemo(() => {
+    const groups = new Map<string, MaintenanceRecord[]>();
+    filteredRecords.forEach((record) => {
+      const key = maintenanceDayKey(record);
+      groups.set(key, [...(groups.get(key) || []), record]);
+    });
+    return [...groups.entries()].map(([key, groupRecords]) => ({ key, label: maintenanceDayLabel(key), records: groupRecords }));
+  }, [filteredRecords]);
 
   async function loadRecordMedia(record: MaintenanceRecord) {
     if (record.videos !== undefined && (record.photos !== undefined || record.photos_b64 !== undefined)) return record;
@@ -762,8 +790,15 @@ export default function KayitlarPage() {
           </div>
         ) : (
           <>
-          <div className="flex flex-col gap-2">
-            {filteredRecords.map((r) => {
+          <div className="flex flex-col gap-4">
+            {recordGroups.map((group) => (
+              <section key={group.key}>
+                <div className="mb-2 flex items-center justify-between gap-2 border-b border-border px-1 pb-1.5">
+                  <h2 className="text-[11px] font-extrabold uppercase tracking-wide text-muted">{group.label}</h2>
+                  <span className="text-[10px] text-faint">{group.records.length} kayıt</span>
+                </div>
+                <div className="flex flex-col gap-2">
+            {group.records.map((r) => {
               const photos = r.photos || r.photos_b64 || [];
               const videos = r.videos || [];
               const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
@@ -898,6 +933,9 @@ export default function KayitlarPage() {
                 </div>
               );
             })}
+                </div>
+              </section>
+            ))}
           </div>
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">

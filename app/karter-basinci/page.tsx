@@ -249,6 +249,7 @@ export default function KarterBasinciPage() {
   });
   const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
   const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
+  const selectedHistoryEngine = sortedEngines.find((engine) => engine._id === historyEngine);
   const canWrite = user?.role === "yonetici";
   const visibleTab = canWrite ? tab : "history";
   const tabs: Array<[PressureTab, string]> = canWrite
@@ -294,6 +295,10 @@ export default function KarterBasinciPage() {
     <div>
       <TopBar title="Karter Fark Basıncı" />
       <div className="px-4 py-4">
+        <section className="mb-3 rounded-card border border-teal/30 bg-teal/5 p-4">
+          <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">📈</div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Basınç durumu</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yükü ve karter fark basıncını tek akışta takip et.</p></div></div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Motor sayısı</div><div className="mt-1 font-mono text-lg font-bold text-teal">{engines.length}</div></div><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Toplam ölçüm</div><div className="mt-1 font-mono text-lg font-bold text-amber">{readings.length}</div></div></div>
+        </section>
         {/* Modern Tab Butonları */}
         <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-xl border border-border mb-4">
           {tabs.map(([key, label]) => (
@@ -365,8 +370,10 @@ export default function KarterBasinciPage() {
 
         {visibleTab === "history" && (
           <div className="animate-fade-in">
-            <div className="mb-3 rounded-card border border-border bg-panel p-3">
+                          <div className="mb-3 rounded-card border border-border bg-panel p-3">
+              <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-extrabold uppercase tracking-wide text-muted">Motor geçmişi</span><span className="text-[10px] text-faint">{selectedHistoryEngine?.name || "Motor seçilmedi"} · {engineHistory.length} kayıt</span></div>
               <input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Motor ara..." aria-label="Geçmişte motor ara" className="mb-2 w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+
               <select value={historyEngine} onChange={(e) => setHistoryEngine(e.target.value)} aria-label="Geçmiş motoru seç" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[12px] font-bold text-text outline-none focus:border-teal transition">
                 {historyEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
               </select>

@@ -177,6 +177,9 @@ export default function KullanicilarPage() {
     );
   }
 
+  const activeUserCount = users?.filter((item) => item.active !== false).length || 0;
+  const pendingUserCount = users?.filter((item) => !item.approved).length || 0;
+  const technicianCount = users?.filter((item) => item.role === "teknisyen" || item.role === "planlamaci").length || 0;
   const visibleUsers = users?.filter((item) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     const matchesSearch = !needle || [item.full_name, item.phone, item.email].filter(Boolean).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(needle));
@@ -204,6 +207,11 @@ export default function KullanicilarPage() {
     <div>
       <TopBar title="Kullanıcılar" subtitle={`${visibleUsers.length}/${users.length} kullanıcı`} />
       <div className="px-4 py-4">
+        <div className="mb-3 grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-green/30 bg-green/10 px-2.5 py-2.5"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Aktif</div><div className="mt-1 font-mono text-lg font-bold text-green">{activeUserCount}</div></div>
+          <div className="rounded-xl border border-amber/30 bg-amber/10 px-2.5 py-2.5"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Onay bekliyor</div><div className="mt-1 font-mono text-lg font-bold text-amber">{pendingUserCount}</div></div>
+          <div className="rounded-xl border border-teal/30 bg-teal/10 px-2.5 py-2.5"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Teknisyen</div><div className="mt-1 font-mono text-lg font-bold text-teal">{technicianCount}</div></div>
+        </div>
         <div className="mb-3 rounded-card border border-border bg-panel p-3">
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kullanıcı ara..." aria-label="Kullanıcı ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -237,7 +245,7 @@ export default function KullanicilarPage() {
               {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>}
             <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
-            <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+            <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
@@ -250,7 +258,7 @@ export default function KullanicilarPage() {
 
         <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
           {visibleUsers.map((u) => (
-            <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
+            <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-teal/40 transition-all">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
                   {initials(u.full_name)}

@@ -169,6 +169,11 @@ export default function YagAnalizleriPage() {
     }
   }
 
+  const resultCounts = {
+    good: analyses.filter((analysis) => analysis.result === "İyi").length,
+    attention: analyses.filter((analysis) => analysis.result === "Dikkat").length,
+    bad: analyses.filter((analysis) => analysis.result === "Kötü").length,
+  };
   const filtered = analyses.filter((analysis) => {
     const matchesEngine = filterEngine === "Tümü" || analysis.engine_id === filterEngine;
     const matchesResult = resultFilter === "Tümü" || analysis.result === resultFilter;
@@ -216,6 +221,10 @@ export default function YagAnalizleriPage() {
     <div>
       <TopBar title="Yağ Analizleri" subtitle={`${filtered.length}/${analyses.length} rapor listeleniyor`} />
       <div className="px-4 py-4">
+        <section className="mb-3 rounded-card border border-teal/30 bg-teal/5 p-4">
+          <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">🧪</div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Yağ durum özeti</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yağ analizlerini rapor sonucu ve tarihine göre takip et.</p></div></div>
+          <div className="mt-3 grid grid-cols-3 gap-2"><div className="rounded-xl border border-green/30 bg-green/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">İyi</div><div className="mt-1 font-mono text-lg font-bold text-green">{resultCounts.good}</div></div><div className="rounded-xl border border-amber/30 bg-amber/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Dikkat</div><div className="mt-1 font-mono text-lg font-bold text-amber">{resultCounts.attention}</div></div><div className="rounded-xl border border-red/30 bg-red/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Kötü</div><div className="mt-1 font-mono text-lg font-bold text-red">{resultCounts.bad}</div></div></div>
+        </section>
         {canWrite && (
           <button
             onClick={() => setShowForm((s) => !s)}
@@ -254,7 +263,8 @@ export default function YagAnalizleriPage() {
           </div>
         )}
 
-        <div className="mb-3 rounded-card border border-border bg-panel p-3">
+                  <div className="mb-3 rounded-card border border-border bg-panel p-3">
+
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Motor veya numune ara..." aria-label="Motor veya numune ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <select value={filterEngine} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterEngine(e.target.value)} aria-label="Analiz motor filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal transition">
