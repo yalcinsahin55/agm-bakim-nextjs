@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const allEngines = await (db.collection("engines") as any).find().toArray();
   allEngines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
   const engines = engineFilter ? allEngines.filter((engine: any) => engine._id === engineFilter || engine.name === engineFilter) : allEngines;
-  const types = await (db.collection("maintenance_types") as any).find().toArray();
+  const types = await (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }).toArray();
   const items = buildItems(engines, types).filter((item: any) => !typeFilter || item.type_label === typeFilter);
 
   const wb = XLSX.utils.book_new();

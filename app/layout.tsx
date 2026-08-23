@@ -16,7 +16,7 @@ export const viewport = {
   themeColor: "#0f1319",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // Kullanıcıların erişilebilirlik amacıyla yakınlaştırma yapabilmesine izin verilir.
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

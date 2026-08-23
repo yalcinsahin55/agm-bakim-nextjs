@@ -10,8 +10,32 @@ import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 
 export const dynamic = "force-dynamic";
+
+type RecordCursor = { createdAt: string; id: string };
+
+function decodeRecordCursor(value: string | null): RecordCursor | null {
+  if (!value || value.length > 500) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Partial<RecordCursor>;
+    if (typeof decoded.createdAt !== "string" || typeof decoded.id !== "string" || decoded.id.length > 100) return null;
+    const date = new Date(decoded.createdAt);
+    if (!Number.isFinite(date.getTime()) || !ObjectId.isValid(decoded.id)) return null;
+    return { createdAt: date.toISOString(), id: decoded.id };
+  } catch {
+    return null;
+  }
+}
+
+function encodeRecordCursor(record: { created_at?: Date | string; _id?: unknown }): string | null {
+  if (!record.created_at || !record._id) return null;
+  const date = new Date(record.created_at);
+  if (!Number.isFinite(date.getTime())) return null;
+  return Buffer.from(JSON.stringify({ createdAt: date.toISOString(), id: String(record._id) }), "utf8").toString("base64url");
+}
 
 async function getRecords(req: NextRequest) {
   try {
@@ -33,7 +57,9 @@ async function getRecords(req: NextRequest) {
     const sortDirection = searchParams.get("sort") === "asc" ? 1 : -1;
     const sortSpec = { maintenance_start_at: sortDirection, created_at: sortDirection, _id: sortDirection } as const;
     const legacyLimit = searchParams.get("limit");
-    const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size"));
+    const cursor = decodeRecordCursor(searchParams.get("cursor"));
+    const cursorRequest = Boolean(cursor);
+    const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size") && !cursorRequest);
 
     const query: Record<string, any> = {};
     if (engineId) query.engine_id = engineId;
@@ -52,6 +78,25 @@ async function getRecords(req: NextRequest) {
     }
 
     const recordsCol = db.collection("maintenance_records") as any;
+    if (cursorRequest && cursor) {
+      const cursorDate = new Date(cursor.createdAt);
+      const cursorId = new ObjectId(cursor.id);
+      const direction = sortDirection === 1 ? "$gt" : "$lt";
+      const cursorQuery = {
+        $and: [
+          query,
+          { $or: [{ created_at: { [direction]: cursorDate } }, { created_at: cursorDate, _id: { [direction]: cursorId } }] },
+        ],
+      };
+      const cursorRows = await recordsCol.find(cursorQuery, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+        .sort({ created_at: sortDirection, _id: sortDirection })
+        .limit(pageSize + 1)
+        .toArray();
+      const hasNextPage = cursorRows.length > pageSize;
+      const records = hasNextPage ? cursorRows.slice(0, pageSize) : cursorRows;
+      return NextResponse.json({ records, pageSize, pagination: "cursor", hasNextPage, nextCursor: hasNextPage ? encodeRecordCursor(records[records.length - 1]) : null });
+    }
+
     if (legacyRequest) {
       const records = await recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
         .sort(sortSpec)
@@ -93,6 +138,8 @@ async function postRecord(req: NextRequest) {
     if (user.role === "goruntuleyici") {
       return NextResponse.json({ error: "Görüntüleyici rolü bakım tamamlayamaz." }, { status: 403 });
     }
+    const rateLimited = enforceApiRateLimit(req, "records-create", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const body = await req.json().catch(() => ({}));
 
@@ -108,6 +155,10 @@ async function postRecord(req: NextRequest) {
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, external_service_name,
     } = parsed.data as RecordInput;
+
+    if (legacyMediaTooLarge(photos_b64, videos)) {
+      return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
+    }
 
     const enginesCol = db.collection("engines") as any;
     const typesCol = db.collection("maintenance_types") as any;
@@ -171,7 +222,7 @@ async function postRecord(req: NextRequest) {
       responsibleTechnicianOption = resolvedResponsible[0];
     }
     const requestedTypeKeys = [...new Set([type_key, ...(extra_types || []).map((item) => item.type_key)])];
-    const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
+    const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
     const maintenanceTypeByKey = new Map(maintenanceTypes.map((item: any) => [String(item._id), item]));
     const missingType = requestedTypeKeys.find((key) => !maintenanceTypeByKey.has(key));
     if (missingType) return NextResponse.json({ error: "Seçilen bakım türü bulunamadı." }, { status: 404 });

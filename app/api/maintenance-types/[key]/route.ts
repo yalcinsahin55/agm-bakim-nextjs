@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,21 +15,33 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
   }
+  const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { key } = params;
-  const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
+  const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible, restore } = await req.json();
 
   const typesCol = db.collection("maintenance_types") as any;
   const type = await typesCol.findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 
   const update: Record<string, any> = {};
+  const unset: Record<string, ""> = {};
+  if (restore === true) {
+    update.is_deleted = false;
+    unset.deleted_at = "";
+  }
   if (label) update.label = label.trim();
   if (typeof default_period_hours === "number") update.default_period_hours = default_period_hours;
   if (work_domains !== undefined) update.work_domains = normalizeWorkDomains(work_domains, "mekanik");
   if (allow_electromechanical_support !== undefined) update.allow_electromechanical_support = allow_electromechanical_support === true;
   if (allow_electromechanical_responsible !== undefined) update.allow_electromechanical_responsible = allow_electromechanical_responsible === true;
-  if (Object.keys(update).length) await typesCol.updateOne({ _id: key }, { $set: update });
+  if (Object.keys(update).length || Object.keys(unset).length) {
+    const updateOperation: Record<string, Record<string, unknown>> = {};
+    if (Object.keys(update).length) updateOperation.$set = update;
+    if (Object.keys(unset).length) updateOperation.$unset = unset;
+    await typesCol.updateOne({ _id: key }, updateOperation);
+  }
 
   if (apply_period_to_all && typeof default_period_hours === "number") {
     const engineIds = Object.keys(type.engine_states || {});
@@ -74,9 +87,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { key: stri
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
   }
+  const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { key } = params;
-  await (db.collection("maintenance_records") as any).deleteMany({ type_key: key });
-  await (db.collection("maintenance_types") as any).deleteOne({ _id: key });
-  return NextResponse.json({ ok: true });
+  const type = await (db.collection("maintenance_types") as any).findOne({ _id: key });
+  if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
+
+  // Geçmiş bakım kayıtları hiçbir koşulda silinmez. Tür yalnızca gizlenir;
+  // böylece yanlış silme durumunda tarihçe ve raporlar korunur.
+  await (db.collection("maintenance_types") as any).updateOne(
+    { _id: key },
+    { $set: { is_deleted: true, deleted_at: new Date() } },
+  );
+  return NextResponse.json({ ok: true, soft_deleted: true });
 }

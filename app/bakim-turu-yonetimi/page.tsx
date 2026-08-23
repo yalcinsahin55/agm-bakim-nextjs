@@ -183,7 +183,7 @@ export default function BakimTuruYonetimiPage() {
       const res = await fetch(`/api/maintenance-types/${key}`, { method: "DELETE" });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Bakım türü silindi! ️");
+        toast.success("Bakım türü gizlendi; geçmiş kayıtlar korundu.");
         setConfirmDeleteKey(null);
         invalidateMaintenancePanel();
         load();

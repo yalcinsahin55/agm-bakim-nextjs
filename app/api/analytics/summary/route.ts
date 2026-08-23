@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         ? new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
         : null;
   const records = db.collection("maintenance_records") as any;
+  const aggregate = (pipeline: any[]) => records.aggregate(pipeline, { allowDiskUse: true });
   const activeTechniciansPromise = listActiveTechnicians(db);
 
   const dateMatch = engineSince ? [{ $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } }, { $match: { maintenance_date: { $gte: engineSince } } }] : [];
@@ -65,25 +66,25 @@ export async function GET(req: NextRequest) {
     { $sort: { [`${role}_count`]: -1, technician: 1 } },
   ];
   const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
-    records.aggregate([
+    aggregate([
       { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       { $match: { maintenance_date: { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]).toArray(),
-    records.aggregate([
+    aggregate([
       ...dateMatch,
       { $group: { _id: "$engine_id", engine: { $first: "$engine_name" }, count: { $sum: 1 } } },
       { $sort: { count: -1, engine: 1 } },
       { $limit: 12 },
     ]).toArray(),
-    records.aggregate([
+    aggregate([
       ...dateMatch,
       { $group: { _id: "$type_label", count: { $sum: 1 } } },
       { $sort: { count: -1, _id: 1 } },
       { $limit: 12 },
     ]).toArray(),
-    records.aggregate([
+    aggregate([
       { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       {
         $group: {
@@ -94,9 +95,9 @@ export async function GET(req: NextRequest) {
         },
       },
     ]).toArray(),
-    records.aggregate(contributionStages("responsible")).toArray(),
-    records.aggregate(contributionStages("support")).toArray(),
-    records.aggregate([
+    aggregate(contributionStages("responsible")).toArray(),
+    aggregate(contributionStages("support")).toArray(),
+    aggregate([
       ...dateMatch,
       {
         $group: {

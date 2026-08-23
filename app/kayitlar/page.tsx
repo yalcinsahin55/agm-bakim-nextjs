@@ -94,15 +94,34 @@ function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> 
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("Fotoğraf işlenemedi."));
+        const release = () => {
+          img.onload = null;
+          img.onerror = null;
+          img.removeAttribute("src");
+          canvas.width = 1;
+          canvas.height = 1;
+        };
+        if (!ctx) {
+          release();
+          reject(new Error("Fotoğraf işlenemedi."));
+          return;
+        }
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error("Fotoğraf sıkıştırılamadı."));
+          release();
+          if (!blob) {
+            reject(new Error("Fotoğraf sıkıştırılamadı."));
+            return;
+          }
           resolve(blob);
         }, "image/jpeg", quality);
       };
       img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-      img.src = e.target?.result as string;
+      if (typeof e.target?.result !== "string") {
+        reject(new Error("Fotoğraf okunamadı."));
+        return;
+      }
+      img.src = e.target.result;
     };
     reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
     reader.readAsDataURL(file);

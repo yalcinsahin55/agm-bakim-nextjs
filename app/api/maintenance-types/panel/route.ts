@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     (db.collection("engines") as any).find({}, {
       projection: { _id: 1, name: 1, hours: 1, load_kw: 1 },
     }).toArray(),
-    (db.collection("maintenance_types") as any).find({}, {
+    (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }, {
       projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 },
     }).toArray(),
   ]);

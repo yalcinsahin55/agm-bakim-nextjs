@@ -9,6 +9,8 @@ import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  const rateLimited = enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const recordsCol = db.collection("maintenance_records") as any;
   const record = await recordsCol.findOne({ _id: new ObjectId(params.id) });
@@ -43,6 +47,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json();
   const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
+
+  if (legacyMediaTooLarge(photos_b64, videos)) {
+    return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
+  }
 
   const update: Record<string, any> = {};
   let nextStartAt: Date | undefined = record.maintenance_start_at ? new Date(record.maintenance_start_at) : undefined;
@@ -71,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
   const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item: any) => item.type_key) : [];
   const selectedTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys, ...(Array.isArray(extra_types) ? extra_types.map((item: any) => item.type_key) : [])])];
-  const selectedTypeDocs = await (db.collection("maintenance_types") as any).find({ _id: { $in: selectedTypeKeys } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } }).toArray();
+  const selectedTypeDocs = await (db.collection("maintenance_types") as any).find({ _id: { $in: selectedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } }).toArray();
   if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı." }, { status: 404 });
   let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
   let nextResponsibleName = useExternalService
@@ -261,6 +269,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  const rateLimited = enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const recordsCol = db.collection("maintenance_records") as any;
   const record = await recordsCol.findOne({ _id: new ObjectId(params.id) });

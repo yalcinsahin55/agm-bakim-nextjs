@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(request, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  const rateLimited = enforceApiRateLimit(request, "blob-upload", 120, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   try {
     const formData = await request.formData();

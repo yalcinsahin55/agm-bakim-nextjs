@@ -57,6 +57,8 @@ export interface MaintenanceType {
   work_domains?: WorkDomain[];
   allow_electromechanical_support?: boolean;
   allow_electromechanical_responsible?: boolean;
+  is_deleted?: boolean;
+  deleted_at?: string | Date;
   engine_states: Record<string, EngineState>;
 }
 

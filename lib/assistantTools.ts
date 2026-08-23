@@ -87,7 +87,7 @@ async function resolveMaintenanceType(db: Db, query: AssistantQuery) {
   if (!value) return null;
   const escaped = escapeRegex(value);
   return db.collection("maintenance_types").findOne(
-    { $or: [{ key: value }, { label: { $regex: escaped, $options: "i" } }] },
+    { is_deleted: { $ne: true }, $or: [{ key: value }, { label: { $regex: escaped, $options: "i" } }] },
     { projection: { key: 1, label: 1 } },
   );
 }
@@ -96,7 +96,7 @@ async function statusPairs(db: Db, status: AssistantStatusFilter | undefined): P
   if (!status) return [];
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const targetStatus = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
   return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])
@@ -209,7 +209,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
 async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const items = buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[]);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;

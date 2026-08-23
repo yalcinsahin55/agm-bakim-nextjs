@@ -48,10 +48,25 @@ function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> 
         const canvas = document.createElement("canvas");
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("Fotoğraf işlenemedi."));
+        const release = () => {
+          img.onload = null;
+          img.onerror = null;
+          img.removeAttribute("src");
+          canvas.width = 1;
+          canvas.height = 1;
+        };
+        if (!ctx) {
+          release();
+          reject(new Error("Fotoğraf işlenemedi."));
+          return;
+        }
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error("Fotoğraf sıkıştırılamadı."));
+          release();
+          if (!blob) {
+            reject(new Error("Fotoğraf sıkıştırılamadı."));
+            return;
+          }
           resolve(blob);
         }, "image/jpeg", quality);
       };
@@ -452,7 +467,10 @@ export default function TamamlaPage() {
     
     setSubmitting(true);
     
-    const isBackdated = new Date(maintenanceStartAt).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
+    const startDate = new Date(maintenanceStartAt);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const isBackdated = Number.isFinite(startDate.getTime()) && startDate.getTime() < todayStart.getTime();
 
     const extra_types = extraKeys.map((k) => {
       const t = types.find((tt) => tt.key === k);

@@ -23,7 +23,7 @@ async function healthStatusPairs(db: Db, status: string | null): Promise<Array<{
   if (!status || !["overdue", "critical", "upcoming", "normal"].includes(status)) return [];
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray(),
   ]);
   const target = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
   return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])

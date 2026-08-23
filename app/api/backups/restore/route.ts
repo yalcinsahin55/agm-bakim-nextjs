@@ -3,28 +3,33 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_COLLECTIONS = ["engines", "maintenance_types", "maintenance_records", "oil_analyses"] as const;
-const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64"]);
+const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64", "__proto__", "prototype", "constructor"]);
 
 type AllowedCollection = typeof ALLOWED_COLLECTIONS[number];
 
 function clean(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(clean);
   if (!value || typeof value !== "object") return value;
-  const result: Record<string, unknown> = {};
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const [key, item] of Object.entries(value)) {
-    if (!BLOCKED_KEYS.has(key)) result[key] = clean(item);
+    if (BLOCKED_KEYS.has(key) || key.startsWith("$") || key.includes(".")) continue;
+    result[key] = clean(item);
   }
   return result;
 }
 
 function getIdentity(document: Record<string, unknown>): string | null {
   const id = document._id;
-  if (typeof id === "string" && id.length > 0) return id;
-  if (id && typeof id === "object" && "$oid" in id && typeof (id as { $oid?: unknown }).$oid === "string") return (id as { $oid: string }).$oid;
+  if (typeof id === "string" && id.length > 0 && id.length <= 200 && !/[.$\0]/.test(id)) return id;
+  if (id && typeof id === "object" && "$oid" in id && typeof (id as { $oid?: unknown }).$oid === "string") {
+    const oid = (id as { $oid: string }).$oid;
+    return /^[a-f\d]{24}$/i.test(oid) ? oid : null;
+  }
   return null;
 }
 
@@ -33,12 +38,14 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Geri yükleme yetkiniz yok." }, { status: 403 });
+  const rateLimited = enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   try {
     const body = await req.json();
     if (body?.confirm !== "RESTORE") return NextResponse.json({ error: "Geri yüklemeyi onaylamak için RESTORE yazılmalıdır." }, { status: 400 });
     const collections = body?.collections;
-    if (!collections || typeof collections !== "object") return NextResponse.json({ error: "Geçersiz yedek dosyası." }, { status: 400 });
+    if (!collections || typeof collections !== "object" || Array.isArray(collections)) return NextResponse.json({ error: "Geçersiz yedek dosyası." }, { status: 400 });
 
     const summary: Record<string, number> = {};
     for (const name of ALLOWED_COLLECTIONS) {
@@ -46,7 +53,7 @@ export async function POST(req: NextRequest) {
       if (documents.length > 50000) return NextResponse.json({ error: `${name} koleksiyonu çok büyük.` }, { status: 413 });
       let count = 0;
       for (const raw of documents) {
-        if (!raw || typeof raw !== "object") continue;
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
         const document = clean(raw) as Record<string, unknown>;
         const identity = getIdentity(document);
         if (identity) {

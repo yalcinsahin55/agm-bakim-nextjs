@@ -64,6 +64,12 @@ Yönetici, **Diğer Menüler → Yönetim → Teknisyen Yetkilendirme** ekranın
 
 Aynı ekranda teknisyenin sorumlu olabilmesi, yardımcı olabilmesi ve çalışma alanları yönetilir. Bakım Türü Yönetimi ekranındaki çalışma alanı ve elektromekanik destek ayarlarıyla birlikte, Bakım Tamamla ve Bakım Kayıtları formlarında yalnızca uyumlu teknisyenler listelenir. Bu seçimler API tarafında da tekrar doğrulanır; istemciden gönderilen yetkisiz bir teknisyen kaydı kabul edilmez. Eski hesaplar ve eski bakım kayıtları bozulmaz; yeni alanı olmayan teknisyenler mekanik varsayılanlarıyla çalışır.
 
+### Bakım türü silme ve veri güvenliği
+
+Bir bakım türü silindiğinde geçmiş bakım kayıtları fiziksel olarak silinmez. Tür `is_deleted` işaretiyle pasifleştirilir; aktif bakım panelleri, yeni kayıt formları, bildirimler ve sağlık filtreleri bu türü göstermeyi bırakır, ancak geçmiş kayıtlar ve rapor tarihçesi korunur. Böylece yanlış silme yüzünden yüzlerce bakım kaydının kaybolması engellenir. Yönetici motor kapsamını bakım türünü silmeden de **Dahil** seçeneğiyle motor bazında kaldırabilir.
+
+Seed, yedek geri yükleme, içe aktarma, bakım kaydı ve medya yükleme endpoint’lerinde yönetici/kullanıcı yetkisi ve uygun rate limit kontrolleri bulunur. Yedek geri yükleme yalnızca izin verilen koleksiyonları işler; MongoDB özel anahtarları, hassas alanlar ve güvenli olmayan kimlikler temizlenir.
+
 ## Bakım kaydı iş akışı
 
 1. Kullanıcı motoru ve bakım türünü seçer. QR bağlantısı kullanılmışsa bu seçimlerden biri veya ikisi otomatik doldurulabilir.
@@ -173,7 +179,9 @@ Bakım tamamlama formu bağlantı olmadığında kaydı tarayıcıdaki IndexedDB
 
 ## Medya depolama
 
-Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir.
+Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır.
+
+Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez.
 
 Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOKEN` değerlerinin ilgili ortama tanımlanması gerekir. Token değerleri kaynak koda yazılmamalı ve GitHub’a gönderilmemelidir.
 
@@ -397,6 +405,7 @@ Script yalnızca `technician_source`, `technician_id`, `technician_name` ve `ext
 | `npm run start` | Production derlemesini çalıştırır. |
 | `npx tsc --noEmit --pretty false` | TypeScript tip kontrolü yapar. |
 | `git diff --check` | Boşluk ve patch kaynaklı diff sorunlarını kontrol eder. |
+| `npx tsx /home/ubuntu/agm-audit-regression.ts` | Güvenlik, soft-delete, TTL ve legacy medya sınırı için geçici regresyon kontrolü. |
 | `BASE_URL=https://staging.example node scripts/staging-load-smoke.mjs` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
 
 Staging smoke/load kontrolü yalnızca test ortamında çalıştırılmalıdır. Script POST, PATCH veya DELETE göndermez; production alan adını açık onay olmadan reddeder. Yetkili staging oturumu ile test etmek için cookie değeri yalnızca yerel shell değişkeni olarak verilebilir:

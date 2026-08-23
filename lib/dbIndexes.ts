@@ -32,6 +32,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(records, { engine_id: 1, type_label: 1, created_at: -1 }),
       createIndexSafely(records, { engine_id: 1, created_at: -1 }, { name: "records_engine_created_at" }),
       createIndexSafely(records, { created_at: -1 }),
+      createIndexSafely(records, { created_at: -1, _id: -1 }, { name: "records_created_at_id_desc" }),
       createIndexSafely(records, { engine_id: 1, type_key: 1, created_at: 1 }, { name: "records_engine_type_created_at" }),
       createIndexSafely(records, { engine_id: 1, type_key: 1, hour_at_completion: -1 }, { name: "records_engine_type_hour_desc" }),
       createIndexSafely(records, { maintenance_start_at: -1, created_at: -1, _id: -1 }, { name: "records_maintenance_date_desc" }),
@@ -54,6 +55,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(users, { role: 1, active: 1, approved: 1 }, { name: "users_technician_lookup" }),
       createIndexSafely(pushSubscriptions, { endpoint: 1 }, { unique: true }),
       createIndexSafely(videoChunks, { upload_id: 1, index: 1 }, { name: "video_chunks_upload_index" }),
+      createIndexSafely(videoChunks, { at: 1 }, { expireAfterSeconds: 24 * 60 * 60, name: "video_chunks_at_ttl" }),
     ]).then(() => undefined);
   }
 

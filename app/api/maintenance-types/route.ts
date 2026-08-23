@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const types = await (db.collection("maintenance_types") as any).find().toArray();
+    const types = await (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }).toArray();
     return NextResponse.json(types);
   } catch (error) {
     console.error("Bakım türleri getirilirken hata:", error);
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
     if (user.role !== "yonetici") {
       return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     }
+    const rateLimited = enforceApiRateLimit(req, "maintenance-type-create", 30, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { label, default_period_hours, apply_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
     const normalizedWorkDomains = normalizeWorkDomains(work_domains, "mekanik");
