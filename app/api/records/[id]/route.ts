@@ -12,31 +12,39 @@ import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionD
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
+function parseRecordId(value: string): ObjectId | null {
+  return ObjectId.isValid(value) ? new ObjectId(value) : null;
+}
 
 function canModify(user: any, record: any): boolean {
   return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
+  const recordId = parseRecordId(id);
+  if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
   const includeMedia = req.nextUrl.searchParams.get("include_media") === "true";
   const record = await (db.collection("maintenance_records") as any).findOne(
-    { _id: new ObjectId(params.id) },
+    { _id: recordId },
     includeMedia ? undefined : { projection: { photos_b64: 0, videos: 0 } },
   );
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   return NextResponse.json(record);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
@@ -45,8 +53,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const rateLimited = enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
+  const recordId = parseRecordId(id);
+  if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
   const recordsCol = db.collection("maintenance_records") as any;
-  const record = await recordsCol.findOne({ _id: new ObjectId(params.id) });
+  const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
@@ -199,7 +209,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     user,
     action: "update",
     entity: "maintenance_record",
-    entityId: params.id,
+    entityId: id,
     summary: `${record.engine_name} · ${record.type_label} bakım kaydı güncellendi`,
     before: record,
     after: update,
@@ -251,7 +261,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         { projection: { _id: 1 } },
       );
       if (existingExtra) continue;
-      if (typeof ex.period === "number") {
+      if (typeof ex.period === "number" && isSafeMongoPathSegment(record.engine_id)) {
         await typesCol.updateOne(
           { _id: ex.type_key },
           { $set: { [`engine_states.${record.engine_id}.period_hours`]: ex.period } },
@@ -295,7 +305,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
@@ -304,8 +315,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const rateLimited = enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
+  const recordId = parseRecordId(id);
+  if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
   const recordsCol = db.collection("maintenance_records") as any;
-  const record = await recordsCol.findOne({ _id: new ObjectId(params.id) });
+  const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı silme yetkiniz yok." }, { status: 403 });
 
@@ -315,7 +328,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     user,
     action: "delete",
     entity: "maintenance_record",
-    entityId: params.id,
+    entityId: id,
     summary: `${record.engine_name} · ${record.type_label} bakım kaydı silindi; motor bakım takibi yeniden hesaplandı`,
     before: record,
   });

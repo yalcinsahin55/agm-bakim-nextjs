@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_BACKUP_REQUEST_BYTES } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,10 @@ export async function POST(req: NextRequest) {
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Geri yükleme yetkiniz yok." }, { status: 403 });
   const rateLimited = enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  const contentLength = Number(req.headers.get("content-length") || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BACKUP_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Yedek dosyası izin verilen boyutu aşıyor." }, { status: 413 });
+  }
 
   try {
     const body = await req.json();

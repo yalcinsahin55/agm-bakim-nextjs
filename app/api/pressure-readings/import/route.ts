@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
+import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
 
-function toNumber(v: any): number | null {
+function toNumber(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-function normalizeName(name: any): string {
+function normalizeName(name: unknown): string {
   return String(name).trim().replace(/-/g, " ").replace(/\s+/g, " ");
 }
 
@@ -30,27 +32,27 @@ export async function POST(req: NextRequest) {
 
   const { file_b64 } = await req.json();
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
+  if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
+    return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });
+  }
 
-  let wb: XLSX.WorkBook;
+  let wb: ExcelJS.Workbook;
   try {
     const buf = Buffer.from(file_b64, "base64");
-    wb = XLSX.read(buf, { type: "buffer", cellDates: true });
+    wb = await loadExcelWorkbook(buf);
   } catch {
     return NextResponse.json({ error: "Dosya okunamadı, geçerli bir Excel dosyası olduğundan emin olun." }, { status: 400 });
   }
 
   const engines = await (db.collection("engines") as any).find().toArray();
   const engineNames = new Set(engines.map((e: any) => e._id));
-
   const docs: any[] = [];
 
-  for (const sheetName of wb.SheetNames) {
-    const m = sheetName.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  for (const worksheet of wb.worksheets) {
+    const m = worksheet.name.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if (!m) continue;
     const sheetDate = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-
-    const ws = wb.Sheets[sheetName];
-    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }) as any[][];
+    const grid = worksheetToGrid(worksheet);
 
     let headerRow = -1;
     for (let r = 0; r < Math.min(5, grid.length); r++) {
@@ -58,10 +60,10 @@ export async function POST(req: NextRequest) {
     }
     if (headerRow === -1) continue;
 
-    const header = grid[headerRow];
+    const header = grid[headerRow] || [];
     const blocks: { motorCol: number; loadCol: number | null; pressureCol: number | null }[] = [];
     let current: { motorCol: number; loadCol: number | null; pressureCol: number | null } | null = null;
-    header.forEach((label: any, c: number) => {
+    header.forEach((label, c) => {
       if (label === "MOTOR NO") {
         if (current) blocks.push(current);
         current = { motorCol: c, loadCol: null, pressureCol: null };

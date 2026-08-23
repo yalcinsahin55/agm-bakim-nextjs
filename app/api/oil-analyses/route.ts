@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { canWriteMaintenance } from "@/lib/permissions";
+import { isAdmin } from "@/lib/permissions";
+import { isAllowedPdfUrl } from "@/lib/pdfSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +35,14 @@ export async function POST(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap yağ analizi ekleyemez." }, { status: 403 });
+    if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
 
     const { engine_id, analysis_date, result, note, pdf_url, pdf_b64, pdf_filename } = await req.json();
     if (!engine_id || (!pdf_url && !pdf_b64)) {
       return NextResponse.json({ error: "Motor ve PDF dosyası gerekli." }, { status: 400 });
     }
-    if (pdf_url && typeof pdf_url !== "string") {
-      return NextResponse.json({ error: "Geçersiz PDF bağlantısı." }, { status: 400 });
+    if (pdf_url && !isAllowedPdfUrl(pdf_url)) {
+      return NextResponse.json({ error: "PDF bağlantısı izin verilen güvenli depolama alanından olmalıdır." }, { status: 400 });
     }
     if (pdf_b64 && (typeof pdf_b64 !== "string" || pdf_b64.length > 10 * 1024 * 1024 * 1.4)) {
       return NextResponse.json({ error: "Dosya 10MB sınırını aşıyor." }, { status: 400 });

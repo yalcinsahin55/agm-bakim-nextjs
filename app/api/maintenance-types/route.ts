@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number; tracking_source: "manual" }> = {};
     if (engine_states && typeof engine_states === "object") {
       Object.entries(engine_states).forEach(([engId, st]: [string, any]) => {
+        if (!isSafeMongoPathSegment(engId)) return;
         engineStates[engId] = {
           last_maintenance_hour: Number(st?.last_maintenance_hour) || 0,
           period_hours: Number(st?.period_hours) || 0,
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     } else if (apply_to_all) {
       const engines = await (db.collection("engines") as any).find().toArray();
       engines.forEach((e: any) => {
-        engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0, tracking_source: "manual" };
+        if (isSafeMongoPathSegment(e._id)) engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0, tracking_source: "manual" };
       });
     }
 

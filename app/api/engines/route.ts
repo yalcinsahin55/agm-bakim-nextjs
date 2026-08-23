@@ -6,6 +6,7 @@ import { isAdmin } from "@/lib/permissions";
 import { engineSortKey } from "@/lib/status";
 import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -58,20 +59,24 @@ async function postEngine(req: NextRequest) {
     }
 
     const { name, hours, load_kw } = await req.json();
-    if (!name || !name.trim()) {
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    if (!normalizedName) {
       return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });
+    }
+    if (!isSafeMongoPathSegment(normalizedName)) {
+      return NextResponse.json({ error: "Motor adında nokta, $ veya geçersiz karakter kullanılamaz." }, { status: 400 });
     }
 
     const enginesCol = db.collection("engines") as any;
-    const existing = await enginesCol.findOne({ _id: name.trim() });
+    const existing = await enginesCol.findOne({ _id: normalizedName });
     if (existing) {
       return NextResponse.json({ error: "Bu isimde bir motor zaten var." }, { status: 409 });
     }
 
     const now = new Date();
     const doc = {
-      _id: name.trim(),
-      name: name.trim(),
+      _id: normalizedName,
+      name: normalizedName,
       hours: Number(hours) || 0,
       load_kw: Number(load_kw) || 0,
       updated_at: now,

@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
@@ -7,8 +7,24 @@ import { buildItems, STATUS_LABELS, engineSortKey } from "@/lib/status";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
+import { escapeSpreadsheetRows } from "@/lib/spreadsheetSecurity";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { addRows } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
+
+function uniqueSheetName(label: string, used: Set<string>): string {
+  const base = label.replace(/[\\/?*[\]:]/g, "").trim().slice(0, 31) || "Bakım";
+  let name = base;
+  let suffix = 2;
+  while (used.has(name)) {
+    const suffixText = ` (${suffix})`;
+    name = `${base.slice(0, 31 - suffixText.length)}${suffixText}`;
+    suffix += 1;
+  }
+  used.add(name);
+  return name;
+}
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -16,6 +32,8 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req, usersCol);
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
+  const rateLimited = enforceApiRateLimit(req, "export-excel", 12, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
@@ -28,19 +46,24 @@ export async function GET(req: NextRequest) {
   const types = await (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }).toArray();
   const items = buildItems(engines, types).filter((item: any) => !typeFilter || item.type_label === typeFilter);
 
-  const wb = XLSX.utils.book_new();
+  const workbook = new ExcelJS.Workbook();
+  const usedSheetNames = new Set<string>();
+  const addDataSheet = (name: string, rows: Record<string, unknown>[]) => {
+    const worksheet = workbook.addWorksheet(uniqueSheetName(name, usedSheetNames));
+    addRows(worksheet, escapeSpreadsheetRows(rows));
+  };
 
   const engineRows = engines.map((e: any) => ({
     "MOTOR": e.name, "MOTOR ÇALIŞMA SAATİ": e.hours, "YÜK (kW)": e.load_kw || 0,
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(engineRows), "Motor Saatleri");
+  addDataSheet("Motor Saatleri", engineRows);
 
   const summaryRows = [...items].sort((a, b) => a.remaining - b.remaining).map((i) => ({
     "MOTOR": i.engine_name, "BAKIM TÜRÜ": i.type_label, "MOTOR SAATİ": i.engine_hours,
     "SON BAKIM SAATİ": i.last_hour, "PERİYOT": i.period,
     "KALAN SAAT": Math.round(i.remaining * 10) / 10, "DURUM": STATUS_LABELS[i.status].toUpperCase(),
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Bakım Özeti");
+  addDataSheet("Bakım Özeti", summaryRows);
 
   const byType: Record<string, typeof items> = {};
   items.forEach((i) => { (byType[i.type_label] ||= []).push(i); });
@@ -51,8 +74,7 @@ export async function GET(req: NextRequest) {
       "PERİYODİK BAKIM SAATİ": i.period, "KALAN SAAT": Math.round(i.remaining * 10) / 10,
       "DURUM": STATUS_LABELS[i.status].toUpperCase(),
     }));
-    const safeName = label.replace(/[\\/?*[\]:]/g, "").slice(0, 31);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetRows), safeName);
+    addDataSheet(label, sheetRows);
   });
 
   const history = await (db.collection("maintenance_records") as any).find(recordQuery, {
@@ -75,16 +97,17 @@ export async function GET(req: NextRequest) {
     "TEYİT EDEN YÖNETİCİ": record.manager_confirmed_by_name || "",
     "TEYİT TARİHİ": record.manager_confirmed_at ? new Date(record.manager_confirmed_at).toLocaleString("tr-TR") : "",
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historyRows), "Bakım Geçmişi");
+  addDataSheet("Bakım Geçmişi", historyRows);
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const buffer = await workbook.xlsx.writeBuffer();
   const filename = `AGM_Motor_Bakim_Raporu_${new Date().toISOString().slice(0, 10)}.xlsx`;
-
-  return new Response(buf, {
+  return new Response(Buffer.from(buffer as ArrayBuffer), {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

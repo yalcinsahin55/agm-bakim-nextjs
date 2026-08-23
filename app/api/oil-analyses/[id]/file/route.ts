@@ -2,8 +2,10 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAllowedPdfUrl, looksLikePdf, MAX_PDF_BYTES, readPdfResponse } from "@/lib/pdfSecurity";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function safeFilename(filename: string): string {
   const cleaned = filename.replace(/[^a-zA-Z0-9._-]/g, "-").trim();
@@ -20,33 +22,44 @@ function decodePdfData(value: string): Uint8Array | null {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const db = await getDb();
     const user = await getCurrentUser(req, db.collection("users") as any);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    if (!ObjectId.isValid(params.id)) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Geçersiz analiz kaydı." }, { status: 400 });
     }
 
     const doc = await (db.collection("oil_analyses") as any).findOne(
-      { _id: new ObjectId(params.id) },
+      { _id: new ObjectId(id) },
       { projection: { pdf_url: 1, pdf_b64: 1, pdf_filename: 1 } },
     );
     if (!doc) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
     let bytes: Uint8Array | null = null;
-    if (typeof doc.pdf_url === "string" && /^https:\/\//i.test(doc.pdf_url)) {
-      const upstream = await fetch(doc.pdf_url, { cache: "no-store" });
+    if (typeof doc.pdf_url === "string") {
+      if (!isAllowedPdfUrl(doc.pdf_url)) {
+        return NextResponse.json({ error: "PDF bağlantısı güvenli depolama alanında değil." }, { status: 422 });
+      }
+      const upstream = await fetch(doc.pdf_url, {
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      });
       if (!upstream.ok) return NextResponse.json({ error: "Blob PDF dosyası okunamadı." }, { status: 502 });
-      bytes = new Uint8Array(await upstream.arrayBuffer());
+      bytes = await readPdfResponse(upstream);
     } else if (typeof doc.pdf_b64 === "string") {
       bytes = decodePdfData(doc.pdf_b64);
     }
 
     if (!bytes || bytes.length === 0) {
       return NextResponse.json({ error: "PDF verisi bulunamadı veya bozuk." }, { status: 404 });
+    }
+    if (bytes.length > MAX_PDF_BYTES || !looksLikePdf(bytes)) {
+      return NextResponse.json({ error: "Geçersiz veya izin verilen boyutu aşan PDF dosyası." }, { status: 422 });
     }
 
     const filename = safeFilename(doc.pdf_filename || "analiz.pdf");

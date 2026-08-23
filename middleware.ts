@@ -4,7 +4,11 @@ import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "agm_session";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/icon", "/manifest"];
+const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/icon", "/manifest", "/fonts", "/sw.js"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 function unauthorized(req: NextRequest, pathname: string): NextResponse {
   if (pathname.startsWith("/api/")) {
@@ -19,12 +23,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
   // Herkese açık yollar
-  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
-
-  // Dosya uzantılı statik istekler (svg, png, webmanifest...)
-  if (/\.[a-zA-Z0-9]+$/.test(pathname)) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
+import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,18 +23,28 @@ export async function POST(req: NextRequest) {
 
   const { file_b64, import_date } = await req.json();
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
-
-  let wb: XLSX.WorkBook;
-  try {
-    const buf = Buffer.from(file_b64, "base64");
-    wb = XLSX.read(buf, { type: "buffer" });
-  } catch {
-    return NextResponse.json({ error: "Dosya okunamadı." }, { status: 400 });
+  if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
+    return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });
   }
 
-  const sheetName = ["Motor Saatleri", "Güncelleme Sayfası"].find((n) => wb.SheetNames.includes(n)) || wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: null }) as any[];
+  let wb: ExcelJS.Workbook;
+  try {
+    const buf = Buffer.from(file_b64, "base64");
+    wb = await loadExcelWorkbook(buf);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const status = message.includes("boyutu") || message.includes("sayfası") ? 413 : 400;
+    return NextResponse.json({ error: status === 413 ? "Excel çalışma sayfası izin verilen boyutu aşıyor." : "Dosya okunamadı." }, { status });
+  }
+
+  const sheet = wb.getWorksheet("Motor Saatleri") || wb.getWorksheet("Güncelleme Sayfası") || wb.worksheets[0];
+  if (!sheet) return NextResponse.json({ error: "Çalışma sayfası bulunamadı." }, { status: 400 });
+  let rows: Record<string, unknown>[];
+  try {
+    rows = worksheetToObjects(sheet);
+  } catch {
+    return NextResponse.json({ error: "Excel çalışma sayfası izin verilen boyutu aşıyor." }, { status: 413 });
+  }
   if (rows.length === 0) return NextResponse.json({ error: "Boş dosya." }, { status: 400 });
 
   const cols = Object.keys(rows[0]);
@@ -45,8 +57,8 @@ export async function POST(req: NextRequest) {
   }
 
   const enginesCol = db.collection("engines") as any;
-  // Excel'deki verinin ait olduğu tarih seçilebilir — seçilmezse şu an kullanılır.
   const stamp = import_date ? new Date(import_date) : new Date();
+  if (Number.isNaN(stamp.getTime())) return NextResponse.json({ error: "Geçersiz içe aktarma tarihi." }, { status: 400 });
   let updated = 0;
 
   for (const row of rows) {

@@ -5,10 +5,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { key: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
   const db = await getDb();
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
@@ -19,7 +21,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { key } = params;
   const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible, restore } = await req.json();
 
   const typesCol = db.collection("maintenance_types") as any;
@@ -47,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   if (apply_period_to_all && typeof default_period_hours === "number") {
     const engineIds = Object.keys(type.engine_states || {});
     for (const engId of engineIds) {
+      if (!isSafeMongoPathSegment(engId)) continue;
       await typesCol.updateOne({ _id: key }, { $set: { [`engine_states.${engId}.period_hours`]: default_period_hours, [`engine_states.${engId}.tracking_source`]: "manual" } });
     }
   }
@@ -54,6 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
   if (engine_states && typeof engine_states === "object") {
     for (const [engId, st] of Object.entries(engine_states as Record<string, any>)) {
+      if (!isSafeMongoPathSegment(engId)) continue;
       const set: Record<string, any> = {};
       if (typeof st?.period_hours === "number") set[`engine_states.${engId}.period_hours`] = st.period_hours;
       if (typeof st?.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = st.last_maintenance_hour;
@@ -63,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   }
 
   const removeEngineIds = Array.isArray(remove_engine_ids)
-    ? [...new Set(remove_engine_ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0))]
+    ? [...new Set(remove_engine_ids.filter((id: unknown): id is string => isSafeMongoPathSegment(id)))]
     : [];
   if (removeEngineIds.length > 0) {
     const unset: Record<string, ""> = {};
@@ -81,7 +84,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { key: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
+  const { key } = await params;
   const db = await getDb();
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
@@ -92,7 +96,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { key: stri
   const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { key } = params;
   const type = await (db.collection("maintenance_types") as any).findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 

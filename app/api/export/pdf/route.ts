@@ -10,6 +10,7 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ async function createPdf(req: NextRequest) {
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
+  const rateLimited = enforceApiRateLimit(req, "export-pdf", 12, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");

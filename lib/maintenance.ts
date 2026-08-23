@@ -1,8 +1,10 @@
 import type { Db } from "mongodb";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 const MAX_RECOMPUTE_ATTEMPTS = 3;
 
 export async function recomputeLastMaintenance(db: Db, engineId: string, typeKey: string): Promise<void> {
+  if (!isSafeMongoPathSegment(engineId) || !isSafeMongoPathSegment(typeKey)) return;
   const recordsCol = db.collection("maintenance_records") as any;
   const typesCol = db.collection("maintenance_types") as any;
   const recordFilter = { engine_id: engineId, type_key: typeKey };

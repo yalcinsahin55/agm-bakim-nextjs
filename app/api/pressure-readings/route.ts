@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (user.role === "goruntuleyici") return NextResponse.json({ error: "Görüntüleyici rolü ölçüm ekleyemez." }, { status: 403 });
+    if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
 
     const { reading_date, entries } = await req.json();
     if (!Array.isArray(entries) || entries.length === 0) {

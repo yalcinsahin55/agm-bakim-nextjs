@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
+import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
 
-function normalizeName(name: any): string {
+function normalizeName(name: unknown): string {
   return String(name).trim().replace(/-/g, " ").replace(/\s+/g, " ");
 }
 
@@ -35,20 +37,31 @@ export async function POST(req: NextRequest) {
 
   const { file_b64 } = await req.json();
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
-
-  let wb: XLSX.WorkBook;
-  try {
-    const buf = Buffer.from(file_b64, "base64");
-    wb = XLSX.read(buf, { type: "buffer" });
-  } catch {
-    return NextResponse.json({ error: "Dosya okunamadı." }, { status: 400 });
+  if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
+    return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });
   }
 
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }) as any[][];
+  let wb: ExcelJS.Workbook;
+  try {
+    const buf = Buffer.from(file_b64, "base64");
+    wb = await loadExcelWorkbook(buf);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const status = message.includes("boyutu") || message.includes("sayfası") ? 413 : 400;
+    return NextResponse.json({ error: status === 413 ? "Excel çalışma sayfası izin verilen boyutu aşıyor." : "Dosya okunamadı." }, { status });
+  }
+
+  const worksheet = wb.worksheets[0];
+  if (!worksheet) return NextResponse.json({ error: "Çalışma sayfası bulunamadı." }, { status: 400 });
+  let grid: unknown[][];
+  try {
+    grid = worksheetToGrid(worksheet);
+  } catch {
+    return NextResponse.json({ error: "Excel çalışma sayfası izin verilen boyutu aşıyor." }, { status: 413 });
+  }
   if (grid.length === 0) return NextResponse.json({ error: "Boş dosya." }, { status: 400 });
 
-  const header = (grid[0] || []).map((h: any) => (h ? String(h).trim().toUpperCase() : null));
+  const header = (grid[0] || []).map((h) => h ? String(h).trim().toUpperCase() : null);
   const motorCol = header.indexOf("MOTOR NO");
   if (motorCol === -1) return NextResponse.json({ error: "'Motor No' sütunu bulunamadı." }, { status: 400 });
 

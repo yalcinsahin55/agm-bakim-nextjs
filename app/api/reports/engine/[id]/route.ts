@@ -18,8 +18,9 @@ function parseParams(req: NextRequest) {
   return { all, page, pageSize, skip: (page - 1) * pageSize };
 }
 
-async function getEngineReport(req: NextRequest, { params }: { params: { id: string } }) {
+async function getEngineReport(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
     const db = await getDb();
     await ensureAppIndexes(db);
     const usersCol = db.collection("users") as any;
@@ -32,7 +33,7 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
     const typeLabel = searchParams.get("type_label");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
-    const match: Record<string, unknown> = { engine_id: params.id };
+    const match: Record<string, unknown> = { engine_id: id };
     if (typeLabel) match.type_label = typeLabel;
     const recordsCol = db.collection("maintenance_records") as any;
     const pipeline: Record<string, unknown>[] = [
@@ -110,6 +111,6 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withApiTiming("GET /api/reports/engine/[id]", () => getEngineReport(req, context));
 }

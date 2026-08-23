@@ -4,6 +4,8 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { getPublicVapidKey, isPushConfigured } from "@/lib/push";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { isAllowedPushEndpoint } from "@/lib/pushSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -25,21 +27,26 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     await ensureAppIndexes(db);
     if (!isPushConfigured()) return NextResponse.json({ error: "Web Push henüz yapılandırılmamış." }, { status: 503 });
+    const rateLimited = enforceApiRateLimit(req, "push-subscribe", 30, 60 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const subscription = body?.subscription;
-    if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+    const endpoint = subscription?.endpoint;
+    const p256dh = subscription?.keys?.p256dh;
+    const auth = subscription?.keys?.auth;
+    if (!isAllowedPushEndpoint(endpoint) || typeof p256dh !== "string" || p256dh.length > 200 || typeof auth !== "string" || auth.length > 200) {
       return NextResponse.json({ error: "Geçersiz push aboneliği." }, { status: 400 });
     }
 
     const now = new Date();
     const collection = db.collection("push_subscriptions");
     await collection.updateOne(
-      { endpoint: subscription.endpoint },
+      { endpoint },
       {
         $set: {
           user_id: user._id,
-          endpoint: subscription.endpoint,
+          endpoint,
           subscription,
           user_agent: req.headers.get("user-agent") || undefined,
           updated_at: now,
@@ -59,9 +66,11 @@ export async function DELETE(req: NextRequest) {
   try {
     const { db, user } = await getUser(req);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = enforceApiRateLimit(req, "push-unsubscribe", 30, 60 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
     const body = await req.json();
     const endpoint = body?.endpoint;
-    if (!endpoint) return NextResponse.json({ error: "Abonelik endpoint’i gerekli." }, { status: 400 });
+    if (!isAllowedPushEndpoint(endpoint)) return NextResponse.json({ error: "Geçersiz abonelik endpoint’i." }, { status: 400 });
     await db.collection("push_subscriptions").deleteOne({ endpoint, user_id: user._id });
     return NextResponse.json({ ok: true });
   } catch (error) {

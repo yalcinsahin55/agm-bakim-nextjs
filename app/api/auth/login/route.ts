@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     const { password } = parsed.data;
     const identifier = parsed.data.identifier || parsed.data.phone || parsed.data.email || "";
     const normalizedIdentifier = isValidPhone(identifier) ? normalizePhone(identifier) : identifier.toLowerCase().trim();
+    const identifierRate = checkRateLimit(`login-identifier:${normalizedIdentifier}`, 8, 10 * 60 * 1000);
+    if (!identifierRate.ok) {
+      return NextResponse.json(
+        { error: `Çok fazla deneme. Lütfen ${Math.ceil(identifierRate.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
+        { status: 429 },
+      );
+    }
 
     const db = await getDb();
     const usersCol = db.collection("users") as any;

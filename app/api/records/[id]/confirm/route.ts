@@ -8,8 +8,8 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  void req;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
   const usersCol = db.collection("users") as any;
@@ -18,16 +18,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bakım kayıtlarını yalnızca yöneticiler teyit edebilir." }, { status: 403 });
   }
-  if (!ObjectId.isValid(params.id)) {
+  if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Kayıt kimliği geçersiz." }, { status: 400 });
   }
 
   const recordsCol = db.collection("maintenance_records") as any;
-  const recordId = new ObjectId(params.id);
+  const recordId = new ObjectId(id);
   const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (record.manager_confirmation_status === "confirmed") {
-    return NextResponse.json({ ok: true, alreadyConfirmed: true, confirmed_at: record.manager_confirmed_at, confirmed_by_name: record.manager_confirmed_by_name, confirmed_ids: [params.id] });
+    return NextResponse.json({ ok: true, alreadyConfirmed: true, confirmed_at: record.manager_confirmed_at, confirmed_by_name: record.manager_confirmed_by_name, confirmed_ids: [id] });
   }
   if (record.manager_confirmation_status !== "pending") {
     return NextResponse.json({ error: "Bu kayıt yeni yönetici teyit akışına dahil değil." }, { status: 409 });
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const pendingRecords = await recordsCol.find({ ...confirmationScope, manager_confirmation_status: "pending" }, { projection: { _id: 1, engine_name: 1, type_label: 1 } }).toArray();
   if (pendingRecords.length === 0) {
     const latest = await recordsCol.findOne({ _id: recordId }, { projection: { manager_confirmation_status: 1, manager_confirmed_at: 1, manager_confirmed_by_name: 1 } });
-    return NextResponse.json({ ok: true, alreadyConfirmed: latest?.manager_confirmation_status === "confirmed", confirmed_at: latest?.manager_confirmed_at, confirmed_by_name: latest?.manager_confirmed_by_name, confirmed_ids: [params.id] });
+    return NextResponse.json({ ok: true, alreadyConfirmed: latest?.manager_confirmation_status === "confirmed", confirmed_at: latest?.manager_confirmed_at, confirmed_by_name: latest?.manager_confirmed_by_name, confirmed_ids: [id] });
   }
 
   const confirmedAt = new Date();
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     user,
     action: "update",
     entity: "maintenance_record",
-    entityId: record.group_id || params.id,
+    entityId: record.group_id || id,
     summary: `${record.engine_name} · ${record.type_label}${confirmedCount > 1 ? ` ve ${confirmedCount - 1} ilişkili bakım` : ""} yönetici tarafından teyit edildi`,
     before: { manager_confirmation_status: "pending", affected_record_count: pendingRecords.length },
     after: { ...confirmation, affected_record_count: confirmedCount },

@@ -68,7 +68,7 @@ Aynı ekranda teknisyenin sorumlu olabilmesi, yardımcı olabilmesi ve çalışm
 
 Bir bakım türü silindiğinde geçmiş bakım kayıtları fiziksel olarak silinmez. Tür `is_deleted` işaretiyle pasifleştirilir; aktif bakım panelleri, yeni kayıt formları, bildirimler ve sağlık filtreleri bu türü göstermeyi bırakır, ancak geçmiş kayıtlar ve rapor tarihçesi korunur. Böylece yanlış silme yüzünden yüzlerce bakım kaydının kaybolması engellenir. Yönetici, **Bakım Türü Yönetimi** ekranındaki **Arşivlenmiş bakım türleri** bölümünden gizlenen türü yeniden aktifleştirebilir; geri alma geçmiş kayıtları değiştirmez. Yönetici motor kapsamını bakım türünü silmeden de **Dahil** seçeneğiyle motor bazında kaldırabilir.
 
-Seed, yedek geri yükleme, içe aktarma, bakım kaydı ve medya yükleme endpoint’lerinde yönetici/kullanıcı yetkisi ve uygun rate limit kontrolleri bulunur. Yedek geri yükleme yalnızca izin verilen koleksiyonları işler; MongoDB özel anahtarları, hassas alanlar ve güvenli olmayan kimlikler temizlenir.
+Seed, yedek geri yükleme, içe aktarma, bakım kaydı ve medya yükleme endpoint’lerinde yönetici/kullanıcı yetkisi ve uygun rate limit kontrolleri bulunur. Yedek geri yükleme yalnızca izin verilen koleksiyonları işler; MongoDB özel anahtarları, hassas alanlar ve güvenli olmayan kimlikler temizlenir. Excel içe aktarma işlemleri çalışma sayfası, satır, sütun ve istek gövdesi limitleriyle sınırlandırılmıştır; dışa aktarılan hücrelerde `=`, `+`, `-` veya `@` ile başlayan kullanıcı metinleri Excel formülü olarak çalıştırılmayacak şekilde kaçışlanır. Production bağımlılıkları için `pnpm audit --prod` kontrolü yapılır; Next.js, PostCSS, Sharp ve UUID yamalı sürümlere sabitlenmiştir.
 
 ## Bakım kaydı iş akışı
 
@@ -189,13 +189,13 @@ Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOK
 
 ### Teknoloji yığını
 
-- **Next.js 14 App Router**
+- **Next.js 15.5.21 App Router**
 - **React 18** ve **TypeScript**
 - **MongoDB Atlas**
 - **Tailwind CSS 3**
 - **Vercel** ve Vercel Blob Storage
 - **Web Push** bildirimleri
-- **PDFKit** ile PDF, **SheetJS/XLSX** ile Excel üretimi
+- **PDFKit** ile PDF, **ExcelJS** ile Excel içe/dışa aktarma
 - **QRCode** ile QR görseli üretimi
 - **Zod** ile API payload doğrulaması
 - **JOSE** ve JWT tabanlı oturum güvenliği
@@ -233,6 +233,9 @@ lib/
 ├── offlineQueue.ts              # IndexedDB çevrimdışı kayıt kuyruğu
 ├── maintenance.ts               # Bakım durumu ve motor güncellemeleri
 ├── dbIndexes.ts                 # Uygulama indeksleri
+├── excel.ts                     # ExcelJS parser/limit yardımcıları
+├── spreadsheetSecurity.ts       # Excel formül enjeksiyonu kaçışı
+├── mongoSecurity.ts             # Dinamik Mongo path doğrulaması
 └── ...
 middleware.ts                   # Route koruması ve auth yönlendirmeleri
 public/                          # Manifest, ikon ve küçük statik dosyalar

@@ -13,6 +13,7 @@ import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionD
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -192,6 +193,7 @@ async function postRecord(req: NextRequest) {
       if (existing) return NextResponse.json({ ok: true, duplicate: true, completed: [existing.type_label], group_id: existing.group_id });
     }
 
+    if (!isSafeMongoPathSegment(engine_id)) return NextResponse.json({ error: "Geçersiz motor kimliği." }, { status: 400 });
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
