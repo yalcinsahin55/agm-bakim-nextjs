@@ -290,6 +290,21 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <div className="mb-4 rounded-card border border-teal/30 bg-gradient-to-br from-teal/10 via-panel to-panel p-4 animate-fade-in">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0"><div className="text-[14px] font-extrabold text-text">Bakım Asistanı</div><div className="mt-0.5 text-[11px] leading-5 text-muted">Gecikmiş bakımların, motor geçmişinin ve raporların özetini sor.</div></div>
+            <span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2 py-1 text-[9px] font-bold text-green">SALT OKUNUR</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              "Hangi bakımlar gecikmiş?",
+              "Bu ay kaç bakım yapıldı?",
+              "Garanti kapsamında dış servise giden motorlar hangileri?",
+            ].map((question) => <Link key={question} href={`/asistan?question=${encodeURIComponent(question)}`} className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-teal/50 hover:text-text">{question}</Link>)}
+          </div>
+          <Link href="/asistan" className="mt-3 inline-flex text-[10px] font-bold text-teal hover:underline">Tüm soruları aç →</Link>
+        </div>
+
         <StatCards counts={counts} />
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2" aria-label="Hızlı erişim">
           {[

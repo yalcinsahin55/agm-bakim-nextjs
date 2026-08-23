@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { useCurrentUser } from "@/lib/useCurrentUser";
@@ -16,6 +17,7 @@ interface AssistantMessage {
   period?: string;
   generatedAt?: string;
   error?: boolean;
+  exportQuery?: Record<string, string>;
 }
 
 const QUICK_QUESTIONS = [
@@ -47,6 +49,129 @@ function formatDate(value: unknown): string {
 
 function stringValue(value: unknown, fallback = "—"): string {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onstart: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+function VoiceInputButton({ disabled, onTranscript }: { disabled: boolean; onTranscript: (text: string) => void }) {
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [supported, setSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const speechWindow = window as typeof window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+    setSupported(Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition));
+    return () => recognitionRef.current?.stop();
+  }, []);
+
+  if (!supported) return null;
+
+  function toggleListening() {
+    const speechWindow = window as typeof window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const Constructor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!Constructor) return;
+    const recognition = new Constructor();
+    recognition.lang = "tr-TR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => { setListening(true); setStatus("Dinleniyor..."); };
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        onTranscript(transcript);
+        setStatus("Soru hazırlandı; göndermeden önce kontrol edebilirsin.");
+      }
+    };
+    recognition.onerror = () => { setListening(false); setStatus("Ses anlaşılamadı; metin olarak yazabilirsin."); };
+    recognition.onend = () => { setListening(false); };
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      setStatus("Sesli giriş başlatılamadı.");
+    }
+  }
+
+  return <div className="flex items-center gap-1.5"><button type="button" onClick={toggleListening} disabled={disabled} aria-label={listening ? "Sesli girişi durdur" : "Sesli soru söyle"} aria-pressed={listening} className={`rounded-xl border px-3 py-2.5 text-[10px] font-bold transition ${listening ? "border-red/50 bg-red/10 text-red" : "border-border bg-panel text-muted hover:border-amber/50 hover:text-amber"} disabled:cursor-not-allowed disabled:opacity-50`}>{listening ? "Durdur" : "Mikrofon"}</button>{status && <span className="hidden max-w-52 text-[9px] text-faint sm:inline">{status}</span>}</div>;
+}
+
+function localDateString(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function periodDateQuery(period?: string): Record<string, string> {
+  if (!period || period === "all") return {};
+  const now = new Date();
+  const start = period === "month" ? new Date(now.getFullYear(), now.getMonth(), 1) : period === "3months" ? new Date(now.getFullYear(), now.getMonth() - 2, 1) : new Date(now.getFullYear(), 0, 1);
+  return { from: localDateString(start), to: localDateString(now) };
+}
+
+function exportFileName(kind: "pdf" | "excel"): string {
+  return kind === "pdf" ? "AGM_Bakim_Asistan_Raporu.pdf" : "AGM_Bakim_Asistan_Raporu.xlsx";
+}
+
+function buildExportQuery(intent: string | undefined, period: string | undefined, data: Record<string, unknown> | undefined): Record<string, string> {
+  if (!intent || intent === "help" || intent === "overdue") return {};
+  const query = periodDateQuery(period);
+  if (intent === "external_service") query.source = "external_service";
+  if (intent === "technician_performance") {
+    const selected = data?.selected_technician as Record<string, unknown> | null | undefined;
+    if (selected?.id) query.technician_id = String(selected.id);
+  }
+  if (intent === "engine_history" && data?.engine_id) query.engine_id = String(data.engine_id);
+  return query;
+}
+
+function ExportActions({ exportQuery }: { exportQuery: Record<string, string> }) {
+  const [busy, setBusy] = useState<"pdf" | "excel" | "">("");
+  const [error, setError] = useState("");
+
+  async function download(kind: "pdf" | "excel") {
+    setBusy(kind);
+    setError("");
+    try {
+      const endpoint = kind === "pdf" ? "/api/export/pdf" : "/api/export/excel";
+      const params = new URLSearchParams(exportQuery);
+      const response = await fetch(`${endpoint}?${params.toString()}`);
+      if (!response.ok) throw new Error(response.status === 401 ? "Oturum süresi doldu." : "Dosya hazırlanamadı.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = exportFileName(kind);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "Dosya indirilemedi.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-[9px] text-faint">Bu cevabın raporunu indir:</span><button type="button" onClick={() => void download("pdf")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted transition hover:border-amber/50 hover:text-amber disabled:opacity-50">{busy === "pdf" ? "Hazırlanıyor..." : "PDF indir"}</button><button type="button" onClick={() => void download("excel")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted transition hover:border-green/50 hover:text-green disabled:opacity-50">{busy === "excel" ? "Hazırlanıyor..." : "Excel indir"}</button>{error && <span className="text-[9px] text-red">{error}</span>}</div>;
 }
 
 function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent?: string }) {
@@ -99,6 +224,7 @@ function detailHref(intent?: string): string | null {
 
 export default function AssistantPage() {
   const { user, loading } = useCurrentUser();
+  const searchParams = useSearchParams();
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([
@@ -106,6 +232,11 @@ export default function AssistantPage() {
   ]);
 
   const canAsk = useMemo(() => Boolean(user) && !sending, [sending, user]);
+
+  useEffect(() => {
+    const initialQuestion = searchParams.get("question")?.trim();
+    if (initialQuestion && initialQuestion.length <= 300) setQuestion((current) => current || initialQuestion);
+  }, [searchParams]);
 
   async function ask(value: string) {
     const nextQuestion = value.trim();
@@ -121,7 +252,7 @@ export default function AssistantPage() {
         setMessages((current) => [...current, { id: `a-${Date.now()}`, role: "assistant", text: payload.message || payload.error || "Asistan şu anda yanıt veremiyor.", error: true }]);
         return;
       }
-      setMessages((current) => [...current, { id: `a-${Date.now()}`, role: "assistant", text: payload.summary || "Sonuç hazırlandı.", title: payload.title, data: payload.data, intent: payload.meta?.intent, period: payload.meta?.period, generatedAt: payload.meta?.generated_at }]);
+      setMessages((current) => [...current, { id: `a-${Date.now()}`, role: "assistant", text: payload.summary || "Sonuç hazırlandı.", title: payload.title, data: payload.data, intent: payload.meta?.intent, period: payload.meta?.period, generatedAt: payload.meta?.generated_at, exportQuery: buildExportQuery(payload.meta?.intent, payload.meta?.period, payload.data) }]);
     } catch {
       setMessages((current) => [...current, { id: `a-${Date.now()}`, role: "assistant", text: "Asistan isteği tamamlanamadı. Bağlantınızı kontrol edip tekrar deneyin.", error: true }]);
     } finally {
@@ -143,5 +274,5 @@ export default function AssistantPage() {
 
   if (loading) return <div className="min-h-screen bg-bg p-4 text-sm text-muted">Bakım Asistanı yükleniyor...</div>;
 
-  return <div className="min-h-screen pb-20"><TopBar title="Bakım Asistanı" subtitle="Salt okunur rapor yardımcısı" /><main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4"><div className="rounded-card border border-amber/30 bg-gradient-to-br from-panel to-panel2 p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-base font-extrabold text-text">Raporlarını sor</div><p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Asistan yalnızca AGM Bakım’daki rapor ve bakım verilerini okur. Kayıt oluşturmaz, düzenlemez, silmez ve teknisyen atamaz.</p></div><span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2.5 py-1 text-[9px] font-bold text-green">SALT OKUNUR</span></div></div><section aria-label="Hızlı sorular"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Hızlı sorular</div><div className="flex gap-2 overflow-x-auto pb-1">{QUICK_QUESTIONS.map((item) => <button key={item} type="button" onClick={() => void ask(item)} disabled={!canAsk} className="flex-shrink-0 rounded-full border border-border bg-panel px-3 py-2 text-[10px] font-semibold text-muted transition hover:border-amber/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">{item}</button>)}</div></section><section aria-label="Asistan konuşması" className="flex flex-col gap-3">{messages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`w-full max-w-3xl rounded-card border p-3.5 ${message.role === "user" ? "border-amber/30 bg-amber/10 sm:max-w-xl" : message.error ? "border-red/30 bg-red/5" : "border-border bg-panel"}`}><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{message.role === "user" ? "Sen" : message.title || "Bakım Asistanı"}</div>{message.role === "assistant" && message.intent && <span className="text-[9px] text-faint">{message.period === "month" ? "Bu ay" : message.period === "3months" ? "Son 3 ay" : message.period === "year" ? "Bu yıl" : "Tümü"}</span>}</div><div className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-text">{message.text}</div>{message.data && message.intent && <ResultDetails data={message.data} intent={message.intent} />}{message.role === "assistant" && message.intent && detailHref(message.intent) && <Link href={detailHref(message.intent)!} className="mt-3 inline-flex text-[10px] font-bold text-amber hover:underline">Detay raporunu aç →</Link>}{message.generatedAt && <div className="mt-2 text-[9px] text-faint">Rapor verisi: {formatDate(message.generatedAt)}</div>}</div></div>)}{sending && <div className="flex justify-start"><div className="rounded-card border border-border bg-panel px-3.5 py-3 text-[11px] text-muted">Raporlar okunuyor...</div></div>}</section><form onSubmit={submit} className="sticky bottom-16 z-10 rounded-card border border-border bg-bg/95 p-2 shadow-xl backdrop-blur"><div className="flex gap-2"><input value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={handleKeyDown} maxLength={300} disabled={!canAsk} placeholder="Örn. Bu ay kaç bakım yapıldı?" aria-label="Bakım asistanına soru yazın" className="min-w-0 flex-1 rounded-xl border border-border bg-panel px-3 py-2.5 text-[12px] text-text outline-none placeholder:text-faint focus:border-amber/60" /><button type="submit" disabled={!canAsk || !question.trim()} className="rounded-xl bg-amber px-4 py-2.5 text-[11px] font-bold text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">{sending ? "..." : "Sor"}</button></div><div className="mt-1 px-1 text-right text-[9px] text-faint">{question.length}/300 · Yalnızca rapor okuma</div></form></main><BottomNav /></div>;
+  return <div className="min-h-screen pb-20"><TopBar title="Bakım Asistanı" subtitle="Salt okunur rapor yardımcısı" /><main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4"><div className="rounded-card border border-amber/30 bg-gradient-to-br from-panel to-panel2 p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-base font-extrabold text-text">Raporlarını sor</div><p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Asistan yalnızca AGM Bakım’daki rapor ve bakım verilerini okur. Kayıt oluşturmaz, düzenlemez, silmez ve teknisyen atamaz.</p></div><span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2.5 py-1 text-[9px] font-bold text-green">SALT OKUNUR</span></div></div><section aria-label="Hızlı sorular"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Hızlı sorular</div><div className="flex gap-2 overflow-x-auto pb-1">{QUICK_QUESTIONS.map((item) => <button key={item} type="button" onClick={() => void ask(item)} disabled={!canAsk} className="flex-shrink-0 rounded-full border border-border bg-panel px-3 py-2 text-[10px] font-semibold text-muted transition hover:border-amber/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">{item}</button>)}</div></section><section aria-label="Asistan konuşması" className="flex flex-col gap-3">{messages.map((message) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`w-full max-w-3xl rounded-card border p-3.5 ${message.role === "user" ? "border-amber/30 bg-amber/10 sm:max-w-xl" : message.error ? "border-red/30 bg-red/5" : "border-border bg-panel"}`}><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{message.role === "user" ? "Sen" : message.title || "Bakım Asistanı"}</div>{message.role === "assistant" && message.intent && <span className="text-[9px] text-faint">{message.period === "month" ? "Bu ay" : message.period === "3months" ? "Son 3 ay" : message.period === "year" ? "Bu yıl" : "Tümü"}</span>}</div><div className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-text">{message.text}</div>{message.data && message.intent && <ResultDetails data={message.data} intent={message.intent} />}{message.role === "assistant" && message.intent && detailHref(message.intent) && <Link href={detailHref(message.intent)!} className="mt-3 inline-flex text-[10px] font-bold text-amber hover:underline">Detay raporunu aç →</Link>}{message.role === "assistant" && message.exportQuery && Object.keys(message.exportQuery).length > 0 && <ExportActions exportQuery={message.exportQuery} />}{message.generatedAt && <div className="mt-2 text-[9px] text-faint">Rapor verisi: {formatDate(message.generatedAt)}</div>}</div></div>)}{sending && <div className="flex justify-start"><div className="rounded-card border border-border bg-panel px-3.5 py-3 text-[11px] text-muted">Raporlar okunuyor...</div></div>}</section><form onSubmit={submit} className="sticky bottom-16 z-10 rounded-card border border-border bg-bg/95 p-2 shadow-xl backdrop-blur"><div className="flex gap-2"><VoiceInputButton disabled={!canAsk} onTranscript={(text) => setQuestion((current) => `${current} ${text}`.trim())} /><input value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={handleKeyDown} maxLength={300} disabled={!canAsk} placeholder="Örn. Bu ay kaç bakım yapıldı?" aria-label="Bakım asistanına soru yazın" className="min-w-0 flex-1 rounded-xl border border-border bg-panel px-3 py-2.5 text-[12px] text-text outline-none placeholder:text-faint focus:border-amber/60" /><button type="submit" disabled={!canAsk || !question.trim()} className="rounded-xl bg-amber px-4 py-2.5 text-[11px] font-bold text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">{sending ? "..." : "Sor"}</button></div><div className="mt-1 px-1 text-right text-[9px] text-faint">{question.length}/300 · Yalnızca rapor okuma</div></form></main><BottomNav /></div>;
 }

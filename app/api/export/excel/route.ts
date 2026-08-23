@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { buildItems, STATUS_LABELS, engineSortKey } from "@/lib/status";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +17,19 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
   const typeFilter = searchParams.get("type_label");
+  const sourceFilter = searchParams.get("source");
+  const technicianFilter = searchParams.get("technician_id");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const recordQuery: Record<string, unknown> = {};
   if (engineFilter) recordQuery.engine_id = engineFilter;
   if (typeFilter) recordQuery.type_label = typeFilter;
+  const sourceConditions: Record<string, unknown>[] = [];
+  if (sourceFilter === "external_service") sourceConditions.push({ technician_source: "external_service" }, { technician_id: EXTERNAL_SERVICE_TECHNICIAN_ID });
+  if (sourceFilter === "internal") sourceConditions.push({ technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } });
+  if (sourceConditions.length === 1) Object.assign(recordQuery, sourceConditions[0]);
+  if (sourceConditions.length > 1) recordQuery.$or = sourceConditions;
+  if (technicianFilter) recordQuery.$and = [{ $or: [{ technician_id: technicianFilter }, { "other_technicians.id": technicianFilter }] }];
   if (from || to) {
     recordQuery.created_at = {
       ...(from ? { $gte: new Date(`${from}T00:00:00.000Z`) } : {}),
