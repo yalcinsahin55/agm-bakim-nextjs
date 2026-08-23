@@ -300,6 +300,62 @@ Uygulama içindeki yedekleme/arsiv ekranı kullanılabilse de MongoDB Atlas tara
 - Audit log kayıtlarını silmeden önce operasyonel ve denetim ihtiyaçlarını kontrol edin.
 - Üretim verisine karşı migration veya toplu düzeltme yapmadan önce dry-run/önizleme yaklaşımı kullanın.
 
+## Eski teknisyen kayıtlarını standardize etme
+
+Yeni kayıtlar teknisyenleri sabit kullanıcı ID’siyle saklar. Eski kayıtlarda yalnızca görünen ad veya farklı yazım biçimleri bulunuyorsa `scripts/migrate-technician-source.mjs` yardımcı aracı kullanılabilir. Araç varsayılan olarak **dry-run** çalışır; bu modda hiçbir kayıt değiştirilmez.
+
+Önce üretim veritabanının ayrı ve erişimi kısıtlı bir yedeğini alın. Ardından proje kök dizininde yalnızca rapor üretin:
+
+```bash
+node scripts/migrate-technician-source.mjs --report=migration-output/technician-preview.json
+```
+
+Araç şu sınıflandırmayı yapar:
+
+| Durum | Migration davranışı |
+|---|---|
+| Geçerli teknisyen ID’si aktif/onaylı kullanıcıyla eşleşir | `technician_source: "internal"` ve güncel kullanıcı adı yazılır. |
+| ID eşleşmez, normalize edilmiş ad tek bir aktif/onaylı kullanıcıyla eşleşir | Güvenli otomatik `internal` eşleşmesi yapılır. Büyük-küçük harf, Türkçe Unicode ve fazla boşluk farkları normalize edilir. |
+| Kayıt dış hizmet sentinel’i veya mevcut dış hizmet işareti taşıyor | `external_service` ve standart dış hizmet kimliği korunur; varsa servis adı korunur. |
+| Hiç eşleşme yok veya aynı normalize edilmiş ada sahip birden fazla kullanıcı var | Kayıt **değiştirilmez** ve `unresolved_samples` raporuna alınır. |
+
+Dry-run raporunda `high_confidence_changes`, `internal_changes`, `external_service_changes`, `unchanged` ve `unresolved` sayılarını inceleyin. Belirsiz kayıtları yönetici olarak doğruladıktan sonra isteğe bağlı bir mapping dosyası oluşturabilirsiniz:
+
+```json
+{
+  "records": {
+    "<kayıt_id>": { "source": "internal", "technician_id": "<kullanıcı_id>" },
+    "<kayıt_id>": { "source": "external_service", "external_service_name": "Garanti Servisi" }
+  }
+}
+```
+
+Mapping ve sınırlı apply işlemi:
+
+```bash
+node scripts/migrate-technician-source.mjs \
+  --mapping=migration-output/mapping.json \
+  --report=migration-output/apply-report.json \
+  --backup=migration-output/technician-backup.json \
+  --max-changes=1000 \
+  --apply \
+  --confirm=APPLY-TECHNICIAN-SOURCE-MIGRATION
+```
+
+Apply modu yalnızca yüksek güvenli otomatik eşleşmeleri ve mapping dosyasında açıkça belirtilen kayıtları uygular. Her çalıştırmada değiştirilecek teknisyen alanlarının yedeğini önce JSON dosyasına atomik olarak yazar. Varsayılan tek çalıştırma sınırı 1.000 kayıttır; bu sınırı yükseltmeden önce dry-run raporunu ve veritabanı yedeğini kontrol edin. Apply sırasında beklenmeyen bir güncelleme hatası oluşursa, o ana kadar uygulanan değişiklikler otomatik olarak backup alanlarından geri alınır; geri alma sırasında da hata olursa backup dosyası manuel rollback için korunur.
+
+Bir hata veya yanlış eşleşme fark edilirse, apply sırasında üretilen yedekle yalnızca migration’ın takip ettiği alanları geri yükleyin:
+
+```bash
+node scripts/migrate-technician-source.mjs \
+  --rollback=migration-output/technician-backup.json \
+  --max-changes=1000 \
+  --apply \
+  --confirm=ROLLBACK-TECHNICIAN-SOURCE-MIGRATION
+```
+
+Script yalnızca `technician_source`, `technician_id`, `technician_name` ve `external_service_name` alanlarına dokunur; motor, bakım türü, tarih-saat, medya, not, kontrol listesi ve ekip teknisyeni alanlarını değiştirmez. `migration-output/` klasörü `.gitignore` içinde tutulduğu için rapor ve yedekler GitHub’a gönderilmez. Migration tamamlandıktan sonra Teknisyen Raporu’nu yenileyerek isim varyasyonlarının tek satırda birleştiğini, dış hizmet kayıtlarının ise teknisyen metriklerine dahil olmadığını kontrol edin.
+
 ## Geliştirme ve doğrulama komutları
 
 | Komut | Açıklama |

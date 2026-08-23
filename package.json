@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "migrate:technician-source": "node scripts/migrate-technician-source.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
