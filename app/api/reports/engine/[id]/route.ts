@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 
@@ -24,6 +25,7 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    if (!hasPermission(user.role, "reports:read")) return NextResponse.json({ error: "Rapor görme yetkiniz yok." }, { status: 403 });
 
     const { all, page, pageSize, skip } = parseParams(req);
     const searchParams = new URL(req.url).searchParams;
@@ -32,51 +34,54 @@ async function getEngineReport(req: NextRequest, { params }: { params: { id: str
     const to = searchParams.get("to");
     const match: Record<string, unknown> = { engine_id: params.id };
     if (typeLabel) match.type_label = typeLabel;
+    const recordsCol = db.collection("maintenance_records") as any;
+    const pipeline: Record<string, unknown>[] = [
+      { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
+      { $match: match },
+    ];
     if (from || to) {
-      match.created_at = {
+      pipeline.push({ $match: { maintenance_date: {
         ...(from ? { $gte: new Date(`${from}T00:00:00.000Z`) } : {}),
         ...(to ? { $lte: new Date(`${to}T23:59:59.999Z`) } : {}),
-      };
+      } } });
     }
-    const recordsCol = db.collection("maintenance_records") as any;
-    const [result] = await recordsCol.aggregate([
-      { $match: match },
-      {
-        $facet: {
-          metadata: [{ $count: "total" }],
-          stats: [
-            {
-              $group: {
-                _id: null,
-                first_date: { $min: "$created_at" },
-                last_date: { $max: "$created_at" },
-                total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
-              },
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: "total" }],
+        stats: [
+          {
+            $group: {
+              _id: null,
+              first_date: { $min: "$maintenance_date" },
+              last_date: { $max: "$maintenance_date" },
+              total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
             },
-          ],
-          records: [
-            { $sort: { created_at: -1, _id: -1 } },
-            { $skip: skip },
-            { $limit: pageSize },
-            {
-              $project: {
-                _id: 1,
-                engine_id: 1,
-                engine_name: 1,
-                type_label: 1,
-                hour_at_completion: 1,
-                maintenance_start_at: 1,
-                maintenance_end_at: 1,
-                maintenance_duration_minutes: 1,
-                technician_name: 1,
-                other_technicians: 1,
-                created_at: 1,
-              },
+          },
+        ],
+        records: [
+          { $sort: { maintenance_date: -1, _id: -1 } },
+          { $skip: skip },
+          { $limit: pageSize },
+          {
+            $project: {
+              _id: 1,
+              engine_id: 1,
+              engine_name: 1,
+              type_label: 1,
+              hour_at_completion: 1,
+              maintenance_start_at: 1,
+              maintenance_end_at: 1,
+              maintenance_duration_minutes: 1,
+              technician_name: 1,
+              other_technicians: 1,
+              created_at: 1,
+              maintenance_date: 1,
             },
-          ],
-        },
+          },
+        ],
       },
-    ]).toArray();
+    });
+    const [result] = await recordsCol.aggregate(pipeline).toArray();
 
     const total = Number(result?.metadata?.[0]?.total || 0);
     const range = result?.stats?.[0];

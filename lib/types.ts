@@ -1,6 +1,7 @@
 // 📚 Ortak tip tanımları — tüm uygulama bu tipleri kullanacak
 
 export type Role = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";
+export type TechnicianType = "mekanik" | "elektromekanik";
 
 export interface User {
   _id: string;
@@ -12,6 +13,7 @@ export interface User {
   role: Role;
   active: boolean;
   approved?: boolean;
+  technician_type?: TechnicianType;
   created_at: Date | string;
 }
 
@@ -33,6 +35,7 @@ export interface Engine {
 export interface EngineState {
   last_maintenance_hour: number;
   period_hours: number;
+  tracking_source?: "manual" | "record";
 }
 
 export interface MaintenanceType {
@@ -40,6 +43,7 @@ export interface MaintenanceType {
   key: string;
   label: string;
   default_period_hours: number;
+  engine_scope?: "explicit" | "all";
   engine_states: Record<string, EngineState>;
 }
 
@@ -48,6 +52,14 @@ export interface VideoRef {
   data_b64?: string;
   filename?: string;
   mime?: string;
+}
+
+export interface MaintenanceTechnicianContribution {
+  id: string;
+  full_name: string;
+  technician_type?: TechnicianType;
+  contribution_role: "responsible" | "support";
+  duration_minutes: number;
 }
 
 export interface MaintenanceRecord {
@@ -72,7 +84,8 @@ export interface MaintenanceRecord {
   technician_source?: "internal" | "external_service";
   external_service_name?: string;
   other_technician_ids?: string[];
-  other_technicians?: Array<{ id: string; full_name: string }>;
+  other_technicians?: Array<{ id: string; full_name: string; technician_type?: TechnicianType }>;
+  technician_contributions?: MaintenanceTechnicianContribution[];
   checklist?: Array<{ label: string; completed: boolean }>;
   completion_confirmed_at?: Date | string;
   manager_confirmation_status?: "pending" | "confirmed";

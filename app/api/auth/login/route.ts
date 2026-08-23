@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const token = await createSessionToken(user._id);
     const res = NextResponse.json({
       ok: true,
-      user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role },
+      user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role, technician_type: user.technician_type === "elektromekanik" ? "elektromekanik" : user.role === "teknisyen" || user.role === "planlamaci" ? "mekanik" : undefined },
     });
     res.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,

@@ -10,6 +10,10 @@ import { ROLE_LABELS } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 const ROLES = ["yonetici", "teknisyen", "goruntuleyici"];
+const TECHNICIAN_TYPES = [
+  { value: "mekanik", label: "Mekanik teknisyen" },
+  { value: "elektromekanik", label: "Elektromekanik teknisyen" },
+];
 
 const ROLE_COLORS = {
   yonetici: "text-amber bg-amber/10 border-amber/30",
@@ -28,7 +32,7 @@ export default function KullanicilarPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen" });
+  const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -52,7 +56,7 @@ export default function KullanicilarPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success("Kullanıcı eklendi! 👥");
-        setForm({ full_name: "", phone: "", password: "", role: "teknisyen" });
+        setForm({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
         setShowForm(false);
         load();
       } else {
@@ -163,7 +167,10 @@ export default function KullanicilarPage() {
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
-            <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz.</p>
+            {form.role === "teknisyen" && <select value={form.technician_type} onChange={(e) => setForm({ ...form, technician_type: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+              {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>}
+            <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
             <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
@@ -207,6 +214,9 @@ export default function KullanicilarPage() {
                   {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
+                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value })} className="flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" aria-label={`${u.full_name} teknisyen türü`}>
+                  {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>}
                 <label className="flex items-center gap-1.5 text-[11px] text-muted flex-shrink-0 cursor-pointer">
                   <input type="checkbox" checked={u.active} onChange={(e) => updateUser(u.id, { active: e.target.checked })} />
                   Aktif

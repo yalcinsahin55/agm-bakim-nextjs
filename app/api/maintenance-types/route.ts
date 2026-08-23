@@ -54,18 +54,19 @@ export async function POST(req: NextRequest) {
     }
 
     // 🎯 Motor bazlı durumlar (yeni özellik) — yoksa eski apply_to_all davranışı
-    let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number }> = {};
+    let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number; tracking_source: "manual" }> = {};
     if (engine_states && typeof engine_states === "object") {
       Object.entries(engine_states).forEach(([engId, st]: [string, any]) => {
         engineStates[engId] = {
           last_maintenance_hour: Number(st?.last_maintenance_hour) || 0,
           period_hours: Number(st?.period_hours) || 0,
+          tracking_source: "manual",
         };
       });
     } else if (apply_to_all) {
       const engines = await (db.collection("engines") as any).find().toArray();
       engines.forEach((e: any) => {
-        engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0 };
+        engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0, tracking_source: "manual" };
       });
     }
 
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       key,
       label: label.trim(),
       default_period_hours: Number(default_period_hours) || 0,
+      engine_scope: apply_to_all ? "all" : "explicit",
       engine_states: engineStates,
     };
     await typesCol.insertOne(doc);

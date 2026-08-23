@@ -11,8 +11,8 @@ import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME } from "@/lib/technicians";
-import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, getMaintenanceRecordDate, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 interface Engine {
   _id: string;
@@ -54,10 +54,12 @@ interface MaintenanceRecord {
   created_at: string;
   technician_name: string;
   technician_id: string;
+  technician_type?: "mekanik" | "elektromekanik";
   technician_source?: "internal" | "external_service";
   external_service_name?: string;
   other_technician_ids?: string[];
-  other_technicians?: Array<{ id: string; full_name: string }>;
+  other_technicians?: Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik" }>;
+  technician_contributions?: Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik"; contribution_role: "responsible" | "support"; duration_minutes: number }>;
   checklist?: Array<{ label: string; completed: boolean }>;
   completion_confirmed_at?: string;
   manager_confirmation_status?: "pending" | "confirmed";
@@ -139,9 +141,11 @@ function toLocalDateTimeInput(value: string | Date | undefined): string {
 }
 
 function technicianLabel(record: MaintenanceRecord): string {
-  return record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID
+  const name = record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID
     ? record.technician_name || EXTERNAL_SERVICE_TECHNICIAN_NAME
     : record.technician_name || "—";
+  if (record.technician_source === "external_service" || !record.technician_type) return name;
+  return `${name} · ${TECHNICIAN_TYPE_LABELS[record.technician_type] || "Mekanik teknisyen"}`;
 }
 
 interface EditFormProps {
@@ -162,11 +166,12 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
-  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik" }>>([]);
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
   const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
+  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
 
@@ -322,6 +327,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       other_technician_ids: technicianSource === "external_service" ? [] : otherTechnicianIds,
+      other_technician_durations: technicianSource === "external_service" ? {} : Object.fromEntries(otherTechnicianIds.map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes])),
       technician_source: technicianSource,
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
@@ -371,7 +377,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
           <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu kayıt teknisyen performansına dahil edilmez ve yalnızca yönetici tarafından düzenlenebilir.</div>
         </> : <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
           {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
-          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+          {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
         </select>}
       </div>}
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
@@ -416,7 +422,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       {technicianSource !== "external_service" && technicians.filter((technician) => technician.id !== responsibleTechnicianId).length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
         <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında bakıma katılanları seç.</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== responsibleTechnicianId).map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id))} />{technician.full_name}</label>)}</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{technicians.filter((technician) => technician.id !== responsibleTechnicianId).map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: current[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60 } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
       </div>}
 
       {offlineMedia.length > 0 && (
@@ -778,7 +784,7 @@ export default function KayitlarPage() {
                     {r.manager_confirmation_status === "confirmed" ? <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green">✓ Teyitli</span> : r.manager_confirmation_status === "pending" ? <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
                   </div>
                   <div className="text-[11px] text-faint mt-0.5">
-                    {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
+                    {getMaintenanceRecordDate(r.maintenance_start_at, r.created_at)?.toLocaleDateString("tr-TR") || "—"} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
                   </div>
                   {(r.maintenance_start_at || r.maintenance_end_at || r.maintenance_duration_minutes != null) && <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] text-teal"><span>Başlangıç: {r.maintenance_start_at ? new Date(r.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {r.maintenance_end_at ? new Date(r.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>Süre: {formatMaintenanceDuration(r.maintenance_duration_minutes)}</span></div>}
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
@@ -883,20 +889,20 @@ export default function KayitlarPage() {
             <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
               <div>
                 <div className="text-base font-extrabold text-text">{selectedRecord.type_label}</div>
-                <div className="mt-0.5 text-[11px] text-muted">{selectedRecord.engine_name} · {new Date(selectedRecord.created_at).toLocaleDateString("tr-TR")}</div>
+                <div className="mt-0.5 text-[11px] text-muted">{selectedRecord.engine_name} · {getMaintenanceRecordDate(selectedRecord.maintenance_start_at, selectedRecord.created_at)?.toLocaleDateString("tr-TR") || "—"}</div>
               </div>
               <button type="button" onClick={() => setSelectedRecord(null)} className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Detayı kapat">✕</button>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
-              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{technicianLabel(selectedRecord)}</div></div>
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{technicianLabel(selectedRecord)}</div><div className="mt-0.5 text-[9.5px] text-faint">{TECHNICIAN_TYPE_LABELS[selectedRecord.technician_type || "mekanik"]}</div></div>
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 text-[11px]">
               <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Başlangıç</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_start_at ? new Date(selectedRecord.maintenance_start_at).toLocaleString("tr-TR") : "—"}</div></div>
               <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Bitiş</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_end_at ? new Date(selectedRecord.maintenance_end_at).toLocaleString("tr-TR") : "—"}</div></div>
               <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(selectedRecord.maintenance_duration_minutes)}</div></div>
             </div>
-            {selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
+            {selectedRecord.technician_contributions?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Teknisyen katkıları:</b><div className="mt-1 flex flex-col gap-0.5">{selectedRecord.technician_contributions.map((contribution) => <span key={`${contribution.id}-${contribution.contribution_role}`}>{contribution.full_name} · {TECHNICIAN_TYPE_LABELS[contribution.technician_type || "mekanik"]} · {contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {formatMaintenanceDuration(contribution.duration_minutes)}</span>)}</div></div> : selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
             {selectedRecord.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>✓ Yönetici teyidi:</b> {selectedRecord.manager_confirmed_by_name || "Yönetici"} · {selectedRecord.manager_confirmed_at ? new Date(selectedRecord.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : selectedRecord.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {user?.role === "yonetici" && <button type="button" onClick={() => void confirmRecord(selectedRecord)} disabled={confirmingId === selectedRecord._id} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-[#071a12] disabled:opacity-50">{confirmingId === selectedRecord._id ? "Teyit ediliyor..." : "✓ Kontrol ettim, teyit et"}</button>}</div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}

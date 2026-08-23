@@ -15,7 +15,7 @@ import Lightbox from "@/components/Lightbox";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
-import { EXTERNAL_SERVICE_TECHNICIAN_NAME } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
@@ -103,7 +103,6 @@ export default function TamamlaPage() {
   const [hours, setHours] = useState(0);
   const [maintenanceStartAt, setMaintenanceStartAt] = useState("");
   const [maintenanceEndAt, setMaintenanceEndAt] = useState("");
-  const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10));
   const [pressure, setPressure] = useState("");
   const [techNote, setTechNote] = useState("");
   const [extraKeys, setExtraKeys] = useState([]);
@@ -111,6 +110,7 @@ export default function TamamlaPage() {
   const [technicians, setTechnicians] = useState([]);
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState("");
   const [otherTechnicianIds, setOtherTechnicianIds] = useState([]);
+  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState({});
   const [technicianSource, setTechnicianSource] = useState("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState({});
@@ -390,6 +390,12 @@ export default function TamamlaPage() {
 
   function toggleOtherTechnician(id, checked) {
     setOtherTechnicianIds((current) => checked ? [...new Set([...current, id])] : current.filter((currentId) => currentId !== id));
+    setOtherTechnicianDurations((current) => {
+      const next = { ...current };
+      if (checked) next[id] = next[id] || maintenanceDurationMinutes || 60;
+      else delete next[id];
+      return next;
+    });
   }
 
   function changeTechnicianSource(source) {
@@ -426,7 +432,7 @@ export default function TamamlaPage() {
     
     setSubmitting(true);
     
-    const isBackdated = recordDate !== new Date().toISOString().slice(0, 10);
+    const isBackdated = new Date(maintenanceStartAt).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10);
 
     const extra_types = extraKeys.map((k) => {
       const t = types.find((tt) => tt.key === k);
@@ -450,9 +456,10 @@ export default function TamamlaPage() {
       photos,
       videos,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-      backdated: isBackdated, record_date: recordDate,
+      backdated: isBackdated,
       period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
       other_technician_ids: otherTechnicianIds,
+      other_technician_durations: Object.fromEntries(otherTechnicianIds.map((id) => [id, Number(otherTechnicianDurations[id]) || maintenanceDurationMinutes || 60])),
       checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
       completion_confirmation: true,
     };
@@ -602,13 +609,6 @@ export default function TamamlaPage() {
           <div className={`mt-2 rounded-lg px-2.5 py-2 text-[10.5px] ${timeTrackingReady ? "bg-green/10 text-green" : "bg-red/10 text-red"}`} role="status">{timeTrackingReady ? `Toplam bakım süresi: ${formatMaintenanceDuration(maintenanceDurationMinutes)}` : "Geçerli bir başlangıç ve bitiş zamanı girin."}</div>
         </div>
 
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Tarihi</label>
-        <input
-          type="date" value={recordDate} max={new Date().toISOString().slice(0, 10)}
-          onChange={(e) => setRecordDate(e.target.value)}
-          className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2"
-        />
-
         {(typeKey === "krank" || typeKey === "intercooler") && (
           <>
             <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fark Basıncı (bar)</label>
@@ -632,10 +632,10 @@ export default function TamamlaPage() {
           </>}
           {technicianSource !== "external_service" && user?.role === "yonetici" && <div className="mt-3 rounded-lg border border-purple-400/25 bg-purple-400/5 p-2.5">
             <label className="text-[11px] font-bold uppercase tracking-wide text-muted" htmlFor="responsible-technician">Yetkili / sorumlu bakımcı</label>
-            <div className="mt-0.5 text-[10px] text-faint">Bu kayıt kimin sorumluluğunda tamamlandıysa onu seç. Bu seçim yalnızca yöneticiye açıktır.</div>
+            <div className="mt-0.5 text-[10px] text-faint">Bu kayıt kimin sorumluluğunda tamamlandıysa onu seç. Elektromekanik ekip üyeleri genellikle destek rolünde takip edilir. Bu seçim yalnızca yöneticiye açıktır.</div>
             <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
               <option value="">Varsayılan: benim hesabım</option>
-              {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+              {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
             </select>
           </div>}
         </div>}
@@ -650,7 +650,7 @@ export default function TamamlaPage() {
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında bakıma katılan ekip üyelerini seçebilirsin.</div>
           <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {selectableTechnicians.map((technician) => <label key={technician.id} className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name}</label>)}
+            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi (dk)<input type="number" min="1" max={366 * 24 * 60} step="15" value={otherTechnicianDurations[technician.id] || maintenanceDurationMinutes || 60} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
           </div>
         </div>}
 

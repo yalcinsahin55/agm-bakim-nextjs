@@ -1,8 +1,19 @@
 import type { Db } from "mongodb";
+import type { TechnicianType } from "@/lib/types";
+
+export const TECHNICIAN_TYPE_LABELS: Record<TechnicianType, string> = {
+  mekanik: "Mekanik teknisyen",
+  elektromekanik: "Elektromekanik teknisyen",
+};
+
+export function normalizeTechnicianType(value: unknown): TechnicianType {
+  return value === "elektromekanik" ? "elektromekanik" : "mekanik";
+}
 
 export interface TechnicianOption {
   id: string;
   full_name: string;
+  technician_type: TechnicianType;
 }
 
 export const EXTERNAL_SERVICE_TECHNICIAN_ID = "__external_service__" as const;
@@ -24,12 +35,12 @@ export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]>
       active: { $ne: false },
       approved: { $ne: false },
     },
-    { projection: { _id: 1, full_name: 1 } },
+    { projection: { _id: 1, full_name: 1, technician_type: 1 } },
   ).toArray();
 
   return users
     .filter((user) => user._id != null && typeof user.full_name === "string" && user.full_name.trim())
-    .map((user) => ({ id: String(user._id), full_name: (user.full_name as string).trim() }))
+    .map((user) => ({ id: String(user._id), full_name: (user.full_name as string).trim(), technician_type: normalizeTechnicianType(user.technician_type) }))
     .sort((a, b) => a.full_name.localeCompare(b.full_name, "tr"));
 }
 

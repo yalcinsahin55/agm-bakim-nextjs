@@ -37,6 +37,7 @@ export const adminUserSchema = z.object({
   phone: z.string().trim().min(5, "Telefon numarası gereklidir.").max(30),
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır.").max(128),
   role: z.enum(["yonetici", "teknisyen", "goruntuleyici"]).default("teknisyen"),
+  technician_type: z.enum(["mekanik", "elektromekanik"]).optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -66,6 +67,7 @@ export const recordSchema = z.object({
   technician_note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   other_technician_ids: z.array(z.string().min(1).max(100)).max(20, "En fazla 20 yardımcı teknisyen seçilebilir.").optional(),
+  other_technician_durations: z.record(z.string().min(1).max(100), z.number().int().positive().max(366 * 24 * 60)).optional(),
   checklist: z.array(z.object({ label: z.string().min(1).max(200), completed: z.boolean() })).max(20).optional(),
   completion_confirmation: z.boolean().optional(),
 

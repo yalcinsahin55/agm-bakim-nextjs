@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
+import type { TechnicianType } from "@/lib/types";
 
 interface CurrentUser {
   id?: string;
@@ -9,6 +10,7 @@ interface CurrentUser {
   email?: string;
   phone?: string;
   role: string;
+  technician_type?: TechnicianType;
   active?: boolean;
   approved?: boolean;
 }

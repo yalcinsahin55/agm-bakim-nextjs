@@ -7,7 +7,7 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
   const body = await req.json();
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = body;
 
   const update: Record<string, any> = {};
   let nextStartAt: Date | undefined = record.maintenance_start_at ? new Date(record.maintenance_start_at) : undefined;
@@ -73,7 +73,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   let nextResponsibleName = useExternalService
     ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
     : record.technician_name;
-  let effectiveOtherTechnicians: Array<{ id: string; full_name: string }> = [];
+  let nextResponsibleType = useExternalService ? undefined : normalizeTechnicianType(record.technician_type);
+    let effectiveOtherTechnicians: Array<{ id: string; full_name: string; technician_type: "mekanik" | "elektromekanik" }> = [];
   if (useExternalService) {
     if (Array.isArray(other_technician_ids) && other_technician_ids.length > 0) {
       return NextResponse.json({ error: "Dış hizmet kaydında kayıtlı yardımcı teknisyen seçilemez." }, { status: 400 });
@@ -81,8 +82,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     update.technician_id = nextResponsibleId;
     update.technician_name = nextResponsibleName;
     update.technician_source = "external_service";
+    update.$unset = { technician_type: "" };
     if (externalServiceName) update.external_service_name = externalServiceName;
-    else update.$unset = { external_service_name: "" };
+    else update.$unset.external_service_name = "";
     update.other_technician_ids = [];
     update.other_technicians = [];
   } else {
@@ -99,10 +101,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       nextResponsibleId = resolvedResponsible[0].id;
       nextResponsibleName = resolvedResponsible[0].full_name;
+      nextResponsibleType = resolvedResponsible[0].technician_type;
       update.technician_id = nextResponsibleId;
       update.technician_name = nextResponsibleName;
     }
     update.technician_source = "internal";
+    update.technician_type = nextResponsibleType;
     update.$unset = { external_service_name: "" };
 
     effectiveOtherTechnicians = Array.isArray(record.other_technicians)
@@ -113,13 +117,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
         return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
       }
-      effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
+      effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
       update.other_technician_ids = effectiveOtherTechnicians.map((technician) => technician.id);
       update.other_technicians = effectiveOtherTechnicians;
     } else if (nextResponsibleId !== record.technician_id && effectiveOtherTechnicians.some((technician) => technician.id === nextResponsibleId)) {
       return NextResponse.json({ error: "Yeni sorumlu teknisyen yardımcı listesinde bulunamaz." }, { status: 400 });
     }
   }
+  const technicianContributions = useExternalService ? [] : [
+    { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: nextDurationMinutes || 0 },
+    ...effectiveOtherTechnicians.map((technician) => ({
+      ...technician,
+      contribution_role: "support",
+      duration_minutes: Number(other_technician_durations?.[technician.id]) || nextDurationMinutes || 0,
+    })),
+  ];
+  update.technician_contributions = technicianContributions;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
   if (typeof technician_note === "string") update.technician_note = technician_note;
@@ -167,6 +180,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       await recordsCol.updateOne({ _id: record._id }, { $set: { group_id: groupId } });
     }
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
+    const extraTechnicianContributions = useExternalService ? [] : [
+      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: nextDurationMinutes || 0 },
+      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support", duration_minutes: Number(other_technician_durations?.[technician.id]) || nextDurationMinutes || 0 })),
+    ];
     const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
     const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
     const typesCol = db.collection("maintenance_types") as any;
@@ -202,6 +219,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
         other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
         other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
+        technician_contributions: extraTechnicianContributions,
+        technician_type: useExternalService ? undefined : nextResponsibleType,
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,
       });
@@ -231,7 +250,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     action: "delete",
     entity: "maintenance_record",
     entityId: params.id,
-    summary: `${record.engine_name} · ${record.type_label} bakım kaydı silindi`,
+    summary: `${record.engine_name} · ${record.type_label} bakım kaydı silindi; motor bakım takibi yeniden hesaplandı`,
     before: record,
   });
 

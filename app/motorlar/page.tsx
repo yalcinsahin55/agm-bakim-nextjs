@@ -13,6 +13,7 @@ import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import { getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 
 export default function MotorlarPage() {
   const router = useRouter();
@@ -285,7 +286,7 @@ export default function MotorlarPage() {
                             <div className="min-w-0">
                               <div className="text-[11.5px] font-semibold text-text truncate">{r.type_label}</div>
                               <div className="text-[9.5px] text-faint">
-                                {new Date(r.created_at).toLocaleDateString("tr-TR")} · {r.technician_name || ""}
+                                {getMaintenanceRecordDate(r.maintenance_start_at, r.created_at)?.toLocaleDateString("tr-TR") || "—"} · {r.technician_name || ""}
                               </div>
                             </div>
                             <div className="font-mono text-[11px] text-amber flex-shrink-0">

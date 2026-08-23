@@ -41,6 +41,17 @@ export function formatMaintenanceDuration(minutes: number | undefined | null): s
   return remainingMinutes ? `${hours} sa ${remainingMinutes} dk` : `${hours} sa`;
 }
 
+/** Yeni kayıtlarda bakım başlangıcı, legacy kayıtlarda created_at iş tarihi olarak kullanılır. */
+export function getMaintenanceRecordDate(
+  maintenanceStartAt?: Date | string | null,
+  createdAt?: Date | string | null,
+): Date | null {
+  const value = maintenanceStartAt || createdAt;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 export function formatTimeInput(date: Date = new Date()): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");

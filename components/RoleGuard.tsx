@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { canAccessRoute } from "@/lib/permissions";
+import { canAccessRoute, defaultRouteForRole } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 
 export default function RoleGuard({ children }: { children: ReactNode }) {
@@ -14,7 +14,7 @@ export default function RoleGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading || isPublic || !user) return;
-    if (!allowed) router.replace("/dashboard");
+    if (!allowed) router.replace(defaultRouteForRole(user.role));
   }, [allowed, isPublic, loading, router, user]);
 
   if (isPublic) return <>{children}</>;

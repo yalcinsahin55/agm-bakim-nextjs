@@ -8,7 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates } from "@/lib/maintenanceTime";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ async function getRecords(req: NextRequest) {
     const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
     const includeMedia = searchParams.get("include_media") === "true";
     const sortDirection = searchParams.get("sort") === "asc" ? 1 : -1;
-    const sortSpec = { created_at: sortDirection, _id: sortDirection } as const;
+    const sortSpec = { maintenance_start_at: sortDirection, created_at: sortDirection, _id: sortDirection } as const;
     const legacyLimit = searchParams.get("limit");
     const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size"));
 
@@ -105,7 +105,7 @@ async function postRecord(req: NextRequest) {
     const {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
-      other_technician_ids, checklist, completion_confirmation, time_tracking_version,
+      other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, external_service_name,
     } = parsed.data as RecordInput;
 
@@ -158,6 +158,7 @@ async function postRecord(req: NextRequest) {
     let responsibleTechnicianName = useExternalService
       ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
       : user.full_name;
+    let responsibleTechnicianType = useExternalService ? undefined : normalizeTechnicianType(user.technician_type);
     if (!useExternalService && typeof responsible_technician_id === "string") {
       const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
       if (!resolvedResponsible || resolvedResponsible.length !== 1) {
@@ -165,12 +166,23 @@ async function postRecord(req: NextRequest) {
       }
       responsibleTechnicianId = resolvedResponsible[0].id;
       responsibleTechnicianName = resolvedResponsible[0].full_name;
+      responsibleTechnicianType = resolvedResponsible[0].technician_type;
     }
     const resolvedOtherTechnicians = useExternalService ? [] : await resolveTechnicianOptions(db, other_technician_ids);
     if (!resolvedOtherTechnicians || resolvedOtherTechnicians.some((technician) => technician.id === responsibleTechnicianId)) {
       return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
     }
-    const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name }) => ({ id, full_name }));
+    const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
+    const technicianContributions = useExternalService ? [] : [
+      { id: responsibleTechnicianId, full_name: responsibleTechnicianName, technician_type: responsibleTechnicianType, contribution_role: "responsible", duration_minutes: maintenanceDurationMinutes || 0 },
+      ...otherTechnicians.map((technician) => ({
+        ...technician,
+        contribution_role: "support",
+        duration_minutes: Number(other_technician_durations?.[technician.id]) || maintenanceDurationMinutes || 0,
+      })),
+    ];
+    const primaryType = await typesCol.findOne({ _id: type_key }, { projection: { engine_states: 1 } });
+    const primaryTrackingAutoCreated = typeof period === "number" && (!primaryType?.engine_states?.[engine_id] || primaryType.engine_states[engine_id]?.tracking_source === "record");
     const shouldConfirmOnCreate = user.role === "yonetici";
     const managerConfirmationStatus = shouldConfirmOnCreate ? "confirmed" : "pending";
     const managerConfirmedAt = shouldConfirmOnCreate ? new Date() : undefined;
@@ -178,7 +190,7 @@ async function postRecord(req: NextRequest) {
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
 
-    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean) {
+    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false) {
       const rec: any = {
         engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
         hour_at_completion,
@@ -204,13 +216,16 @@ async function postRecord(req: NextRequest) {
         } : {}),
         technician_id: responsibleTechnicianId,
         technician_name: responsibleTechnicianName,
+        ...(responsibleTechnicianType ? { technician_type: responsibleTechnicianType } : {}),
         technician_source: useExternalService ? "external_service" : "internal",
         ...(useExternalService && externalServiceName ? { external_service_name: externalServiceName } : {}),
         other_technician_ids: otherTechnicians.map((technician) => technician.id),
         other_technicians: otherTechnicians,
+        technician_contributions: technicianContributions,
         client_request_id: client_request_id || undefined,
         created_at: createdAt, backdated: !!backdated,
         group_id: groupId, grouped_with: isPrimary ? null : tLabel,
+        ...(trackingAutoCreated ? { auto_created_tracking: true } : {}),
       };
       if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
       await recordsCol.insertOne(rec);
@@ -220,23 +235,25 @@ async function postRecord(req: NextRequest) {
     if (typeof period === "number") {
       await typesCol.updateOne(
         { _id: type_key },
-        { $set: { [`engine_states.${engine_id}.period_hours`]: period } },
+        { $set: { [`engine_states.${engine_id}.period_hours`]: period, [`engine_states.${engine_id}.tracking_source`]: primaryTrackingAutoCreated ? "record" : "manual", engine_scope: primaryType?.engine_scope === "all" ? "all" : "explicit" } },
         { upsert: true }
       );
     }
-    await insertOneRecord(type_key, type_label, true);
+    await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated);
 
     const completedLabels: string[] = [type_label];
     if (Array.isArray(extra_types)) {
       for (const ex of extra_types) {
+        const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1 } });
+        const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
         if (typeof ex.period === "number") {
           await typesCol.updateOne(
             { _id: ex.type_key },
-            { $set: { [`engine_states.${engine_id}.period_hours`]: ex.period } },
+            { $set: { [`engine_states.${engine_id}.period_hours`]: ex.period, [`engine_states.${engine_id}.tracking_source`]: extraTrackingAutoCreated ? "record" : "manual", engine_scope: extraType?.engine_scope === "all" ? "all" : "explicit" } },
             { upsert: true }
           );
         }
-        await insertOneRecord(ex.type_key, ex.type_label, false);
+        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated);
         completedLabels.push(ex.type_label);
       }
     }

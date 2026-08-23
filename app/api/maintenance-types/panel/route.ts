@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     projection: { _id: 1, name: 1, hours: 1, load_kw: 1 },
   }).toArray();
   const types = await (db.collection("maintenance_types") as any).find({}, {
-    projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 },
+    projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 },
   }).toArray();
   const items = buildItems(engines, types);
 

@@ -1,7 +1,7 @@
 import type { Db } from "mongodb";
 import { buildItems, type PanelItem } from "@/lib/status";
 import type { Engine, MaintenanceType } from "@/lib/types";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName, normalizeTechnicianType, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 
 export interface AssistantToolResponse {
@@ -96,7 +96,7 @@ async function statusPairs(db: Db, status: AssistantStatusFilter | undefined): P
   if (!status) return [];
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const targetStatus = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
   return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])
@@ -209,7 +209,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
 async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const items = buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[]);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
@@ -277,7 +277,7 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
         maintenance_duration_minutes: 1, created_at: 1,
       },
     },
-  ).sort({ created_at: -1 }).limit(20).toArray();
+  ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(20).toArray();
   const safeRecords = records.map((record: any) => ({
     id: String(record._id),
     type: record.type_label || "Bilinmeyen",
@@ -289,7 +289,7 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     start_at: record.maintenance_start_at || null,
     end_at: record.maintenance_end_at || null,
     duration_minutes: Number(record.maintenance_duration_minutes || 0),
-    created_at: record.created_at || null,
+    created_at: record.maintenance_start_at || record.created_at || null,
   }));
   return {
     intent: "engine_history",
@@ -309,26 +309,48 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
   const match = await internalRecordMatch(db, query, query.engineQuery ? { engine_id: selectedEngine ? String(selectedEngine._id) : "__assistant_no_matching_engine__" } : {});
   const includeResponsible = query.technicianRole !== "support";
   const includeSupport = query.technicianRole !== "responsible";
+  const contributionFallback = {
+    $concatArrays: [
+      [{ id: "$technician_id", full_name: "$technician_name", technician_type: { $ifNull: ["$technician_type", "mekanik"] }, contribution_role: "responsible", duration_minutes: { $ifNull: ["$maintenance_duration_minutes", 0] } }],
+      { $map: { input: { $ifNull: ["$other_technicians", []] }, as: "technician", in: { id: "$$technician.id", full_name: "$$technician.full_name", technician_type: { $ifNull: ["$$technician.technician_type", "mekanik"] }, contribution_role: "support", duration_minutes: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+    ],
+  };
+  const contributionProject = {
+    contributions: {
+      $cond: [
+        { $and: [{ $isArray: "$technician_contributions" }, { $gt: [{ $size: { $ifNull: ["$technician_contributions", []] } }, 0] }] },
+        "$technician_contributions",
+        contributionFallback,
+      ],
+    },
+  };
+  const contributionMatch = (role: "responsible" | "support") => ({ $match: { "contributions.contribution_role": role } });
   const [responsible, support] = await Promise.all([
     includeResponsible ? records.aggregate([
       { $match: match },
-      { $group: { _id: "$technician_id", technician: { $first: "$technician_name" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+      { $project: contributionProject },
+      { $unwind: "$contributions" },
+      contributionMatch("responsible"),
+      { $group: { _id: "$contributions.id", technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
     ]).toArray() : Promise.resolve([]),
     includeSupport ? records.aggregate([
       { $match: match },
-      { $unwind: "$other_technicians" },
-      { $group: { _id: "$other_technicians.id", technician: { $first: "$other_technicians.full_name" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+      { $project: contributionProject },
+      { $unwind: "$contributions" },
+      contributionMatch("support"),
+      { $group: { _id: "$contributions.id", technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
     ]).toArray() : Promise.resolve([]),
   ]);
-  const rows = new Map<string, { technician_id: string; technician: string; responsible_count: number; support_count: number; duration_minutes: number; average_minutes: number }>();
+  const rows = new Map<string, { technician_id: string; technician: string; technician_type: "mekanik" | "elektromekanik"; responsible_count: number; support_count: number; duration_minutes: number; average_minutes: number }>();
   const merge = (item: any, kind: "responsible" | "support") => {
     const id = String(item._id || "unknown");
-    const current = rows.get(id) || { technician_id: id, technician: item.technician || "Bilinmeyen", responsible_count: 0, support_count: 0, duration_minutes: 0, average_minutes: 0 };
+    const current = rows.get(id) || { technician_id: id, technician: item.technician || "Bilinmeyen", technician_type: normalizeTechnicianType(item.technician_type), responsible_count: 0, support_count: 0, duration_minutes: 0, average_minutes: 0 };
     current.technician = item.technician || current.technician;
+    if (item.technician_type === "mekanik" || item.technician_type === "elektromekanik") current.technician_type = item.technician_type;
     if (kind === "responsible") current.responsible_count += Number(item.count || 0);
     else current.support_count += Number(item.count || 0);
     current.duration_minutes += Number(item.duration || 0);
@@ -351,14 +373,15 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
         : { $or: [{ technician_id: selected.id }, { "other_technicians.id": selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }, { "other_technicians.full_name": { $regex: selectedName, $options: "i" } }] };
     const selectedMatch = { $and: [match, participation] };
     const selectedRecords = await records.find(selectedMatch, {
-      projection: { _id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
-    }).sort({ created_at: -1 }).limit(50).toArray();
+      projection: { _id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, technician_type: 1, other_technicians: 1, technician_contributions: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
+    }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(50).toArray();
     const typeCounts = new Map<string, number>();
     const typeEngineCounts = new Map<string, Map<string, { engine_id: string; engine: string; count: number }>>();
     const engineCounts = new Map<string, { engine_id: string; engine: string; count: number }>();
     const engineTypeCounts = new Map<string, Map<string, number>>();
     activities = selectedRecords.map((record: any) => {
-      const isResponsible = String(record.technician_id) === selected.id || normalizeTechnicianName(record.technician_name) === normalizeTechnicianName(selected.full_name);
+      const contribution = Array.isArray(record.technician_contributions) ? record.technician_contributions.find((item: any) => String(item.id) === selected.id || normalizeTechnicianName(item.full_name) === normalizeTechnicianName(selected.full_name)) : null;
+      const isResponsible = contribution ? contribution.contribution_role === "responsible" : String(record.technician_id) === selected.id || normalizeTechnicianName(record.technician_name) === normalizeTechnicianName(selected.full_name);
       const type = record.type_label || "Bilinmeyen";
       const engine = record.engine_name || "Bilinmeyen";
       typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
@@ -381,8 +404,8 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
         type,
         role: isResponsible ? "Sorumlu" : "Yardımcı",
         start_at: record.maintenance_start_at || null,
-        duration_minutes: Number(record.maintenance_duration_minutes || 0),
-        created_at: record.created_at || null,
+        duration_minutes: Number(contribution?.duration_minutes ?? record.maintenance_duration_minutes ?? 0),
+        created_at: record.maintenance_start_at || record.created_at || null,
       };
     });
     activityByType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([type, count]) => ({ type, count, engines: [...(typeEngineCounts.get(type)?.values() || [])].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")) }));
@@ -400,6 +423,8 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     ]).toArray();
     return {
       technician_id: technician.technician_id,
+      technician_type: technician.technician_type,
+      technician_type_label: TECHNICIAN_TYPE_LABELS[technician.technician_type],
       by_type: (detail?.byType || []).map((item: any) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0) })),
       by_engine: (detail?.byEngine || []).map((item: any) => ({ engine_id: item._id?.engine_id || null, engine: item._id?.engine || "Bilinmeyen", count: Number(item.count || 0) })),
     };

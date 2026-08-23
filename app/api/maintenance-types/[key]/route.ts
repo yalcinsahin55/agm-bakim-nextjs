@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
   if (apply_period_to_all && typeof default_period_hours === "number") {
     const engineIds = Object.keys(type.engine_states || {});
     for (const engId of engineIds) {
-      await typesCol.updateOne({ _id: key }, { $set: { [`engine_states.${engId}.period_hours`]: default_period_hours } });
+      await typesCol.updateOne({ _id: key }, { $set: { [`engine_states.${engId}.period_hours`]: default_period_hours, [`engine_states.${engId}.tracking_source`]: "manual" } });
     }
   }
 
@@ -39,6 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { key: strin
       const set: Record<string, any> = {};
       if (typeof st?.period_hours === "number") set[`engine_states.${engId}.period_hours`] = st.period_hours;
       if (typeof st?.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = st.last_maintenance_hour;
+      set[`engine_states.${engId}.tracking_source`] = "manual";
       if (Object.keys(set).length) await typesCol.updateOne({ _id: key }, { $set: set });
     }
   }

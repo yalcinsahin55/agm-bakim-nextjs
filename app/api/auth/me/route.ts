@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     email: user.email || "",
     phone: user.phone || user.phone_normalized || "",
     role: user.role,
+    technician_type: user.technician_type === "elektromekanik" ? "elektromekanik" : user.role === "teknisyen" || user.role === "planlamaci" ? "mekanik" : undefined,
     approved: user.approved !== false,
   });
 }

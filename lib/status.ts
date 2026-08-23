@@ -68,7 +68,8 @@ export function buildItems(engines: Engine[], types: MaintenanceType[]): PanelIt
 
   types.forEach((t) => {
     const states = t.engine_states || {};
-    const applicable = Object.keys(states).length ? Object.keys(states) : Object.keys(engineMap);
+    const explicitScope = t.engine_scope === "explicit" || (t.engine_scope === undefined && Object.keys(states).length > 0);
+    const applicable = explicitScope ? Object.keys(states) : Object.keys(engineMap);
     applicable.forEach((engineId) => {
       const engine = engineMap[engineId];
       if (!engine) return;

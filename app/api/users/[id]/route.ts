@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers, normalizeRole } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { normalizeTechnicianType } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +24,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { db, usersCol, user, response } = await getAuthorizedAdmin(req);
   if (response) return response;
 
-  const { role, active, approved, phone } = await req.json();
+  const { role, active, approved, phone, technician_type } = await req.json();
   if (user._id === params.id && (active === false || approved === false)) {
     return NextResponse.json({ error: "Kendi yönetici erişiminizi pasifleştiremez veya onayını kaldıramazsınız." }, { status: 400 });
   }
   const update: Record<string, any> = {};
+  const unset: Record<string, any> = {};
   if (role !== undefined) {
     const normalizedRole = normalizeRole(role);
     if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });
     update.role = normalizedRole;
+    if (normalizedRole === "teknisyen") update.technician_type = normalizeTechnicianType(technician_type);
+    else unset.technician_type = "";
+  }
+  if (role === undefined && technician_type !== undefined) {
+    const target = await usersCol.findOne({ _id: params.id }, { projection: { role: 1 } });
+    if (!target || normalizeRole(target.role) !== "teknisyen") {
+      return NextResponse.json({ error: "Teknisyen alt türü yalnızca teknisyen hesaplarına atanabilir." }, { status: 400 });
+    }
+    update.technician_type = normalizeTechnicianType(technician_type);
   }
   if (typeof active === "boolean") update.active = active;
   if (typeof approved === "boolean") update.approved = approved;
@@ -49,11 +60,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const before = await usersCol.findOne({ _id: params.id }, { projection: { password_hash: 0 } });
   if (!before) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
-  const result = await usersCol.updateOne({ _id: params.id }, { $set: update });
+  const result = await usersCol.updateOne({ _id: params.id }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
   if (result.matchedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
   await writeAuditLog(db, {
     user, action: "update", entity: "user", entityId: params.id,
-    summary: `${before.full_name || "Kullanıcı"} hesabı güncellendi.`, before, after: update,
+    summary: `${before.full_name || "Kullanıcı"} hesabı güncellendi.`, before, after: { ...update, ...(Object.keys(unset).length ? { $unset: unset } : {}) },
   });
   return NextResponse.json({ ok: true });
 }

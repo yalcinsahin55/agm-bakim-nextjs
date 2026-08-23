@@ -6,6 +6,7 @@ import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { adminUserSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { normalizeTechnicianType } from "@/lib/technicians";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
     const users = await usersCol.find().toArray();
     return NextResponse.json(users.map((u: any) => ({
       id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
+      technician_type: (u.role === "teknisyen" || u.role === "planlamaci") ? normalizeTechnicianType(u.technician_type) : undefined,
       active: u.active !== false, approved: u.approved !== false, created_at: u.created_at,
     })));
   } catch (error) {
@@ -42,7 +44,8 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { full_name, phone, password, role } = parsed.data;
+    const { full_name, phone, password, role, technician_type } = parsed.data;
+    const normalizedTechnicianType = role === "teknisyen" ? normalizeTechnicianType(technician_type) : undefined;
     if (!isValidPhone(phone)) {
       return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin (05xx xxx xx xx)." }, { status: 400 });
     }
@@ -54,12 +57,12 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
       _id: normalizedPhone, full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
-      password_hash: passwordHash, role, active: true, approved: false, created_at: new Date(),
+      password_hash: passwordHash, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType } : {}), active: true, approved: false, created_at: new Date(),
     });
     await writeAuditLog(db, {
       user, action: "create", entity: "user", entityId: normalizedPhone,
       summary: `${full_name.trim()} kullanıcısı oluşturuldu; yönetici onayı bekliyor.`,
-      after: { full_name: full_name.trim(), phone: normalizedPhone, role, active: true, approved: false },
+      after: { full_name: full_name.trim(), phone: normalizedPhone, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType } : {}), active: true, approved: false },
     });
     return NextResponse.json({ ok: true, approved: false });
   } catch (error) {

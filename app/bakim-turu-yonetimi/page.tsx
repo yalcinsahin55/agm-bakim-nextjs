@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
+import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import type { Engine, MaintenanceType } from "@/lib/types";
 
 interface EngineRowState {
@@ -82,6 +83,7 @@ export default function BakimTuruYonetimiPage() {
         toast.dismiss(loadingToast);
         toast.success(`'${newLabel}' bakım türü eklendi! 🔧`);
         setNewLabel(""); setNewPeriod(1000); setAddRows({}); setShowAdd(false);
+        invalidateMaintenancePanel();
         load();
       } else {
         const data = await res.json();
@@ -132,6 +134,7 @@ export default function BakimTuruYonetimiPage() {
         toast.dismiss(loadingToast);
         toast.success("Bakım türü güncellendi! ✅");
         setEditingKey(null);
+        invalidateMaintenancePanel();
         load();
       } else {
         const data = await res.json();
@@ -154,6 +157,7 @@ export default function BakimTuruYonetimiPage() {
         toast.dismiss(loadingToast);
         toast.success("Bakım türü silindi! ️");
         setConfirmDeleteKey(null);
+        invalidateMaintenancePanel();
         load();
       } else {
         const data = await res.json();

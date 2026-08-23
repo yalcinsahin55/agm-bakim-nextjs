@@ -14,8 +14,8 @@ export type AssignableRole = (typeof ROLE_OPTIONS)[number];
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   yonetici: ["users:read", "users:write", "maintenance:read", "maintenance:write", "reports:read"],
   // Eski planlamacı kayıtları, geçiş süresince teknisyen erişiminde çalışır.
-  planlamaci: ["maintenance:read", "maintenance:write", "reports:read"],
-  teknisyen: ["maintenance:read", "maintenance:write", "reports:read"],
+  planlamaci: ["maintenance:read", "maintenance:write"],
+  teknisyen: ["maintenance:read", "maintenance:write"],
   goruntuleyici: ["maintenance:read", "reports:read"],
 };
 
@@ -43,17 +43,15 @@ export function canWriteMaintenance(role: Role | string | undefined): boolean {
 }
 
 const TECHNICIAN_ROUTES = [
-  "/dashboard",
   "/tamamla",
   "/kayitlar",
-  "/diger",
-  "/karter-basinci",
-  "/saat-gecmisi",
-  "/yag-analizleri",
-  "/araliklar",
-  "/teknisyen-raporu",
-  "/asistan",
 ];
+
+export function defaultRouteForRole(role: Role | string | undefined): string {
+  const normalized = normalizeRole(role);
+  if (normalized === "teknisyen") return "/tamamla";
+  return "/dashboard";
+}
 
 const VIEWER_ROUTES = [
   "/dashboard",

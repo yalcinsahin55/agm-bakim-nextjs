@@ -34,7 +34,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 | Motor yönetimi | Motor listesi, çalışma saati, yük bilgisi, saat geçmişi ve motor bazlı bakım durumu |
 | Bakım kayıtları | Bakım türü, motor saati, not, kontrol listesi, fotoğraf/video kanıtı, yönetici teyidi ve bakım geçmişi |
 | Zaman takibi | Başlangıç ve bitiş için tam tarih+saat, çok günlü/haftalık bakım desteği ve otomatik toplam süre hesabı |
-| Ekip çalışması | Sorumlu teknisyen ile bakımda çalışan diğer teknisyenlerin ayrı tutulması |
+| Ekip çalışması | Sorumlu teknisyen ile bakımda çalışan diğer teknisyenlerin ayrı tutulması; mekanik/elektromekanik türleri ve kişi bazlı katkı süreleri |
 | Dış servis | Garanti veya harici servis bakımlarının yönetici tarafından kaydedilmesi; bu kayıtların teknisyen performansından ayrılması |
 | QR workflow | Motor QR’ı, bakım türü QR’ı ve motor + bakım türü bağlantılarıyla mobil hızlı seçim |
 | Raporlama | Teknisyen performans raporu, motor bakım raporu, istatistikler, bakım türü ve motor dağılımları |
@@ -51,7 +51,7 @@ Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur ve onaylar. Kullan
 | Rol | Yetki özeti |
 |---|---|
 | `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
-| `teknisyen` | Bakım tamamlar, dashboard ve analiz ekranlarını kullanır, bakım kayıtlarını görüntüler. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
+| `teknisyen` | Yalnızca Bakım Tamamlama ve Bakım Kayıtları ekranlarını kullanır. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
 | `goruntuleyici` | Dashboard, motorlar, bakım kayıtları, analiz ve takip, bilgi/rapor, bakım türleri ve tahmin modüllerini görüntüler; kayıt üzerinde değişiklik yapamaz. |
 | `planlamaci` | Eski hesaplarla geriye dönük uyumluluk için teknisyen davranışıyla değerlendirilir. Yeni kullanıcı arayüzünde ayrı bir planlamacı akışı bulunmaz. |
 
@@ -61,7 +61,7 @@ Yetkilendirme iki katmanda uygulanır: menü ve sayfa görünürlüğü istemci 
 
 1. Kullanıcı motoru ve bakım türünü seçer. QR bağlantısı kullanılmışsa bu seçimlerden biri veya ikisi otomatik doldurulabilir.
 2. Motor çalışma saati girilir. Birincil bakım türünün yanı sıra aynı işlemde tamamlanan ek bakım türleri seçilebilir.
-3. Yeni kayıtlar için bakım başlangıç ve bitiş tarih+saatleri girilir. Bitiş zamanı başlangıçtan önce olamaz.
+3. Yeni kayıtlarda bakım tarihi ayrıca seçilmez; bakım başlangıç ve bitiş tarih+saatleri tek tarih kaynağıdır. Bitiş zamanı başlangıçtan önce olamaz.
 4. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf veya video kanıtlarından en az biri eklenir.
 5. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur. Yönetici bakım tamamlıyorsa sorumlu/yetkili bakımcıyı ayrıca seçebilir; bu alan teknisyenlere açılmaz.
 6. Kayıt çevrimiçiyse API’ye gönderilir; bağlantı yoksa IndexedDB kuyruğuna alınır ve bağlantı geri geldiğinde senkronize edilir.
@@ -79,13 +79,13 @@ Bakım süresi yalnızca saat olarak değil, tam tarih+saat aralığı olarak tu
 - `maintenance_start_at`: Bakım başlangıç zamanı.
 - `maintenance_end_at`: Bakım bitiş zamanı.
 - `maintenance_duration_minutes`: API tarafından başlangıç ve bitiş arasından hesaplanan toplam dakika.
-- `record_date`: İşletme tarihi/backdate amacıyla ayrıca tutulabilir; bu alan bakım başlangıç tarihinden bağımsız olarak geriye dönük kayıt ihtiyacını destekler.
+- `record_date`: Eski istemcilerle geriye dönük uyumluluk için korunur; yeni kullanıcı arayüzünde ayrıca seçilmez. Geriye dönük kayıt işareti başlangıç tarih-saatinden türetilir.
 
 Tarih+saat değerleri API ve veritabanı katmanında UTC tabanlı saklanır; kullanıcı arayüzünde cihazın yerel saat dilimine çevrilerek gösterilir. Böylece telefon ve bilgisayar arasında saat kayması azaltılır.
 
 ## Ekip teknisyenleri ve dış hizmet bakımları
 
-Bir bakımın birincil sorumlu teknisyeni ile destek olan diğer teknisyenler ayrı alanlarda tutulur. Teknisyen performans raporu sorumlu ve destek görevlerini birlikte gösterir. Ekip bakımındaki aynı bakım süresi, o bakımda seçilen her teknisyenin katkı süresine yansıtılır.
+Bir bakımın birincil sorumlu teknisyeni ile destek olan diğer teknisyenler ayrı alanlarda tutulur. Yönetici kullanıcıları oluştururken teknisyen hesabını **Mekanik teknisyen** veya **Elektromekanik teknisyen** olarak sınıflandırabilir. Elektromekanik çalışanlar genellikle elektriksel işler ve devreye alma desteği için yardımcı seçilir; istisnai olarak sorumlu seçilirse bu durum da kayıt üzerinde açıkça korunur. Her yardımcı teknisyenin o bakıma ayırdığı süre ayrıca girilebilir. Teknisyen performans raporu tür, rol ve kişi bazında görevleri ve katkı sürelerini ayrı gösterir.
 
 ### Dış hizmet veya garanti bakımı
 
@@ -131,6 +131,7 @@ Mevcut motor QR bağlantıları korunur. Yeni bağlantılar örneğin `/tamamla?
 - Toplam bakım kaydı ve teknisyen görevi.
 - Sorumlu ve destek görevleri.
 - Toplam teknisyen katkı süresi ve görev başına ortalama süre.
+- Mekanik ve elektromekanik teknisyen türü bazında kişi, sorumlu, destek, görev ve toplam süre özetleri.
 - Teknisyen bazında bakım türü ve motor dağılımları.
 - Süre bilgisi bulunmayan eski kayıtlar için uyumluluk uyarısı.
 

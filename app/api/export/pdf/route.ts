@@ -4,9 +4,11 @@ import PDFDocument from "pdfkit";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
-import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
+import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,7 @@ async function createPdf(req: NextRequest) {
   await ensureAppIndexes(db);
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
+  if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
 
   const { searchParams } = new URL(req.url);
   const engineFilter = searchParams.get("engine_id");
@@ -40,7 +43,7 @@ async function createPdf(req: NextRequest) {
   const recordsCollection = db.collection("maintenance_records") as any;
   const [total, records] = await Promise.all([
     recordsCollection.countDocuments(query),
-    recordsCollection.find(query, { projection: { photos_b64: 0, photos: 0, videos: 0 } }).sort({ created_at: -1, _id: -1 }).limit(MAX_ROWS).toArray(),
+    recordsCollection.find(query, { projection: { photos_b64: 0, photos: 0, videos: 0 } }).sort({ maintenance_start_at: -1, created_at: -1, _id: -1 }).limit(MAX_ROWS).toArray(),
   ]);
 
   const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
@@ -98,15 +101,15 @@ async function createPdf(req: NextRequest) {
     tableHeading();
     records.forEach((record: any, index: number) => {
       drawRow([
-        record.created_at ? new Date(record.created_at).toLocaleDateString("tr-TR") : "",
+        getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
         record.engine_name || "",
         record.type_label || "",
         record.hour_at_completion !== undefined && record.hour_at_completion !== null ? Number(record.hour_at_completion).toLocaleString("tr-TR") : "",
         record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
         record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
         formatMaintenanceDuration(record.maintenance_duration_minutes),
-        record.technician_name || "",
-        Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
+        record.technician_name ? `${record.technician_name}${record.technician_type ? ` · ${TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || "Mekanik"}` : ""}` : "",
+        Array.isArray(record.technician_contributions) ? record.technician_contributions.filter((contribution: any) => contribution.contribution_role === "support").map((contribution: any) => `${contribution.full_name} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(", ") : Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
         record.technician_note || "",
         record.manager_confirmation_status === "pending" ? "Bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski",
       ], index % 2 === 1);

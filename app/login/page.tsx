@@ -40,7 +40,8 @@ export default function LoginPage() {
         return;
       }
       toast.success("Giriş başarılı, hoş geldiniz.");
-      router.push(redirectPath);
+      const destination = redirectPath === "/dashboard" && ["teknisyen", "planlamaci"].includes(data.user?.role) ? "/tamamla" : redirectPath;
+      router.push(destination);
       router.refresh();
     } catch {
       toast.error("Sunucuya ulaşılamadı. Lütfen tekrar deneyin.");

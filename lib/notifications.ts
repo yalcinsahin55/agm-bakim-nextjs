@@ -26,7 +26,7 @@ function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineNa
 async function loadActionableItems(db: Db): Promise<PanelItem[]> {
   const [engines, types] = await Promise.all([
     db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } }).toArray(),
-    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_states: 1 } }).toArray(),
+    db.collection("maintenance_types").find({}, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   return buildItems(engines as any, types as any).filter((item) => item.status !== "normal");
 }
