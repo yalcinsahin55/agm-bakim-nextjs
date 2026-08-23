@@ -161,33 +161,6 @@ function EngineHealthDetails({ engine, items, onClose }: EngineHealthDetailsProp
   </div>;
 }
 
-interface EngineAttentionRow {
-  engine_id: string;
-  engine: string;
-  overdue: number;
-  critical: number;
-  total: number;
-}
-
-function EngineAttentionChart({ rows, loading }: { rows: EngineAttentionRow[]; loading: boolean }): JSX.Element {
-  const maxCount = Math.max(...rows.map((row) => Math.max(row.overdue, row.critical)), 1);
-  return <div className="rounded-card border border-border bg-panel p-3.5 md:col-span-2">
-    <div className="mb-2 flex items-start justify-between gap-3">
-      <div><div className="text-[11px] font-bold uppercase text-muted">Kritik ve gecikmiş bakım dağılımı</div><div className="mt-1 text-[10px] text-faint">Motor bazında dikkat gerektiren bakım maddeleri</div></div>
-      <div className="flex flex-shrink-0 flex-wrap justify-end gap-x-3 gap-y-1 text-[9px] text-faint"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red" />Gecikmiş</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-orange" />Kritik</span></div>
-    </div>
-    {loading ? <div className="space-y-3 py-2"><div className="h-10 animate-pulse rounded-lg bg-panel2" /><div className="h-10 animate-pulse rounded-lg bg-panel2" /><div className="h-10 animate-pulse rounded-lg bg-panel2" /></div> : rows.length === 0 ? <div className="rounded-lg bg-panel2 p-3 text-[11px] text-faint">Kritik veya gecikmiş bakım maddesi bulunmuyor.</div> : <div className="space-y-2" aria-label="Motor bazında kritik ve gecikmiş bakım dağılımı">{rows.map((row) => {
-      const href = `/motorlar?engine_id=${encodeURIComponent(row.engine_id)}`;
-      const overdueWidth = row.overdue ? Math.max((row.overdue / maxCount) * 100, 7) : 0;
-      const criticalWidth = row.critical ? Math.max((row.critical / maxCount) * 100, 7) : 0;
-      return <Link key={row.engine_id} href={href} className="block rounded-lg border border-border bg-panel2 px-2.5 py-2 transition hover:border-amber/50 hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber" title={`${row.engine}: ${row.overdue} gecikmiş, ${row.critical} kritik bakım maddesi · Motor detayını aç`}>
-        <div className="mb-1.5 flex items-center justify-between gap-2"><span className="min-w-0 truncate text-[10.5px] font-bold text-text">{row.engine}</span><span className="flex-shrink-0 font-mono text-[9.5px] text-muted">{row.total} madde · detay →</span></div>
-        <div className="grid grid-cols-2 gap-2"><div className="min-w-0"><div className="mb-0.5 flex items-center justify-between gap-1 text-[9px]"><span className="text-red">Gecikmiş</span><b className="font-mono text-text">{row.overdue}</b></div><div className="h-2 overflow-hidden rounded-full bg-panel"><div className="h-full rounded-full bg-gradient-to-r from-red to-[#ff7a7f] transition-all" style={{ width: `${overdueWidth}%` }} /></div></div><div className="min-w-0"><div className="mb-0.5 flex items-center justify-between gap-1 text-[9px]"><span className="text-orange">Kritik</span><b className="font-mono text-text">{row.critical}</b></div><div className="h-2 overflow-hidden rounded-full bg-panel"><div className="h-full rounded-full bg-gradient-to-r from-orange to-[#ffc078] transition-all" style={{ width: `${criticalWidth}%` }} /></div></div></div>
-      </Link>;
-    })}</div>}
-  </div>;
-}
-
 export default function DashboardPage() {
   const { user } = useCurrentUser();
   const [items, setItems] = useState<PanelItem[]>([]);
@@ -283,12 +256,6 @@ export default function DashboardPage() {
     status: row.engine_id ? engineStatusById[row.engine_id]?.status || "normal" : "normal",
     attention: row.engine_id ? engineStatusById[row.engine_id]?.attention || 0 : 0,
   })), [analytics.byEngine, engineStatusById]);
-  const engineAttentionRows = useMemo<EngineAttentionRow[]>(() => sortedEngines.map((engine) => {
-    const engineItems = items.filter((item) => item.engine_id === engine._id);
-    const overdue = engineItems.filter((item) => item.status === "gecikmis").length;
-    const critical = engineItems.filter((item) => item.status === "kritik").length;
-    return { engine_id: engine._id, engine: engine.name, overdue, critical, total: overdue + critical };
-  }).filter((row) => row.total > 0).sort((a, b) => b.total - a.total || engineSortKey(a.engine) - engineSortKey(b.engine)), [items, sortedEngines]);
   const maxEngineMaintenance = useMemo(() => Math.max(...engineChartRows.map((row) => row.count), 1), [engineChartRows]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
   const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
@@ -444,8 +411,6 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-
-        <EngineAttentionChart rows={engineAttentionRows} loading={loading || refreshing} />
 
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-card border border-border bg-panel p-3.5">
