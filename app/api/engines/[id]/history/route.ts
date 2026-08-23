@@ -53,8 +53,9 @@ async function persistHistory(enginesCol: any, engine: any, history: HistoryEntr
   return update;
 }
 
-async function getHistory(req: NextRequest, { params }: { params: { id: string } }) {
+async function getHistory(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
     const db = await getDb();
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
@@ -63,7 +64,7 @@ async function getHistory(req: NextRequest, { params }: { params: { id: string }
     const { limit, page, skip } = parsePageParams(req);
     const enginesCol = db.collection("engines") as any;
     const engine = await enginesCol.findOne(
-      { _id: params.id },
+      { _id: id },
       { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } },
     );
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
@@ -71,7 +72,7 @@ async function getHistory(req: NextRequest, { params }: { params: { id: string }
     // Geçmiş gömülü tutulduğu için yalnız seçilen motor açılır; unwind/sort
     // sıralamayı güvenceye alır ve response'a sadece istenen sayfa çıkar.
     const [result] = await enginesCol.aggregate([
-      { $match: { _id: params.id } },
+      { $match: { _id: id } },
       { $project: { history: { $ifNull: ["$history", []] } } },
       { $unwind: { path: "$history", includeArrayIndex: "history_index" } },
       { $sort: { "history.date": 1, history_index: 1 } },
@@ -118,8 +119,9 @@ async function getHistory(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-async function patchHistory(req: NextRequest, { params }: { params: { id: string } }) {
+async function patchHistory(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
     const db = await getDb();
     const usersCol = db.collection("users") as any;
     const user = await getCurrentUser(req, usersCol);
@@ -130,7 +132,7 @@ async function patchHistory(req: NextRequest, { params }: { params: { id: string
 
     const body = await req.json();
     const enginesCol = db.collection("engines") as any;
-    const engine = await enginesCol.findOne({ _id: params.id });
+    const engine = await enginesCol.findOne({ _id: id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
     // Hedefli düzenleme/silme sırasında legacy alanları veya eski biçimleri sessizce düşürme.
@@ -169,10 +171,10 @@ async function patchHistory(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withApiTiming("GET /api/engines/[id]/history", () => getHistory(req, context));
 }
 
-export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withApiTiming("PATCH /api/engines/[id]/history", () => patchHistory(req, context));
 }

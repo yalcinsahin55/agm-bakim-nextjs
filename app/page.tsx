@@ -7,7 +7,8 @@ import { defaultRouteForRole } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
   const userId = token ? await verifySessionToken(token) : null;
   if (!userId) redirect("/login");
 

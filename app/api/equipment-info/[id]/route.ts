@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 const FIELDS = ["kaver_tipi", "hava_filtresi", "krankcase", "esanjor_tipi", "dungs", "radyator_tipi", "not"];
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const db = await getDb();
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
@@ -18,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const col = db.collection("equipment_info") as any;
-  const existing = await col.findOne({ _id: params.id });
+  const existing = await col.findOne({ _id: id });
   if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
   const body = await req.json();
@@ -27,6 +28,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (f in body) update[f] = body[f] || null;
   }
 
-  await col.updateOne({ _id: params.id }, { $set: update });
+  await col.updateOne({ _id: id }, { $set: update });
   return NextResponse.json({ ok: true });
 }

@@ -6,13 +6,14 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id: notificationId } = await params;
     const db = await getDb();
     const user = await getCurrentUser(req, db.collection("users") as any);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const id = ObjectId.isValid(params.id) ? new ObjectId(params.id) : params.id;
+    const id = ObjectId.isValid(notificationId) ? new ObjectId(notificationId) : notificationId;
     const result = await db.collection("notifications").updateOne(
       { _id: id as any, user_id: user._id },
       { $set: { read_at: new Date(), updated_at: new Date() } },
