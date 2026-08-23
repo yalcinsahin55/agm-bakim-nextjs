@@ -1,12 +1,38 @@
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 export const MAX_EXCEL_ROWS = 50_000;
 export const MAX_EXCEL_COLUMNS = 100;
 export const MAX_EXCEL_SHEETS = 100;
 
+async function removeLegacyCommentMetadata(buffer: Buffer): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  const relationshipPattern = /<Relationship\b[^>]*\bType="[^"]*\/(?:comments|vmlDrawing)"[^>]*\/>/g;
+  const legacyDrawingPattern = /<legacyDrawing\b[^>]*\/>/g;
+
+  for (const path of Object.keys(zip.files)) {
+    if (/^xl\/(comments\/|drawings\/commentsDrawing)/.test(path)) {
+      zip.remove(path);
+      continue;
+    }
+    if (/^xl\/worksheets\/_rels\/sheet[^/]+\.xml\.rels$/.test(path)) {
+      const xml = await zip.file(path)?.async("string");
+      if (xml) zip.file(path, xml.replace(relationshipPattern, ""));
+      continue;
+    }
+    if (/^xl\/worksheets\/sheet[^/]+\.xml$/.test(path)) {
+      const xml = await zip.file(path)?.async("string");
+      if (xml) zip.file(path, xml.replace(legacyDrawingPattern, ""));
+    }
+  }
+
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
 export async function loadExcelWorkbook(buffer: Buffer): Promise<ExcelJS.Workbook> {
+  const normalizedBuffer = await removeLegacyCommentMetadata(buffer);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+  await workbook.xlsx.load(normalizedBuffer as any);
   if (workbook.worksheets.length > MAX_EXCEL_SHEETS) {
     throw new Error("Çok fazla çalışma sayfası.");
   }

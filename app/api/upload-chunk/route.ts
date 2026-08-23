@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap video yükleyemez." }, { status: 403 });
-  const rateLimited = enforceApiRateLimit(req, "video-upload", 600, 30 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "video-upload", 600, 30 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const body = await req.json();

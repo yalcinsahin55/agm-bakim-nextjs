@@ -93,18 +93,18 @@ export default function KullanicilarPage() {
     }
   }
 
-  async function doDelete(u) {
-    const loadingToast = toast.loading("Kullanıcı siliniyor...");
+  async function deactivateUser(u) {
+    const loadingToast = toast.loading("Kullanıcı pasifleştiriliyor...");
     try {
       const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.dismiss(loadingToast);
-        toast.error(data.error || "Kullanıcı silinemedi.");
+        toast.error(data.error || "Kullanıcı pasifleştirilemedi.");
         return;
       }
       toast.dismiss(loadingToast);
-      toast.success("Kullanıcı silindi! 🗑️");
+      toast.success("Kullanıcı pasifleştirildi; bakım geçmişi korundu.");
       setConfirmDeleteId(null);
       load();
     } catch {
@@ -222,14 +222,14 @@ export default function KullanicilarPage() {
                   Aktif
                 </label>
                 {u.id === currentUser?.id ? (
-                  <button disabled className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed">Sil</button>
+                  <button disabled className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed">Pasifleştir</button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <button onClick={() => doDelete(u)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition">Evet</button>
+                    <button onClick={() => deactivateUser(u)} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition">Evet</button>
                     <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition">Vazgeç</button>
                   </>
                 ) : (
-                  <button onClick={() => setConfirmDeleteId(u.id)} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition">Sil</button>
+                  <button onClick={() => setConfirmDeleteId(u.id)} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition">Pasifleştir</button>
                 )}
               </div>
             </div>

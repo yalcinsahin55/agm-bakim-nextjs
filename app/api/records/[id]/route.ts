@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  const rateLimited = enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const recordId = parseRecordId(id);
@@ -312,7 +312,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const usersCol = db.collection("users") as any;
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  const rateLimited = enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const recordId = parseRecordId(id);

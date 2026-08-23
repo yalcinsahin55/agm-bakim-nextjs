@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { hashPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { registerSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 
@@ -10,13 +10,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   // 🔒 IP başına 10 dakikada en fazla 3 kayıt denemesi
-  const rl = checkRateLimit(`register:${getClientIp(req)}`, 3, 10 * 60 * 1000);
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: `Çok fazla kayıt denemesi. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
-      { status: 429 }
-    );
-  }
+  const rateLimited = await enforceApiRateLimit(req, "register", 3, 10 * 60 * 1000);
+  if (rateLimited) return rateLimited;
 
   try {
     const body = await req.json().catch(() => ({}));

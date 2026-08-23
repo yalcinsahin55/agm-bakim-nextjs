@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { verifyPassword, createSessionToken, SESSION_COOKIE } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { enforceCompositeRateLimit } from "@/lib/apiRateLimit";
+import { getClientIp } from "@/lib/rate-limit";
 import { loginSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
@@ -10,15 +11,6 @@ import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/t
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // 🔒 IP başına 10 dakikada en fazla 5 giriş denemesi
-  const rl = checkRateLimit(`login:${getClientIp(req)}`, 5, 10 * 60 * 1000);
-  if (!rl.ok) {
-    return NextResponse.json(
-      { error: `Çok fazla deneme. Lütfen ${Math.ceil(rl.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
-      { status: 429 }
-    );
-  }
-
   try {
     const body = await req.json().catch(() => ({}));
 
@@ -29,13 +21,13 @@ export async function POST(req: NextRequest) {
     const { password } = parsed.data;
     const identifier = parsed.data.identifier || parsed.data.phone || parsed.data.email || "";
     const normalizedIdentifier = isValidPhone(identifier) ? normalizePhone(identifier) : identifier.toLowerCase().trim();
-    const identifierRate = checkRateLimit(`login-identifier:${normalizedIdentifier}`, 8, 10 * 60 * 1000);
-    if (!identifierRate.ok) {
-      return NextResponse.json(
-        { error: `Çok fazla deneme. Lütfen ${Math.ceil(identifierRate.retryAfterMs / 1000)} saniye sonra tekrar deneyin.` },
-        { status: 429 },
-      );
-    }
+    // 🔒 IP ve gerçek normalize edilmiş identifier limitleri tek Redis kararında uygulanır.
+    const clientIp = getClientIp(req);
+    const rateLimited = await enforceCompositeRateLimit(req, [
+      { scope: "login-ip", limit: 5, windowMs: 10 * 60 * 1000, identity: clientIp },
+      { scope: "login-identifier", limit: 8, windowMs: 10 * 60 * 1000, identity: normalizedIdentifier },
+    ]);
+    if (rateLimited) return rateLimited;
 
     const db = await getDb();
     const usersCol = db.collection("users") as any;

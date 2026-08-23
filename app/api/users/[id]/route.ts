@@ -6,6 +6,7 @@ import { canManageUsers, normalizeRole } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const { db, usersCol, user, response } = await getAuthorizedAdmin(req);
   if (response) return response;
+  const rateLimited = await enforceApiRateLimit(req, "user-update", 60, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } = await req.json();
   if (user._id === id && (active === false || approved === false)) {
@@ -84,11 +87,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { usersCol, user, response } = await getAuthorizedAdmin(req);
+  const { db, usersCol, user, response } = await getAuthorizedAdmin(req);
   if (response) return response;
-  if (user._id === id) return NextResponse.json({ error: "Kendi hesabınızı silemezsiniz." }, { status: 400 });
+  const rateLimited = await enforceApiRateLimit(req, "user-deactivate", 20, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
+  if (user._id === id) return NextResponse.json({ error: "Kendi hesabınızı pasifleştiremezsiniz." }, { status: 400 });
 
-  const result = await usersCol.deleteOne({ _id: id });
-  if (result.deletedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  const before = await usersCol.findOne({ _id: id }, { projection: { password_hash: 0 } });
+  if (!before) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+  const result = await usersCol.updateOne(
+    { _id: id },
+    { $set: { active: false, approved: false, deactivated_at: new Date(), deactivated_by: user._id } },
+  );
+  if (result.matchedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+  await writeAuditLog(db, {
+    user,
+    action: "update",
+    entity: "user",
+    entityId: id,
+    summary: `${before.full_name || "Kullanıcı"} hesabı pasifleştirildi; geçmiş bakım kayıtları korundu.`,
+    before,
+    after: { active: false, approved: false, deactivated_at: new Date() },
+  });
+  return NextResponse.json({ ok: true, deactivated: true });
 }

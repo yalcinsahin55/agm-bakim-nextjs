@@ -70,6 +70,8 @@ Bir bakım türü silindiğinde geçmiş bakım kayıtları fiziksel olarak sili
 
 Seed, yedek geri yükleme, içe aktarma, bakım kaydı ve medya yükleme endpoint’lerinde yönetici/kullanıcı yetkisi ve uygun rate limit kontrolleri bulunur. Yedek geri yükleme yalnızca izin verilen koleksiyonları işler; MongoDB özel anahtarları, hassas alanlar ve güvenli olmayan kimlikler temizlenir. Excel içe aktarma işlemleri çalışma sayfası, satır, sütun ve istek gövdesi limitleriyle sınırlandırılmıştır; dışa aktarılan hücrelerde `=`, `+`, `-` veya `@` ile başlayan kullanıcı metinleri Excel formülü olarak çalıştırılmayacak şekilde kaçışlanır. Production bağımlılıkları için `pnpm audit --prod` kontrolü yapılır; Next.js, PostCSS, Sharp ve UUID yamalı sürümlere sabitlenmiştir.
 
+Dağıtık rate limit için production’da `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` ve ayrı bir `RATE_LIMIT_KEY_SECRET` tanımlanır. Kritik login/yazma/upload işlemleri Redis erişilemiyorsa güvenli biçimde geçici `503` döndürür; Redis değişkenleri olmayan local geliştirmede bellek içi fallback kullanılabilir. Kullanıcı yönetimindeki **Pasifleştir** işlemi fiziksel silme yapmaz; hesabı pasif/onaysız duruma getirir, audit log yazar ve geçmiş bakım kayıtlarını korur. Excel import akışı güvenli `ExcelJS` ile `.xlsx` dosyalarını destekler; eski `.xls` dosyaları önce `.xlsx` formatına dönüştürülmelidir.
+
 ## Bakım kaydı iş akışı
 
 1. Kullanıcı motoru ve bakım türünü seçer. QR bağlantısı kullanılmışsa bu seçimlerden biri veya ikisi otomatik doldurulabilir.
@@ -287,6 +289,10 @@ Uygulama varsayılan olarak [http://localhost:3000](http://localhost:3000) adres
 | `VAPID_PUBLIC_KEY` | Web Push için | İstemci tarafında abonelik oluşturmak için kullanılan public anahtar. |
 | `VAPID_PRIVATE_KEY` | Web Push için | Yalnızca sunucuda tutulması gereken private anahtar. |
 | `CRON_SECRET` | Cron için | `/api/cron/refresh` endpoint’ini koruyan gizli değer. |
+| `UPSTASH_REDIS_REST_URL` | Dağıtık rate limit için | Upstash Redis REST endpoint’i; yalnızca server-side environment variable olarak tutulur. |
+| `UPSTASH_REDIS_REST_TOKEN` | Dağıtık rate limit için | Redis REST token’ı; `NEXT_PUBLIC_` ile başlamamalı ve istemciye gönderilmemelidir. |
+| `RATE_LIMIT_KEY_SECRET` | Dağıtık rate limit için | Redis anahtarlarındaki identifier HMAC’i için uzun, ayrı ve rastgele secret. |
+| `RATE_LIMIT_REDIS_TIMEOUT_MS` | İsteğe bağlı | Redis kontrol timeout’u; varsayılan 750 ms, 100–5000 ms aralığı kabul edilir. |
 | `PDF_ALLOWED_HOSTS` | İsteğe bağlı | Vercel Blob dışındaki, yönetici tarafından önceden onaylanmış HTTPS PDF hostlarını virgülle ayırarak ekler. Boş bırakılırsa yalnızca Vercel public Blob hostları kabul edilir. |
 | `PUSH_ALLOWED_HOSTS` | İsteğe bağlı | Varsayılan Web Push sağlayıcıları dışındaki, önceden onaylanmış HTTPS push endpoint hostlarını virgülle ayırarak ekler. |
 

@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 
 interface RateEntry {
@@ -15,9 +16,18 @@ export interface RateResult {
 }
 
 export function getClientIp(req: NextRequest): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+  const realIp = req.headers.get("x-real-ip")?.trim();
+  if (realIp && isIP(realIp)) return realIp;
+
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const candidates = forwarded.split(",").map((value) => value.trim()).filter(Boolean);
+    for (let index = candidates.length - 1; index >= 0; index -= 1) {
+      const candidate = candidates[index];
+      if (candidate && isIP(candidate)) return candidate;
+    }
+  }
+  return "unknown";
 }
 
 /** Basit bellek-içi rate limiter.
@@ -44,4 +54,41 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): Ra
 
   entry.count += 1;
   return { ok: true, remaining: limit - entry.count, retryAfterMs: 0 };
+}
+
+export interface BatchRateRequest {
+  key: string;
+  limit: number;
+  windowMs: number;
+}
+
+/**
+ * Local fallback için birden fazla boyutu aynı instance içinde birlikte kontrol eder.
+ * Redis production modunda bu işlem Lua script’iyle gerçek anlamda atomiktir.
+ */
+export function checkRateLimitBatch(requests: BatchRateRequest[]): RateResult {
+  const now = Date.now();
+  const entries = requests.map((request) => ({ request, entry: store.get(request.key) }));
+  const blocked = entries.find(({ request, entry }) => entry && now <= entry.resetAt && entry.count >= request.limit);
+  if (blocked) {
+    return {
+      ok: false,
+      remaining: 0,
+      retryAfterMs: Math.max(1, (blocked.entry as RateEntry).resetAt - now),
+    };
+  }
+
+  let remaining = Number.MAX_SAFE_INTEGER;
+  let retryAfterMs = 0;
+  for (const { request, entry } of entries) {
+    if (!entry || now > entry.resetAt) {
+      store.set(request.key, { count: 1, resetAt: now + request.windowMs });
+      remaining = Math.min(remaining, request.limit - 1);
+      continue;
+    }
+    entry.count += 1;
+    remaining = Math.min(remaining, request.limit - entry.count);
+    retryAfterMs = Math.max(retryAfterMs, entry.resetAt - now);
+  }
+  return { ok: true, remaining: Math.max(0, remaining), retryAfterMs: 0 };
 }

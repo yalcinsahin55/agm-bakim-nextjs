@@ -27,7 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const user = await getCurrentUser(request, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
-  const rateLimited = enforceApiRateLimit(request, "blob-upload-legacy", 60, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(request, "blob-upload-legacy", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const body = (await request.json()) as HandleUploadBody;

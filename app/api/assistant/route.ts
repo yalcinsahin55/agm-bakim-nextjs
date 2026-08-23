@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/rate-limit";
+import { checkDistributedRateLimit } from "@/lib/redisRateLimit";
 import { evaluateAssistantQuestion, ASSISTANT_POLICY_VERSION, ASSISTANT_RATE_LIMIT, ASSISTANT_RATE_WINDOW_MS } from "@/lib/assistantPolicy";
 import { runAssistantTool } from "@/lib/assistantTools";
 
@@ -19,10 +20,22 @@ export async function POST(req: NextRequest) {
     if (!user) return jsonError("Giriş gerekli", 401);
     if (!hasPermission(user.role, "reports:read")) return jsonError("Bakım raporlarını görme yetkiniz yok.", 403);
 
-    const rate = checkRateLimit(`assistant:${user._id}:${getClientIp(req)}`, ASSISTANT_RATE_LIMIT, ASSISTANT_RATE_WINDOW_MS);
+    const rate = await checkDistributedRateLimit({
+      scope: "assistant",
+      identifier: `${user._id}:${getClientIp(req)}`,
+      limit: ASSISTANT_RATE_LIMIT,
+      windowMs: ASSISTANT_RATE_WINDOW_MS,
+    }, "fail-closed");
+    const retryAfter = Math.max(1, Math.ceil(Math.max(0, rate.resetAt - Date.now()) / 1000));
+    if (rate.infrastructureFailure) {
+      return jsonError("İstek koruma servisi geçici olarak kullanılamıyor. Lütfen biraz sonra tekrar deneyin.", 503, {
+        "Retry-After": String(retryAfter),
+        "X-RateLimit-Remaining": "0",
+      });
+    }
     if (!rate.ok) {
       return jsonError("Çok fazla soru gönderildi. Lütfen biraz sonra tekrar deneyin.", 429, {
-        "Retry-After": String(Math.max(1, Math.ceil(rate.retryAfterMs / 1000))),
+        "Retry-After": String(retryAfter),
         "X-RateLimit-Remaining": "0",
       });
     }

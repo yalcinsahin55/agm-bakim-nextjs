@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     await ensureAppIndexes(db);
     if (!isPushConfigured()) return NextResponse.json({ error: "Web Push henüz yapılandırılmamış." }, { status: 503 });
-    const rateLimited = enforceApiRateLimit(req, "push-subscribe", 30, 60 * 60 * 1000, user._id);
+    const rateLimited = await enforceApiRateLimit(req, "push-subscribe", 30, 60 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
     const body = await req.json();
@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { db, user } = await getUser(req);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    const rateLimited = enforceApiRateLimit(req, "push-unsubscribe", 30, 60 * 60 * 1000, user._id);
+    const rateLimited = await enforceApiRateLimit(req, "push-unsubscribe", 30, 60 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
     const body = await req.json();
     const endpoint = body?.endpoint;

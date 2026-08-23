@@ -8,6 +8,7 @@ import { adminUserSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu sayfa yalnızca yöneticiler içindir." }, { status: 403 });
+    const rateLimited = await enforceApiRateLimit(req, "user-list", 60, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const users = await usersCol.find().toArray();
     return NextResponse.json(users.map((u: any) => {
@@ -44,6 +47,8 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
+    const rateLimited = await enforceApiRateLimit(req, "user-create", 30, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const parsed = adminUserSchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) {

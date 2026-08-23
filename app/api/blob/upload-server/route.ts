@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(request, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  const rateLimited = enforceApiRateLimit(request, "blob-upload", 120, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(request, "blob-upload", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   try {

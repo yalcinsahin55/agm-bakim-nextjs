@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Geri yükleme yetkiniz yok." }, { status: 403 });
-  const rateLimited = enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
   const contentLength = Number(req.headers.get("content-length") || 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_BACKUP_REQUEST_BYTES) {

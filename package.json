@@ -9,10 +9,12 @@
     "migrate:technician-source": "node scripts/migrate-technician-source.mjs"
   },
   "dependencies": {
+    "@upstash/redis": "1.38.2",
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^2.4.3",
     "exceljs": "4.4.0",
     "jose": "^5.9.6",
+    "jszip": "3.10.1",
     "mongodb": "^6.9.0",
     "next": "15.5.21",
     "pdfkit": "^0.19.1",

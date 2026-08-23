@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (user.role !== "yonetici") {
       return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     }
-    const rateLimited = enforceApiRateLimit(req, "maintenance-type-create", 30, 10 * 60 * 1000, user._id);
+    const rateLimited = await enforceApiRateLimit(req, "maintenance-type-create", 30, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
     const { label, default_period_hours, apply_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();

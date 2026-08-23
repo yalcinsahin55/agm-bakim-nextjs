@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
-  const rateLimited = enforceApiRateLimit(req, "seed", 2, 60 * 60 * 1000);
+  const rateLimited = await enforceApiRateLimit(req, "seed", 2, 60 * 60 * 1000);
   if (rateLimited) return rateLimited;
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });

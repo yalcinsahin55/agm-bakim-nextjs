@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user.role)) {
     return NextResponse.json({ error: "Bu işlem için yönetici yetkisi gerekir." }, { status: 403 });
   }
-  const rateLimited = enforceApiRateLimit(req, "import-equipment-info", 12, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "import-equipment-info", 12, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const { file_b64 } = await req.json();

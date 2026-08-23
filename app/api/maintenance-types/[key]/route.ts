@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
   }
-  const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible, restore } = await req.json();
@@ -93,7 +93,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
   if (user.role !== "yonetici") {
     return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
   }
-  const rateLimited = enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
   const type = await (db.collection("maintenance_types") as any).findOne({ _id: key });

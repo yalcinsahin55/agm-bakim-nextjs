@@ -140,7 +140,7 @@ async function postRecord(req: NextRequest) {
     if (user.role === "goruntuleyici") {
       return NextResponse.json({ error: "Görüntüleyici rolü bakım tamamlayamaz." }, { status: 403 });
     }
-    const rateLimited = enforceApiRateLimit(req, "records-create", 120, 10 * 60 * 1000, user._id);
+    const rateLimited = await enforceApiRateLimit(req, "records-create", 120, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
     const body = await req.json().catch(() => ({}));

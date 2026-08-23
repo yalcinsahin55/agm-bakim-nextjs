@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req, db.collection("users") as any);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return NextResponse.json({ error: "Rapor görme yetkiniz yok." }, { status: 403 });
-  const rateLimited = enforceApiRateLimit(req, "analytics-summary", 30, 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "analytics-summary", 30, 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
   await ensureAppIndexes(db);
 
