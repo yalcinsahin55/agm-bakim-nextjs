@@ -38,7 +38,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 | Dış servis | Garanti veya harici servis bakımlarının yönetici tarafından kaydedilmesi; bu kayıtların teknisyen performansından ayrılması |
 | QR workflow | Motor QR’ı, bakım türü QR’ı ve motor + bakım türü bağlantılarıyla mobil hızlı seçim |
 | Raporlama | Teknisyen performans raporu, motor bakım raporu, istatistikler, bakım türü ve motor dağılımları |
-| Bakım Asistanı | Salt okunur doğal dil rapor özeti; kayıt oluşturma, düzenleme ve silme yetkisi yoktur |
+| Bakım Asistanı | Salt okunur doğal dil raporu; tarih, teknisyen, bakım ve motor sorguları; kayıt oluşturma, düzenleme ve silme yetkisi yoktur |
 | Dışa aktarma | Bakım geçmişinin Excel ve PDF olarak alınması; tarih, başlangıç, bitiş ve toplam süre sütunları |
 | Teknik modüller | Yağ analizleri, karter fark basıncı, bakım periyotları, tahmini bakım ve takvim |
 | Bildirimler | Uygulama içi bildirimler ve isteğe bağlı Web Push bildirimleri |
@@ -50,7 +50,7 @@ Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur ve onaylar. Kullan
 
 | Rol | Yetki özeti |
 |---|---|
-| `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
+| `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
 | `teknisyen` | Bakım tamamlar, dashboard ve analiz ekranlarını kullanır, bakım kayıtlarını görüntüler. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
 | `goruntuleyici` | Dashboard, motorlar, bakım kayıtları, analiz ve takip, bilgi/rapor, bakım türleri ve tahmin modüllerini görüntüler; kayıt üzerinde değişiklik yapamaz. |
 | `planlamaci` | Eski hesaplarla geriye dönük uyumluluk için teknisyen davranışıyla değerlendirilir. Yeni kullanıcı arayüzünde ayrı bir planlamacı akışı bulunmaz. |
@@ -63,7 +63,7 @@ Yetkilendirme iki katmanda uygulanır: menü ve sayfa görünürlüğü istemci 
 2. Motor çalışma saati girilir. Birincil bakım türünün yanı sıra aynı işlemde tamamlanan ek bakım türleri seçilebilir.
 3. Yeni kayıtlar için bakım başlangıç ve bitiş tarih+saatleri girilir. Bitiş zamanı başlangıçtan önce olamaz.
 4. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf veya video kanıtlarından en az biri eklenir.
-5. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur.
+5. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur. Yönetici bakım tamamlıyorsa sorumlu/yetkili bakımcıyı ayrıca seçebilir; bu alan teknisyenlere açılmaz.
 6. Kayıt çevrimiçiyse API’ye gönderilir; bağlantı yoksa IndexedDB kuyruğuna alınır ve bağlantı geri geldiğinde senkronize edilir.
 7. Sunucu tarafı motoru, bakım türünü, kanıtları, teknisyenleri ve zaman alanlarını doğrular; bakım süresini kendisi hesaplayarak kaydeder.
 
@@ -116,9 +116,9 @@ Mevcut motor QR bağlantıları korunur. Yeni bağlantılar örneğin `/tamamla?
 
 ### Bakım Asistanı
 
-`/asistan` ekranı, AGM Bakım verileri hakkında salt okunur sorulara cevap verir. Bu ilk sürümde bakım özeti, gecikmiş bakımlar, motor bakım geçmişi, teknisyen performansı ve dış hizmet/garanti kayıtları sorgulanabilir. Asistan yalnızca önceden tanımlı okuma araçlarını çağırır; doğrudan MongoDB sorgusu çalıştırmaz ve hiçbir kayıt üzerinde yazma işlemi yapamaz.
+`/asistan` ekranı, AGM Bakım verileri hakkında salt okunur sorulara cevap verir. Bakım özeti, gecikmiş bakımlar, motor bakım geçmişi, dış hizmet kayıtları ve teknisyen performansı sorgulanabilir. Tarih ifadeleri `23.08.2026`, `2026-08-23`, `5 Ağustos 2026`, `Ağustos 2026`, `01.08.2026 - 15.08.2026`, `bu hafta` ve `geçen ay` gibi biçimlerde çözümlenir. Kullanıcı belirli bir teknisyenin hangi bakım türlerinde veya motorlarda sorumlu/yardımcı olarak çalıştığını; ayrıca belirli dönemde en çok görev alan teknisyeni sorabilir. Asistan yalnızca önceden tanımlı okuma araçlarını çağırır; doğrudan MongoDB sorgusu çalıştırmaz ve hiçbir kayıt üzerinde yazma işlemi yapamaz.
 
-`lib/assistantPolicy.ts` soru uzunluğu, prompt injection, yazma talebi, hassas bilgi ve kesin arıza teşhisi isteklerini filtreler. `/api/assistant` oturum, rol, rate limit ve içerik boyutu kontrollerinden sonra yalnızca rapor verilerini döndürür. Ham medya, base64 içerik, şifre, token ve gereksiz kişisel bilgiler asistan cevabına aktarılmaz.
+`lib/assistantPolicy.ts` soru uzunluğu, prompt injection, yazma talebi, hassas bilgi ve kesin arıza teşhisi isteklerini filtreler. Tarih aralığı policy katmanında doğrulanır; tarih bazlı özel sorgularda bakım başlangıç tarihi, eski kayıtlarda ise geriye dönük uyumluluk için oluşturulma tarihi kullanılır. `/api/assistant` oturum, rol, rate limit ve içerik boyutu kontrollerinden sonra yalnızca rapor verilerini döndürür. Ham medya, base64 içerik, şifre, token ve gereksiz kişisel bilgiler asistan cevabına aktarılmaz.
 
 ### Teknisyen raporu
 
@@ -147,7 +147,7 @@ Asistan ekranındaki mikrofon düğmesi, destekleyen mobil ve masaüstü tarayı
 
 Asistan cevaplarının uygun olduğu yerlerde **PDF indir** ve **Excel indir** düğmeleri görünür. Bu düğmeler cevabın dönem, motor, teknisyen veya dış hizmet filtresini mevcut `/api/export/pdf` ve `/api/export/excel` endpointlerine taşır. Export işlemi de normal oturum ve rol kontrollerinden geçer; dış hizmet kayıtları için `source=external_service`, teknisyen raporu için `technician_id` filtresi kullanılabilir.
 
-Dashboard’da gecikmiş bakım uyarısının hemen altında, sayfadan ayrılmadan soru yazılabilen **Bakım Asistanı** kutusu bulunur. Kutudaki hızlı sorular doğrudan aynı alanda yanıtlanır; ayrıca detaylı cevabı açan bağlantı soruyu yeniden yazmayı veya tekrar gönder düğmesine basmayı gerektirmez. Hızlı örnekler gerçek bir motor numarası varsaymaz ve dış hizmet sorusu “Dış servisten hizmet alınan motorlar ve bakımlar hangileri?” biçimindedir. Bu alan yalnızca hızlı erişim sağlar; asistanın salt okunur policy sınırlarını değiştirmez.
+Dashboard’da gecikmiş bakım uyarısının hemen altında, sayfadan ayrılmadan soru yazılabilen **Bakım Asistanı** kutusu bulunur. Tarih ve teknisyen sorguları da aynı salt-okunur endpoint üzerinden cevaplanır. Kutudaki hızlı sorular doğrudan aynı alanda yanıtlanır; ayrıca detaylı cevabı açan bağlantı soruyu yeniden yazmayı veya tekrar gönder düğmesine basmayı gerektirmez. Hızlı örnekler gerçek bir motor numarası varsaymaz ve dış hizmet sorusu “Dış servisten hizmet alınan motorlar ve bakımlar hangileri?” biçimindedir. Bu alan yalnızca hızlı erişim sağlar; asistanın salt okunur policy sınırlarını değiştirmez.
 
 ## Çevrimdışı çalışma
 

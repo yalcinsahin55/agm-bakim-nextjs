@@ -109,6 +109,7 @@ export default function TamamlaPage() {
   const [extraKeys, setExtraKeys] = useState([]);
   const [extraPeriods, setExtraPeriods] = useState({});
   const [technicians, setTechnicians] = useState([]);
+  const [responsibleTechnicianId, setResponsibleTechnicianId] = useState("");
   const [otherTechnicianIds, setOtherTechnicianIds] = useState([]);
   const [technicianSource, setTechnicianSource] = useState("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
@@ -396,8 +397,14 @@ export default function TamamlaPage() {
     if (source === "external_service") setOtherTechnicianIds([]);
   }
 
+  function changeResponsibleTechnician(id) {
+    setResponsibleTechnicianId(id);
+    setOtherTechnicianIds((current) => current.filter((currentId) => currentId !== id));
+  }
+
   const currentUserId = user?._id || user?.id || "";
-  const selectableTechnicians = technicians.filter((technician) => technician.id !== currentUserId);
+  const effectiveResponsibleTechnicianId = responsibleTechnicianId || currentUserId;
+  const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId);
 
   async function submit() {
     if (!chosenType) {
@@ -434,6 +441,7 @@ export default function TamamlaPage() {
     const payload = {
       engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
       technician_source: technicianSource,
+      ...(user?.role === "yonetici" && technicianSource !== "external_service" && responsibleTechnicianId ? { responsible_technician_id: responsibleTechnicianId } : {}),
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       hour_at_completion: Number(hours), technician_note: techNote,
       time_tracking_version: TIME_TRACKING_VERSION,
@@ -622,6 +630,14 @@ export default function TamamlaPage() {
             <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400" />
             <div className="mt-2 rounded-lg bg-purple-400/10 px-2.5 py-2 text-[10.5px] text-purple-200">Bu kayıt sorumlu teknisyen performansına dahil edilmez; bakım geçmişinde dış hizmet olarak görünür ve yalnızca yönetici tarafından girilebilir.</div>
           </>}
+          {technicianSource !== "external_service" && user?.role === "yonetici" && <div className="mt-3 rounded-lg border border-purple-400/25 bg-purple-400/5 p-2.5">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-muted" htmlFor="responsible-technician">Yetkili / sorumlu bakımcı</label>
+            <div className="mt-0.5 text-[10px] text-faint">Bu kayıt kimin sorumluluğunda tamamlandıysa onu seç. Bu seçim yalnızca yöneticiye açıktır.</div>
+            <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
+              <option value="">Varsayılan: benim hesabım</option>
+              {technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name}</option>)}
+            </select>
+          </div>}
         </div>}
 
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakımcı Notu</label>

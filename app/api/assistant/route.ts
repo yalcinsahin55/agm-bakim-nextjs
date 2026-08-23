@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
         intent: result.intent,
         period: result.period,
         generated_at: new Date().toISOString(),
+        date_range: policy.query?.dateRange || null,
         source: "AGM Bakım raporları",
         rate_limit_remaining: rate.remaining,
       },

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ASSISTANT_POLICY_VERSION = "1.0" as const;
+export const ASSISTANT_POLICY_VERSION = "1.1" as const;
 export const MAX_ASSISTANT_QUESTION_LENGTH = 300;
 export const ASSISTANT_RATE_LIMIT = 20;
 export const ASSISTANT_RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -10,6 +10,11 @@ export const assistantRequestSchema = z.object({
 });
 
 export type AssistantPeriod = "month" | "3months" | "year" | "all";
+export interface AssistantDateRange {
+  from: string;
+  to: string;
+}
+
 export type AssistantIntent =
   | "summary"
   | "overdue"
@@ -30,6 +35,7 @@ export interface AssistantQuery {
   intent: AssistantIntent;
   period: AssistantPeriod;
   engineQuery?: string;
+  dateRange?: AssistantDateRange;
 }
 
 export interface AssistantPolicyResult {
@@ -89,6 +95,11 @@ const TECHNICIAN_PATTERNS = [
   /performans/iu,
   /çalışma\s+süresi/iu,
   /teknisyen\s+görevi/iu,
+  /hangi\s+bakımlarda?\s+(çalış|görev)/iu,
+  /hangi\s+motorlarda?\s+(çalış|görev)/iu,
+  /hangi\s+(bakım|motor|iş).*?(çalış|görev)/iu,
+  /en\s+(çok|fazla)\s+(çalış|görev)/iu,
+  /kim\s+(en\s+çok\s+)?(çalıştı|çalışmış|görev\s+(aldı|yaptı))/iu,
 ];
 
 const OVERDUE_PATTERNS = [
@@ -103,7 +114,6 @@ const ENGINE_HISTORY_PATTERNS = [
   /son\s+bakım/iu,
   /bakım\s+geçmiş/iu,
   /motor\s+\S+/iu,
-  /hangi\s+bakımlar/iu,
 ];
 
 const SUMMARY_PATTERNS = [
@@ -113,10 +123,100 @@ const SUMMARY_PATTERNS = [
   /istatistik/iu,
   /en\s+fazla/iu,
   /bakım\s+sayısı/iu,
+  /hangi\s+bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
+  /bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
 ];
 
 function cleanQuestion(value: string): string {
   return value.normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+const TURKISH_MONTHS: Record<string, number> = {
+  ocak: 1, şubat: 2, mart: 3, nisan: 4, mayıs: 5, haziran: 6,
+  temmuz: 7, ağustos: 8, eylül: 9, ekim: 10, kasım: 11, aralık: 12,
+};
+const TURKISH_MONTH_PATTERN = Object.keys(TURKISH_MONTHS).join("|");
+
+function dateKey(year: number, month: number, day: number): string | null {
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (candidate.getUTCFullYear() !== year || candidate.getUTCMonth() + 1 !== month || candidate.getUTCDate() !== day) return null;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+function shiftDateKey(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()) || value;
+}
+
+function currentTurkeyDateKey(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return dateKey(Number(values.year), Number(values.month), Number(values.day)) || new Date().toISOString().slice(0, 10);
+}
+
+function dateRange(from: string, to = from): AssistantDateRange {
+  return from <= to ? { from, to } : { from: to, to: from };
+}
+
+function parseDateRange(question: string): AssistantDateRange | undefined {
+  const currentYear = Number(currentTurkeyDateKey().slice(0, 4));
+  const numericDates: string[] = [];
+  for (const match of question.matchAll(/(?<!\d)(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?!\d)/g)) {
+    const parsed = dateKey(Number(match[1]), Number(match[2]), Number(match[3]));
+    if (parsed) numericDates.push(parsed);
+  }
+  for (const match of question.matchAll(/(?<![\d-])(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?!\d)/g)) {
+    const parsed = dateKey(Number(match[3]), Number(match[2]), Number(match[1]));
+    if (parsed) numericDates.push(parsed);
+  }
+  if (numericDates.length >= 2) return dateRange(numericDates[0], numericDates[1]);
+  if (numericDates.length === 1) return dateRange(numericDates[0]);
+
+  const sameMonthRange = question.match(new RegExp(`(?<!\\d)(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})\\s+(${TURKISH_MONTH_PATTERN})(?:['’][a-zçğıöşü]+)?(?:\\s+(\\d{4}))?`, "iu"));
+  if (sameMonthRange) {
+    const month = TURKISH_MONTHS[sameMonthRange[3].toLocaleLowerCase("tr-TR")];
+    const year = Number(sameMonthRange[4] || currentYear);
+    const from = dateKey(year, month, Number(sameMonthRange[1]));
+    const to = dateKey(year, month, Number(sameMonthRange[2]));
+    if (from && to) return dateRange(from, to);
+  }
+
+  const dayMonthDates: string[] = [];
+  for (const match of question.matchAll(new RegExp(`(?<!\\d)(\\d{1,2})\\s+(${TURKISH_MONTH_PATTERN})(?:['’][a-zçğıöşü]+)?(?:\\s+(\\d{4}))?`, "giu"))) {
+    const month = TURKISH_MONTHS[match[2].toLocaleLowerCase("tr-TR")];
+    const parsed = dateKey(Number(match[3] || currentYear), month, Number(match[1]));
+    if (parsed) dayMonthDates.push(parsed);
+  }
+  if (dayMonthDates.length >= 2) return dateRange(dayMonthDates[0], dayMonthDates[1]);
+  if (dayMonthDates.length === 1) return dateRange(dayMonthDates[0]);
+
+  const monthYear = question.match(new RegExp(`(${TURKISH_MONTH_PATTERN})(?:['’]?[a-zçğıöşü]+)?\\s+(\\d{4})`, "iu"))
+    || question.match(new RegExp(`(\\d{4})\\s+(${TURKISH_MONTH_PATTERN})`, "iu"));
+  if (monthYear) {
+    const monthName = monthYear[1].match(/^\\d/) ? monthYear[2] : monthYear[1];
+    const year = Number(monthYear[1].match(/^\\d/) ? monthYear[1] : monthYear[2]);
+    const month = TURKISH_MONTHS[monthName.toLocaleLowerCase("tr-TR")];
+    const from = dateKey(year, month, 1);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const to = dateKey(year, month, lastDay);
+    if (from && to) return dateRange(from, to);
+  }
+
+  const today = currentTurkeyDateKey();
+  if (/geçen\s+hafta/iu.test(question) || /bu\s+hafta/iu.test(question)) {
+    const weekday = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+    const monday = shiftDateKey(today, -(weekday + 6) % 7);
+    return /geçen\s+hafta/iu.test(question) ? dateRange(shiftDateKey(monday, -7), shiftDateKey(monday, -1)) : dateRange(monday, shiftDateKey(monday, 6));
+  }
+  if (/geçen\s+ay/iu.test(question)) {
+    const firstThisMonth = `${today.slice(0, 8)}01`;
+    const lastPreviousMonth = shiftDateKey(firstThisMonth, -1);
+    const from = `${lastPreviousMonth.slice(0, 8)}01`;
+    return dateRange(from, lastPreviousMonth);
+  }
+  return undefined;
 }
 
 function periodFromQuestion(question: string): AssistantPeriod {
@@ -198,6 +298,7 @@ export function evaluateAssistantQuestion(value: unknown): AssistantPolicyResult
       intent,
       period: periodFromQuestion(question),
       engineQuery: extractEngineQuery(question),
+      dateRange: parseDateRange(question),
     },
   };
 }
