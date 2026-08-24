@@ -601,245 +601,122 @@ export default function TamamlaPage() {
   }
 
   return (
-    <div>
+    <div className="min-h-screen pb-20">
       <TopBar
         title={quickMode ? "Hızlı Bakım" : "Bakım Tamamla"}
         subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""}
       />
-      <div className="mx-auto max-w-7xl px-4 py-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="flex min-w-0 flex-col gap-1">
+      <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
+        <div className="mb-4 flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Kayıt çalışma alanı</div>
+            <h1 className="text-xl font-extrabold tracking-tight text-text md:text-2xl">Bakım kaydını tamamla</h1>
+            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Motor, bakım zamanı, ekip katkısı ve kanıtları tek ekranda kontrol ederek kaydı güvenle tamamlayın.</p>
+          </div>
+          <div className={`w-fit rounded-full border px-3 py-1.5 text-[10px] font-bold ${isOnline ? "border-green/30 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber"}`}>
+            {isOnline ? "ÇEVRİMİÇİ" : "ÇEVRİMDIŞI ÇALIŞMA"}
+          </div>
+        </div>
+
         {quickMode && (
-          <div className="mb-2 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2.5 text-[11px] text-teal" role="status">
-            <div className="font-bold">QR ile Hızlı Bakım Modu</div>
-            <div className="mt-0.5 text-[10px] text-muted">{qrEngineId && qrTypeKey ? "Motor ve bakım türü QR koddan seçildi ve kilitlendi." : qrEngineId ? "Motor QR koddan seçildi ve kilitlendi." : qrTypeKey ? "Bakım türü QR koddan seçildi ve kilitlendi; şimdi motoru seç." : "QR ile hızlı bakım başlatıldı."}</div>
+          <div className="mb-3 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2.5 text-[11px] text-teal" role="status">
+            <div className="font-bold">Hızlı bakım modu</div>
+            <div className="mt-0.5 text-[10px] text-muted">{qrEngineId && qrTypeKey ? "Motor ve bakım türü hızlı bağlantıdan seçildi ve kilitlendi." : qrEngineId ? "Motor hızlı bağlantıdan seçildi ve kilitlendi." : qrTypeKey ? "Bakım türü hızlı bağlantıdan seçildi ve kilitlendi; şimdi motoru seç." : "Hızlı bakım kaydı başlatıldı."}</div>
           </div>
         )}
         {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
-          <div className="mb-2 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
+          <div className="mb-3 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
             <div className="font-bold">{!isOnline ? "Çevrimdışı çalışma açık." : "Senkronizasyon bekleyen kayıt var."}</div>
-            <div className="mt-0.5 text-[10px] text-muted">
-              {!isOnline ? "Kayıt ve seçtiğiniz medya cihazda tutulur; bağlantı gelince gönderilir." : `${pendingOfflineCount} kayıt bağlantı üzerinden gönderilmeyi bekliyor.`}
-            </div>
+            <div className="mt-0.5 text-[10px] text-muted">{!isOnline ? "Kayıt ve seçtiğiniz medya cihazda tutulur; bağlantı gelince gönderilir." : `${pendingOfflineCount} kayıt bağlantı üzerinden gönderilmeyi bekliyor.`}</div>
             {isOnline && pendingOfflineCount > 0 && <button type="button" onClick={() => { window.dispatchEvent(new Event("offline-queue:sync")); }} className="mt-2 rounded-lg border border-amber/40 px-2.5 py-1.5 text-[10px] font-bold text-amber">Şimdi senkronize et</button>}
           </div>
         )}
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Motor</label>
-        <select
-          value={engineId}
-          onChange={(e) => setEngineId(e.target.value)}
-          disabled={Boolean(quickMode && qrEngineId)}
-          className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode && qrEngineId ? "cursor-not-allowed opacity-80" : ""}`}
-          aria-label={quickMode && qrEngineId ? "QR ile seçilen motor" : "Motor seçimi"}
-        >
-          {engineList.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-        </select>
 
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakım Türü</label>
-                <select
-          value={typeKey} onChange={(e) => setTypeKey(e.target.value)} disabled={Boolean(quickMode && qrTypeKey)} className={`bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 ${quickMode && qrTypeKey ? "cursor-not-allowed opacity-80" : ""}`}>
-          {allTypesSorted.map((t) => {
-            const it = engItems.find((i) => i.type_key === t.key);
-            const label = it
-              ? `${t.label} · ${STATUS_LABELS[it.status]} · ${Math.round(it.remaining)} sa`
-              : `${t.label} · ⚪ Bu motor için tanımlı değil`;
-            return <option key={t.key} value={t.key}>{label}</option>;
-          })}
-        </select>
-
-        {chosenItem ? (
-          <div className="bg-teal/10 border border-teal/30 rounded-xl px-3.5 py-3 mb-2 text-[11.5px] text-muted">
-            Motor saati: {chosenItem.engine_hours.toLocaleString("tr-TR")} · Son bakım: {chosenItem.last_hour.toLocaleString("tr-TR")} · Periyot: {chosenItem.period.toLocaleString("tr-TR")} sa
-          </div>
-        ) : chosenType ? (
-          <div className="bg-amber/10 border border-amber/30 rounded-xl px-3.5 py-3 mb-2">
-            <div className="text-[11.5px] text-muted mb-2">
-              <b className="text-amber">{chosenType.label}</b>, bu motor için tanımlı değildi. Bu kaydı eklersen yeni bir bakım takibi başlatılır.
-            </div>
-            <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
-            <input
-              type="number" value={primaryPeriod} onChange={(e) => setPrimaryPeriod(Number(e.target.value) || 0)}
-              className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono mt-1"
-            />
-          </div>
-        ) : null}
-
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">O Anki Motor Çalışma Saati</label>
-        <input
-          type="number" value={hours} onChange={(e) => setHours(Number(e.target.value) || 0)}
-          className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-amber mb-1"
-        />
-        <p className="text-[11px] text-faint mb-2 leading-relaxed">
-          Bu değer motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu bakım kaydına yazılır.
-        </p>
-
-        <div className="mb-2 rounded-xl border border-amber/30 bg-amber/5 p-3">
-          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bakım Başlangıç ve Bitiş Zamanı</div>
-          <div className="mt-0.5 text-[10.5px] text-faint">Bakım birden fazla gün sürebilir; gerçek başlangıç ve bitiş tarih-saatini seçin.</div>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="text-[10.5px] font-bold text-muted">Başlangıç
-              <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-            </label>
-            <label className="text-[10.5px] font-bold text-muted">Bitiş
-              <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-            </label>
-          </div>
-          <div className={`mt-2 rounded-lg px-2.5 py-2 text-[10.5px] ${timeTrackingReady ? "bg-green/10 text-green" : "bg-red/10 text-red"}`} role="status">{timeTrackingReady ? `Toplam bakım süresi: ${formatMaintenanceDuration(maintenanceDurationMinutes)}` : "Geçerli bir başlangıç ve bitiş zamanı girin."}</div>
-        </div>
-
-        {(typeKey === "krank" || typeKey === "intercooler") && (
-          <>
-            <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fark Basıncı (bar)</label>
-            <input
-              type="number" step="0.1" value={pressure} onChange={(e) => setPressure(e.target.value)}
-              className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm font-mono text-teal mb-2"
-            />
-          </>
-        )}
-
-        {user?.role === "yonetici" && <div className="mb-2 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
-          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</div>
-          <div className="mt-0.5 text-[10.5px] text-faint">Dış servis veya garanti kapsamındaki bakımlarda kayıtlı teknisyen seçmeden kayıt oluşturabilirsin.</div>
-          <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value as "internal" | "external_service")} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
-            <option value="internal">Kayıtlı teknisyenler / benim hesabım</option>
-            <option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
-          </select>
-          {technicianSource === "external_service" && <>
-            <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400" />
-            <div className="mt-2 rounded-lg bg-purple-400/10 px-2.5 py-2 text-[10.5px] text-purple-200">Bu kayıt sorumlu teknisyen performansına dahil edilmez; bakım geçmişinde dış hizmet olarak görünür ve yalnızca yönetici tarafından girilebilir.</div>
-          </>}
-          {technicianSource !== "external_service" && user?.role === "yonetici" && <div className="mt-3 rounded-lg border border-purple-400/25 bg-purple-400/5 p-2.5">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-muted" htmlFor="responsible-technician">Yetkili / sorumlu bakımcı</label>
-            <div className="mt-0.5 text-[10px] text-faint">Bu kayıt kimin sorumluluğunda tamamlandıysa onu seç. Elektromekanik ekip üyeleri genellikle destek rolünde takip edilir. Bu seçim yalnızca yöneticiye açıktır.</div>
-            <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-400">
-              <option value="">Varsayılan: benim hesabım</option>
-              {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
-            </select>
-            <label className="mt-2 block text-[10.5px] font-bold text-muted" htmlFor="responsible-technician-duration">Sorumlu teknisyen çalışma süresi (saat)
-              <input id="responsible-technician-duration" type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration === "" ? minutesToHoursInput(maintenanceDurationMinutes ?? 60) : responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-purple-400" />
-            </label>
-            <div className="mt-1 text-[10px] text-faint">Varsayılan değer toplam bakım süresidir; birden fazla gün süren bakımda gerçek kişi süresini girin.</div>
-          </div>}
-        </div>}
-
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Bakımcı Notu</label>
-        <textarea
-          value={techNote} onChange={(e) => setTechNote(e.target.value)} rows={2}
-          className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-2 resize-none"
-        />
-
-        {technicianSource !== "external_service" && selectableTechnicians.length > 0 && <div className="mb-2 rounded-xl border border-teal/30 bg-teal/5 p-3">
-          <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
-          <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan ekip üyelerini seçebilirsin.</div>
-          <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi ({user?.role === "yonetici" ? "saat" : "dk"})<input type="number" min="0" max={user?.role === "yonetici" ? 8784 : 366 * 24 * 60} step={user?.role === "yonetici" ? "0.25" : "15"} value={user?.role === "yonetici" ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: user?.role === "yonetici" ? (hoursInputToMinutes(event.target.value) ?? 0) : event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
-          </div>
-        </div>}
-
-        <div className="mb-2 rounded-xl border border-border bg-panel p-3">
-          <div className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-muted">Kontrol Listesi</div>
-          <div className="mb-2 text-[10.5px] text-faint">Standart maddeleri işaretleyerek bakımın tamamlandığını doğrula.</div>
-          <div className="flex flex-col gap-1.5">
-            {checklistItems.map((item) => <label key={item} className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(e) => setChecklist((current) => ({ ...current, [item]: e.target.checked }))} />{item}</label>)}
-          </div>
-          <div className={`mt-2 rounded-lg p-2 text-[10.5px] ${checklistComplete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{checklistComplete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div>
-        </div>
-
-        {otherTypes.length > 0 && (
-          <>
-            <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide mt-1">Birlikte Tamamlanan Diğer Bakımlar</label>
-            <p className="text-[11px] text-faint mb-1.5">
-              Bazen bir bakımı yaparken diğerlerini de yapmış oluyorsunuz — motor için daha önce hiç tanımlı olmayan
-              bir bakım türü de olsa, işaretleyip periyodunu girerek ekleyebilirsiniz. Hepsi aynı saat/tarihle kaydedilir.
-            </p>
-            <div className="flex flex-col gap-1.5 mb-2">
-              {otherTypes.map((t) => {
-                const tracked = trackedKeys.has(t.key);
-                const checked = extraKeys.includes(t.key);
-                return (
-                  <div key={t.key} className="bg-panel border border-border rounded-xl px-3 py-2.5">
-                    <label className="flex items-center gap-2 text-[12.5px] text-text">
-                      <input type="checkbox" checked={checked} onChange={(e) => toggleExtra(t.key, e.target.checked)} />
-                      {t.label}
-                      {!tracked && <span className="text-[10px] text-faint">· ⚪ tanımlı değil</span>}
-                    </label>
-                    {checked && !tracked && (
-                      <div className="mt-2 pl-6">
-                        <label className="text-[10px] font-bold text-muted uppercase tracking-wide">Periyodik bakım saati</label>
-                        <input
-                          type="number" value={extraPeriods[t.key] ?? ""}
-                          onChange={(e) => setExtraPeriods((prev) => ({ ...prev, [t.key]: Number(e.target.value) || 0 }))}
-                          className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-1.5 text-[12.5px] font-mono mt-1"
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-          </div>
-        </div>
-        <div className="mt-3 flex flex-col gap-1">
-        {/* Fotoğraf Bölümü */}
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
-        <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
-          📷 {photoBusy ? "İşleniyor..." : "Fotoğraf ekle (birden fazla seçebilirsiniz)"}
-          <input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" />
-        </label>
-        {photos.length > 0 && (
-          <div className="flex gap-1.5 mb-2 flex-wrap">
-            {photos.map((p, idx) => (
-              <div key={idx} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPhoto(getPhotoSrc(p, offlinePreviews))}
-                  className="block hover:scale-105 transition-transform"
-                  aria-label="Fotoğrafı büyüt"
-                >
-                  <img src={getPhotoSrc(p, offlinePreviews)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
-                </button>
-                <button onClick={() => removePhoto(idx)} className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5">✕</button>
+        <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="maintenance-definition-heading">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">01 · Bakım tanımı</div><h2 id="maintenance-definition-heading" className="mt-1 text-base font-extrabold text-text">Motor ve bakım seçimi</h2></div>
+                <span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">ZORUNLU</span>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Video Bölümü — ✨ Blob'a yüklenir */}
-        <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Video</label>
-        <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
-          🎥 {videoBusy ? "Yükleniyor..." : "Video ekle (Max 5 adet, her biri max 100MB)"}
-          <input type="file" accept="video/*" multiple onChange={handleVideos} className="hidden" />
-        </label>
-        {videos.length > 0 && (
-          <div className="flex gap-1.5 mb-2 flex-wrap">
-            {videos.map((v, idx) => (
-              <div key={idx} className="relative">
-                <video src={v.url?.startsWith("offline:") ? offlinePreviews[v.url.slice("offline:".length)] : v.url} className="w-20 h-20 rounded-lg object-cover border border-border bg-black" controls={false} />
-                <button 
-                  onClick={() => removeVideo(idx)} 
-                  className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-panel2 border border-border text-[10px] leading-none p-0.5 text-red"
-                >
-                  ✕
-                </button>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Motor
+                  <select value={engineId} onChange={(event) => setEngineId(event.target.value)} disabled={Boolean(quickMode && qrEngineId)} className={`mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber ${quickMode && qrEngineId ? "cursor-not-allowed opacity-80" : ""}`} aria-label={quickMode && qrEngineId ? "Hızlı bağlantı ile seçilen motor" : "Motor seçimi"}>
+                    {engineList.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
+                  </select>
+                </label>
+                <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım türü
+                  <select value={typeKey} onChange={(event) => setTypeKey(event.target.value)} disabled={Boolean(quickMode && qrTypeKey)} className={`mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber ${quickMode && qrTypeKey ? "cursor-not-allowed opacity-80" : ""}`}>
+                    {allTypesSorted.map((type) => {
+                      const item = engItems.find((entry) => entry.type_key === type.key);
+                      const label = item ? `${type.label} · ${STATUS_LABELS[item.status]} · ${Math.round(item.remaining)} sa` : `${type.label} · Bu motor için tanımlı değil`;
+                      return <option key={type.key} value={type.key}>{label}</option>;
+                    })}
+                  </select>
+                </label>
               </div>
-            ))}
-          </div>
-        )}
+              {chosenItem ? (
+                <div className="mt-3 rounded-xl border border-teal/30 bg-teal/10 px-3 py-3 text-[11px] text-muted">
+                  <div className="mb-1 flex items-center justify-between gap-2"><span className="font-bold uppercase tracking-wide text-teal">Mevcut bakım takibi</span><span className="rounded-full bg-teal/15 px-2 py-1 text-[9px] font-bold text-teal">{STATUS_LABELS[chosenItem.status]}</span></div>
+                  <div className="grid gap-1 sm:grid-cols-3"><span>Motor saati <b className="font-mono text-text">{chosenItem.engine_hours.toLocaleString("tr-TR")}</b></span><span>Son bakım <b className="font-mono text-text">{chosenItem.last_hour.toLocaleString("tr-TR")}</b></span><span>Periyot <b className="font-mono text-text">{chosenItem.period.toLocaleString("tr-TR")} sa</b></span></div>
+                </div>
+              ) : chosenType ? (
+                <div className="mt-3 rounded-xl border border-amber/30 bg-amber/10 px-3 py-3">
+                  <div className="text-[11px] leading-5 text-muted"><b className="text-amber">{chosenType.label}</b>, bu motor için tanımlı değil. Bu kaydı eklersen yeni bir bakım takibi başlatılır.</div>
+                  <label className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati
+                    <input type="number" value={primaryPeriod} onChange={(event) => setPrimaryPeriod(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono text-text outline-none focus:border-amber" />
+                  </label>
+                </div>
+              ) : null}
+              <label className="mt-4 block text-[10.5px] font-bold uppercase tracking-wide text-muted">O anki motor çalışma saati
+                <input type="number" value={hours} onChange={(event) => setHours(Number(event.target.value) || 0)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-base font-bold text-amber outline-none focus:border-amber" />
+              </label>
+              <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu kayda yazılır.</p>
+            </section>
 
-        {!evidenceReady && <div className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu veya fotoğraf/video kanıtı ekleyin.</div>}
-        <button
-          onClick={submit} disabled={submitting || videoBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady}
-          className="mt-3 w-full rounded-xl bg-amber py-3.5 text-[14.5px] font-extrabold text-[#1a1206] shadow-lg disabled:opacity-50"
-        >
-          {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}
-        </button>
-        </div>
-      </div>
+            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="time-tracking-heading">
+              <div className="mb-3 flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">02 · Zaman takibi</div><h2 id="time-tracking-heading" className="mt-1 text-base font-extrabold text-text">Başlangıç ve bitiş</h2></div><span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">ZORUNLU</span></div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-[10.5px] font-bold text-muted">Başlangıç
+                  <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2.5 text-sm font-mono text-text outline-none focus:border-amber" />
+                </label>
+                <label className="text-[10.5px] font-bold text-muted">Bitiş
+                  <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2.5 text-sm font-mono text-text outline-none focus:border-amber" />
+                </label>
+              </div>
+              <div className={`mt-3 rounded-xl border px-3 py-3 ${timeTrackingReady ? "border-green/30 bg-green/10 text-green" : "border-red/30 bg-red/10 text-red"}`} role="status"><div className="text-[10px] font-bold uppercase tracking-wide">{timeTrackingReady ? "Toplam bakım süresi" : "Zaman bilgisi eksik"}</div><div className="mt-1 text-lg font-extrabold">{timeTrackingReady ? formatMaintenanceDuration(maintenanceDurationMinutes) : "Geçerli başlangıç ve bitiş girin"}</div><div className="mt-1 text-[10px] text-muted">Bakım birden fazla gün sürebilir; gerçek tarih-saatleri seçin.</div></div>
+              {(typeKey === "krank" || typeKey === "intercooler") && <div className="mt-3 rounded-xl border border-teal/30 bg-teal/5 p-3"><label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Fark basıncı (bar)
+                <input type="number" step="0.1" value={pressure} onChange={(event) => setPressure(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm font-mono text-teal outline-none focus:border-teal" />
+              </label></div>}
+            </section>
+          </div>
+
+          <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="technician-source-heading">
+            <div className="mb-3 flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">03 · Teknisyen ve kaynak</div><h2 id="technician-source-heading" className="mt-1 text-base font-extrabold text-text">Ekip katkısı</h2></div><span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">YÖNETİCİ KONTROLLÜ</span></div>
+            {user?.role === "yonetici" ? <>
+              <label className="block text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı
+                <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value as "internal" | "external_service")} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400 sm:max-w-md">
+                  <option value="internal">Kayıtlı teknisyenler / benim hesabım</option><option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
+                </select>
+              </label>
+              {technicianSource === "external_service" ? <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]"><input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400" /><div className="rounded-lg bg-purple-400/10 px-3 py-2.5 text-[10.5px] leading-4 text-purple-200">Bu kayıt sorumlu teknisyen performansına dahil edilmez; geçmişte dış hizmet olarak görünür.</div></div> : <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]"><label className="text-[10.5px] font-bold text-muted">Yetkili / sorumlu bakımcı
+                <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400"><option value="">Varsayılan: benim hesabım</option>{responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}</select></label><label className="text-[10.5px] font-bold text-muted">Sorumlu teknisyen çalışma süresi (saat)
+                <input id="responsible-technician-duration" type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration === "" ? minutesToHoursInput(maintenanceDurationMinutes ?? 60) : responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm font-mono text-text outline-none focus:border-purple-400" /><span className="mt-1 block text-[9.5px] text-faint">Varsayılan değer toplam bakım süresidir.</span></label></div>}
+            </> : <div className="rounded-lg border border-teal/20 bg-teal/5 px-3 py-2.5 text-[10.5px] text-muted">Kayıt, giriş yapan teknisyen hesabı adına oluşturulacak. Yönetici onayı gerektiren alanlar yalnızca yöneticilere gösterilir.</div>}
+            {technicianSource !== "external_service" && selectableTechnicians.length > 0 && <div className="mt-4 border-t border-border pt-3"><div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Diğer çalışan teknisyenler</div><p className="mt-1 text-[10px] text-faint">Sorumlu teknisyen dışında bu bakımda çalışan ekip üyelerini seçin ve kişi bazlı sürelerini girin.</p><div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name}<span className="text-[9.5px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-2 flex items-center justify-between gap-2 text-[9.5px] text-faint">Çalışma süresi ({user?.role === "yonetici" ? "saat" : "dk"})<input type="number" min="0" max={user?.role === "yonetici" ? 8784 : 366 * 24 * 60} step={user?.role === "yonetici" ? "0.25" : "15"} value={user?.role === "yonetici" ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: user?.role === "yonetici" ? (hoursInputToMinutes(event.target.value) ?? 0) : event.target.value }))} className="w-24 rounded-md border border-border bg-panel px-2 py-1.5 text-right font-mono text-[10.5px] text-text" /></label>}</div>)}</div></div>}
+          </section>
+
+          {otherTypes.length > 0 && <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="additional-maintenance-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">04 · Birlikte tamamlanan bakımlar</div><h2 id="additional-maintenance-heading" className="mt-1 text-base font-extrabold text-text">Aynı işlemde tamamlanan diğer bakım türleri</h2><p className="mt-1 text-[10px] leading-4 text-faint">İşaretlenen bakım türleri aynı saat ve tarihle kaydedilir. Motor için tanımlı olmayan bakımda periyodu ayrıca girebilirsiniz.</p></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{otherTypes.map((type) => { const tracked = trackedKeys.has(type.key); const checked = extraKeys.includes(type.key); return <div key={type.key} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9.5px] text-faint">· tanımlı değil</span>}</label>{checked && !tracked && <label className="mt-2 block pl-6 text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-[11px] font-mono text-text" /></label>}</div>; })}</div></section>}
+
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="checklist-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">05 · Kontrol listesi</div><h2 id="checklist-heading" className="mt-1 text-base font-extrabold text-text">Bakım doğrulaması</h2><p className="mt-1 text-[10px] text-faint">Kaydetmeden önce tüm maddeleri işaretleyin.</p></div><div className="grid gap-1.5">{checklistItems.map((item) => <label key={item} className="flex items-center gap-2.5 rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(event) => setChecklist((current) => ({ ...current, [item]: event.target.checked }))} />{item}</label>)}</div><div className={`mt-3 rounded-lg px-3 py-2.5 text-[10.5px] ${checklistComplete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{checklistComplete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div></section>
+
+            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="evidence-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">06 · Kanıt ve notlar</div><h2 id="evidence-heading" className="mt-1 text-base font-extrabold text-text">Bakım kanıtları</h2><p className="mt-1 text-[10px] text-faint">En az bir not, fotoğraf veya video eklenmesi zorunludur.</p></div><label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımcı notu<textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{photoBusy ? "Fotoğraflar işleniyor..." : "Fotoğraf ekle"}<span className="mt-1 block text-[9px] text-faint">Birden fazla seçebilirsiniz</span></span><input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" /></label><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{videoBusy ? "Videolar yükleniyor..." : "Video ekle"}<span className="mt-1 block text-[9px] text-faint">En fazla 5 adet · 100MB</span></span><input type="file" accept="video/*" multiple onChange={handleVideos} className="hidden" /></label></div>{photos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Fotoğraflar</div><div className="flex flex-wrap gap-2">{photos.map((photo, index) => <div key={`${photo}-${index}`} className="relative"><button type="button" onClick={() => setSelectedPhoto(getPhotoSrc(photo, offlinePreviews))} className="block" aria-label="Fotoğrafı büyüt"><img src={getPhotoSrc(photo, offlinePreviews)} className="h-16 w-16 rounded-lg border border-border object-cover" alt="" /></button><button type="button" onClick={() => removePhoto(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-text">✕</button></div>)}</div></div>}{videos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Videolar</div><div className="flex flex-wrap gap-2">{videos.map((video, index) => <div key={`${video.url}-${index}`} className="relative"><video src={video.url?.startsWith("offline:") ? offlinePreviews[video.url.slice("offline:".length)] : video.url} className="h-16 w-20 rounded-lg border border-border bg-black object-cover" controls={false} /><button type="button" onClick={() => removeVideo(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-red">✕</button></div>)}</div></div>}{!evidenceReady && <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu veya fotoğraf/video kanıtı ekleyin.</div>}</section>
+          </div>
+
+          <div className="flex flex-col-reverse items-stretch justify-between gap-3 rounded-2xl border border-border bg-panel p-3 sm:flex-row sm:items-center"><div className="text-[10px] text-faint">Kaydetmeden önce zaman, kontrol listesi ve kanıt alanlarını doğrulayın.</div><div className="flex gap-2 sm:min-w-[320px] sm:justify-end"><button type="button" onClick={() => router.back()} className="flex-1 rounded-lg border border-border bg-panel2 px-4 py-3 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text sm:flex-none">İptal</button><button type="submit" disabled={submitting || videoBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady} className="flex-1 rounded-lg bg-amber px-5 py-3 text-[12px] font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[220px]">{submitting ? "Kaydediliyor..." : "BAKIMI TAMAMLA"}</button></div></div>
+        </form>
+      </main>
 
       <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
 
