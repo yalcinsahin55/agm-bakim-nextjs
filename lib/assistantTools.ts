@@ -257,6 +257,10 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
         engine: item.engine_name,
         type_key: item.type_key,
         type: item.type_label,
+        engine_hours: item.engine_hours,
+        last_hour: item.last_hour,
+        period_hours: item.period,
+        status: item.status,
         remaining_hours: Math.round(item.remaining),
         overdue_hours: Math.max(0, Math.round(Math.abs(item.remaining))),
       })),
@@ -331,7 +335,7 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     match,
     {
       projection: {
-        _id: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
+        _id: 1, engine_id: 1, engine_name: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
         external_service_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_end_at: 1,
         maintenance_duration_minutes: 1, created_at: 1,
       },
@@ -339,6 +343,8 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
   ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(20).toArray();
   const safeRecords = records.map((record) => ({
     id: String(record._id),
+    engine_id: record.engine_id || null,
+    engine_name: record.engine_name || null,
     type: record.type_label || "Bilinmeyen",
     hour_at_completion: Number(record.hour_at_completion || 0),
     technician: record.technician_name || "Bilinmeyen",
@@ -806,6 +812,7 @@ export async function runAssistantTool(db: Db, query: AssistantQuery, context: {
         "Motor teknik bilgi kartları neler?",
         "Aktif teknisyenler kimler?",
         "Yalçın Şahin bu hafta ne kadar çalıştı?",
+        "Yalçın Şahin hangi bakımlarda çalıştı?",
         "Okunmamış bildirimlerim hangileri?",
         "Motor bakım sağlığı ve kalan saatler nasıl?",
         "Dış servisten hizmet alınan motorlar ve bakımlar hangileri?",

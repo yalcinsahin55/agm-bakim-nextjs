@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 import { canAccessRoute } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { MaintenancePanelResponse } from "@/lib/maintenancePanel";
+const QrScanDialog = dynamic(() => import("@/components/QrScanDialog"), { ssr: false });
 
 interface MenuItem {
   href: string;
@@ -31,6 +33,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [gecikmis, setGecikmis] = useState<number>(0);
+  const [qrOpen, setQrOpen] = useState(false);
   const { user } = useCurrentUser();
   const isTechnicianAccount = user?.role === "teknisyen" || user?.role === "planlamaci";
   const visibleItems = (isTechnicianAccount ? TECHNICIAN_ITEMS : ITEMS).filter((item) => canAccessRoute(user?.role, item.href));
@@ -45,6 +48,11 @@ export default function BottomNav() {
       .catch(() => {});
     return () => { alive = false; };
   }, [pathname]);
+
+  function handleQrDetected(target: string) {
+    setQrOpen(false);
+    router.push(target);
+  }
 
   async function handleLogout() {
     const loadingToast = toast.loading("Çıkış yapılıyor...");
@@ -85,7 +93,18 @@ export default function BottomNav() {
               </Link>
             );
           })}
-          {/*  Mobil Çıkış */}
+          {isTechnicianAccount && (
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-amber"
+              aria-label="QR kod okut"
+            >
+              <span className="text-lg leading-none">▣</span>
+              <span className="max-w-full truncate text-[9.5px] font-bold">QR Oku</span>
+            </button>
+          )}
+          {/* Mobil Çıkış */}
           <button
             onClick={handleLogout}
             className="min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
@@ -95,6 +114,7 @@ export default function BottomNav() {
           </button>
         </div>
       </div>
+      {isTechnicianAccount && qrOpen && <QrScanDialog open onClose={() => setQrOpen(false)} onDetected={handleQrDetected} />}
     </>
   );
 }
