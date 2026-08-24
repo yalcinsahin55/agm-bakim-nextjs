@@ -127,6 +127,19 @@ export const recordSchema = z.object({
     .optional(),
 });
 
+// 👥 Yönetici teyidinde her ekip üyesinin gerçek katkı süresi ayrı doğrulanır.
+export const recordConfirmationSchema = z.object({
+  technician_contributions: z.array(z.object({
+    id: z.string().min(1).max(100),
+    duration_minutes: z.number({ required_error: "Kişi çalışma süresi gereklidir.", invalid_type_error: "Kişi çalışma süresi sayı olmalıdır." })
+      .int("Kişi çalışma süresi tam dakika olmalıdır.")
+      .positive("Çalışan kişi için çalışma süresi 0’dan büyük olmalıdır.")
+      .max(366 * 24 * 60, "Kişi çalışma süresi mantık dışı büyük."),
+  })).max(20, "En fazla 20 ekip üyesi teyit edilebilir."),
+});
+
+export type RecordConfirmationInput = z.infer<typeof recordConfirmationSchema>;
+
 // 🔍 Schema'lardan türetilen tipler (TypeScript'in gücü burada!)
 export type RecordInput = z.infer<typeof recordSchema>;
 

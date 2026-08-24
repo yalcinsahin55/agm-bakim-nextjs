@@ -173,6 +173,44 @@ function technicianLabel(record: MaintenanceRecord): string {
   return `${name} · ${TECHNICIAN_TYPE_LABELS[record.technician_type] || "Mekanik teknisyen"}`;
 }
 
+interface ConfirmationContributionRow {
+  id: string;
+  full_name: string;
+  technician_type?: "mekanik" | "elektromekanik";
+  contribution_role: "responsible" | "support";
+  duration_minutes?: number;
+}
+
+function confirmationContributionRows(record: MaintenanceRecord): ConfirmationContributionRow[] {
+  if (record.technician_contributions?.length) return record.technician_contributions;
+  if (record.technician_source === "external_service") return [];
+  const fallbackDuration = typeof record.maintenance_duration_minutes === "number" ? record.maintenance_duration_minutes : undefined;
+  const rows: ConfirmationContributionRow[] = [{
+    id: record.technician_id,
+    full_name: record.technician_name || "Sorumlu teknisyen",
+    technician_type: record.technician_type,
+    contribution_role: "responsible",
+    duration_minutes: fallbackDuration,
+  }];
+  for (const technician of record.other_technicians || []) {
+    if (!technician?.id || !technician.full_name) continue;
+    rows.push({ ...technician, contribution_role: "support" });
+  }
+  return rows;
+}
+
+function minutesToHoursInput(minutes: number | undefined): string {
+  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return "";
+  return String(Number((minutes / 60).toFixed(2)));
+}
+
+function hoursInputToMinutes(value: string): number | null {
+  const hours = Number(value.trim().replace(",", "."));
+  if (!Number.isFinite(hours) || hours <= 0) return null;
+  const minutes = Math.round(hours * 60);
+  return minutes > 0 && minutes <= 366 * 24 * 60 ? minutes : null;
+}
+
 function maintenanceDayKey(record: MaintenanceRecord): string {
   const date = getMaintenanceRecordDate(record.maintenance_start_at, record.created_at);
   if (!date || !Number.isFinite(date.getTime())) return "unknown";
@@ -571,6 +609,8 @@ export default function KayitlarPage() {
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; filename: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [confirmationRecord, setConfirmationRecord] = useState<MaintenanceRecord | null>(null);
+  const [confirmationDurations, setConfirmationDurations] = useState<Record<string, string>>({});
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmationFilter, setConfirmationFilter] = useState<"all" | "pending">("all");
 
@@ -615,6 +655,9 @@ export default function KayitlarPage() {
     return [...groups.entries()].map(([key, groupRecords]) => ({ key, label: maintenanceDayLabel(key), records: groupRecords }));
   }, [filteredRecords]);
 
+  const confirmationRows = confirmationRecord ? confirmationContributionRows(confirmationRecord) : [];
+  const confirmationTotalMinutes = confirmationRows.reduce((total, row) => total + (hoursInputToMinutes(confirmationDurations[row.id] || "") || 0), 0);
+
   async function loadRecordMedia(record: MaintenanceRecord) {
     if (record.videos !== undefined && (record.photos !== undefined || record.photos_b64 !== undefined)) return record;
     setMediaLoadingId(record._id);
@@ -642,13 +685,34 @@ export default function KayitlarPage() {
     if (detail) setSelectedRecord(detail);
   }
 
-  async function confirmRecord(record: MaintenanceRecord) {
+  function openConfirmation(record: MaintenanceRecord) {
+    if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending") return;
+    const rows = confirmationContributionRows(record);
+    setConfirmationRecord(record);
+    setConfirmationDurations(Object.fromEntries(rows.map((row) => [row.id, minutesToHoursInput(row.duration_minutes)])));
+  }
+
+  async function confirmRecord(record: MaintenanceRecord, durationInputs: Record<string, string>) {
     if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending" || confirmingId === record._id) return;
-    if (!window.confirm("Bu bakım kaydını kontrol ettim ve yönetici olarak teyit etmek istiyorum.")) return;
+    const rows = confirmationContributionRows(record);
+    const isExternalService = record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID;
+    const technicianContributions = isExternalService ? [] : rows.map((row) => ({
+      id: row.id,
+      duration_minutes: hoursInputToMinutes(durationInputs[row.id] || "") ?? -1,
+    }));
+    if (!isExternalService && technicianContributions.some((item) => item.duration_minutes <= 0)) {
+      toast.error("Teyit için tüm çalışan kişilerin saatini 0’dan büyük girin.");
+      return;
+    }
+    if (!window.confirm("Kişi bazlı çalışma sürelerini kontrol ettim ve bu bakım kaydını teyit etmek istiyorum.")) return;
     setConfirmingId(record._id);
     try {
-      const res = await fetch(`/api/records/${record._id}/confirm`, { method: "POST" });
-      const data = await res.json().catch(() => ({})) as { confirmed_at?: string; confirmed_by_name?: string; confirmed_ids?: string[]; error?: string };
+      const res = await fetch(`/api/records/${record._id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ technician_contributions: technicianContributions }),
+      });
+      const data = await res.json().catch(() => ({})) as { confirmed_at?: string; confirmed_by_name?: string; confirmed_ids?: string[]; technician_contributions?: NonNullable<MaintenanceRecord["technician_contributions"]>; error?: string };
       if (!res.ok) {
         toast.error(data.error || "Bakım kaydı teyit edilemedi.");
         return;
@@ -661,10 +725,13 @@ export default function KayitlarPage() {
         manager_confirmed_by_id: user.id || user._id,
         manager_confirmed_by_name: data.confirmed_by_name || user.full_name,
         manager_confirmed_by_role: user.role,
+        ...(data.technician_contributions ? { technician_contributions: data.technician_contributions } : {}),
       } : item;
       setRecords((current) => current.map(applyConfirmation));
       setSelectedRecord((current) => current ? applyConfirmation(current) : current);
-      toast.success("Bakım kaydı teyit edildi.");
+      setConfirmationRecord(null);
+      setConfirmationDurations({});
+      toast.success("Kişi bazlı çalışma süreleri kaydedildi ve bakım teyit edildi.");
       window.dispatchEvent(new Event("notifications:refresh"));
     } catch {
       toast.error("Teyit işlemi sırasında sunucu hatası oluştu.");
@@ -877,7 +944,7 @@ export default function KayitlarPage() {
                     </button>
                     {user?.role === "yonetici" && r.manager_confirmation_status === "pending" && <button
                       type="button"
-                      onClick={() => void confirmRecord(r)}
+                      onClick={() => openConfirmation(r)}
                       disabled={confirmingId === r._id}
                       className="text-[11px] font-bold text-[#071a12] bg-green rounded-lg px-2.5 py-1.5 hover:brightness-110 transition disabled:opacity-50"
                     >
@@ -962,6 +1029,45 @@ export default function KayitlarPage() {
         )}
       </div>
 
+      {/* Yönetici kişi bazlı süre teyit modalı */}
+      {confirmationRecord && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="Kişi bazlı çalışma süresi teyidi">
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl md:rounded-2xl">
+            <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
+              <div className="min-w-0">
+                <div className="text-base font-extrabold text-text">Teyit öncesi çalışma süreleri</div>
+                <div className="mt-0.5 truncate text-[11px] text-muted">{confirmationRecord.engine_name} · {confirmationRecord.type_label}</div>
+              </div>
+              <button type="button" onClick={() => setConfirmationRecord(null)} className="h-8 w-8 flex-shrink-0 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Teyit penceresini kapat">✕</button>
+            </div>
+            <div className="rounded-xl border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber">
+              <b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerler saat cinsindendir; örnek: <b>8,5</b> = 8 saat 30 dakika.
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{confirmationRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
+              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Geçen bakım süresi</div><div className="mt-0.5 font-bold text-teal">{formatMaintenanceDuration(confirmationRecord.maintenance_duration_minutes)}</div></div>
+            </div>
+            {confirmationRecord.technician_source === "external_service" || confirmationRecord.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? (
+              <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/10 p-3 text-[11px] text-purple-100"><b>Dış hizmet kaydı</b><div className="mt-1 text-[10.5px] text-purple-200">Bu kayıtta kayıtlı personel bulunmadığı için kişi bazlı çalışma süresi girilmeyecek. Kontrol ettikten sonra teyit edebilirsin.</div></div>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2">
+                {confirmationRows.map((row) => (
+                  <label key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel2 px-3 py-2.5">
+                    <span className="min-w-0"><span className="block truncate text-[12px] font-bold text-text">{row.full_name}</span><span className="mt-0.5 block text-[10px] text-faint">{row.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {TECHNICIAN_TYPE_LABELS[row.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></span>
+                    <span className="flex flex-shrink-0 items-center gap-1.5 text-[10px] text-muted"><input type="number" min="0.25" max={366 * 24} step="0.25" required value={confirmationDurations[row.id] || ""} onChange={(event) => setConfirmationDurations((current) => ({ ...current, [row.id]: event.target.value }))} className="w-24 rounded-lg border border-border bg-panel px-2 py-2 text-right font-mono text-[12px] text-text outline-none focus:border-amber" aria-label={`${row.full_name} çalışma süresi (saat)`} /> saat</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {confirmationRecord.technician_source !== "external_service" && confirmationRecord.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && <div className="mt-3 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-[10.5px] text-teal">Toplam kişi katkısı: <b>{formatMaintenanceDuration(confirmationTotalMinutes)}</b> · Mesai ve farklı günlerdeki çalışma bu toplamda birlikte tutulur.</div>}
+            <div className="mt-4 flex gap-2">
+              <button type="button" onClick={() => setConfirmationRecord(null)} className="flex-1 rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
+              <button type="button" onClick={() => void confirmRecord(confirmationRecord, confirmationDurations)} disabled={confirmingId === confirmationRecord._id} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-[#071a12] disabled:opacity-50">{confirmingId === confirmationRecord._id ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bakım Kaydı Detay Modalı */}
       {selectedRecord && (
         <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/75 backdrop-blur-sm p-0 md:p-4" role="dialog" aria-modal="true" aria-label="Bakım kaydı detayı">
@@ -983,7 +1089,7 @@ export default function KayitlarPage() {
               <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(selectedRecord.maintenance_duration_minutes)}</div></div>
             </div>
             {selectedRecord.technician_contributions?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Teknisyen katkıları:</b><div className="mt-1 flex flex-col gap-0.5">{selectedRecord.technician_contributions.map((contribution) => <span key={`${contribution.id}-${contribution.contribution_role}`}>{contribution.full_name} · {TECHNICIAN_TYPE_LABELS[contribution.technician_type || "mekanik"]} · {contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {formatMaintenanceDuration(contribution.duration_minutes)}</span>)}</div></div> : selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
-            {selectedRecord.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>✓ Yönetici teyidi:</b> {selectedRecord.manager_confirmed_by_name || "Yönetici"} · {selectedRecord.manager_confirmed_at ? new Date(selectedRecord.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : selectedRecord.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {user?.role === "yonetici" && <button type="button" onClick={() => void confirmRecord(selectedRecord)} disabled={confirmingId === selectedRecord._id} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-[#071a12] disabled:opacity-50">{confirmingId === selectedRecord._id ? "Teyit ediliyor..." : "✓ Kontrol ettim, teyit et"}</button>}</div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
+            {selectedRecord.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>✓ Yönetici teyidi:</b> {selectedRecord.manager_confirmed_by_name || "Yönetici"} · {selectedRecord.manager_confirmed_at ? new Date(selectedRecord.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : selectedRecord.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {user?.role === "yonetici" && <button type="button" onClick={() => openConfirmation(selectedRecord)} disabled={confirmingId === selectedRecord._id} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-[#071a12] disabled:opacity-50">{confirmingId === selectedRecord._id ? "Teyit ediliyor..." : "✓ Kontrol ettim, teyit et"}</button>}</div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
             {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}

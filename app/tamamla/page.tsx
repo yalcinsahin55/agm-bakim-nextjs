@@ -570,7 +570,9 @@ export default function TamamlaPage() {
         title={quickMode ? "Hızlı Bakım" : "Bakım Tamamla"}
         subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""}
       />
-      <div className="px-4 py-4 flex flex-col gap-1">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div className="flex min-w-0 flex-col gap-1">
         {quickMode && (
           <div className="mb-2 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2.5 text-[11px] text-teal" role="status">
             <div className="font-bold">QR ile Hızlı Bakım Modu</div>
@@ -626,6 +628,8 @@ export default function TamamlaPage() {
           </div>
         ) : null}
 
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">O Anki Motor Çalışma Saati</label>
         <input
           type="number" value={hours} onChange={(e) => setHours(Number(e.target.value) || 0)}
@@ -738,6 +742,9 @@ export default function TamamlaPage() {
           </>
         )}
 
+          </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-1">
         {/* Fotoğraf Bölümü */}
         <label className="text-[11.5px] font-bold text-muted uppercase tracking-wide">Fotoğraf</label>
         <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted mb-2 cursor-pointer">
@@ -787,10 +794,11 @@ export default function TamamlaPage() {
         {!evidenceReady && <div className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu veya fotoğraf/video kanıtı ekleyin.</div>}
         <button
           onClick={submit} disabled={submitting || videoBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady}
-          className="mt-2 py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50"
+          className="mt-3 w-full rounded-xl bg-amber py-3.5 text-[14.5px] font-extrabold text-[#1a1206] shadow-lg disabled:opacity-50"
         >
           {submitting ? "Kaydediliyor..." : "✅ Bakımı Tamamla"}
         </button>
+        </div>
       </div>
 
       <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />

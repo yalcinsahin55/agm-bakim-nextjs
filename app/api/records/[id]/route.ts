@@ -190,8 +190,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }
+  const existingResponsibleContribution = Array.isArray(record.technician_contributions)
+    ? record.technician_contributions.find((contribution: any) => contribution?.id === nextResponsibleId && contribution?.contribution_role === "responsible")
+    : undefined;
+  const responsibleDurationMinutes = nextResponsibleId === record.technician_id && typeof existingResponsibleContribution?.duration_minutes === "number"
+    ? existingResponsibleContribution.duration_minutes
+    : nextDurationMinutes ?? 0;
   const technicianContributions = useExternalService ? [] : [
-    { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: nextDurationMinutes || 0 },
+    { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: responsibleDurationMinutes },
     ...effectiveOtherTechnicians.map((technician) => ({
       ...technician,
       contribution_role: "support",
@@ -247,7 +253,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
     const extraTechnicianContributions = useExternalService ? [] : [
-      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: nextDurationMinutes || 0 },
+      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: responsibleDurationMinutes },
       ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support", duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0) })),
     ];
     const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
