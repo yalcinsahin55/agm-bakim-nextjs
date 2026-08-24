@@ -221,6 +221,8 @@ const TECHNICIAN_DIRECTORY_PATTERNS = [
 const MAINTENANCE_HEALTH_PATTERNS = [
   /bakım\s+(?:sağlığı|durumu|takibi)/iu,
   /kalan\s+saat(?:i|leri)?/iu,
+  /kritik\s+bakım(?:lar|ları)?/iu,
+  /hangi\s+bakım(?:lar|ları)?\s+kritik/iu,
   /hangi\s+motor(?:lar|ların)?\s+(?:kritik|gecikmiş|yaklaşıyor|normal)/iu,
   /motor(?:lar|ların)?\s+hangi\s+bakım(?:larda|ları)?\s+(?:kritik|gecikmiş|yaklaşıyor|normal)/iu,
 ];
@@ -448,7 +450,9 @@ function extractEngineQuery(question: string): string | undefined {
   const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([^,?]+)/iu);
   const reverseMatch = !match ? question.match(/\b([a-zçğıöşü0-9][a-zçğıöşü0-9 _-]{1,60}?)\s+motor(?:u|un|unda|ünde|ında|inde|da|de|ta|te)?\b/iu) : null;
   const namedEngineMatch = question.match(/\b(agm[-\s]?\d{1,3})\b/iu);
-  const rawCandidate = match?.[1] || reverseMatch?.[1] || namedEngineMatch?.[1];
+  // AGM-7/AGM 7 gibi açık motor adlarını, “motor teknik bilgi...” gibi
+  // genel ifadelerden önce tercih et.
+  const rawCandidate = namedEngineMatch?.[1] || match?.[1] || reverseMatch?.[1];
   if (!rawCandidate) return undefined;
   let candidate = rawCandidate.trim();
   if (reverseMatch && !match) {
@@ -456,8 +460,10 @@ function extractEngineQuery(question: string): string | undefined {
     candidate = candidate.replace(/^.*\b(?:için|üzerinde|ile|ve)\s+/iu, "");
   }
   candidate = candidate.replace(/\s+(?:(?:\d{1,2}[./-]\d{1,2}[./-]\d{4})|(?:\d{4}[-.]\d{2}[-.]\d{2})).*$/iu, "");
-  candidate = candidate.split(/\s+(?=ile\b|arasında\b|üzerinde\b|bak(?:ım|ımları|ımlarını|ımı)?\b|geçmiş(?:i|ine)?\b|durum(?:u)?\b|sayısı\b|istatistiği\b|raporu\b|için\b|hangileri\b|kaç\b|hangi\b|çalışma\b|saat(?:i|leri)?\b|yük(?:ü|leri)?\b|teknik\b|bilgi(?:si|leri)?\b|dağılımı\b)/iu)[0]?.trim() || candidate;
-  if (/^(bakım|bakımları|geçmişi|durumu|sayısı|istatistiği|raporu|için|hangileri|var|larda|motorlar?|motorların|çalışma|çalışma\s+saatleri|saat|saatleri|yük|yükü|yükü\s+bilgisi|bilgi|bilgileri|durum|dağılımı)$/iu.test(candidate)) return undefined;
+  const boundedCandidate = candidate.split(/\s+(?=ile\b|arasında\b|üzerinde\b|bak(?:ım|ımları|ımlarını|ımı)?\b|geçmiş(?:i|ine)?\b|durum(?:u)?\b|sağlığı\b|kalan\b|sayısı\b|istatistiği\b|raporu\b|için\b|hangileri\b|kaç\b|hangi\b|çalışma\b|saat(?:i|leri)?\b|yük(?:ü|leri)?\b|teknik\b|bilgi(?:si|leri)?\b|kart(?:ı|ları)?\b|dağılımı\b)/iu)[0]?.trim();
+  if (boundedCandidate) candidate = boundedCandidate;
+  if (/^(?:agm|bakım|bakımları|geçmişi|durumu|sağlığı|kalan|sayısı|istatistiği|raporu|için|hangileri|var|larda|motorlar?|motorların|çalışma|çalışma\s+saatleri|saat|saatleri|yük|yükü|yükü\s+bilgisi|teknik|bilgi|bilgileri|kart|kartları|durum|dağılımı)$/iu.test(candidate)) return undefined;
+  if (/^(?:teknik\s+bilgi|bilgi\s+kart(?:ı|ları)?|bakım\s+(?:sağlığı|durumu|takibi)|çalışma\s+saat(?:i|leri)?|yük(?:ü|leri)?|kalan\s+saat)/iu.test(candidate)) return undefined;
   return candidate;
 }
 

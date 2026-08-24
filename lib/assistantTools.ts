@@ -710,16 +710,25 @@ async function getOilAnalysis(db: Db, query: AssistantQuery): Promise<AssistantT
   };
 }
 
+function normalizeEquipmentEngineName(value: unknown): string {
+  const compact = String(value || "").normalize("NFC").toLocaleLowerCase("tr-TR").replace(/[\s_-]+/g, "");
+  const agm = compact.match(/^agm0*(\d{1,3})$/u);
+  return agm ? `agm${Number(agm[1])}` : compact;
+}
+
 async function getEquipmentInfo(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
-  const filter = selectedEngine ? { engine_name: selectedEngine.name } : query.engineQuery ? { engine_name: "__assistant_no_matching_engine__" } : {};
-  const infos = await equipmentInfoCollection(db).find(filter, { projection: { _id: 1, engine_name: 1, kaver_tipi: 1, hava_filtresi: 1, krankcase: 1, esanjor_tipi: 1, dungs: 1, radyator_tipi: 1, not: 1 } }).sort({ engine_name: 1 }).limit(100).toArray();
+  const allInfos = await equipmentInfoCollection(db).find({}, { projection: { _id: 1, engine_name: 1, kaver_tipi: 1, hava_filtresi: 1, krankcase: 1, esanjor_tipi: 1, dungs: 1, radyator_tipi: 1, not: 1 } }).sort({ engine_name: 1 }).limit(200).toArray();
+  const selectedEngineName = selectedEngine ? normalizeEquipmentEngineName(selectedEngine.name) : "";
+  const infos = selectedEngine
+    ? allInfos.filter((info) => normalizeEquipmentEngineName(info.engine_name) === selectedEngineName || normalizeEquipmentEngineName(info._id) === selectedEngineName)
+    : query.engineQuery ? [] : allInfos;
   return {
     intent: "equipment_info",
     period: "all",
     title: selectedEngine ? `${selectedEngine.name} teknik bilgi kartı` : "Motor teknik bilgi kartları",
     summary: `${infos.length} motor teknik bilgi kartı bulundu.`,
-    data: { infos: infos.map((info) => ({ id: String(info._id), engine_name: info.engine_name, kaver_tipi: info.kaver_tipi || null, hava_filtresi: info.hava_filtresi || null, krankcase: info.krankcase || null, esanjor_tipi: info.esanjor_tipi || null, dungs: info.dungs || null, radyator_tipi: info.radyator_tipi || null, note: info.not || null })) },
+    data: { infos: infos.map((info) => ({ id: String(info._id), engine_name: info.engine_name || String(info._id), kaver_tipi: info.kaver_tipi || null, hava_filtresi: info.hava_filtresi || null, krankcase: info.krankcase || null, esanjor_tipi: info.esanjor_tipi || null, dungs: info.dungs || null, radyator_tipi: info.radyator_tipi || null, note: info.not || null })) },
   };
 }
 

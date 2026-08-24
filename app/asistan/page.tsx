@@ -24,13 +24,13 @@ interface AssistantMessage {
 const QUICK_QUESTIONS = [
   "Bu ay kaç bakım yapıldı?",
   "Hangi bakımlar gecikmiş?",
-  "Kritik ve geriye dönük bakımlar hangileri?",
+  "Geriye dönük bakım kayıtları hangileri?",
   "Başlangıç veya bitiş saati eksik bakımlar hangileri?",
   "Yönetici teyidi bekleyen bakımlar hangileri?",
   "Bakım istatistiklerinin özeti nedir?",
   "En çok hangi teknisyen görev aldı?",
   "Bu ay fotoğraflı bakımlar hangileri?",
-  "1000 saat ile 1500 saat arasında hangi bakımlar yapıldı?",
+  "Kritik bakımlar hangileri?",
   "Dış servisten hizmet alınan motorlar ve bakımlar hangileri?",
   "İç ekip tarafından yapılan ekip bakımları hangileri?",
   "Gelecek yıl hangi bakımlar gelecek? Gecikmişleri de göster.",
@@ -243,6 +243,10 @@ function ExportActions({ exportQuery }: { exportQuery: Record<string, string> })
   return <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-[9px] text-faint">Bu cevabın raporunu indir:</span><button type="button" onClick={() => void download("pdf")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted transition hover:border-amber/50 hover:text-amber disabled:opacity-50">{busy === "pdf" ? "Hazırlanıyor..." : "PDF indir"}</button><button type="button" onClick={() => void download("excel")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted transition hover:border-green/50 hover:text-green disabled:opacity-50">{busy === "excel" ? "Hazırlanıyor..." : "Excel indir"}</button>{error && <span className="text-[9px] text-red">{error}</span>}</div>;
 }
 
+function ResultEmpty({ children }: { children: string }) {
+  return <div className="mt-3 rounded-lg border border-border bg-panel2 px-2.5 py-2.5 text-[10.5px] text-muted">{children}</div>;
+}
+
 function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; dateRange?: { from: string; to: string } | null }) {
   const filters = data.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
   const items: string[] = [];
@@ -280,8 +284,9 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   const [expandedTechnicianId, setExpandedTechnicianId] = useState<string | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const [expandedActivityId, setExpandedActivityId] = useState<string | null>(null);
-  const overdueItems = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
-  const forecastItems = intent === "maintenance_forecast" ? overdueItems : [];
+  const allResultItems = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
+  const overdueItems = intent === "overdue" ? allResultItems : [];
+  const forecastItems = intent === "maintenance_forecast" ? allResultItems : [];
   const records = Array.isArray(data.records) ? data.records as Array<Record<string, unknown>> : [];
   const technicians = Array.isArray(data.technicians) ? data.technicians as Array<Record<string, unknown>> : [];
   const services = Array.isArray(data.services) ? data.services as Array<Record<string, unknown>> : [];
@@ -314,7 +319,7 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   const equipmentRows = Array.isArray(data.infos) ? data.infos as Array<Record<string, unknown>> : [];
   const directoryRows = intent === "technician_directory" && Array.isArray(data.technicians) ? data.technicians as Array<Record<string, unknown>> : [];
   const notificationRows = Array.isArray(data.notifications) ? data.notifications as Array<Record<string, unknown>> : [];
-  const healthItems = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
+  const healthItems = intent === "maintenance_health" ? allResultItems : [];
   const breakdowns = <div className="mt-3 grid gap-2 sm:grid-cols-2">
     {byEngine.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Motor dağılımı</div>{byEngine.map((row) => {
       const engineId = String(row.engine_id || row.engine || "");
@@ -335,22 +340,27 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   }
 
   if (intent === "engine_data") {
+    if (!engineRows.length) return <ResultEmpty>Seçilen koşullarla eşleşen motor çalışma verisi bulunamadı.</ResultEmpty>;
     return <div className="mt-3 grid gap-2 sm:grid-cols-2">{engineRows.map((engine) => { const latest = engine.latest_history && typeof engine.latest_history === "object" ? engine.latest_history as Record<string, unknown> : null; return <div key={String(engine.engine_id)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(engine.engine)}</div><div className="mt-1 text-[9.5px] text-faint">Güncelleme: {formatDate(engine.updated_at)}</div></div><span className="flex-shrink-0 rounded-full bg-teal/10 px-2 py-1 font-mono text-[10px] font-bold text-teal">{Number(engine.hours || 0).toLocaleString("tr-TR")} saat</span></div><div className="mt-2 grid grid-cols-2 gap-1.5"><div className="rounded-md border border-border px-2 py-1.5"><div className="text-[8.5px] text-faint">Anlık yük</div><div className="font-mono text-[10.5px] font-bold text-text">{Number(engine.load_kw || 0).toLocaleString("tr-TR")} kW</div></div><div className="rounded-md border border-border px-2 py-1.5"><div className="text-[8.5px] text-faint">Son geçmiş kaydı</div><div className="font-mono text-[10.5px] font-bold text-text">{latest ? `${Number(latest.hours || 0).toLocaleString("tr-TR")} saat` : "—"}</div></div></div>{Array.isArray(engine.history) && engine.history.length > 0 && <div className="mt-2 border-t border-border pt-2"><div className="mb-1 text-[8.5px] font-bold uppercase tracking-wide text-faint">Dönem geçmişi</div>{engine.history.slice(-5).reverse().map((entry, index) => { const historyEntry = entry && typeof entry === "object" ? entry as Record<string, unknown> : {}; return <div key={`${String(historyEntry.date)}-${index}`} className="flex justify-between gap-2 border-b border-border/70 py-1 last:border-0 text-[9px]"><span className="text-muted">{formatDate(historyEntry.date)}</span><span className="font-mono text-text">{Number(historyEntry.hours || 0).toLocaleString("tr-TR")} sa · {Number(historyEntry.load_kw || 0).toLocaleString("tr-TR")} kW</span></div>; })}</div>}</div>; })}</div>;
   }
 
   if (intent === "maintenance_catalog") {
+    if (!catalogTypes.length) return <ResultEmpty>Seçilen motor veya bakım türüyle eşleşen aktif bakım planı bulunamadı.</ResultEmpty>;
     return <div className="mt-3 grid gap-2 sm:grid-cols-2">{catalogTypes.map((type) => <div key={String(type.type_key)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(type.type)}</div><div className="mt-1 text-[9.5px] text-muted">Kapsam: {type.engine_scope === "all" ? "Tüm motorlar" : "Seçili motorlar"}</div></div><span className="flex-shrink-0 font-mono text-[10.5px] font-bold text-amber">{Number(type.default_period_hours || 0).toLocaleString("tr-TR")} saat</span></div>{typeof type.selected_engine === "string" && type.selected_engine.trim().length > 0 && <div className="mt-2 text-[9.5px] text-faint">{stringValue(type.selected_engine)}: {type.applicable_to_selected_engine === true ? "uygulanabilir" : "tanımlı değil"}{type.selected_engine_state !== null && type.selected_engine_state !== undefined && typeof type.selected_engine_state === "object" ? ` · Son bakım saati: ${Number((type.selected_engine_state as Record<string, unknown>).last_maintenance_hour || 0).toLocaleString("tr-TR")}` : ""}</div>}</div>)}</div>;
   }
 
   if (intent === "pressure_readings") {
+    if (!pressureRows.length) return <ResultEmpty>Seçilen koşullarla eşleşen karter basıncı ölçümü bulunamadı.</ResultEmpty>;
     return <div className="mt-3 grid gap-2">{pressureRows.map((reading) => <div key={String(reading.id)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(reading.engine)}</div><div className="mt-0.5 text-[9.5px] text-muted">{formatDate(reading.reading_date)}</div></div><span className="flex-shrink-0 font-mono text-[11px] font-bold text-text">{reading.pressure_bar === null || reading.pressure_bar === undefined ? "—" : `${Number(reading.pressure_bar).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} bar`}</span></div><div className="mt-1 text-[9.5px] text-faint">Yük: {reading.load_kw === null || reading.load_kw === undefined ? "—" : `${Number(reading.load_kw).toLocaleString("tr-TR")} kW`} · Durum: {stringValue(reading.status, "Belirtilmemiş")}</div>{typeof reading.note === "string" && reading.note.trim() && <div className="mt-1 text-[9.5px] text-muted">Not: {reading.note}</div>}</div>)}</div>;
   }
 
   if (intent === "oil_analysis") {
+    if (!oilRows.length) return <ResultEmpty>Seçilen koşullarla eşleşen yağ analizi bulunamadı.</ResultEmpty>;
     return <div className="mt-3 grid gap-2">{oilRows.map((analysis) => <div key={String(analysis.id)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(analysis.engine)}</div><div className="mt-0.5 text-[9.5px] text-muted">{formatDate(analysis.analysis_date)}</div></div>{typeof analysis.pdf_href === "string" && analysis.pdf_href.startsWith("/") && <Link href={analysis.pdf_href} target="_blank" className="flex-shrink-0 text-[9.5px] font-bold text-amber hover:underline">PDF aç</Link>}</div>{typeof analysis.result === "string" && analysis.result.trim() && <div className="mt-2 whitespace-pre-wrap text-[10px] leading-4 text-text">{analysis.result}</div>}{typeof analysis.note === "string" && analysis.note.trim() && <div className="mt-1 text-[9.5px] text-muted">Not: {analysis.note}</div>}</div>)}</div>;
   }
 
   if (intent === "equipment_info") {
+    if (!equipmentRows.length) return <ResultEmpty>Seçilen motorla eşleşen teknik bilgi kartı bulunamadı. Teknik kartın Motor Bilgi ekranında tanımlı olduğunu kontrol edin.</ResultEmpty>;
     const fields: Array<[string, string]> = [["Kaver", "kaver_tipi"], ["Hava filtresi", "hava_filtresi"], ["Krankcase", "krankcase"], ["Eşanjör", "esanjor_tipi"], ["Dungs", "dungs"], ["Radyatör", "radyator_tipi"], ["Not", "note"]];
     return <div className="mt-3 grid gap-2 sm:grid-cols-2">{equipmentRows.map((info) => <div key={String(info.id)} className="rounded-lg border border-border bg-panel2 p-2.5"><div className="text-[11px] font-bold text-text">{stringValue(info.engine_name)}</div><div className="mt-2 grid gap-1">{fields.filter(([, key]) => info[key] !== null && info[key] !== undefined && String(info[key]).trim()).map(([label, key]) => <div key={key} className="flex items-start justify-between gap-2 border-b border-border/70 py-1 last:border-0"><span className="text-[9.5px] text-faint">{label}</span><span className="text-right text-[9.5px] text-muted">{stringValue(info[key])}</span></div>)}</div></div>)}</div>;
   }
@@ -367,7 +377,7 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   if (intent === "maintenance_health") {
     const counts = data.counts && typeof data.counts === "object" ? data.counts as Record<string, unknown> : {};
     const statusLabels: Record<string, string> = { gecikmis: "Gecikmiş", kritik: "Kritik", yaklasiyor: "Yaklaşıyor", normal: "Normal" };
-    return <div className="mt-3 grid gap-2"><div className="flex flex-wrap gap-1.5">{Object.entries(statusLabels).map(([key, label]) => <span key={key} className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9.5px] text-muted">{label}: <b className="font-mono text-text">{Number(counts[key] || 0)}</b></span>)}</div><div className="grid gap-1.5">{healthItems.slice(0, 40).map((item) => <div key={`${String(item.engine_id)}-${String(item.type_key)}`} className="flex items-start justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="min-w-0"><div className="truncate text-[10.5px] font-bold text-text">{stringValue(item.engine)} · {stringValue(item.type)}</div><div className="mt-0.5 text-[9px] text-faint">Motor saati: {Number(item.engine_hours || 0).toLocaleString("tr-TR")} · Son bakım: {Number(item.last_hour || 0).toLocaleString("tr-TR")} · Periyot: {Number(item.period_hours || 0).toLocaleString("tr-TR")} saat</div></div><span className={`flex-shrink-0 font-mono text-[10px] font-bold ${item.status === "gecikmis" ? "text-red" : item.status === "kritik" ? "text-amber" : item.status === "yaklasiyor" ? "text-yellow-300" : "text-green"}`}>{Number(item.remaining_hours || 0).toLocaleString("tr-TR")} saat</span></div>)}</div></div>;
+    return <div className="mt-3 grid gap-2"><div className="flex flex-wrap gap-1.5">{Object.entries(statusLabels).map(([key, label]) => <span key={key} className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9.5px] text-muted">{label}: <b className="font-mono text-text">{Number(counts[key] || 0)}</b></span>)}</div><div className="grid gap-1.5">{healthItems.slice(0, 40).map((item) => <div key={`${String(item.engine_id)}-${String(item.type_key)}`} className="flex items-start justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="min-w-0"><div className="truncate text-[10.5px] font-bold text-text">{stringValue(item.engine)} · {stringValue(item.type)}</div><div className="mt-0.5 text-[9px] text-faint">Motor saati: {Number(item.engine_hours || 0).toLocaleString("tr-TR")} · Son bakım: {Number(item.last_hour || 0).toLocaleString("tr-TR")} · Periyot: {Number(item.period_hours || 0).toLocaleString("tr-TR")} saat</div></div><span className={`flex-shrink-0 font-mono text-[10px] font-bold ${item.status === "gecikmis" ? "text-red" : item.status === "kritik" ? "text-amber" : item.status === "yaklasiyor" ? "text-yellow-300" : "text-green"}`}>{Number(item.remaining_hours || 0).toLocaleString("tr-TR")} saat</span></div>)}</div>{healthItems.length === 0 && <ResultEmpty>Seçilen motor, bakım türü veya durumla eşleşen bakım sağlığı kaydı bulunamadı.</ResultEmpty>}</div>
   }
 
   if (intent === "maintenance_forecast") {
@@ -418,6 +428,8 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
     return <div className="mt-3 grid gap-2">{overdueItems.map((item) => { const itemId = `${String(item.engine_id)}-${String(item.type_key)}`; const expanded = expandedRecordId === `status-${itemId}`; return <div key={itemId} className="rounded-lg border border-red/25 bg-red/5 p-2.5"><button type="button" onClick={() => setExpandedRecordId(expanded ? null : `status-${itemId}`)} aria-expanded={expanded} className="w-full text-left"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(item.engine)}</div><div className="mt-0.5 truncate text-[10px] text-muted">{stringValue(item.type)}</div></div><span className="flex-shrink-0 rounded-full bg-red/10 px-2 py-1 text-[9px] font-bold text-red">{Number(item.overdue_hours || 0).toLocaleString("tr-TR")} sa gecikme · {expanded ? "kapat ↑" : "detay →"}</span></div></button>{expanded && <div className="mt-2 grid gap-1 border-t border-red/20 pt-2 text-[9.5px] text-muted"><div>Motor saati: <span className="font-mono text-text">{Number(item.engine_hours || 0).toLocaleString("tr-TR")}</span> · Son bakım: <span className="font-mono text-text">{Number(item.last_hour || 0).toLocaleString("tr-TR")}</span></div><div>Periyot: <span className="font-mono text-text">{Number(item.period_hours || 0).toLocaleString("tr-TR")} saat</span> · Kalan: <span className="font-mono font-bold text-red">{Number(item.remaining_hours || 0).toLocaleString("tr-TR")} saat</span></div></div>}</div>; })}</div>;
   }
 
+  if (intent === "overdue") return <ResultEmpty>Şu anda eşleşen gecikmiş bakım bulunamadı.</ResultEmpty>;
+
   if (records.length > 0) {
     return <div className="mt-3 grid gap-2">{records.slice(0, 8).map((record) => {
       const recordId = String(record.id);
@@ -444,6 +456,8 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   }
 
   if (byEngine.length > 0 || byType.length > 0) return breakdowns;
+
+  if (intent === "summary") return <ResultEmpty>Seçilen filtrelerle eşleşen bakım kaydı bulunamadı.</ResultEmpty>;
 
   if (intent === "engine_history" && data.engine) {
     return <div className="mt-3 rounded-lg border border-border bg-panel2 p-2.5 text-[10.5px] text-muted">Görüntülenecek bakım kaydı bulunamadı.</div>;

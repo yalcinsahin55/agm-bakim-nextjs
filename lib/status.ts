@@ -60,31 +60,49 @@ export interface PanelItem {
   status: StatusKey;
 }
 
+function normalizeEngineLookupKey(value: string): string {
+  const compact = value.normalize("NFC").toLocaleLowerCase("tr-TR").replace(/[\s_-]+/g, "");
+  const agm = compact.match(/^agm0*(\d{1,3})$/u);
+  return agm ? `agm${Number(agm[1])}` : compact;
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function engineStateFor(states: Record<string, unknown>, engine: Engine): unknown {
+  const direct = states[engine._id] ?? states[engine.name];
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct;
+  const target = normalizeEngineLookupKey(engine.name);
+  const matchingKey = Object.keys(states).find((key) => normalizeEngineLookupKey(key) === target);
+  const matched = matchingKey ? states[matchingKey] : undefined;
+  return matched && typeof matched === "object" && !Array.isArray(matched) ? matched : undefined;
+}
+
 /** Motor + bakım türü verilerinden düz bir liste üretir (dashboard/motorlar/bakım türleri sayfalarının ortak veri kaynağı). */
 export function buildItems(engines: Engine[], types: MaintenanceType[]): PanelItem[] {
   const items: PanelItem[] = [];
-  const engineMap: Record<string, Engine> = {};
-  engines.forEach((e) => { engineMap[e._id] = e; });
 
   types.forEach((t) => {
     const rawStates = t.engine_states;
-    const states: Record<string, EngineState> = rawStates && !Array.isArray(rawStates) && typeof rawStates === "object" ? rawStates as Record<string, EngineState> : {};
+    const states: Record<string, unknown> = rawStates && !Array.isArray(rawStates) && typeof rawStates === "object" ? rawStates as Record<string, unknown> : {};
     const explicitScope = t.engine_scope === "explicit" || (t.engine_scope === undefined && Object.keys(states).length > 0);
-    const applicable = explicitScope ? Object.keys(states) : Object.keys(engineMap);
-    applicable.forEach((engineId) => {
-      const engine = engineMap[engineId];
-      if (!engine) return;
-      const rawState = states[engineId];
-      const state: Partial<EngineState> = rawState && !Array.isArray(rawState) && typeof rawState === "object" ? rawState as Partial<EngineState> : {};
-      const lastHour = typeof state.last_maintenance_hour === "number" && Number.isFinite(state.last_maintenance_hour) ? state.last_maintenance_hour : 0;
-      const period = typeof state.period_hours === "number" && Number.isFinite(state.period_hours) ? state.period_hours : t.default_period_hours;
-      const remaining = remainingHours(engine.hours, lastHour, period);
+    const applicableEngines = explicitScope ? engines.filter((engine) => engineStateFor(states, engine) !== undefined) : engines;
+    applicableEngines.forEach((engine) => {
+      const rawState = engineStateFor(states, engine);
+      const state: Partial<EngineState> = rawState && typeof rawState === "object" && !Array.isArray(rawState) ? rawState as Partial<EngineState> : {};
+      const engineHours = finiteNumber(engine.hours, 0);
+      const lastHour = finiteNumber(state.last_maintenance_hour, 0);
+      const period = finiteNumber(state.period_hours, finiteNumber(t.default_period_hours, 0));
+      if (period <= 0) return;
+      const remaining = remainingHours(engineHours, lastHour, period);
       items.push({
-        engine_id: engineId,
+        engine_id: String(engine._id),
         engine_name: engine.name,
         type_key: t.key,
         type_label: t.label,
-        engine_hours: engine.hours,
+        engine_hours: engineHours,
         last_hour: lastHour,
         period,
         remaining,
