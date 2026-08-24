@@ -131,6 +131,7 @@ export default function QrEtiketleriPage() {
               <button type="button" onClick={printLabels} disabled={!selectedItems.length} className="rounded-lg bg-amber px-3 py-2 text-[11px] font-extrabold text-[#161006] transition hover:brightness-110 disabled:opacity-40">Yazdır / PDF al</button>
             </div>
           </div>
+          <div className="mt-3 rounded-lg border border-amber/25 bg-amber/5 px-3 py-2 text-[10px] leading-relaxed text-muted">Hizalamanın doğru çıkması için yazdırma penceresinde <strong className="text-amber">Ölçek: %100 / Gerçek boyut</strong> ve <strong className="text-amber">Kenar boşlukları: Yok</strong> seçeneğini kullan.</div>
           <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel2 p-1">
             <button type="button" onClick={() => setMode("engine")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "engine" ? "bg-teal/15 text-teal shadow-sm" : "text-muted"}`}>Motor QR etiketleri</button>
             <button type="button" onClick={() => setMode("type")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "type" ? "bg-amber/15 text-amber shadow-sm" : "text-muted"}`}>Bakım türü QR etiketleri</button>
@@ -157,20 +158,29 @@ export default function QrEtiketleriPage() {
     <BottomNav />
     <style jsx global>{`
       .qr-sheet { display: none; }
-      .qr-label { box-sizing: border-box; background: #fff; color: #10151b; border: 1px solid #b7c0c8; border-radius: 10px; padding: 12px; text-align: center; break-inside: avoid; }
+      .qr-label { box-sizing: border-box; background: #fff; color: #10151b; border: 1px solid #b7c0c8; border-radius: 10px; padding: 12px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
       .qr-label-brand { color: #586673; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
-      .qr-label-title { font-size: 18px; line-height: 1.1; font-weight: 900; margin-top: 4px; }
-      .qr-label-subtitle { color: #586673; font-size: 9px; margin-top: 4px; }
+      .qr-label-title { font-size: 18px; line-height: 1.1; font-weight: 900; margin-top: 4px; overflow-wrap: anywhere; }
+      .qr-label-subtitle { color: #586673; font-size: 9px; line-height: 1.2; margin-top: 4px; }
       .qr-image-wrap { min-height: 170px; display: flex; align-items: center; justify-content: center; margin-top: 8px; }
-      .qr-image-wrap img { width: 170px; height: 170px; image-rendering: pixelated; }
+      .qr-image-wrap img { display: block; width: 170px; height: 170px; image-rendering: pixelated; }
       .qr-loading { color: #586673; font-size: 10px; }
       .qr-label-footer { color: #586673; font-size: 8px; margin-top: 6px; }
       @media print {
-        @page { size: A4; margin: 10mm; }
-        body { background: #fff !important; }
+        @page { size: A4 portrait; margin: 0; }
+        html, body { width: 210mm; min-width: 210mm; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-print, nav, aside, header, footer { display: none !important; }
-        .qr-sheet { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 6mm; align-items: start; }
-        .qr-label { min-height: 78mm; }
+        .min-h-screen { min-height: 0 !important; padding-bottom: 0 !important; }
+        .qr-sheet { display: grid !important; width: 190mm; grid-template-columns: repeat(3, 60mm); grid-auto-rows: 82mm; gap: 5mm; align-items: stretch; justify-content: start; margin: 10mm 10mm 0; padding: 0 !important; }
+        .qr-label { width: 60mm; height: 82mm; min-height: 0; border: .25mm solid #9aa5af; border-radius: 2mm; padding: 4mm; overflow: hidden; }
+        .qr-label-brand { font-size: 7pt; letter-spacing: .1em; line-height: 1.1; }
+        .qr-label-title { font-size: 13pt; line-height: 1.1; margin-top: 1.5mm; max-height: 10mm; overflow: hidden; }
+        .qr-label-subtitle { font-size: 7pt; line-height: 1.2; margin-top: 1.5mm; min-height: 7mm; }
+        .qr-image-wrap { width: 100%; height: 46mm; min-height: 46mm; margin-top: 2mm; }
+        .qr-image-wrap img { width: 44mm; height: 44mm; image-rendering: pixelated; }
+        .qr-loading { font-size: 7pt; }
+        .qr-label-footer { font-size: 6.5pt; line-height: 1.1; margin-top: 2mm; }
       }
     `}</style>
   </div>;
