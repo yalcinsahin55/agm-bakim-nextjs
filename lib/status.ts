@@ -67,15 +67,17 @@ export function buildItems(engines: Engine[], types: MaintenanceType[]): PanelIt
   engines.forEach((e) => { engineMap[e._id] = e; });
 
   types.forEach((t) => {
-    const states = t.engine_states || {};
+    const rawStates = t.engine_states;
+    const states: Record<string, EngineState> = rawStates && !Array.isArray(rawStates) && typeof rawStates === "object" ? rawStates as Record<string, EngineState> : {};
     const explicitScope = t.engine_scope === "explicit" || (t.engine_scope === undefined && Object.keys(states).length > 0);
     const applicable = explicitScope ? Object.keys(states) : Object.keys(engineMap);
     applicable.forEach((engineId) => {
       const engine = engineMap[engineId];
       if (!engine) return;
-      const state: EngineState = states[engineId] || { last_maintenance_hour: 0, period_hours: 0 };
-      const lastHour = state.last_maintenance_hour ?? 0;
-      const period = state.period_hours ?? t.default_period_hours;
+      const rawState = states[engineId];
+      const state: Partial<EngineState> = rawState && !Array.isArray(rawState) && typeof rawState === "object" ? rawState as Partial<EngineState> : {};
+      const lastHour = typeof state.last_maintenance_hour === "number" && Number.isFinite(state.last_maintenance_hour) ? state.last_maintenance_hour : 0;
+      const period = typeof state.period_hours === "number" && Number.isFinite(state.period_hours) ? state.period_hours : t.default_period_hours;
       const remaining = remainingHours(engine.hours, lastHour, period);
       items.push({
         engine_id: engineId,

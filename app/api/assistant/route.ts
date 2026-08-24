@@ -60,7 +60,7 @@ async function postAssistant(req: NextRequest) {
       });
     }
 
-    const result = await runAssistantTool(db, policy.query!);
+    const result = await runAssistantTool(db, policy.query!, { userId: user._id });
     return NextResponse.json({
       ok: true,
       policy_version: ASSISTANT_POLICY_VERSION,
