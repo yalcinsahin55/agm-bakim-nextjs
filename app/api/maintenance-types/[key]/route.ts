@@ -7,6 +7,7 @@ import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import { buildEngineStateUpdate, isObjectRecord, mergeEngineState } from "@/lib/maintenance";
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
@@ -49,24 +50,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     await typesCol.updateOne({ _id: key }, updateOperation);
   }
 
+  let currentEngineStates: unknown = type.engine_states;
   if (apply_period_to_all && typeof default_period_hours === "number") {
-    const engineIds = Object.keys(type.engine_states || {});
+    const engineIds = Object.keys(isObjectRecord(currentEngineStates) ? currentEngineStates : {});
     for (const engId of engineIds) {
       if (!isSafeMongoPathSegment(engId)) continue;
-      await typesCol.updateOne({ _id: key }, { $set: { [`engine_states.${engId}.period_hours`]: default_period_hours, [`engine_states.${engId}.tracking_source`]: "manual" } });
+      const patch = { period_hours: default_period_hours, tracking_source: "manual" as const };
+      await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engId, patch) });
+      currentEngineStates = mergeEngineState(currentEngineStates, engId, patch);
     }
   }
 
   // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
-  if (engine_states && typeof engine_states === "object") {
-    for (const [engId, rawState] of Object.entries(engine_states as Record<string, unknown>)) {
+  if (isObjectRecord(engine_states)) {
+    for (const [engId, rawState] of Object.entries(engine_states)) {
       if (!isSafeMongoPathSegment(engId)) continue;
       const state = rawState && typeof rawState === "object" ? rawState as EngineStateInput : {};
-      const set: Record<string, unknown> = {};
-      if (typeof state.period_hours === "number") set[`engine_states.${engId}.period_hours`] = state.period_hours;
-      if (typeof state.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = state.last_maintenance_hour;
-      set[`engine_states.${engId}.tracking_source`] = "manual";
-      if (Object.keys(set).length) await typesCol.updateOne({ _id: key }, { $set: set });
+      const patch: Record<string, unknown> = { tracking_source: "manual" };
+      if (typeof state.period_hours === "number") patch.period_hours = state.period_hours;
+      if (typeof state.last_maintenance_hour === "number") patch.last_maintenance_hour = state.last_maintenance_hour;
+      await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engId, patch) });
+      currentEngineStates = mergeEngineState(currentEngineStates, engId, patch);
     }
   }
 
@@ -74,11 +78,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     ? [...new Set(remove_engine_ids.filter((id: unknown): id is string => isSafeMongoPathSegment(id)))]
     : [];
   if (removeEngineIds.length > 0) {
-    const unset: Record<string, ""> = {};
-    removeEngineIds.forEach((engineId) => { unset[`engine_states.${engineId}`] = ""; });
+    const nextEngineStates = (isObjectRecord(currentEngineStates) ? { ...currentEngineStates } : {}) as MaintenanceTypeDocument["engine_states"];
+    removeEngineIds.forEach((engineId) => { delete nextEngineStates[engineId]; });
     // Bir motor elle kapsamdan çıkarıldığında "all" kapsamı artık geçerli değildir.
     // explicit kapsam, yalnızca engine_states içinde bırakılan motorları gösterir.
-    await typesCol.updateOne({ _id: key }, { $unset: unset, $set: { engine_scope: "explicit" } });
+    await typesCol.updateOne({ _id: key }, { $set: { engine_states: nextEngineStates, engine_scope: "explicit" } });
   }
 
   if (label && label.trim() !== type.label) {

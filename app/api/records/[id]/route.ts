@@ -7,7 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
-import { recomputeLastMaintenance } from "@/lib/maintenance";
+import { buildEngineStateUpdate, recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
@@ -120,7 +120,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   const selectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
   const allSelectedTypeDocs = await maintenanceTypesCollection(db).find(
     { _id: { $in: selectedTypeKeys } },
-    { projection: { _id: 1, label: 1, is_deleted: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } },
+    { projection: { _id: 1, label: 1, is_deleted: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } },
   ).toArray();
   // Geçmiş kaydın mevcut türü artık arşivlenmiş olsa bile temel düzenlemeler engellenmez.
   // Ancak yeni eklenmek istenen türler mutlaka aktif olmalıdır.
@@ -314,9 +314,10 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
       );
       if (existingExtra) continue;
       if (typeof ex.period === "number" && isSafeMongoPathSegment(record.engine_id)) {
+        const extraTypeState = selectedTypeDocs.find((type) => String(type._id) === ex.type_key)?.engine_states;
         await typesCol.updateOne(
           { _id: ex.type_key },
-          { $set: { [`engine_states.${record.engine_id}.period_hours`]: ex.period } },
+          { $set: buildEngineStateUpdate(extraTypeState, record.engine_id, { period_hours: ex.period }) },
           { upsert: true }
         );
       }

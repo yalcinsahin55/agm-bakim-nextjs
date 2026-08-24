@@ -10,6 +10,51 @@ type TrackingState = {
   tracking_source?: "manual" | "record";
 };
 
+type EngineStatesRecord = Record<string, unknown>;
+
+export function isObjectRecord(value: unknown): value is EngineStatesRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Mongo nested path yazımı yalnızca ara alanlar object olduğunda güvenlidir.
+ * Legacy belgelerde null/array/string kalmışsa tüm engine_states alanını güvenli
+ * bir object olarak yeniden kurmak için bu iki yardımcı kullanılır.
+ */
+export function canUpdateEngineStateNested(states: unknown, engineId: string): boolean {
+  if (states === undefined) return true;
+  if (!isObjectRecord(states)) return false;
+  const current = states[engineId];
+  return current === undefined || isObjectRecord(current);
+}
+
+export function mergeEngineState(
+  states: unknown,
+  engineId: string,
+  patch: Record<string, unknown>,
+): EngineStatesRecord {
+  const merged: EngineStatesRecord = isObjectRecord(states) ? { ...states } : {};
+  const current = isObjectRecord(merged[engineId]) ? merged[engineId] : {};
+  merged[engineId] = { ...current, ...patch };
+  return merged;
+}
+
+/**
+ * Sağlam state’lerde atomik nested update kullanır; legacy state malformed ise
+ * PathNotViable Mongo hatasını önlemek için tüm engine_states alanını object
+ * olarak normalize eden bir `$set` parçası üretir.
+ */
+export function buildEngineStateUpdate(
+  states: unknown,
+  engineId: string,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  if (canUpdateEngineStateNested(states, engineId)) {
+    return Object.fromEntries(Object.entries(patch).map(([key, value]) => [`engine_states.${engineId}.${key}`, value]));
+  }
+  return { engine_states: mergeEngineState(states, engineId, patch) };
+}
+
 function normalizeTrackingState(state: unknown): TrackingState | null {
   if (!state || typeof state !== "object") return null;
   const candidate = state as Record<string, unknown>;
@@ -79,8 +124,8 @@ export async function recomputeLastMaintenance(
         const previousState = normalizeTrackingState(fallbackState);
         if (previousState) {
           await typesCol.updateOne(
-            { _id: typeKey, [`${statePath}.tracking_source`]: { $ne: "record" } },
-            { $set: { [statePath]: previousState } },
+            { _id: typeKey, ...(isObjectRecord(type?.engine_states) ? { [`${statePath}.tracking_source`]: { $ne: "record" } } : {}) },
+            { $set: buildEngineStateUpdate(type?.engine_states, engineId, previousState) },
           );
         }
       }
@@ -92,7 +137,7 @@ export async function recomputeLastMaintenance(
     const maxHour = typeof latest.hour_at_completion === "number" ? latest.hour_at_completion : 0;
     await typesCol.updateOne(
       { _id: typeKey },
-      { $set: { [`${statePath}.last_maintenance_hour`]: maxHour } },
+      { $set: buildEngineStateUpdate(type?.engine_states, engineId, { last_maintenance_hour: maxHour }) },
     );
 
     // Yeni bir kayıt update ile aynı anda geldiyse ilk snapshot artık güncel

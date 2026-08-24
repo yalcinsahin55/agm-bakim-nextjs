@@ -148,6 +148,7 @@ export default function TamamlaPage() {
   const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const offlinePreviewUrlsRef = useRef<Record<string, string>>({});
+  const clientRequestIdRef = useRef<string | null>(null);
   
   const [submitting, setSubmitting] = useState(false);
 
@@ -494,6 +495,8 @@ export default function TamamlaPage() {
     }
     
     setSubmitting(true);
+    const clientRequestId = clientRequestIdRef.current || makeOfflineId();
+    clientRequestIdRef.current = clientRequestId;
     
     const startDate = new Date(maintenanceStartAt);
     const todayStart = new Date();
@@ -512,6 +515,7 @@ export default function TamamlaPage() {
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
     const payload = {
+      client_request_id: clientRequestId,
       engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
       technician_source: technicianSource,
       ...(isManagerInternalRecord && responsibleTechnicianId ? { responsible_technician_id: responsibleTechnicianId } : {}),
@@ -538,6 +542,7 @@ export default function TamamlaPage() {
         await queueRecord(payload, offlineMedia);
         toast.dismiss(loadingToast);
         toast.success(navigator.onLine ? "Kayıt senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt güvenle kuyruğa alındı.");
+        clientRequestIdRef.current = null;
         if (navigator.onLine) void syncOfflineQueue();
         router.push("/dashboard");
         return;
@@ -556,6 +561,7 @@ export default function TamamlaPage() {
         toast.success(user?.role === "yonetici" || data.confirmed ? `${data.completed.join(", ")} bakımı kaydedildi ve teyit edildi.` : `${data.completed.join(", ")} bakımı kaydedildi. Yönetici teyidi bekleniyor.`);
         invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
+        clientRequestIdRef.current = null;
         router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);

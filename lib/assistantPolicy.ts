@@ -130,7 +130,7 @@ const TECHNICIAN_PATTERNS = [
 const FORECAST_PATTERNS = [
   /(?:gelecek|önümüzdeki|bir sonraki)\s+yıl.*(?:bakım|bakımları|bakımların)/iu,
   /(?:hangi|planlanan|tahmini|öngörülen).{0,100}\b bakım(?:lar|ları)?\b.{0,100}(?:gelecek|yapılacak|planlan|öngör)/iu,
-  /\b(?:20\d{2}|21\d{2})\b['’]?(?:de|da|te|ta|yılında|yılına|için)?[^?]{0,100}(?:hangi|planlanan|tahmini|öngörülen|gelecek|yapılacak).{0,80}\bbakım/iu,
+  /\b(?:20\d{2}|21\d{2})\b['’]?(?:de|da|te|ta|yılında|yılına|için)?[^?]{0,100}(?:planlanan|tahmini|öngörülen|gelecek|yapılacak|planlan).{0,80}\bbakım/iu,
   /\bbakım(?:lar|ları)?\b[^?]{0,100}\b(?:20\d{2}|21\d{2})\b[^?]{0,100}(?:gelecek|yapılacak|planlan|tahmin)/iu,
   /bakım\s+tarihi\s+tahmini/iu,
 ];

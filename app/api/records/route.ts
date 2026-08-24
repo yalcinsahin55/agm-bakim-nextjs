@@ -8,7 +8,7 @@ import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { recomputeLastMaintenance, snapshotTrackingState } from "@/lib/maintenance";
+import { buildEngineStateUpdate, recomputeLastMaintenance, snapshotTrackingState } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
@@ -136,7 +136,9 @@ async function getRecords(req: NextRequest) {
 
 
 async function postRecord(req: NextRequest) {
+  let operationStep = "initialize";
   try {
+    operationStep = "connect_db";
     const db = await getDb();
     await ensureAppIndexes(db);
     const usersCol = usersCollection(db);
@@ -149,6 +151,7 @@ async function postRecord(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "records-create", 120, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
+    operationStep = "parse_request";
     const body = await req.json().catch(() => ({}));
 
     // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
@@ -168,6 +171,7 @@ async function postRecord(req: NextRequest) {
       return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
     }
 
+    operationStep = "load_collections";
     const enginesCol = enginesCollection(db);
     const typesCol = maintenanceTypesCollection(db);
     const recordsCol = recordsCollection(db);
@@ -199,6 +203,7 @@ async function postRecord(req: NextRequest) {
       if (existing) return NextResponse.json({ ok: true, duplicate: true, completed: [existing.type_label], group_id: existing.group_id });
     }
 
+    operationStep = "load_engine";
     if (!isSafeMongoPathSegment(engine_id)) return NextResponse.json({ error: "Geçersiz motor kimliği." }, { status: 400 });
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
@@ -237,6 +242,7 @@ async function postRecord(req: NextRequest) {
       responsibleTechnicianType = resolvedResponsible[0].technician_type;
       responsibleTechnicianOption = resolvedResponsible[0];
     }
+    operationStep = "load_maintenance_types";
     const requestedTypeKeys = [...new Set([type_key, ...(extra_types || []).map((item) => item.type_key)])];
     const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
     const maintenanceTypeByKey = new Map<string, MaintenanceTypeDocument>(maintenanceTypes.map((item) => [String(item._id), item]));
@@ -273,7 +279,7 @@ async function postRecord(req: NextRequest) {
     if (!useExternalService && maintenanceDurationMinutes !== null && technicianContributions.some((contribution) => contribution.duration_minutes > maintenanceDurationMinutes)) {
       return NextResponse.json({ error: "Kişi çalışma süresi toplam bakım süresini aşamaz." }, { status: 400 });
     }
-    const primaryType = await typesCol.findOne({ _id: type_key }, { projection: { engine_states: 1 } });
+    const primaryType = await typesCol.findOne({ _id: type_key }, { projection: { engine_states: 1, engine_scope: 1 } });
     const primaryPreviousTrackingState = snapshotTrackingState(primaryType?.engine_states?.[engine_id]);
     const primaryTrackingAutoCreated = typeof period === "number" && (!primaryType?.engine_states?.[engine_id] || primaryType.engine_states[engine_id]?.tracking_source === "record");
     const shouldConfirmOnCreate = user.role === "yonetici";
@@ -332,43 +338,49 @@ async function postRecord(req: NextRequest) {
     }
 
     if (typeof period === "number") {
+      operationStep = "update_primary_tracking";
       await typesCol.updateOne(
         { _id: type_key },
-        { $set: { [`engine_states.${engine_id}.period_hours`]: period, [`engine_states.${engine_id}.tracking_source`]: primaryTrackingAutoCreated ? "record" : "manual", engine_scope: primaryType?.engine_scope === "all" ? "all" : "explicit" } },
+          { $set: { ...buildEngineStateUpdate(primaryType?.engine_states, engine_id, { period_hours: period, tracking_source: primaryTrackingAutoCreated ? "record" : "manual" }), engine_scope: primaryType?.engine_scope === "all" ? "all" : "explicit" } },
         { upsert: true }
       );
     }
+    operationStep = "insert_primary_record";
     await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState);
 
     const completedLabels: string[] = [type_label];
     if (Array.isArray(extra_types)) {
       for (const ex of extra_types) {
-        const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1 } });
+        const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1, engine_scope: 1 } });
         const extraPreviousTrackingState = snapshotTrackingState(extraType?.engine_states?.[engine_id]);
         const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
         if (typeof ex.period === "number") {
+          operationStep = "update_extra_tracking";
           await typesCol.updateOne(
             { _id: ex.type_key },
-            { $set: { [`engine_states.${engine_id}.period_hours`]: ex.period, [`engine_states.${engine_id}.tracking_source`]: extraTrackingAutoCreated ? "record" : "manual", engine_scope: extraType?.engine_scope === "all" ? "all" : "explicit" } },
+            { $set: { ...buildEngineStateUpdate(extraType?.engine_states, engine_id, { period_hours: ex.period, tracking_source: extraTrackingAutoCreated ? "record" : "manual" }), engine_scope: extraType?.engine_scope === "all" ? "all" : "explicit" } },
             { upsert: true }
           );
         }
+        operationStep = "insert_extra_record";
         await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated, extraPreviousTrackingState);
         completedLabels.push(ex.type_label);
       }
     }
 
     if (hour_at_completion > engine.hours) {
+      operationStep = "update_engine_hours";
       const stamp = new Date();
+      const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
       await enginesCol.updateOne(
         { _id: engine_id },
-        {
-          $set: { hours: hour_at_completion, updated_at: stamp },
-          $push: { history: { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 } },
-        }
+        Array.isArray(engine.history)
+          ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
+          : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
       );
     }
 
+    operationStep = "write_audit";
     await writeAuditLog(db, {
       user,
       action: "create",
@@ -378,10 +390,11 @@ async function postRecord(req: NextRequest) {
       after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), responsible_technician_duration: responsibleDurationMinutes, technician_contributions: technicianContributions, completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     invalidateMaintenancePanelServerCache();
+    operationStep = "refresh_notifications";
     await refreshUserMaintenanceNotificationsBestEffort(db, user);
     return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });
   } catch (error) {
-    console.error("POST /api/records hatası:", error instanceof Error ? error.name : "UnknownError");
+    console.error("POST /api/records hatası:", error instanceof Error ? error.name : "UnknownError", `step=${operationStep}`);
     return NextResponse.json({ error: "Bakım kaydı oluşturulurken bir hata oluştu." }, { status: 500 });
   }
 }
