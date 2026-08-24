@@ -93,12 +93,16 @@ const INTENT_ARRAY_LABELS: Record<string, string> = {
   daily_records: "Gün Gün Yapılan Bakımlar",
 };
 
+function isEmptyExportValue(value: unknown): boolean {
+  return value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
+}
+
 function scalarRows(result: AssistantToolResponse): ExportRow[] {
   const selectedTechnician = result.data.selected_technician && typeof result.data.selected_technician === "object" ? result.data.selected_technician as Record<string, unknown> : null;
   const isSelectedTechnician = result.intent === "technician_performance" && Boolean(selectedTechnician);
   const globalTechnicianFields = new Set(["total_tasks", "total_responsible_tasks", "total_support_tasks", "total_duration_minutes", "total_duration_text", "top_technician"]);
   const rows = Object.entries(result.data)
-    .filter(([key, value]) => !Array.isArray(value) && (typeof value !== "object" || value === null) && !(isSelectedTechnician && globalTechnicianFields.has(key)))
+    .filter(([key, value]) => !isEmptyExportValue(value) && !Array.isArray(value) && (typeof value !== "object" || value === null) && !(isSelectedTechnician && globalTechnicianFields.has(key)))
     .map(([key, value]) => ({ Alan: displayLabel(key), Değer: formatValue(value) }));
   if (selectedTechnician) {
     for (const key of ["full_name", "technician_type", "responsible_tasks", "support_tasks", "total_tasks", "duration_minutes", "duration_text"]) {
@@ -130,6 +134,25 @@ function sortExportItems(items: unknown[], sort: AssistantExportOptions["sort"])
   });
 }
 
+function distributionDetails(value: unknown, labelKey: "type" | "engine"): string | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const details = value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const label = record[labelKey];
+    if (typeof label !== "string" || !label.trim()) return [];
+    const count = typeof record.count === "number" && Number.isFinite(record.count) ? ` (${record.count.toLocaleString("tr-TR")})` : "";
+    return [`${label.trim()}${count}`];
+  });
+  return details.length ? details.join(", ") : null;
+}
+
+function sheetColumnValue(record: Record<string, unknown>, column: ExportColumnId, sheetKey: string): unknown {
+  if (sheetKey === "by_engine" && column === "type") return distributionDetails(record.type_stats, "type");
+  if (sheetKey === "by_type" && column === "engine") return distributionDetails(record.engines, "engine");
+  return getExportColumnValue(record, column);
+}
+
 function arraySheets(result: AssistantToolResponse, options: AssistantExportOptions): Array<{ name: string; rows: ExportRow[] }> {
   const keys = options.sheets.length ? options.sheets : INTENT_ARRAY_KEYS[result.intent] || [];
   const columns = options.columns.length ? options.columns : getAvailableColumns(result.intent);
@@ -137,10 +160,12 @@ function arraySheets(result: AssistantToolResponse, options: AssistantExportOpti
     const value = result.data[key];
     if (!Array.isArray(value) || value.length === 0) return [];
     const values = sortExportItems(value.slice(0, MAX_EXPORT_ROWS), options.sort);
+    const records = values.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+    const effectiveColumns = columns.filter((column) => records.some((record) => !isEmptyExportValue(sheetColumnValue(record, column, key))));
     const rows = values.map((item) => {
       if (item && typeof item === "object" && !Array.isArray(item)) {
         const record = item as Record<string, unknown>;
-        return Object.fromEntries(columns.map((column) => [exportColumnLabel(column), formatValue(getExportColumnValue(record, column))]));
+        return Object.fromEntries(effectiveColumns.map((column) => [exportColumnLabel(column), formatValue(sheetColumnValue(record, column, key))]));
       }
       return { Değer: formatValue(item) };
     });

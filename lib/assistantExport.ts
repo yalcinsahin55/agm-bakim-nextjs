@@ -202,12 +202,25 @@ export function normalizeExportOptions(intent: string, data: Record<string, unkn
   };
 }
 
+function nestedDistributionLabel(value: unknown, labelKey: "type" | "engine"): string | null {
+  if (!Array.isArray(value)) return null;
+  const labels = value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const label = record[labelKey];
+    if (typeof label !== "string" || !label.trim()) return [];
+    const count = typeof record.count === "number" && Number.isFinite(record.count) ? ` (${record.count.toLocaleString("tr-TR")})` : "";
+    return [`${label.trim()}${count}`];
+  });
+  return labels.length ? labels.join(", ") : null;
+}
+
 export function getExportColumnValue(row: Record<string, unknown>, column: ExportColumnId): unknown {
   const value = (key: string) => row[key];
   switch (column) {
     case "date": return value("date") ?? value("created_at") ?? value("updated_at") ?? value("reading_date") ?? value("analysis_date");
-    case "engine": return value("engine") ?? value("engine_name") ?? value("selected_engine");
-    case "type": return value("type") ?? value("type_label") ?? value("maintenance_type") ?? value("types");
+    case "engine": return value("engine") ?? value("engine_name") ?? value("selected_engine") ?? nestedDistributionLabel(value("engines"), "engine");
+    case "type": return value("type") ?? value("type_label") ?? value("maintenance_type") ?? value("types") ?? nestedDistributionLabel(value("type_stats"), "type");
     case "hours": return value("hours") ?? value("engine_hours") ?? value("hour_at_completion") ?? value("current_hours");
     case "load_kw": return value("load_kw") ?? value("average_load_kw");
     case "start": return value("start_at") ?? value("maintenance_start_at");
