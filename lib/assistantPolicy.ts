@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ASSISTANT_POLICY_VERSION = "1.2" as const;
+export const ASSISTANT_POLICY_VERSION = "1.3" as const;
 export const MAX_ASSISTANT_QUESTION_LENGTH = 300;
 export const ASSISTANT_RATE_LIMIT = 20;
 export const ASSISTANT_RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -27,6 +27,7 @@ export type AssistantIntent =
   | "engine_history"
   | "technician_performance"
   | "external_service"
+  | "maintenance_forecast"
   | "help";
 
 export type AllowedAssistantTool =
@@ -34,7 +35,8 @@ export type AllowedAssistantTool =
   | "getOverdueMaintenance"
   | "getEngineMaintenanceHistory"
   | "getTechnicianPerformance"
-  | "getExternalServiceSummary";
+  | "getExternalServiceSummary"
+  | "getMaintenanceForecast";
 
 export interface AssistantQuery {
   question: string;
@@ -44,6 +46,8 @@ export interface AssistantQuery {
   maintenanceTypeQuery?: string;
   serviceQuery?: string;
   dateRange?: AssistantDateRange;
+  targetYear?: number;
+  maintenancePeriodHours?: number;
   technicianRole?: AssistantTechnicianRole;
   sourceFilter?: AssistantSourceFilter;
   evidenceFilter?: AssistantEvidenceFilter;
@@ -121,6 +125,14 @@ const TECHNICIAN_PATTERNS = [
   /['’](?:in|ın|ün|un|nin|nın|nün|nun)\s+.{0,80}\bbakım/iu,
   /en\s+(çok|fazla)\s+(çalış|görev)/iu,
   /kim\s+(en\s+çok\s+)?(çalıştı|çalışmış|görev\s+(aldı|yaptı))/iu,
+];
+
+const FORECAST_PATTERNS = [
+  /(?:gelecek|önümüzdeki|bir sonraki)\s+yıl.*(?:bakım|bakımları|bakımların)/iu,
+  /(?:hangi|planlanan|tahmini|öngörülen).{0,100}\b bakım(?:lar|ları)?\b.{0,100}(?:gelecek|yapılacak|planlan|öngör)/iu,
+  /\b(?:20\d{2}|21\d{2})\b['’]?(?:de|da|te|ta|yılında|yılına|için)?[^?]{0,100}(?:hangi|planlanan|tahmini|öngörülen|gelecek|yapılacak).{0,80}\bbakım/iu,
+  /\bbakım(?:lar|ları)?\b[^?]{0,100}\b(?:20\d{2}|21\d{2})\b[^?]{0,100}(?:gelecek|yapılacak|planlan|tahmin)/iu,
+  /bakım\s+tarihi\s+tahmini/iu,
 ];
 
 const OVERDUE_PATTERNS = [
@@ -212,7 +224,7 @@ function extractServiceQuery(question: string): string | undefined {
   return undefined;
 }
 
-function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "recordFilters" | "hourRange" | "durationRange" | "teamOnly"> {
+function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "maintenancePeriodHours" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "recordFilters" | "hourRange" | "durationRange" | "teamOnly"> {
   const technicianRole: AssistantTechnicianRole | undefined = /yardımcı|destek|ekip\s+üyesi/iu.test(question) ? "support" : /sorumlu|yetkili/iu.test(question) ? "responsible" : undefined;
   const sourceFilter: AssistantSourceFilter | undefined = INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) ? "internal" : EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) ? "external_service" : undefined;
   const evidenceFilter: AssistantEvidenceFilter | undefined = /fotoğraf|fotoğraflı/iu.test(question) ? "photo" : /video|videolu/iu.test(question) ? "video" : /notu|notlu|not\s+içeren/iu.test(question) ? "note" : /kontrol\s+listesi/iu.test(question) ? "checklist" : undefined;
@@ -227,7 +239,8 @@ function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQu
   const durationInHours = Boolean(rawDurationRange && /saat/iu.test(question) && !/motor\s+saati|çalışma\s+saati/iu.test(question));
   const durationRange = rawDurationRange ? Object.fromEntries(Object.entries(rawDurationRange).map(([key, value]) => [key, durationInHours ? Number(value) * 60 : value])) as { min?: number; max?: number } : undefined;
   const teamOnly = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question) ? true : undefined;
-  return { maintenanceTypeQuery: extractMaintenanceTypeQuery(question), serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly };
+  const maintenancePeriodHours = extractMaintenancePeriodHours(question);
+  return { maintenanceTypeQuery: maintenancePeriodHours ? undefined : extractMaintenanceTypeQuery(question), maintenancePeriodHours, serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly };
 }
 
 function cleanQuestion(value: string): string {
@@ -329,6 +342,25 @@ function periodFromQuestion(question: string): AssistantPeriod {
   return "all";
 }
 
+function extractMaintenancePeriodHours(question: string): number | undefined {
+  const match = question.match(/(?<![\d.,])(\d[\d.,]*)\s*(?:saat(?:lik)?\s*)?bakım(?:ı|ını|ları|larını)?\b/iu);
+  if (!match) return undefined;
+  const value = parseNumber(match[1]);
+  return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : undefined;
+}
+
+function extractTargetYear(question: string): number | undefined {
+  const explicit = question.match(/(?<!\d)((?:20|21)\d{2})(?!\d)/u);
+  if (explicit) {
+    const year = Number(explicit[1]);
+    if (year >= 2000 && year <= 2100) return year;
+  }
+  if (/(?:gelecek|önümüzdeki|bir sonraki)\s+yıl/iu.test(question)) {
+    return Number(currentTurkeyDateKey().slice(0, 4)) + 1;
+  }
+  return undefined;
+}
+
 function extractEngineQuery(question: string): string | undefined {
   const match = question.match(/\bmotor(?:\s+(?:no|numarası)\s*|\s*#\s*|\s+)([^,?]+)/iu);
   const reverseMatch = !match ? question.match(/\b([a-zçğıöşü0-9][a-zçğıöşü0-9 _-]{1,60}?)\s+motor(?:u|un|unda|ünde|ında|inde|da|de|ta|te)?\b/iu) : null;
@@ -347,7 +379,9 @@ function extractEngineQuery(question: string): string | undefined {
 
 function inferIntent(question: string): AssistantIntent {
   if (QUESTION_HELP_PATTERNS.some((pattern) => pattern.test(question))) return "help";
+  if (FORECAST_PATTERNS.some((pattern) => pattern.test(question))) return "maintenance_forecast";
   const engineQuery = extractEngineQuery(question);
+  if (extractMaintenancePeriodHours(question)) return "maintenance_forecast";
   if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
   if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
   if (/(?:\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen)/iu.test(question) && /bakım/iu.test(question)) return "summary";
@@ -415,6 +449,8 @@ export function evaluateAssistantQuestion(value: unknown): AssistantPolicyResult
       question,
       intent,
       period: periodFromQuestion(question),
+      targetYear: extractTargetYear(question),
+      maintenancePeriodHours: extractMaintenancePeriodHours(question),
       engineQuery: extractEngineQuery(question),
       dateRange: parseDateRange(question),
       ...parseFilters(question),
@@ -429,6 +465,7 @@ export function isAllowedAssistantTool(tool: string): tool is AllowedAssistantTo
     "getEngineMaintenanceHistory",
     "getTechnicianPerformance",
     "getExternalServiceSummary",
+    "getMaintenanceForecast",
   ].includes(tool);
 }
 
@@ -447,8 +484,8 @@ export function redactedRecordProjection(): Record<string, 0 | 1> {
     other_technicians: 1,
     maintenance_start_at: 1,
     maintenance_end_at: 1,
-    maintenance_duration_minutes: 1,
-    created_at: 1,
+        maintenance_duration_minutes: 1,
+        created_at: 1,
   };
 }
 
@@ -457,6 +494,7 @@ export function assistantSystemBoundary(): string {
     `Policy ${ASSISTANT_POLICY_VERSION}: You are a read-only maintenance reporting assistant.`,
     "Never create, update, delete, assign, approve, notify, or restore data.",
     "Only answer from tool results; never invent records, names, dates, durations, or diagnoses.",
+    "For forecast results, distinguish overdue backlog from estimated future dates and state the 24-hour-per-day assumption.",
     "Do not reveal secrets, credentials, raw media, base64, or unnecessary personal data.",
     "For oil/pressure or machine health questions, describe observations and recommend human review; do not give definitive diagnosis or repair instructions.",
   ].join(" ");

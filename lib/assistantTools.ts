@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import { buildItems, type PanelItem } from "@/lib/status";
+import { buildItems, engineSortKey, STATUS_LABELS, type PanelItem } from "@/lib/status";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName, normalizeTechnicianType, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 import { enginesCollection, maintenanceTypesCollection, recordsCollection } from "@/lib/dbCollections";
@@ -37,6 +37,23 @@ function dateKeyLabel(value: string): string {
 function periodLabel(query: AssistantQuery): string {
   if (query.dateRange) return `${dateKeyLabel(query.dateRange.from)} - ${dateKeyLabel(query.dateRange.to)}`;
   return query.period === "month" ? "bu ay" : query.period === "3months" ? "son üç ay" : query.period === "year" ? "bu yıl" : "tüm dönem";
+}
+
+function turkeyDateKey(value = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function estimatedMaintenanceDateKey(remainingHours: number, now = new Date()): string {
+  const estimatedDate = new Date(`${turkeyDateKey(now)}T00:00:00.000Z`);
+  estimatedDate.setUTCDate(estimatedDate.getUTCDate() + Math.round(remainingHours / 24));
+  return estimatedDate.toISOString().slice(0, 10);
 }
 
 function dateKeyStart(value: string): Date | null {
@@ -245,6 +262,89 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
         remaining_hours: Math.round(item.remaining),
         overdue_hours: Math.max(0, Math.round(Math.abs(item.remaining))),
       })),
+    },
+  };
+}
+
+async function getMaintenanceForecast(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
+  const [engines, types] = await Promise.all([
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
+  ]);
+  const today = turkeyDateKey();
+  const currentYear = Number(today.slice(0, 4));
+  const targetYear = query.targetYear && query.targetYear >= 2000 && query.targetYear <= 2100 ? query.targetYear : null;
+  const horizonEnd = targetYear ? `${targetYear}-12-31` : null;
+  const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
+  const selectedType = await resolveMaintenanceType(db, query);
+  const targetStatus = query.statusFilter === "overdue" ? "gecikmis" : query.statusFilter === "critical" ? "kritik" : query.statusFilter === "upcoming" ? "yaklasiyor" : query.statusFilter === "normal" ? "normal" : null;
+  // Forecast soruları varsayılan olarak gecikmiş backlog’u da içerir; “gecikmişleri de göster” tüm planı gecikmişlerle daraltmamalıdır.
+  const scheduledStatus = targetStatus === "gecikmis" ? null : targetStatus;
+  const targetPeriod = query.maintenancePeriodHours;
+
+  const forecasts = buildItems(engines, types)
+    .filter((item) => !query.engineQuery || Boolean(selectedEngine && item.engine_id === String(selectedEngine._id)))
+    .filter((item) => !query.maintenanceTypeQuery || Boolean(selectedType && item.type_key === String(selectedType.key)))
+    .filter((item) => targetPeriod === undefined || Math.round(item.period) === targetPeriod)
+    .filter((item) => !scheduledStatus || item.status === scheduledStatus)
+    .map((item: PanelItem) => {
+      const estimatedDate = estimatedMaintenanceDateKey(item.remaining);
+      const forecastYear = Number(estimatedDate.slice(0, 4));
+      const overdue = item.remaining <= 0;
+      return {
+        engine_id: item.engine_id,
+        engine: item.engine_name,
+        type_key: item.type_key,
+        type: item.type_label,
+        current_hours: Math.round(item.engine_hours),
+        last_maintenance_hours: Math.round(item.last_hour),
+        period_hours: Math.round(item.period),
+        remaining_hours: Math.round(item.remaining),
+        overdue_hours: Math.max(0, Math.round(Math.abs(item.remaining))),
+        status: item.status,
+        status_label: STATUS_LABELS[item.status],
+        estimated_date: estimatedDate,
+        estimated_date_label: dateKeyLabel(estimatedDate),
+        forecast_year: forecastYear,
+        category: overdue ? "overdue" : targetYear !== null && forecastYear < targetYear ? "before_target_year" : "target_year",
+      };
+    })
+    .filter((item) => item.category === "overdue" || !horizonEnd || item.estimated_date <= horizonEnd)
+    .sort((a, b) => (a.category === "overdue" ? -1 : 1) - (b.category === "overdue" ? -1 : 1) || a.estimated_date.localeCompare(b.estimated_date) || engineSortKey(a.engine) - engineSortKey(b.engine) || a.type.localeCompare(b.type, "tr"))
+    .slice(0, 500);
+
+  const overdueCount = forecasts.filter((item) => item.category === "overdue").length;
+  const targetYearCount = targetYear === null ? 0 : forecasts.filter((item) => item.forecast_year === targetYear).length;
+  const beforeTargetYearCount = targetYear === null ? 0 : forecasts.filter((item) => item.category === "before_target_year").length;
+  const scheduledCount = forecasts.length - overdueCount;
+  const targetLabel = targetYear ? `${targetYear} yılına kadar` : "mevcut tahmini plan";
+  const periodLabel = targetPeriod ? `${targetPeriod.toLocaleString("tr-TR")} saatlik bakım` : "bakım planı";
+  return {
+    intent: "maintenance_forecast",
+    period: "all",
+    title: targetYear ? `${targetYear} bakım planı ve tamamlanmamış bakımlar` : `${periodLabel} ve tamamlanmamış bakımlar`,
+    summary: targetPeriod
+      ? `${periodLabel} için toplam ${forecasts.length} plan satırı bulundu. ${overdueCount} tanesi tamamlanmamış/gecikmiş, ${scheduledCount} tanesi ${targetLabel} içinde tahmini plan. ${targetYear ? `${targetYear} yılına denk gelen ${targetYearCount} adet.` : ""}`
+      : `${today} itibarıyla ${overdueCount} tamamlanmamış/gecikmiş bakım var. ${targetLabel} içinde tahmini ${scheduledCount} bakım daha görünüyor; ${targetYear ? `${targetYear} yılına denk geleni ${targetYearCount} adet${beforeTargetYearCount ? `, hedef yıldan önce planlananı ${beforeTargetYearCount} adet` : ""}.` : "Mevcut her bakım türü için bir sonraki tahmini bakım gösteriliyor."}`,
+    data: {
+      current_date: today,
+      current_year: currentYear,
+      target_year: targetYear,
+      horizon_end: horizonEnd,
+      total: forecasts.length,
+      overdue_count: overdueCount,
+      scheduled_count: scheduledCount,
+      before_target_year_count: beforeTargetYearCount,
+      target_year_count: targetYearCount,
+      grouped_by_period: targetPeriod === undefined ? Object.values(forecasts.reduce<Record<string, { period_hours: number; count: number }>>((groups, item) => {
+        const key = String(item.period_hours);
+        groups[key] = groups[key] || { period_hours: item.period_hours, count: 0 };
+        groups[key].count += 1;
+        return groups;
+      }, {})).sort((a, b) => a.period_hours - b.period_hours) : [{ period_hours: targetPeriod, count: forecasts.length }],
+      assumptions: { daily_engine_hours: 24, formula: "kalan_motor_saati / 24 = yaklaşık gün" },
+      filters: { target_year: targetYear, maintenance_period_hours: targetPeriod || null, engine: selectedEngine?.name || query.engineQuery || null, engine_id: selectedEngine ? String(selectedEngine._id) : null, maintenance_type: selectedType?.label || query.maintenanceTypeQuery || null, status: query.statusFilter || null },
+      items: forecasts,
     },
   };
 }
@@ -496,6 +596,7 @@ export async function runAssistantTool(db: Db, query: AssistantQuery): Promise<A
   if (query.intent === "engine_history") return getEngineMaintenanceHistory(db, query);
   if (query.intent === "technician_performance") return getTechnicianPerformance(db, query);
   if (query.intent === "external_service") return getExternalServiceSummary(db, query);
+  if (query.intent === "maintenance_forecast") return getMaintenanceForecast(db, query);
   return {
     intent: "help",
     period: query.period,

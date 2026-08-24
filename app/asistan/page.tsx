@@ -33,6 +33,8 @@ const QUICK_QUESTIONS = [
   "1000 saat ile 1500 saat arasında hangi bakımlar yapıldı?",
   "Dış servisten hizmet alınan motorlar ve bakımlar hangileri?",
   "İç ekip tarafından yapılan ekip bakımları hangileri?",
+  "Gelecek yıl hangi bakımlar gelecek? Gecikmişleri de göster.",
+  "Kaç 9000 saatlik bakım var? Motorları ve tahmini tarihleri göster.",
 ];
 
 function formatMinutes(value: unknown): string {
@@ -162,7 +164,7 @@ function exportFileName(kind: "pdf" | "excel"): string {
 }
 
 function buildExportQuery(intent: string | undefined, period: string | undefined, dateRange: { from: string; to: string } | null | undefined, data: Record<string, unknown> | undefined): Record<string, string> {
-  if (!intent || intent === "help" || intent === "overdue") return {};
+  if (!intent || intent === "help" || intent === "overdue" || intent === "maintenance_forecast") return {};
   const query = dateRange ? { from: dateRange.from, to: dateRange.to } : periodDateQuery(period);
   const filters = data?.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
   if (intent === "external_service") query.source = "external_service";
@@ -226,6 +228,8 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
   if (dateRange) items.push(`${formatDateOnly(dateRange.from)} – ${formatDateOnly(dateRange.to)}`);
   if (typeof filters.engine === "string" && filters.engine) items.push(`Motor: ${filters.engine}`);
   if (typeof filters.maintenance_type === "string" && filters.maintenance_type) items.push(`Tür: ${filters.maintenance_type}`);
+  if (typeof filters.target_year === "number") items.push(`Plan yılı: ${filters.target_year}`);
+  if (typeof filters.maintenance_period_hours === "number") items.push(`Periyot: ${filters.maintenance_period_hours.toLocaleString("tr-TR")} saat`);
   if (filters.role === "responsible") items.push("Rol: Sorumlu");
   if (filters.role === "support") items.push("Rol: Yardımcı");
   if (filters.source === "internal") items.push("Kaynak: İç ekip");
@@ -252,6 +256,7 @@ function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [expandedTechnicianId, setExpandedTechnicianId] = useState<string | null>(null);
   const overdueItems = Array.isArray(data.items) ? data.items as Array<Record<string, unknown>> : [];
+  const forecastItems = intent === "maintenance_forecast" ? overdueItems : [];
   const records = Array.isArray(data.records) ? data.records as Array<Record<string, unknown>> : [];
   const technicians = Array.isArray(data.technicians) ? data.technicians as Array<Record<string, unknown>> : [];
   const services = Array.isArray(data.services) ? data.services as Array<Record<string, unknown>> : [];
@@ -294,6 +299,42 @@ function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent
     return <div className="mt-3 grid gap-1.5">{examples.map((example) => <div key={example} className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10.5px] text-muted">{example}</div>)}</div>;
   }
 
+  if (intent === "maintenance_forecast") {
+    const overdueCount = Number(data.overdue_count || 0);
+    const scheduledCount = Number(data.scheduled_count || 0);
+    const targetYearCount = Number(data.target_year_count || 0);
+    const beforeTargetYearCount = Number(data.before_target_year_count || 0);
+    const targetYear = Number(data.target_year || 0);
+    const totalCount = Number(data.total || 0);
+    const filters = data.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
+    const periodHours = typeof filters.maintenance_period_hours === "number" ? filters.maintenance_period_hours : 0;
+    const periodGroups = Array.isArray(data.grouped_by_period) ? data.grouped_by_period as Array<Record<string, unknown>> : [];
+    const visibleForecasts = forecastItems;
+    return <div className="mt-3 grid gap-2">
+      <div className={`grid grid-cols-2 gap-1.5 ${targetYear > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+        <div className="rounded-lg border border-red/25 bg-red/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Tamamlanmamış</div><div className="mt-1 font-mono text-base font-bold text-red">{overdueCount}</div></div>
+        {targetYear > 0 ? <>
+          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Hedef yıl</div><div className="mt-1 font-mono text-base font-bold text-amber">{targetYearCount}</div></div>
+          <div className="rounded-lg border border-teal/25 bg-teal/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Öncesi</div><div className="mt-1 font-mono text-base font-bold text-teal">{beforeTargetYearCount}</div></div>
+          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif plan</div><div className="mt-1 font-mono text-base font-bold text-text">{scheduledCount}</div></div>
+        </> : <>
+          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">{periodHours ? `${periodHours.toLocaleString("tr-TR")} saatlik toplam` : "Toplam plan"}</div><div className="mt-1 font-mono text-base font-bold text-amber">{totalCount}</div></div>
+          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif tahmin</div><div className="mt-1 font-mono text-base font-bold text-text">{scheduledCount}</div></div>
+        </>}
+      </div>
+      {periodGroups.length > 0 && <div className="flex flex-wrap gap-1.5"><span className="self-center text-[9px] font-bold uppercase tracking-wide text-faint">Periyotlar:</span>{periodGroups.map((group) => <span key={String(group.period_hours)} className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] text-muted">{Number(group.period_hours || 0).toLocaleString("tr-TR")} saat · {Number(group.count || 0)} bakım</span>)}</div>}
+      <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[9.5px] leading-4 text-faint">Tahmin, mevcut motor saati ve bakım periyoduna göre yapılır. Uygulamadaki varsayım: motor günde 24 saat çalışır; gerçek çalışma planı değişirse tarih de değişir. Gecikmiş kayıtlar hedef yıldan bağımsız olarak listenin başında tutulur.</div>
+      <div className="grid gap-1.5">{visibleForecasts.map((item) => {
+        const category = String(item.category || "target_year");
+        const overdue = category === "overdue";
+        const beforeTarget = category === "before_target_year";
+        const borderClass = overdue ? "border-red/25 bg-red/5" : beforeTarget ? "border-teal/25 bg-teal/5" : "border-border bg-panel2";
+        const dateText = overdue ? `${Number(item.overdue_hours || 0).toLocaleString("tr-TR")} saat gecikmiş` : `${stringValue(item.estimated_date_label)} tahmini`;
+        return <div key={`${String(item.engine_id)}-${String(item.type_key)}`} className={`rounded-lg border p-2.5 ${borderClass}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(item.engine)}</div><div className="mt-0.5 truncate text-[10px] text-muted">{stringValue(item.type)} · {Number(item.period_hours || 0).toLocaleString("tr-TR")} saatlik bakım</div></div><span className={`flex-shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${overdue ? "bg-red/10 text-red" : beforeTarget ? "bg-teal/10 text-teal" : "bg-amber/10 text-amber"}`}>{overdue ? "Tamamlanmamış" : beforeTarget ? "Hedef yıldan önce" : `${Number(item.forecast_year || targetYear).toLocaleString("tr-TR")} planı`}</span></div><div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[9.5px] text-faint"><span>Motor saati: {Number(item.current_hours || 0).toLocaleString("tr-TR")} · Son bakım: {Number(item.last_maintenance_hours || 0).toLocaleString("tr-TR")} · Kalan: {Number(item.remaining_hours || 0).toLocaleString("tr-TR")} saat · Durum: {stringValue(item.status_label)}</span><span className={overdue ? "font-bold text-red" : "font-bold text-amber"}>{dateText}</span></div></div>;
+      })}</div>
+    </div>;
+  }
+
   if (overdueItems.length > 0) {
     return <div className="mt-3 grid gap-2">{overdueItems.map((item) => <div key={`${String(item.engine_id)}-${String(item.type_key)}`} className="rounded-lg border border-red/25 bg-red/5 p-2.5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="truncate text-[11px] font-bold text-text">{stringValue(item.engine)}</div><div className="mt-0.5 truncate text-[10px] text-muted">{stringValue(item.type)}</div></div><span className="flex-shrink-0 rounded-full bg-red/10 px-2 py-1 text-[9px] font-bold text-red">{Number(item.overdue_hours || 0).toLocaleString("tr-TR")} sa gecikme</span></div></div>)}</div>;
   }
@@ -329,6 +370,7 @@ function detailHref(intent?: string): string | null {
   if (intent === "technician_performance") return "/teknisyen-raporu";
   if (intent === "engine_history") return "/rapor";
   if (intent === "overdue") return "/dashboard";
+  if (intent === "maintenance_forecast") return "/tahmin";
   if (intent === "external_service") return "/kayitlar";
   return null;
 }
