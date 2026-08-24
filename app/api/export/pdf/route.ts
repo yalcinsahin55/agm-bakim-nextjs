@@ -2,6 +2,7 @@ import { enginesCollection, recordsCollection, usersCollection } from "@/lib/dbC
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
@@ -112,10 +113,11 @@ async function createForecastPdf(user: { full_name?: string | null }, context: F
   const buffer = await pdfBuffer(doc);
   const suffix = context.periodHours ? `${context.periodHours}h` : context.targetYear ? String(context.targetYear) : "plan";
   const filename = `AGM_Bakim_Tahmin_Plani_${safeFilenamePart(suffix)}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  return new Response(new Blob([buffer as unknown as BlobPart], { type: "application/pdf" }), {
+  return new NextResponse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
+      "Content-Length": String(buffer.byteLength),
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "private, no-store, max-age=0",
       "X-Content-Type-Options": "nosniff",
@@ -226,11 +228,12 @@ async function createPdf(req: NextRequest) {
   doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Oluşturan: ${user.full_name || "AGM Bakım Merkezi"}`, left, doc.page.height - 28, { width: tableWidth, align: "left" });
   const buffer = await pdfBuffer(doc);
   const filename = `AGM_Bakim_Gecmisi_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const pdfBody = new Blob([buffer as unknown as BlobPart], { type: "application/pdf" });
-  return new Response(pdfBody, {
+  const pdfBody = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+  return new NextResponse(pdfBody, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
+      "Content-Length": String(buffer.byteLength),
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },

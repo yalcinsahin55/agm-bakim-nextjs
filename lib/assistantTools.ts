@@ -60,7 +60,12 @@ function periodMatch(query: AssistantQuery): Record<string, unknown> {
     }
   }
   const start = periodStart(query.period);
-  return start ? { created_at: { $gte: start } } : {};
+  return start ? {
+    $or: [
+      { maintenance_start_at: { $gte: start } },
+      { $and: [{ $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }] }, { created_at: { $gte: start } }] },
+    ],
+  } : {};
 }
 
 function escapeRegex(value: string): string {
@@ -197,13 +202,13 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
           { $group: { _id: { engine_id: "$engine_id", engine: "$engine_name", type: "$type_label" }, count: { $sum: 1 } } },
           { $group: { _id: "$_id.engine_id", engine: { $first: "$_id.engine" }, count: { $sum: "$count" }, type_stats: { $push: { type: "$_id.type", count: "$count" } } } },
           { $sort: { count: -1, engine: 1 } },
-          { $limit: 8 },
+          { $limit: 100 },
         ],
         byType: [
           { $group: { _id: { type: "$type_label", engine_id: "$engine_id", engine: "$engine_name" }, count: { $sum: 1 } } },
           { $group: { _id: "$_id.type", count: { $sum: "$count" }, engines: { $push: { engine_id: "$_id.engine_id", engine: "$_id.engine", count: "$count" } } } },
           { $sort: { count: -1, _id: 1 } },
-          { $limit: 8 },
+          { $limit: 100 },
         ],
       },
     },
@@ -238,19 +243,20 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
   const items = buildItems(engines, types);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
   const selectedType = await resolveMaintenanceType(db, query);
-  const overdue = items
+  const matchingOverdue = items
     .filter((item) => item.status === "gecikmis")
     .filter((item) => !query.engineQuery || (selectedEngine && item.engine_id === String(selectedEngine._id)))
     .filter((item) => !query.maintenanceTypeQuery || (selectedType && item.type_key === String(selectedType.key)))
-    .sort((a, b) => a.remaining - b.remaining)
-    .slice(0, 20);
+    .sort((a, b) => a.remaining - b.remaining);
+  const overdue = matchingOverdue.slice(0, 200);
   return {
     intent: "overdue",
     period: "all",
     title: "Gecikmiş bakımlar",
-    summary: overdue.length ? `${overdue.length} gecikmiş bakım bulundu.` : "Şu anda gecikmiş bakım bulunamadı.",
+    summary: matchingOverdue.length ? `${matchingOverdue.length} gecikmiş bakım bulundu.` : "Şu anda gecikmiş bakım bulunamadı.",
     data: {
-      count: overdue.length,
+      count: matchingOverdue.length,
+      displayed_count: overdue.length,
       filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: selectedType ? selectedType.label : query.maintenanceTypeQuery || null, status: "overdue", record_filters: query.recordFilters || [] },
       items: overdue.map((item: PanelItem) => ({
         engine_id: item.engine_id,
@@ -331,16 +337,20 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     return { intent: "engine_history", period: query.period, title: "Motor bakım geçmişi", summary: `“${query.engineQuery}” ile eşleşen motor bulunamadı.`, data: { records: [] } };
   }
   const match = await buildRecordMatch(db, query, engine ? { engine_id: String(engine._id) } : {});
-  const records = await recordsCollection(db).find(
-    match,
-    {
+  const recordsCollectionRef = recordsCollection(db);
+  const [totalRecords, records] = await Promise.all([
+    recordsCollectionRef.countDocuments(match),
+    recordsCollectionRef.find(
+      match,
+      {
       projection: {
         _id: 1, engine_id: 1, engine_name: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
         external_service_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_end_at: 1,
         maintenance_duration_minutes: 1, created_at: 1,
+        },
       },
-    },
-  ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(20).toArray();
+    ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(20).toArray(),
+  ]);
   const safeRecords = records.map((record) => ({
     id: String(record._id),
     engine_id: record.engine_id || null,
@@ -360,8 +370,8 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
     intent: "engine_history",
     period: query.period,
     title: engine ? `${engine.name} bakım geçmişi` : "Motor bakım geçmişi",
-    summary: engine ? `${engine.name} için ${periodLabel(query)} döneminde ${safeRecords.length} bakım kaydı bulundu.` : `${periodLabel(query)} tüm motorlarda ${safeRecords.length} bakım kaydı bulundu.`,
-    data: { engine_id: engine ? String(engine._id) : null, engine: engine?.name || null, current_hours: engine ? Number(engine.hours || 0) : null, date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
+    summary: engine ? `${engine.name} için ${periodLabel(query)} döneminde ${totalRecords} bakım kaydı bulundu.` : `${periodLabel(query)} tüm motorlarda ${totalRecords} bakım kaydı bulundu.`,
+    data: { engine_id: engine ? String(engine._id) : null, engine: engine?.name || null, current_hours: engine ? Number(engine.hours || 0) : null, total_records: totalRecords, displayed_records: safeRecords.length, date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
   };
 }
 
@@ -524,16 +534,18 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
   const totalSupportTasks = resultRows.reduce((sum, item) => sum + item.support_count, 0);
   const totalDuration = resultRows.reduce((sum, item) => sum + item.duration_minutes, 0);
   const topTechnician = resultRows[0];
+  const selectedRow = selected ? resultRows.find((item) => item.technician_id === selected.id || normalizeTechnicianName(item.technician) === normalizeTechnicianName(selected.full_name)) : undefined;
+  const selectedTotalTasks = selectedRow ? selectedRow.responsible_count + selectedRow.support_count : 0;
   const selectedSummary = selected
     ? {
       id: selected.id,
       full_name: selected.full_name,
       technician_type: selected.technician_type,
-      responsible_tasks: resultRows[0]?.responsible_count || 0,
-      support_tasks: resultRows[0]?.support_count || 0,
-      total_tasks: totalTasks,
-      duration_minutes: totalDuration,
-      duration_text: formatMinutes(totalDuration),
+      responsible_tasks: selectedRow?.responsible_count || 0,
+      support_tasks: selectedRow?.support_count || 0,
+      total_tasks: selectedTotalTasks,
+      duration_minutes: selectedRow?.duration_minutes || 0,
+      duration_text: formatMinutes(selectedRow?.duration_minutes || 0),
     }
     : null;
   return {
@@ -541,7 +553,7 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     period: query.period,
     title: selected ? `${selected.full_name} teknisyen özeti` : "Teknisyen performans özeti",
     summary: selected
-      ? `${selected.full_name}, ${periodLabel(query)} döneminde kayıtlara göre toplam ${formatMinutes(totalDuration)} çalıştı. ${totalTasks} görevde yer aldı; ${resultRows[0]?.responsible_count || 0} sorumlu, ${resultRows[0]?.support_count || 0} yardımcı görev.`
+      ? `${selected.full_name}, ${periodLabel(query)} döneminde kayıtlara göre toplam ${formatMinutes(selectedRow?.duration_minutes || 0)} çalıştı. ${selectedTotalTasks} görevde yer aldı; ${selectedRow?.responsible_count || 0} sorumlu, ${selectedRow?.support_count || 0} yardımcı görev.`
       : `${periodLabel(query)} ${totalTasks} teknisyen görevi ve ${formatMinutes(totalDuration)} toplam katkı süresi bulundu.${topTechnician ? ` En çok görev alan teknisyen: ${topTechnician.technician} (${topTechnician.responsible_count + topTechnician.support_count} görev).` : ""}`,
     data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selectedSummary, total_tasks: totalTasks, total_responsible_tasks: totalResponsibleTasks, total_support_tasks: totalSupportTasks, total_duration_minutes: totalDuration, total_duration_text: formatMinutes(totalDuration), top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), technician_details: technicianDetails, activities, by_type: activityByType, by_engine: activityByEngine },
   };
