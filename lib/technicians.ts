@@ -71,11 +71,16 @@ export const EXTERNAL_SERVICE_TECHNICIAN_NAME = "Dış Hizmet / Harici Servis";
 
 const TECHNICIAN_ROLES: User["role"][] = ["teknisyen", "planlamaci"];
 
-/** Aynı kişinin büyük-küçük harf, Unicode ve fazla boşluk farklarını tek anahtarda birleştirir. */
+/** Aynı kişinin büyük-küçük harf, aksan, Unicode ve fazla boşluk farklarını tek anahtarda birleştirir. */
 export function normalizeTechnicianName(value: unknown): string {
-  return typeof value === "string"
-    ? value.normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("tr-TR")
-    : "";
+  if (typeof value !== "string") return "";
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[ıİ]/g, "i")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("tr-TR");
 }
 
 const TECHNICIAN_PROJECTION = {

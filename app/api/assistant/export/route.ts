@@ -304,8 +304,10 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/assistant/export", () => getAssistantExport(req), { request: req }).catch((error) => {
-    console.error("GET /api/assistant/export hatası:", error instanceof Error ? error.name : "UnknownError");
+  return withApiTiming("GET /api/assistant/export", () => getAssistantExport(req), { request: req   }).catch((error) => {
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorMessage = error instanceof Error ? error.message.replace(/[\\r\\n]+/g, " ").slice(0, 240) : "";
+    console.error("GET /api/assistant/export hatası:", JSON.stringify({ name: errorName, message: errorMessage }));
     return jsonError("PDF/Excel raporu hazırlanırken bir hata oluştu.", 500);
   });
 }
