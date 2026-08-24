@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
+import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions, type TechnicianOption } from "@/lib/technicians";
@@ -351,6 +352,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   invalidateMaintenancePanelServerCache();
+  await refreshUserMaintenanceNotificationsBestEffort(db, user);
   return NextResponse.json({ ok: true });
 }
 
@@ -383,6 +385,7 @@ async function deleteRecord(req: NextRequest, { params }: { params: Promise<{ id
   });
 
   invalidateMaintenancePanelServerCache();
+  await refreshUserMaintenanceNotificationsBestEffort(db, user);
   return NextResponse.json({ ok: true });
 }
 

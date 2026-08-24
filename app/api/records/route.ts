@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
 import { writeAuditLog } from "@/lib/audit";
+import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { recomputeLastMaintenance, snapshotTrackingState } from "@/lib/maintenance";
 import { withApiTiming } from "@/lib/performance";
@@ -375,6 +376,7 @@ async function postRecord(req: NextRequest) {
       after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), responsible_technician_duration: responsibleDurationMinutes, technician_contributions: technicianContributions, completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     invalidateMaintenancePanelServerCache();
+    await refreshUserMaintenanceNotificationsBestEffort(db, user);
     return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });
   } catch (error) {
     console.error("POST /api/records hatası:", error);

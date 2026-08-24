@@ -122,6 +122,18 @@ export async function syncMaintenanceNotifications(db: Db, user: User): Promise<
   return notifications || [];
 }
 
+/**
+ * Mutasyonları bildirim senkronizasyonundaki geçici bir hataya bağlamaz.
+ * Böylece bakım kaydı başarıyla kaydedilir; sonraki zil/cron yenilemesi bildirimi toparlar.
+ */
+export async function refreshUserMaintenanceNotificationsBestEffort(db: Db, user: User): Promise<void> {
+  try {
+    await syncMaintenanceNotifications(db, user);
+  } catch (error) {
+    console.error("Bakım bildirimleri senkronize edilemedi:", error instanceof Error ? error.name : "UnknownError");
+  }
+}
+
 export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<{ users: number; actionable: number }> {
   await ensureAppIndexes(db);
   const [users, actionable] = await Promise.all([

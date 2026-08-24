@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,10 @@ export async function PATCH(req: NextRequest) {
       changed++;
     }
 
-    if (changed > 0) invalidateMaintenancePanelServerCache();
+    if (changed > 0) {
+      invalidateMaintenancePanelServerCache();
+      await refreshUserMaintenanceNotificationsBestEffort(db, user);
+    }
     return NextResponse.json({ ok: true, changed });
   } catch (error) {
     console.error("Motor saatleri güncellenirken hata:", error);
