@@ -58,6 +58,23 @@ body > div {
   box-shadow: 0 6px 24px rgba(232, 149, 47, .10);
 }
 
+/* Asistan sonuçları uzun motor/teknisyen adlarında yatay taşmamalı. */
+.assistant-result,
+.assistant-result * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.assistant-result {
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  .assistant-question-bar {
+    position: static;
+  }
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
