@@ -222,7 +222,7 @@ async function createExcel(result: AssistantToolResponse, question: string): Pro
 
 async function createPdf(result: AssistantToolResponse, question: string): Promise<Response> {
   const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
-  const doc = new PDFDocument({ size: "A4", margins: { top: 42, bottom: 42, left: 42, right: 42 }, autoFirstPage: true });
+  const doc = new PDFDocument({ size: "A4", margins: { top: 42, bottom: 42, left: 42, right: 42 }, font: fontRegular, autoFirstPage: true });
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   const heading = () => {

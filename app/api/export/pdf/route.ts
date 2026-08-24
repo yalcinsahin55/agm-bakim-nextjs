@@ -36,7 +36,7 @@ function safeFilenamePart(value: string): string {
 
 async function createForecastPdf(user: { full_name?: string | null }, context: ForecastExportContext): Promise<Response> {
   const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
-  const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 30, right: 30 }, autoFirstPage: true });
+  const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 30, right: 30 }, font: fontRegular, autoFirstPage: true });
   const left = doc.page.margins.left;
   const columnWidths = [58, 86, 55, 55, 48, 56, 70, 65];
   const columnLabels = ["Motor", "Bakım Türü", "Periyot", "Motor Saati", "Son Bakım", "Kalan/Gecikme", "Tahmini Tarih", "Durum"];
@@ -145,7 +145,7 @@ async function createPdf(req: NextRequest) {
   ]);
 
   const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
-  const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 36, right: 36 }, autoFirstPage: true });
+  const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 36, right: 36 }, font: fontRegular, autoFirstPage: true });
   const title = selectedEngine ? `${selectedEngine.name} Bakım Geçmişi` : "Tüm Motorların Bakım Geçmişi";
   const left = doc.page.margins.left;
   const tableWidth = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
