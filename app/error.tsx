@@ -1,6 +1,6 @@
 "use client";
 
-export default function Error({ error, reset }) {
+export default function Error({ reset }) {
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-6">
       <div className="text-center bg-panel border border-border rounded-card p-6 max-w-sm w-full animate-fade-in">

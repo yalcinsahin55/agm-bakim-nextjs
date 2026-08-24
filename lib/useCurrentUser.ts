@@ -4,8 +4,8 @@ import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
 import type { TechnicianType, WorkDomain } from "@/lib/types";
 
 interface CurrentUser {
-  id?: string;
-  _id: string;
+  id: string;
+  _id?: string;
   full_name: string;
   email?: string;
   phone?: string;

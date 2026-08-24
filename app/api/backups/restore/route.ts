@@ -11,8 +11,6 @@ export const dynamic = "force-dynamic";
 const ALLOWED_COLLECTIONS = ["engines", "maintenance_types", "maintenance_records", "oil_analyses"] as const;
 const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64", "__proto__", "prototype", "constructor"]);
 
-type AllowedCollection = typeof ALLOWED_COLLECTIONS[number];
-
 function clean(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(clean);
   if (!value || typeof value !== "object") return value;

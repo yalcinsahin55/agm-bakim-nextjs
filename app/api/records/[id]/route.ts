@@ -134,7 +134,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     update.other_technician_ids = [];
     update.other_technicians = [];
   } else {
-    if (record.technician_source === "external_service" && typeof responsible_technician_id !== "string") {
+    if ((record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID) && typeof responsible_technician_id !== "string") {
       return NextResponse.json({ error: "Dış hizmet kaydını kayıtlı teknisyene çevirmek için sorumlu teknisyen seçin." }, { status: 400 });
     }
     if (typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id) {
@@ -196,12 +196,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const responsibleDurationMinutes = nextResponsibleId === record.technician_id && typeof existingResponsibleContribution?.duration_minutes === "number"
     ? existingResponsibleContribution.duration_minutes
     : nextDurationMinutes ?? 0;
+  const existingSupportContributions: Map<string, { duration_minutes?: unknown }> = new Map(
+    (Array.isArray(record.technician_contributions) ? record.technician_contributions : [])
+      .filter((contribution: any) => contribution?.contribution_role === "support" && typeof contribution.id === "string")
+      .map((contribution: any) => [contribution.id, { duration_minutes: contribution.duration_minutes }] as const),
+  );
+  const supportDurationMinutes = (technicianId: string): number => {
+    const requestedDuration = other_technician_durations?.[technicianId];
+    if (requestedDuration !== undefined) return normalizeTechnicianContributionDuration(requestedDuration, nextDurationMinutes ?? 0);
+    const existingDuration = existingSupportContributions.get(technicianId)?.duration_minutes;
+    return typeof existingDuration === "number"
+      ? normalizeTechnicianContributionDuration(existingDuration, nextDurationMinutes ?? 0)
+      : normalizeTechnicianContributionDuration(undefined, nextDurationMinutes ?? 0);
+  };
   const technicianContributions = useExternalService ? [] : [
     { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: responsibleDurationMinutes },
     ...effectiveOtherTechnicians.map((technician) => ({
       ...technician,
       contribution_role: "support",
-      duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0),
+      duration_minutes: supportDurationMinutes(technician.id),
     })),
   ];
   update.technician_contributions = technicianContributions;

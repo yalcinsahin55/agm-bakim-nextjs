@@ -382,7 +382,7 @@ export default function KarterBasinciPage() {
             {numericHistory.length >= 2 && (
               <div className="mb-3">
                 <MiniLineChart
-                  points={numericHistory.map((r, i) => ({
+                  points={numericHistory.map((r) => ({
                     y: r.pressure_bar,
                     label: new Date(r.reading_date).toLocaleDateString("tr-TR")
                   }))}
