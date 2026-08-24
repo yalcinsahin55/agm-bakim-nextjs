@@ -219,7 +219,7 @@ async function createExcel(result: AssistantToolResponse, question: string): Pro
 async function createPdf(result: AssistantToolResponse, question: string): Promise<Response> {
   const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
   const boldFont = path.join(process.cwd(), "public/fonts/agm-noto-sans-bold.ttf");
-  const hasFonts = fs.existsSync(regularFont) && fs.existsSync(boldFont);
+  const hasFonts = false;
   const doc = new PDFDocument({ size: "A4", margins: { top: 42, bottom: 42, left: 42, right: 42 }, autoFirstPage: true });
   const fontRegular = hasFonts ? regularFont : "Helvetica";
   const fontBold = hasFonts ? boldFont : "Helvetica-Bold";
