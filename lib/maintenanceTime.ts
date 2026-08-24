@@ -43,6 +43,18 @@ export function normalizeTechnicianContributionDuration(value: unknown, fallback
   return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 60;
 }
 
+export function minutesToHoursInput(minutes: number | undefined | null): string {
+  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) return "";
+  return String(Math.round((minutes / 60) * 100) / 100);
+}
+
+export function hoursInputToMinutes(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const hours = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(hours) || hours < 0) return null;
+  return Math.round(hours * 60);
+}
+
 export function formatMaintenanceDuration(minutes: number | undefined | null): string {
   if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) return "—";
   if (minutes === 0) return "0 dk";

@@ -251,9 +251,12 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
+  const initialResponsibleContribution = (record.technician_contributions || []).find((contribution) => contribution.contribution_role === "responsible");
+  const initialResponsibleMinutes = typeof initialResponsibleContribution?.duration_minutes === "number" ? initialResponsibleContribution.duration_minutes : record.maintenance_duration_minutes;
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
   const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
+  const [responsibleTechnicianDuration, setResponsibleTechnicianDuration] = useState<string | number>(minutesToHoursInput(initialResponsibleMinutes));
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const [busy, setBusy] = useState(false);
@@ -406,6 +409,15 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       toast.error("Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin.");
       return;
     }
+    const responsibleDurationMinutes = isAdmin && technicianSource !== "external_service" ? hoursInputToMinutes(String(responsibleTechnicianDuration)) : null;
+    if (isAdmin && technicianSource !== "external_service" && (!responsibleDurationMinutes || responsibleDurationMinutes <= 0)) {
+      toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
+      return;
+    }
+    if (isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null && responsibleDurationMinutes > maintenanceDurationMinutes) {
+      toast.error("Sorumlu teknisyen süresi toplam bakım süresini aşamaz.");
+      return;
+    }
     setBusy(true);
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
     const payload = {
@@ -424,6 +436,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       technician_source: technicianSource,
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
+      responsible_technician_duration: isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null ? responsibleDurationMinutes : undefined,
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -469,10 +482,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         {technicianSource === "external_service" ? <>
           <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber" />
           <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu kayıt teknisyen performansına dahil edilmez ve yalnızca yönetici tarafından düzenlenebilir.</div>
-        </> : <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
+        </> : <> <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
           {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
           {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</option>)}
-        </select>}
+        </select>
+        <label className="mt-2 block text-[10px] font-bold text-muted">Sorumlu teknisyen çalışma süresi (saat)
+          <input type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
+        </label>
+        <div className="mt-1 text-[9.5px] text-faint">Her kişinin gerçek çalışma süresini ayrı gir. Varsayılan değer kaydın mevcut sorumlu süresidir.</div></>}
       </div>}
       <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
       <input
@@ -516,7 +533,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       {technicianSource !== "external_service" && supportTechnicians.length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
         <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan kişileri seç.</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{supportTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: normalizeTechnicianContributionDuration(current[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60) } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi (dk)<input type="number" min="0" max={366 * 24 * 60} step="15" value={normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{supportTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: normalizeTechnicianContributionDuration(current[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60) } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi ({isAdmin ? "saat" : "dk"})<input type="number" min="0" max={isAdmin ? 8784 : 366 * 24 * 60} step={isAdmin ? "0.25" : "15"} value={isAdmin ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: isAdmin ? (hoursInputToMinutes(event.target.value) ?? 0) : Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
       </div>}
 
       {offlineMedia.length > 0 && (

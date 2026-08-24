@@ -16,7 +16,7 @@ import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_T
 import type { MaintenanceType, VideoRef } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -131,6 +131,7 @@ export default function TamamlaPage() {
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState("");
+  const [responsibleTechnicianDuration, setResponsibleTechnicianDuration] = useState<string | number>("");
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>([]);
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, string | number>>({});
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
@@ -281,6 +282,8 @@ export default function TamamlaPage() {
   const checklistComplete = checklistItems.length > 0 && checklistItems.every((item) => checklist[item] === true);
   const maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt);
   const timeTrackingReady = maintenanceDurationMinutes !== null;
+  const isManagerInternalRecord = user?.role === "yonetici" && technicianSource !== "external_service";
+  const responsibleDurationMinutes = isManagerInternalRecord ? hoursInputToMinutes(responsibleTechnicianDuration) : null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0;
 
   async function handlePhotos(e: ChangeEvent<HTMLInputElement>) {
@@ -438,6 +441,12 @@ export default function TamamlaPage() {
   const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && isEligibleForRole(technician, "support"));
 
   useEffect(() => {
+    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleTechnicianDuration === "") {
+      setResponsibleTechnicianDuration(minutesToHoursInput(maintenanceDurationMinutes));
+    }
+  }, [isManagerInternalRecord, maintenanceDurationMinutes, responsibleTechnicianDuration]);
+
+  useEffect(() => {
     setOtherTechnicianIds((current) => {
       const next = current.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
       return next.length === current.length ? current : next;
@@ -464,6 +473,24 @@ export default function TamamlaPage() {
       toast.error("Bakım kanıtı için en az bir not, fotoğraf veya video ekleyin.");
       return;
     }
+    if (isManagerInternalRecord && (!responsibleDurationMinutes || responsibleDurationMinutes <= 0)) {
+      toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
+      return;
+    }
+    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleDurationMinutes !== null && responsibleDurationMinutes > maintenanceDurationMinutes) {
+      toast.error("Sorumlu teknisyen süresi toplam bakım süresini aşamaz.");
+      return;
+    }
+    const selectedSupportIds = otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
+    const selectedSupportDurations = selectedSupportIds.map((id) => normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 0));
+    if (isManagerInternalRecord && selectedSupportDurations.some((duration) => duration <= 0)) {
+      toast.error("Seçilen her destek teknisyeni için 0’dan büyük çalışma süresini saat olarak girin.");
+      return;
+    }
+    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && selectedSupportDurations.some((duration) => duration > maintenanceDurationMinutes)) {
+      toast.error("Destek teknisyeni süresi toplam bakım süresini aşamaz.");
+      return;
+    }
     
     setSubmitting(true);
     
@@ -485,7 +512,8 @@ export default function TamamlaPage() {
     const payload = {
       engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
       technician_source: technicianSource,
-      ...(user?.role === "yonetici" && technicianSource !== "external_service" && responsibleTechnicianId ? { responsible_technician_id: responsibleTechnicianId } : {}),
+      ...(isManagerInternalRecord && responsibleTechnicianId ? { responsible_technician_id: responsibleTechnicianId } : {}),
+      ...(isManagerInternalRecord && responsibleDurationMinutes !== null ? { responsible_technician_duration: responsibleDurationMinutes } : {}),
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       hour_at_completion: Number(hours), technician_note: techNote,
       time_tracking_version: TIME_TRACKING_VERSION,
@@ -681,6 +709,10 @@ export default function TamamlaPage() {
               <option value="">Varsayılan: benim hesabım</option>
               {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}
             </select>
+            <label className="mt-2 block text-[10.5px] font-bold text-muted" htmlFor="responsible-technician-duration">Sorumlu teknisyen çalışma süresi (saat)
+              <input id="responsible-technician-duration" type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration === "" ? minutesToHoursInput(maintenanceDurationMinutes ?? 60) : responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-purple-400" />
+            </label>
+            <div className="mt-1 text-[10px] text-faint">Varsayılan değer toplam bakım süresidir; birden fazla gün süren bakımda gerçek kişi süresini girin.</div>
           </div>}
         </div>}
 
@@ -694,7 +726,7 @@ export default function TamamlaPage() {
           <div className="text-[11.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan ekip üyelerini seçebilirsin.</div>
           <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi (dk)<input type="number" min="0" max={366 * 24 * 60} step="15" value={normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
+            {selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11.5px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name} <span className="text-[10px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1.5 ml-6 flex items-center gap-1.5 text-[10px] text-faint">Bu bakımda çalışma süresi ({user?.role === "yonetici" ? "saat" : "dk"})<input type="number" min="0" max={user?.role === "yonetici" ? 8784 : 366 * 24 * 60} step={user?.role === "yonetici" ? "0.25" : "15"} value={user?.role === "yonetici" ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: user?.role === "yonetici" ? (hoursInputToMinutes(event.target.value) ?? 0) : event.target.value }))} className="w-20 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[11px] text-text" /></label>}</div>)}
           </div>
         </div>}
 

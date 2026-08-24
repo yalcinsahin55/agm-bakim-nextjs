@@ -57,6 +57,7 @@ export const recordSchema = z.object({
   type_label: z.string().min(1, "Bakım türü adı zorunludur."),
   technician_source: z.enum(["internal", "external_service"]).optional(),
   responsible_technician_id: z.string().min(1).max(100).optional(),
+  responsible_technician_duration: z.number().int("Sorumlu teknisyen süresi tam dakika olmalıdır.").nonnegative("Sorumlu teknisyen süresi negatif olamaz.").max(366 * 24 * 60, "Sorumlu teknisyen süresi mantık dışı büyük.").optional(),
   external_service_name: z.string().trim().max(160, "Dış hizmet adı çok uzun.").optional().or(z.literal("")),
 
   hour_at_completion: z

@@ -159,7 +159,7 @@ async function postRecord(req: NextRequest) {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
-      maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, external_service_name,
+      maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
     } = parsed.data as RecordInput;
 
     if (legacyMediaTooLarge(photos_b64, videos)) {
@@ -205,6 +205,12 @@ async function postRecord(req: NextRequest) {
     if (useExternalService && user.role !== "yonetici") {
       return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler oluşturabilir." }, { status: 403 });
     }
+    if (responsible_technician_duration !== undefined && (user.role !== "yonetici" || useExternalService)) {
+      return NextResponse.json({ error: "Sorumlu teknisyen çalışma süresini yalnızca yönetici, iç ekip kayıtlarında girebilir." }, { status: 403 });
+    }
+    if (user.role === "yonetici" && !useExternalService && (!Number.isFinite(responsible_technician_duration) || Number(responsible_technician_duration) <= 0)) {
+      return NextResponse.json({ error: "Yönetici kayıtlarında sorumlu teknisyen için 0’dan büyük çalışma süresi girilmelidir." }, { status: 400 });
+    }
     if (!useExternalService && responsible_technician_id !== undefined && user.role !== "yonetici") {
       return NextResponse.json({ error: "Sorumlu teknisyeni bakım tamamlama sırasında yalnızca yöneticiler seçebilir." }, { status: 403 });
     }
@@ -248,14 +254,22 @@ async function postRecord(req: NextRequest) {
       return NextResponse.json({ error: "Seçilen yardımcı teknisyenlerden biri bu bakım türü için yetkili değil." }, { status: 403 });
     }
     const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
+    const responsibleDurationMinutes = useExternalService
+      ? 0
+      : user.role === "yonetici"
+        ? Number(responsible_technician_duration)
+        : maintenanceDurationMinutes || 0;
     const technicianContributions: MaintenanceTechnicianContribution[] = useExternalService ? [] : [
-      { id: responsibleTechnicianId, full_name: responsibleTechnicianName, technician_type: responsibleTechnicianType, contribution_role: "responsible" as const, duration_minutes: maintenanceDurationMinutes || 0 },
+      { id: responsibleTechnicianId, full_name: responsibleTechnicianName, technician_type: responsibleTechnicianType, contribution_role: "responsible" as const, duration_minutes: responsibleDurationMinutes },
       ...otherTechnicians.map((technician) => ({
         ...technician,
         contribution_role: "support" as const,
         duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], maintenanceDurationMinutes ?? 0),
       })),
     ];
+    if (!useExternalService && maintenanceDurationMinutes !== null && technicianContributions.some((contribution) => contribution.duration_minutes > maintenanceDurationMinutes)) {
+      return NextResponse.json({ error: "Kişi çalışma süresi toplam bakım süresini aşamaz." }, { status: 400 });
+    }
     const primaryType = await typesCol.findOne({ _id: type_key }, { projection: { engine_states: 1 } });
     const primaryPreviousTrackingState = snapshotTrackingState(primaryType?.engine_states?.[engine_id]);
     const primaryTrackingAutoCreated = typeof period === "number" && (!primaryType?.engine_states?.[engine_id] || primaryType.engine_states[engine_id]?.tracking_source === "record");
@@ -358,7 +372,7 @@ async function postRecord(req: NextRequest) {
       entity: "maintenance_record",
       entityId: groupId,
       summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu${shouldConfirmOnCreate ? " ve yönetici tarafından teyit edildi" : "; yönetici teyidi bekleniyor"}`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), responsible_technician_duration: responsibleDurationMinutes, technician_contributions: technicianContributions, completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     invalidateMaintenancePanelServerCache();
     return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });

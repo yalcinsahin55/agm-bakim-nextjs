@@ -72,7 +72,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
 
   if (legacyMediaTooLarge(photos_b64, videos)) {
     return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
@@ -101,7 +101,13 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   const requestedSource = technician_source === "external_service" || technician_source === "internal" ? technician_source : undefined;
   const useExternalService = requestedSource === "external_service" || (requestedSource === undefined && (record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID));
   if (useExternalService && user.role !== "yonetici") {
-    return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler düzenleyebilir." }, { status: 403 });
+    return NextResponse.json({ error: "Dış hizmet kaydını yalnızca yöneticiler düzenleyebilir." }, { status: 403 });
+  }
+  if (responsible_technician_duration !== undefined && (user.role !== "yonetici" || useExternalService)) {
+    return NextResponse.json({ error: "Sorumlu teknisyen çalışma süresini yalnızca yönetici, iç ekip kayıtlarında düzenleyebilir." }, { status: 403 });
+  }
+  if (responsible_technician_duration !== undefined && (!Number.isFinite(responsible_technician_duration) || responsible_technician_duration <= 0)) {
+    return NextResponse.json({ error: "Sorumlu teknisyen için 0’dan büyük çalışma süresi girilmelidir." }, { status: 400 });
   }
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
   const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item) => item.type_key) : [];
@@ -205,9 +211,11 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   const existingResponsibleContribution = Array.isArray(record.technician_contributions)
     ? record.technician_contributions.find((contribution) => contribution?.id === nextResponsibleId && contribution?.contribution_role === "responsible")
     : undefined;
-  const responsibleDurationMinutes = nextResponsibleId === record.technician_id && typeof existingResponsibleContribution?.duration_minutes === "number"
-    ? existingResponsibleContribution.duration_minutes
-    : nextDurationMinutes ?? 0;
+  const responsibleDurationMinutes = user.role === "yonetici" && responsible_technician_duration !== undefined
+    ? responsible_technician_duration
+    : nextResponsibleId === record.technician_id && typeof existingResponsibleContribution?.duration_minutes === "number"
+      ? existingResponsibleContribution.duration_minutes
+      : nextDurationMinutes ?? 0;
   const existingSupportContributions: Map<string, { duration_minutes?: unknown }> = new Map(
     (Array.isArray(record.technician_contributions) ? record.technician_contributions : [])
       .filter((contribution) => contribution?.contribution_role === "support" && typeof contribution.id === "string")
@@ -229,6 +237,12 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
       duration_minutes: supportDurationMinutes(technician.id),
     })),
   ];
+  if (user.role === "yonetici" && !useExternalService && technicianContributions.some((contribution) => contribution.duration_minutes <= 0)) {
+    return NextResponse.json({ error: "İç ekipteki her teknisyen için 0’dan büyük çalışma süresi girilmelidir." }, { status: 400 });
+  }
+  if (!useExternalService && nextDurationMinutes !== null && technicianContributions.some((contribution) => contribution.duration_minutes > nextDurationMinutes)) {
+    return NextResponse.json({ error: "Kişi çalışma süresi toplam bakım süresini aşamaz." }, { status: 400 });
+  }
   update.technician_contributions = technicianContributions;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
