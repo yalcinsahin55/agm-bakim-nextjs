@@ -75,7 +75,6 @@ function contributionRows(record: MaintenanceRecordDocument): StoredContribution
 async function postConfirmation(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -84,6 +83,7 @@ async function postConfirmation(req: NextRequest, { params }: { params: Promise<
   }
   const rateLimited = await enforceApiRateLimit(req, "record-confirm", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  await ensureAppIndexes(db);
   if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Kayıt kimliği geçersiz." }, { status: 400 });
   }

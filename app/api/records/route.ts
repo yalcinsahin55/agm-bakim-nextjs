@@ -47,10 +47,10 @@ function encodeRecordCursor(record: { created_at?: Date | string; _id?: unknown 
 async function getRecords(req: NextRequest) {
   try {
     const db = await getDb();
-    await ensureAppIndexes(db);
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    await ensureAppIndexes(db);
 
     const { searchParams } = new URL(req.url);
     const engineId = searchParams.get("engine_id");
@@ -61,6 +61,9 @@ async function getRecords(req: NextRequest) {
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
     const includeMedia = searchParams.get("include_media") === "true";
+    if (includeMedia) {
+      return NextResponse.json({ error: "Liste endpointinde medya gönderilmez; medya için /api/records/{id}?include_media=true kullanın." }, { status: 400 });
+    }
     const sortDirection = searchParams.get("sort") === "asc" ? 1 : -1;
     const sortSpec = { maintenance_start_at: sortDirection, created_at: sortDirection, _id: sortDirection } as const;
     const legacyLimit = searchParams.get("limit");
@@ -140,10 +143,10 @@ async function postRecord(req: NextRequest) {
   try {
     operationStep = "connect_db";
     const db = await getDb();
-    await ensureAppIndexes(db);
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    await ensureAppIndexes(db);
     const currentUser = user;
     if (user.role === "goruntuleyici") {
       return NextResponse.json({ error: "Görüntüleyici rolü bakım tamamlayamaz." }, { status: 403 });

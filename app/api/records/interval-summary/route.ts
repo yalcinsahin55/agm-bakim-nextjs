@@ -11,10 +11,10 @@ export const dynamic = "force-dynamic";
 async function getIntervalSummary(req: NextRequest) {
   try {
     const db = await getDb();
-    await ensureAppIndexes(db);
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    await ensureAppIndexes(db);
 
     const engineId = new URL(req.url).searchParams.get("engine_id");
     const match: Record<string, string> = {};

@@ -41,7 +41,7 @@ export async function buildForecastExportContext(db: Db, searchParams: URLSearch
   const excludedTypeLabels = listParam(searchParams.get("exclude_type_label"));
   const status = statusParam(searchParams.get("status"));
   const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const selectedEngine = engineId ? engines.find((engine) => String(engine._id) === engineId || engine.name === engineId) : undefined;

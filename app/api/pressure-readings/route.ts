@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,20 @@ export async function GET(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = await enforceApiRateLimit(req, "pressure-readings-list", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
+    await ensureAppIndexes(db);
 
     const { searchParams } = new URL(req.url);
     const engineId = searchParams.get("engine_id");
     const query = engineId ? { engine_id: engineId } : {};
 
-    const readings = await pressureReadingsCollection(db).find(query).sort({ reading_date: 1 }).toArray();
+    const readings = await pressureReadingsCollection(db).find(query, {
+      projection: {
+        _id: 1, engine_id: 1, engine_name: 1, reading_date: 1, load_kw: 1, pressure_bar: 1,
+        status: 1, new_type: 1, note: 1, uploaded_by: 1, uploaded_by_id: 1, created_at: 1,
+      },
+    }).sort({ reading_date: 1, created_at: 1 }).toArray();
     return NextResponse.json(readings);
   } catch (error) {
     console.error("Karter basınç verileri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
@@ -52,6 +61,7 @@ export async function POST(req: NextRequest) {
     if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     const rateLimited = await enforceApiRateLimit(req, "pressure-reading-create", 60, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
+    await ensureAppIndexes(db);
 
     const body = await req.json() as PressureRequestBody;
     const { reading_date } = body;

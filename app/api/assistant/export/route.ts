@@ -448,8 +448,14 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
 
   const policy = evaluateAssistantQuestion(question);
   if (!policy.ok || !policy.query) return jsonError(policy.message || "Bu soru rapora dönüştürülemedi.", 400);
-  const baseResult = await runAssistantTool(db, policy.query, { userId: user._id });
-  const options = normalizeExportOptions(policy.query.intent, baseResult.data, {
+  const requestedExcludedTypes = String(searchParams.get("exclude_type_label") || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+  const query = requestedExcludedTypes.length ? { ...policy.query, excludedTypeLabels: requestedExcludedTypes } : policy.query;
+  const resultFromQuery = await runAssistantTool(db, query, { userId: user._id });
+  const options = normalizeExportOptions(policy.query.intent, resultFromQuery.data, {
     preset: searchParams.get("preset"),
     columns: searchParams.get("columns"),
     sheets: searchParams.get("sheets"),
@@ -459,12 +465,12 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
     sort: searchParams.get("sort"),
     include_logo: searchParams.get("include_logo"),
     include_footer: searchParams.get("include_footer"),
+    logo_url: searchParams.get("logo_url"),
     exclude_type_label: searchParams.get("exclude_type_label"),
   });
-  const query = options.excludedTypes.length ? { ...policy.query, excludedTypeLabels: options.excludedTypes } : policy.query;
   const result = options.excludedTypes.length
-    ? applyExportTypeExclusions(await runAssistantTool(db, query, { userId: user._id }), options.excludedTypes)
-    : baseResult;
+    ? applyExportTypeExclusions(resultFromQuery, options.excludedTypes)
+    : resultFromQuery;
   return format === "pdf" ? createPdf(result, question, options) : createExcel(result, question, options);
 }
 

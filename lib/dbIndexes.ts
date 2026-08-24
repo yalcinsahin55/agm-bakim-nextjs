@@ -27,6 +27,8 @@ export function ensureAppIndexes(db: Db): Promise<void> {
     const users = db.collection("users");
     const pushSubscriptions = db.collection("push_subscriptions");
     const videoChunks = db.collection("video_chunks");
+    const oilAnalyses = db.collection("oil_analyses");
+    const pressureReadings = db.collection("pressure_readings");
 
     global._agmIndexPromise = Promise.all([
       createIndexSafely(records, { engine_id: 1, type_label: 1, created_at: -1 }),
@@ -58,6 +60,10 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(videoChunks, { upload_id: 1, index: 1 }, { name: "video_chunks_upload_index" }),
       createIndexSafely(videoChunks, { upload_id: 1, owner_id: 1, index: 1 }, { name: "video_chunks_owner_upload_index" }),
       createIndexSafely(videoChunks, { at: 1 }, { expireAfterSeconds: 24 * 60 * 60, name: "video_chunks_at_ttl" }),
+      createIndexSafely(oilAnalyses, { engine_id: 1, analysis_date: -1, created_at: -1 }, { name: "oil_analyses_engine_date_desc" }),
+      createIndexSafely(oilAnalyses, { analysis_date: -1, created_at: -1 }, { name: "oil_analyses_date_desc" }),
+      createIndexSafely(pressureReadings, { engine_id: 1, reading_date: 1, created_at: 1 }, { name: "pressure_readings_engine_date_asc" }),
+      createIndexSafely(pressureReadings, { reading_date: 1, created_at: 1 }, { name: "pressure_readings_date_asc" }),
     ]).then(() => undefined);
   }
 

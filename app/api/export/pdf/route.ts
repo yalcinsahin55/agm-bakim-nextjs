@@ -122,22 +122,26 @@ async function createForecastPdf(user: { full_name?: string | null }, context: F
 
 async function createPdf(req: NextRequest) {
   const db = await getDb();
-  await ensureAppIndexes(db);
   const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "export-pdf", 12, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  await ensureAppIndexes(db);
 
   const { searchParams } = new URL(req.url);
   if (searchParams.get("forecast") === "1") {
     return createForecastPdf(user, await buildForecastExportContext(db, searchParams));
   }
-  const engineFilter = searchParams.get("engine_id");
+  const engineFilter = searchParams.get("engine_id")?.trim() || null;
   const query = await buildMaintenanceRecordQuery(db, searchParams);
 
-  const engines = await enginesCollection(db).find({}, { projection: { _id: 1, name: 1 } }).toArray();
-  const selectedEngine = engineFilter ? engines.find((engine) => engine._id === engineFilter || engine.name === engineFilter) : null;
+  const selectedEngine = engineFilter
+    ? await enginesCollection(db).findOne(
+      { $or: [{ _id: engineFilter }, { name: engineFilter }] },
+      { projection: { _id: 1, name: 1 } },
+    )
+    : null;
   const recordsCol = recordsCollection(db);
   const [total, records] = await Promise.all([
     recordsCol.countDocuments(query),

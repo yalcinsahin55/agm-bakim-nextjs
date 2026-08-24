@@ -9,15 +9,10 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const runtime = "nodejs";
 
-const allowedContentTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-  "video/mp4",
-  "video/webm",
-  "video/quicktime",
-];
+const photoContentTypes = ["image/jpeg", "image/png", "image/webp"];
+const oilAnalysisContentTypes = ["application/pdf"];
+const maxPhotoSize = 4 * 1024 * 1024;
+const maxOilAnalysisSize = 10 * 1024 * 1024;
 
 function isAllowedPathname(pathname: unknown): pathname is string {
   return typeof pathname === "string" && pathname.length <= 220 && /^(photos|oil-analyses)\/[^/\\.][^/]*$/.test(pathname) && !pathname.includes("..") && !pathname.includes("\0");
@@ -44,12 +39,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname) => {
         if (!isAllowedPathname(pathname)) throw new Error("Geçersiz dosya yolu.");
-        const pathAllowedContentTypes = pathname.startsWith("oil-analyses/") ? ["application/pdf"] : allowedContentTypes.filter((type) => type !== "application/pdf");
+        const isOilAnalysis = pathname.startsWith("oil-analyses/");
         return {
-        allowedContentTypes: pathAllowedContentTypes,
-        maximumSizeInBytes: 100 * 1024 * 1024,
-        addRandomSuffix: true,
-        tokenPayload: JSON.stringify({ userId: user._id, pathname }),
+          allowedContentTypes: isOilAnalysis ? oilAnalysisContentTypes : photoContentTypes,
+          maximumSizeInBytes: isOilAnalysis ? maxOilAnalysisSize : maxPhotoSize,
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId: user._id, pathname }),
         };
       },
       onUploadCompleted: async () => {
@@ -59,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error("Blob upload token hatası:", error);
+    console.error("Blob upload token hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Dosya yükleme yetkilendirmesi başarısız." }, { status: 500 });
   }
 }

@@ -103,14 +103,19 @@ async function getExcelExport(req: NextRequest) {
   if (searchParams.get("forecast") === "1") {
     return createForecastExcel(await buildForecastExportContext(db, searchParams));
   }
-  const engineFilter = searchParams.get("engine_id");
+  const engineFilter = searchParams.get("engine_id")?.trim() || null;
   const typeFilter = searchParams.get("type_label");
   const recordQuery = await buildMaintenanceRecordQuery(db, searchParams);
 
-  const allEngines = await enginesCollection(db).find().toArray();
-  allEngines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
-  const engines = engineFilter ? allEngines.filter((engine) => engine._id === engineFilter || engine.name === engineFilter) : allEngines;
-  const types = await maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }).toArray();
+  const engineQuery = engineFilter ? { $or: [{ _id: engineFilter }, { name: engineFilter }] } : {};
+  const engines = await enginesCollection(db).find(engineQuery, {
+    projection: { _id: 1, name: 1, hours: 1, load_kw: 1 },
+  }).toArray();
+  engines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
+  const types = await maintenanceTypesCollection(db).find(
+    { is_deleted: { $ne: true } },
+    { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } },
+  ).toArray();
   const items = buildItems(engines, types).filter((item) => !typeFilter || item.type_label === typeFilter);
 
   const workbook = new ExcelJS.Workbook();

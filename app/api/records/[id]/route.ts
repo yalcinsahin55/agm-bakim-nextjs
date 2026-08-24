@@ -33,10 +33,10 @@ function canModify(user: User, record: MaintenanceRecordDocument): boolean {
 async function getRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  await ensureAppIndexes(db);
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
@@ -64,12 +64,12 @@ async function getRecord(req: NextRequest, { params }: { params: Promise<{ id: s
 async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   const rateLimited = await enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  await ensureAppIndexes(db);
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
@@ -405,12 +405,12 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
 async function deleteRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   const rateLimited = await enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  await ensureAppIndexes(db);
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });

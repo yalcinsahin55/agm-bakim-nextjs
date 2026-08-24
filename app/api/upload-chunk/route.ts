@@ -23,13 +23,13 @@ function isInteger(value: unknown): value is number {
 
 async function postUploadChunk(req: NextRequest) {
   const db = await getDb();
-  await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap video yükleyemez." }, { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "video-upload", 600, 30 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
+  await ensureAppIndexes(db);
 
   const rawBody: unknown = await req.json();
   if (!isObjectRecord(rawBody)) return NextResponse.json({ error: "Geçersiz video isteği." }, { status: 400 });

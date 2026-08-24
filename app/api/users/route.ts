@@ -43,13 +43,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
-    await ensureAppIndexes(db);
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
     const rateLimited = await enforceApiRateLimit(req, "user-create", 30, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
+    await ensureAppIndexes(db);
 
     const parsed = adminUserSchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) {

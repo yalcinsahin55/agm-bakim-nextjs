@@ -121,7 +121,7 @@ async function resolveMaintenanceType(db: Db, query: AssistantQuery) {
 async function statusPairs(db: Db, status: AssistantStatusFilter | undefined): Promise<Array<{ engine_id: string; type_key: string }>> {
   if (!status) return [];
   const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const targetStatus = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
@@ -278,7 +278,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
 
 async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const items = buildItems(engines, types);
@@ -318,7 +318,7 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
 
 async function getMaintenanceForecast(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const targetYear = validForecastYear(query.targetYear);
@@ -863,7 +863,7 @@ async function getTechnicianDirectory(db: Db, query: AssistantQuery): Promise<As
 
 async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
