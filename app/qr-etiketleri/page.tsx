@@ -5,7 +5,6 @@ import QRCode from "qrcode";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
-import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 
 type Engine = { _id: string; name: string };
@@ -113,10 +112,10 @@ export default function QrEtiketleriPage() {
   }
 
   if (loading) {
-    return <div><TopBar title="QR Etiketleri" subtitle="Etiketler hazırlanıyor..." /><div className="grid grid-cols-2 gap-3 px-4 py-4 md:grid-cols-3"><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></div><BottomNav /></div>;
+    return <div><TopBar title="QR Etiketleri" subtitle="Etiketler hazırlanıyor..." /><div className="grid grid-cols-2 gap-3 px-4 py-4 md:grid-cols-3"><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /><Skeleton className="h-44 rounded-xl" /></div></div>;
   }
 
-  return <div className="min-h-screen pb-20">
+  return <div className="min-h-screen">
     <div className="no-print">
       <TopBar title="QR Etiketleri" subtitle={`${selectedItems.length}/${items.length} etiket seçildi`} />
       <main className="mx-auto max-w-5xl px-4 py-4">
@@ -155,7 +154,6 @@ export default function QrEtiketleriPage() {
 
     {qrTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label={`${qrTarget.name} QR kodu`} onClick={() => setQrTarget(null)}><div className="w-full max-w-sm rounded-2xl border border-border bg-panel p-4 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-3 flex items-center justify-between"><div className="text-left"><div className="text-[10px] font-bold uppercase tracking-wider text-amber">{qrTarget.kind === "engine" ? "Motor QR Kodu" : "Bakım Türü QR Kodu"}</div><div className="mt-0.5 text-base font-extrabold text-text">{qrTarget.name}</div></div><button type="button" onClick={() => setQrTarget(null)} className="h-8 w-8 rounded-lg border border-border text-muted transition hover:bg-panel2 hover:text-text" aria-label="QR penceresini kapat">✕</button></div><div className="mx-auto flex min-h-[190px] w-fit min-w-[190px] items-center justify-center rounded-xl bg-white p-3">{qrImages[qrTarget.id] ? <img src={qrImages[qrTarget.id]} alt={`${qrTarget.name} QR kodu`} className="h-52 w-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}</div><p className="mt-3 text-[11px] leading-relaxed text-muted">{qrTarget.kind === "engine" ? "Bu kod okutulduğunda uygulama doğrudan bu motorun bakım panelini açar." : "Bu kod okutulduğunda bakım türü seçilir; teknisyen sonraki adımda motoru seçer."}</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => void copyQrLink()} className="rounded-lg border border-border py-2.5 text-[11px] font-bold text-muted transition hover:bg-panel2">Bağlantıyı kopyala</button><a href={qrImages[qrTarget.id] || undefined} download={`${qrTarget.name.replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-qr.png`} className={`rounded-lg bg-amber py-2.5 text-[11px] font-extrabold text-[#161006] transition ${qrImages[qrTarget.id] ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}>PNG indir</a></div><button type="button" onClick={() => setQrTarget(null)} className="mt-2 w-full rounded-lg border border-border bg-panel2 py-2.5 text-[11px] font-bold text-text transition hover:bg-border">Kapat</button></div></div>}
 
-    <BottomNav />
     <style jsx global>{`
       .qr-sheet { display: none; }
       .qr-label { box-sizing: border-box; background: #fff; color: #10151b; border: 1px solid #b7c0c8; border-radius: 10px; padding: 12px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
