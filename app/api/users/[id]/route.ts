@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 async function getAuthorizedAdmin(req: NextRequest) {
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return { db, usersCol, response: NextResponse.json({ error: "Giriş gerekli" }, { status: 401 }) };
   if (!canManageUsers(user.role)) {

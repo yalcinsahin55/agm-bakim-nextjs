@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu sayfa yalnızca yöneticiler içindir." }, { status: 403 });
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     if (rateLimited) return rateLimited;
 
     const users = await usersCol.find().toArray();
-    return NextResponse.json(users.map((u: any) => {
+    return NextResponse.json(users.map((u) => {
       const isTechnician = u.role === "teknisyen" || u.role === "planlamaci";
       const technician_type = isTechnician ? normalizeTechnicianType(u.technician_type) : undefined;
       const permissions = isTechnician ? normalizeTechnicianPermissions(u, technician_type) : undefined;
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
     await ensureAppIndexes(db);
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });

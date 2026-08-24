@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { MAX_BACKUP_REQUEST_BYTES } from "@/lib/requestLimits";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_COLLECTIONS = ["engines", "maintenance_types", "maintenance_records", "oil_analyses"] as const;
+type RestorableDocument = Record<string, unknown> & { _id?: string };
 const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64", "__proto__", "prototype", "constructor"]);
 
 function clean(value: unknown): unknown {
@@ -34,7 +36,7 @@ function getIdentity(document: Record<string, unknown>): string | null {
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
-  const user = await getCurrentUser(req, db.collection("users") as any);
+  const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Geri yükleme yetkiniz yok." }, { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
@@ -57,18 +59,18 @@ export async function POST(req: NextRequest) {
       let count = 0;
       for (const raw of documents) {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
-        const document = clean(raw) as Record<string, unknown>;
+        const document = clean(raw) as RestorableDocument;
         const identity = getIdentity(document);
         if (identity) {
           delete document._id;
-          await (db.collection(name) as any).updateOne(
+          await db.collection<RestorableDocument>(name).updateOne(
             { _id: identity },
             { $set: document, $setOnInsert: { _id: identity } },
             { upsert: true },
           );
         } else {
           delete document._id;
-          await (db.collection(name) as any).insertOne(document);
+          await db.collection<RestorableDocument>(name).insertOne(document);
         }
         count += 1;
       }

@@ -1,3 +1,4 @@
+import { oilAnalysesCollection, usersCollection } from "@/lib/dbCollections";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
@@ -26,14 +27,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
     const db = await getDb();
-    const user = await getCurrentUser(req, db.collection("users") as any);
+    const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Geçersiz analiz kaydı." }, { status: 400 });
     }
 
-    const doc = await (db.collection("oil_analyses") as any).findOne(
+    const doc = await oilAnalysesCollection(db).findOne(
       { _id: new ObjectId(id) },
       { projection: { pdf_url: 1, pdf_b64: 1, pdf_filename: 1 } },
     );

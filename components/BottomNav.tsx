@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 import { canAccessRoute } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import type { MaintenancePanelResponse } from "@/lib/maintenancePanel";
 
 interface MenuItem {
   href: string;
@@ -36,10 +37,10 @@ export default function BottomNav() {
 
   useEffect(() => {
     let alive = true;
-    cachedFetch("/api/maintenance-types/panel", 30000)
-      .then((data: any) => {
-        if (!data || !alive) return;
-        setGecikmis((data.items || []).filter((i: any) => i.status === "gecikmis").length);
+    cachedFetch<MaintenancePanelResponse>("/api/maintenance-types/panel", 30000)
+      .then((data) => {
+        if (!alive) return;
+        setGecikmis(data.items.filter((item) => item.status === "gecikmis").length);
       })
       .catch(() => {});
     return () => { alive = false; };

@@ -1,3 +1,4 @@
+import { enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
@@ -7,13 +8,15 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
-import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions } from "@/lib/technicians";
+import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTechnicianWorkOnType, normalizeTechnicianPermissions, normalizeTechnicianType, resolveTechnicianOptions, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { recordSchema, formatZodError } from "@/lib/schemas";
+import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
+import type { MaintenanceTechnicianContribution, User } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +24,7 @@ function parseRecordId(value: string): ObjectId | null {
   return ObjectId.isValid(value) ? new ObjectId(value) : null;
 }
 
-function canModify(user: any, record: any): boolean {
+function canModify(user: User, record: MaintenanceRecordDocument): boolean {
   return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
 }
 
@@ -29,14 +32,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
   const includeMedia = req.nextUrl.searchParams.get("include_media") === "true";
-  const record = await (db.collection("maintenance_records") as any).findOne(
+  const record = await recordsCollection(db).findOne(
     { _id: recordId },
     includeMedia ? undefined : { projection: { photos_b64: 0, videos: 0 } },
   );
@@ -48,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   const rateLimited = await enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
@@ -56,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
-  const recordsCol = db.collection("maintenance_records") as any;
+  const recordsCol = recordsCollection(db);
   const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
@@ -74,7 +77,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
   }
 
-  const update: Record<string, any> = {};
+  type RecordUpdate = Partial<MaintenanceRecordDocument> & { $unset?: Record<string, ""> };
+  const update: RecordUpdate = {};
   let nextStartAt: Date | undefined = record.maintenance_start_at ? new Date(record.maintenance_start_at) : undefined;
   let nextEndAt: Date | undefined = record.maintenance_end_at ? new Date(record.maintenance_end_at) : undefined;
   let nextDurationMinutes: number | null = typeof record.maintenance_duration_minutes === "number" ? record.maintenance_duration_minutes : calculateMaintenanceDurationFromDates(nextStartAt, nextEndAt);
@@ -99,27 +103,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Dış hizmet bakım kaydını yalnızca yöneticiler düzenleyebilir." }, { status: 403 });
   }
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
-  const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item: any) => item.type_key) : [];
+  const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item) => item.type_key) : [];
   const historicalTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys])];
   const historicalTypeKeySet = new Set(historicalTypeKeys);
   const requestedExtraTypeKeys = Array.isArray(extra_types)
-    ? extra_types.map((item: any) => item?.type_key).filter((key: unknown): key is string => typeof key === "string" && key.length > 0)
+    ? extra_types.map((item) => item.type_key).filter((key: unknown): key is string => typeof key === "string" && key.length > 0)
     : [];
   const selectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
-  const allSelectedTypeDocs = await (db.collection("maintenance_types") as any).find(
+  const allSelectedTypeDocs = await maintenanceTypesCollection(db).find(
     { _id: { $in: selectedTypeKeys } },
     { projection: { _id: 1, label: 1, is_deleted: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1 } },
   ).toArray();
   // Geçmiş kaydın mevcut türü artık arşivlenmiş olsa bile temel düzenlemeler engellenmez.
   // Ancak yeni eklenmek istenen türler mutlaka aktif olmalıdır.
-  const selectedTypeDocs = allSelectedTypeDocs.filter((type: any) => type.is_deleted !== true || historicalTypeKeySet.has(String(type._id)));
+  const selectedTypeDocs = allSelectedTypeDocs.filter((type) => type.is_deleted !== true || historicalTypeKeySet.has(String(type._id)));
   if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı veya artık aktif değil." }, { status: 404 });
   let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
   let nextResponsibleName = useExternalService
     ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
     : record.technician_name;
   let nextResponsibleType = useExternalService ? undefined : normalizeTechnicianType(record.technician_type);
-  let nextResponsibleOption: any = null;
+  let nextResponsibleOption: TechnicianOption | null = null;
   let effectiveOtherTechnicians: Array<{ id: string; full_name: string; technician_type: "mekanik" | "elektromekanik" }> = [];
   if (useExternalService) {
     if (Array.isArray(other_technician_ids) && other_technician_ids.length > 0) {
@@ -157,7 +161,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     update.$unset = { external_service_name: "" };
 
     effectiveOtherTechnicians = Array.isArray(record.other_technicians)
-      ? record.other_technicians.filter((technician: any) => technician && typeof technician.id === "string" && typeof technician.full_name === "string")
+      ? record.other_technicians
+        .filter((technician) => typeof technician.id === "string" && typeof technician.full_name === "string")
+        .map((technician) => ({
+          id: technician.id,
+          full_name: technician.full_name,
+          technician_type: normalizeTechnicianType(technician.technician_type),
+        }))
       : [];
     if (Array.isArray(other_technician_ids)) {
       const resolvedOtherTechnicians = await resolveTechnicianOptions(db, other_technician_ids);
@@ -165,7 +175,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "Sorumlu teknisyen yardımcı listesine eklenemez veya seçilen teknisyen geçersiz." }, { status: 400 });
       }
       const existingSupportIds = new Set((record.other_technician_ids || []).map((id: unknown) => String(id)));
-      if (resolvedOtherTechnicians.some((technician) => !existingSupportIds.has(technician.id) && !selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(technician, type, "support")))) {
+      if (resolvedOtherTechnicians.some((technician) => !existingSupportIds.has(technician.id) && !selectedTypeDocs.every((type) => canTechnicianWorkOnType(technician, type, "support")))) {
         return NextResponse.json({ error: "Seçilen yardımcı teknisyenlerden biri bu bakım türü için yetkili değil." }, { status: 403 });
       }
       effectiveOtherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
@@ -180,26 +190,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const responsibleSelectionChanged = typeof responsible_technician_id === "string" && responsible_technician_id !== record.technician_id;
   if (!useExternalService && !isExistingOwnerUpdate && (user.role !== "yonetici" || responsibleSelectionChanged || (Array.isArray(extra_types) && extra_types.length > 0))) {
     if (!nextResponsibleOption && nextResponsibleId === user._id) {
-      nextResponsibleOption = { id: user._id, full_name: user.full_name, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions(user as any, nextResponsibleType) };
+        const technicianType = nextResponsibleType || normalizeTechnicianType(user.technician_type);
+        nextResponsibleOption = { id: user._id, full_name: user.full_name, technician_type: technicianType, ...normalizeTechnicianPermissions(user, technicianType) };
     }
     if (!nextResponsibleOption) {
       const resolvedCurrentResponsible = await resolveTechnicianOptions(db, [nextResponsibleId]);
       nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions({}, nextResponsibleType) };
     }
-    if (!keepHistoricalResponsible && !selectedTypeDocs.every((type: any) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
+    if (!keepHistoricalResponsible && nextResponsibleOption && !selectedTypeDocs.every((type) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
       return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }
   const existingResponsibleContribution = Array.isArray(record.technician_contributions)
-    ? record.technician_contributions.find((contribution: any) => contribution?.id === nextResponsibleId && contribution?.contribution_role === "responsible")
+    ? record.technician_contributions.find((contribution) => contribution?.id === nextResponsibleId && contribution?.contribution_role === "responsible")
     : undefined;
   const responsibleDurationMinutes = nextResponsibleId === record.technician_id && typeof existingResponsibleContribution?.duration_minutes === "number"
     ? existingResponsibleContribution.duration_minutes
     : nextDurationMinutes ?? 0;
   const existingSupportContributions: Map<string, { duration_minutes?: unknown }> = new Map(
     (Array.isArray(record.technician_contributions) ? record.technician_contributions : [])
-      .filter((contribution: any) => contribution?.contribution_role === "support" && typeof contribution.id === "string")
-      .map((contribution: any) => [contribution.id, { duration_minutes: contribution.duration_minutes }] as const),
+      .filter((contribution) => contribution?.contribution_role === "support" && typeof contribution.id === "string")
+      .map((contribution) => [contribution.id, { duration_minutes: contribution.duration_minutes }] as const),
   );
   const supportDurationMinutes = (technicianId: string): number => {
     const requestedDuration = other_technician_durations?.[technicianId];
@@ -209,11 +220,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ? normalizeTechnicianContributionDuration(existingDuration, nextDurationMinutes ?? 0)
       : normalizeTechnicianContributionDuration(undefined, nextDurationMinutes ?? 0);
   };
-  const technicianContributions = useExternalService ? [] : [
-    { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: responsibleDurationMinutes },
+  const technicianContributions: MaintenanceTechnicianContribution[] = useExternalService ? [] : [
+    { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible" as const, duration_minutes: responsibleDurationMinutes },
     ...effectiveOtherTechnicians.map((technician) => ({
       ...technician,
-      contribution_role: "support",
+      contribution_role: "support" as const,
       duration_minutes: supportDurationMinutes(technician.id),
     })),
   ];
@@ -226,9 +237,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Array.isArray(videos)) update.videos = videos;
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
-  const unset = update.$unset;
-  delete update.$unset;
-  await recordsCol.updateOne({ _id: record._id }, { $set: update, ...(unset ? { $unset: unset } : {}) });
+  const { $unset: unset, ...setFields } = update;
+  await recordsCol.updateOne({ _id: record._id }, { $set: setFields, ...(unset ? { $unset: unset } : {}) });
   await writeAuditLog(db, {
     user,
     action: "update",
@@ -242,7 +252,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
     await recomputeLastMaintenance(db, record.engine_id, record.type_key);
 
-    const enginesCol = db.collection("engines") as any;
+    const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne({ _id: record.engine_id });
     if (engine && hour_at_completion > engine.hours) {
       const stamp = new Date();
@@ -265,13 +275,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await recordsCol.updateOne({ _id: record._id }, { $set: { group_id: groupId } });
     }
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
-    const extraTechnicianContributions = useExternalService ? [] : [
-      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible", duration_minutes: responsibleDurationMinutes },
-      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support", duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0) })),
+    const extraTechnicianContributions: MaintenanceTechnicianContribution[] = useExternalService ? [] : [
+      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible" as const, duration_minutes: responsibleDurationMinutes },
+      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support" as const, duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0) })),
     ];
     const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
     const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
-    const typesCol = db.collection("maintenance_types") as any;
+    const typesCol = maintenanceTypesCollection(db);
 
     for (const ex of extra_types) {
       const extraClientRequestId = `${clientRequestId || `record:${String(record._id)}`}:extra:${String(ex.type_key)}`;
@@ -333,7 +343,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   const rateLimited = await enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
@@ -341,7 +351,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const recordId = parseRecordId(id);
   if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
-  const recordsCol = db.collection("maintenance_records") as any;
+  const recordsCol = recordsCollection(db);
   const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı silme yetkiniz yok." }, { status: 403 });

@@ -1,5 +1,7 @@
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { Document } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
@@ -9,9 +11,24 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
+type MonthlyAggregateRow = { _id?: string; count?: number };
+type EngineAggregateRow = { _id?: string; engine?: string; count?: number };
+type TypeAggregateRow = { _id?: string; count?: number };
+type TotalsAggregateRow = { total?: number; thisCount?: number; lastCount?: number };
+type PeriodTotalsAggregateRow = { total?: number; total_duration_minutes?: number; technician_duration_minutes?: number; missing_duration?: number; technician_tasks?: number };
+type TechnicianAggregateRow = {
+  _id?: unknown;
+  technician?: unknown;
+  technician_type?: unknown;
+  responsible_count?: number;
+  support_count?: number;
+  responsible_duration_minutes?: number;
+  support_duration_minutes?: number;
+};
+
 export async function GET(req: NextRequest) {
   const db = await getDb();
-  const user = await getCurrentUser(req, db.collection("users") as any);
+  const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return NextResponse.json({ error: "Rapor görme yetkiniz yok." }, { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "analytics-summary", 30, 60 * 1000, user._id);
@@ -31,8 +48,8 @@ export async function GET(req: NextRequest) {
       : enginePeriod === "year"
         ? new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
         : null;
-  const records = db.collection("maintenance_records") as any;
-  const aggregate = (pipeline: any[]) => records.aggregate(pipeline, { allowDiskUse: true });
+  const records = recordsCollection(db);
+  const aggregate = <T extends Document>(pipeline: Document[]) => records.aggregate<T>(pipeline, { allowDiskUse: true });
   const activeTechniciansPromise = listActiveTechnicians(db);
 
   const dateMatch = engineSince ? [{ $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } }, { $match: { maintenance_date: { $gte: engineSince } } }] : [];
@@ -69,25 +86,25 @@ export async function GET(req: NextRequest) {
     { $sort: { [`${role}_count`]: -1, technician: 1 } },
   ];
   const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
-    aggregate([
+    aggregate<MonthlyAggregateRow>([
       { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       { $match: { maintenance_date: { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]).toArray(),
-    aggregate([
+    aggregate<EngineAggregateRow>([
       ...dateMatch,
       { $group: { _id: "$engine_id", engine: { $first: "$engine_name" }, count: { $sum: 1 } } },
       { $sort: { count: -1, engine: 1 } },
       { $limit: 12 },
     ]).toArray(),
-    aggregate([
+    aggregate<TypeAggregateRow>([
       ...dateMatch,
       { $group: { _id: "$type_label", count: { $sum: 1 } } },
       { $sort: { count: -1, _id: 1 } },
       { $limit: 12 },
     ]).toArray(),
-    aggregate([
+    aggregate<TotalsAggregateRow>([
       { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       {
         $group: {
@@ -98,9 +115,9 @@ export async function GET(req: NextRequest) {
         },
       },
     ]).toArray(),
-    aggregate(contributionStages("responsible")).toArray(),
-    aggregate(contributionStages("support")).toArray(),
-    aggregate([
+    aggregate<TechnicianAggregateRow>(contributionStages("responsible")).toArray(),
+    aggregate<TechnicianAggregateRow>(contributionStages("support")).toArray(),
+    aggregate<PeriodTotalsAggregateRow>([
       ...dateMatch,
       {
         $group: {
@@ -133,7 +150,7 @@ export async function GET(req: NextRequest) {
   const periodRow = periodTotals[0] || { total: 0, total_duration_minutes: 0, technician_duration_minutes: 0, missing_duration: 0, technician_tasks: 0 };
   type TechnicianAggregate = { technician: string; technician_type: "mekanik" | "elektromekanik"; responsible_count: number; support_count: number; responsible_duration_minutes: number; support_duration_minutes: number };
   const technicianMap = new Map<string, TechnicianAggregate>();
-  function canonicalTechnician(row: any): { key: string; name: string; technician_type: "mekanik" | "elektromekanik" } {
+  function canonicalTechnician(row: TechnicianAggregateRow): { key: string; name: string; technician_type: "mekanik" | "elektromekanik" } {
     const id = row?._id != null ? String(row._id) : "";
     const byId = id ? technicianById.get(id) : undefined;
     const byName = technicianByName.get(normalizeTechnicianName(row?.technician));
@@ -144,7 +161,7 @@ export async function GET(req: NextRequest) {
       technician_type: row?.technician_type === "elektromekanik" || row?.technician_type === "mekanik" ? row.technician_type : canonical?.technician_type || normalizeTechnicianType(row?.technician_type),
     };
   }
-  function mergeTechnicianRow(row: any, kind: "responsible" | "support") {
+  function mergeTechnicianRow(row: TechnicianAggregateRow, kind: "responsible" | "support") {
     const canonical = canonicalTechnician(row);
     const current = technicianMap.get(canonical.key) || { technician: canonical.name, technician_type: canonical.technician_type, responsible_count: 0, support_count: 0, responsible_duration_minutes: 0, support_duration_minutes: 0 };
     current.technician = canonical.name;
@@ -158,8 +175,8 @@ export async function GET(req: NextRequest) {
     }
     technicianMap.set(canonical.key, current);
   }
-  responsibleStaff.forEach((row: any) => mergeTechnicianRow(row, "responsible"));
-  supportStaff.forEach((row: any) => mergeTechnicianRow(row, "support"));
+  responsibleStaff.forEach((row) => mergeTechnicianRow(row, "responsible"));
+  supportStaff.forEach((row) => mergeTechnicianRow(row, "support"));
   const allTechnicianRows = [...technicianMap.entries()]
     .map(([technician_id, row]) => ({ technician_id, technician: row.technician, technician_type: row.technician_type, technician_type_label: TECHNICIAN_TYPE_LABELS[row.technician_type], responsible_count: row.responsible_count, support_count: row.support_count, total_count: row.responsible_count + row.support_count, responsible_duration_minutes: row.responsible_duration_minutes, support_duration_minutes: row.support_duration_minutes, total_duration_minutes: row.responsible_duration_minutes + row.support_duration_minutes, average_duration_minutes: row.responsible_count + row.support_count ? Math.round((row.responsible_duration_minutes + row.support_duration_minutes) / (row.responsible_count + row.support_count)) : 0 }));
   const byTechnician = [...allTechnicianRows]
@@ -177,9 +194,9 @@ export async function GET(req: NextRequest) {
   });
   const byTechnicianType = [...technicianTypeTotals.values()].sort((a, b) => b.total_count - a.total_count || a.technician_type.localeCompare(b.technician_type, "tr"));
   return NextResponse.json({
-    monthly: monthly.map((row: any) => ({ month: row._id, count: row.count })),
-    byEngine: byEngine.map((row: any) => ({ engine_id: row._id || null, engine: row.engine || "Bilinmeyen", count: row.count })),
-    byType: byType.map((row: any) => ({ type: row._id || "Bilinmeyen", count: row.count })),
+    monthly: monthly.map((row) => ({ month: row._id, count: row.count })),
+    byEngine: byEngine.map((row) => ({ engine_id: row._id || null, engine: row.engine || "Bilinmeyen", count: row.count })),
+    byType: byType.map((row) => ({ type: row._id || "Bilinmeyen", count: row.count })),
     byTechnician,
     byTechnicianType,
     total: totalRow.total || 0,

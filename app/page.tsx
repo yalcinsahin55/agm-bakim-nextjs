@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth";
@@ -13,7 +14,7 @@ export default async function Home() {
   if (!userId) redirect("/login");
 
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await usersCol.findOne(
     { _id: userId },
     { projection: { role: 1, active: 1, approved: 1 } },

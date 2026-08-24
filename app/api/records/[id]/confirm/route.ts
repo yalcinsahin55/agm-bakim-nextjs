@@ -1,3 +1,4 @@
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
@@ -8,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
+import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -23,18 +25,24 @@ function isFinitePositive(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-function contributionRows(record: any): StoredContribution[] {
-  if (Array.isArray(record.technician_contributions) && record.technician_contributions.length > 0) {
-    return record.technician_contributions
-      .filter((item: any) => item && typeof item.id === "string" && typeof item.full_name === "string")
-      .map((item: any) => ({
-        id: item.id,
-        full_name: item.full_name,
-        technician_type: item.technician_type,
-        contribution_role: item.contribution_role === "support" ? "support" : "responsible",
-        duration_minutes: typeof item.duration_minutes === "number" ? item.duration_minutes : undefined,
-      }));
-  }
+function normalizeStoredContribution(value: unknown): StoredContribution | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || typeof item.full_name !== "string") return null;
+  return {
+    id: item.id,
+    full_name: item.full_name,
+    technician_type: item.technician_type === "mekanik" || item.technician_type === "elektromekanik" ? item.technician_type : undefined,
+    contribution_role: item.contribution_role === "support" ? "support" : "responsible",
+    duration_minutes: typeof item.duration_minutes === "number" ? item.duration_minutes : undefined,
+  };
+}
+
+function contributionRows(record: MaintenanceRecordDocument): StoredContribution[] {
+  const storedRows = Array.isArray(record.technician_contributions)
+    ? record.technician_contributions.map(normalizeStoredContribution).filter((item): item is StoredContribution => item !== null)
+    : [];
+  if (storedRows.length > 0) return storedRows;
 
   if (record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID) return [];
 
@@ -67,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (user.role !== "yonetici") {
@@ -79,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Kayıt kimliği geçersiz." }, { status: 400 });
   }
 
-  const recordsCol = db.collection("maintenance_records") as any;
+  const recordsCol = recordsCollection(db);
   const recordId = new ObjectId(id);
   const record = await recordsCol.findOne({ _id: recordId });
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
@@ -144,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const confirmedAt = new Date();
-  const confirmation = {
+  const confirmation: Pick<MaintenanceRecordDocument, "manager_confirmation_status" | "manager_confirmed_at" | "manager_confirmed_by_id" | "manager_confirmed_by_name" | "manager_confirmed_by_role" | "technician_contributions"> = {
     manager_confirmation_status: "confirmed",
     manager_confirmed_at: confirmedAt,
     manager_confirmed_by_id: user._id,
@@ -156,7 +164,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     { ...confirmationScope, manager_confirmation_status: "pending" },
     { $set: confirmation },
   );
-  const confirmedIds = pendingRecords.map((item: { _id: ObjectId }) => String(item._id));
+  const confirmedIds = pendingRecords.map((item) => String(item._id));
   const confirmedCount = Number(result.modifiedCount || 0);
 
   await writeAuditLog(db, {

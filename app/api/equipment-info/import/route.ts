@@ -1,3 +1,4 @@
+import { equipmentInfoCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
@@ -26,7 +27,7 @@ const COLUMN_MAP: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) {
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (idx !== -1) colIndex[key] = idx;
   });
 
-  const col = db.collection("equipment_info") as any;
+  const col = equipmentInfoCollection(db);
   let updated = 0;
   for (let r = 1; r < grid.length; r++) {
     const row = grid[r] || [];

@@ -20,6 +20,7 @@ export interface User {
   role: Role;
   active: boolean;
   approved?: boolean;
+  bootstrap_key?: string;
   technician_type?: TechnicianType;
   can_be_responsible?: boolean;
   can_be_support?: boolean;

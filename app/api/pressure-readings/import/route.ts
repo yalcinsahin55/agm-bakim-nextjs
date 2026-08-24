@@ -1,3 +1,4 @@
+import { enginesCollection, pressureReadingsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
@@ -7,6 +8,7 @@ import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
+import type { PressureReadingDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ function normalizeName(name: unknown): string {
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) {
@@ -45,9 +47,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Dosya okunamadı, geçerli bir Excel dosyası olduğundan emin olun." }, { status: 400 });
   }
 
-  const engines = await (db.collection("engines") as any).find().toArray();
-  const engineNames = new Set(engines.map((e: any) => e._id));
-  const docs: any[] = [];
+  const engines = await enginesCollection(db).find().toArray();
+  const engineNames = new Set(engines.map((engine) => engine._id));
+  const docs: Array<Omit<PressureReadingDocument, "_id">> = [];
 
   for (const worksheet of wb.worksheets) {
     const m = worksheet.name.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
@@ -108,7 +110,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (docs.length > 0) {
-    await (db.collection("pressure_readings") as any).insertMany(docs);
+    await pressureReadingsCollection(db).insertMany(docs);
   }
 
   return NextResponse.json({ ok: true, inserted: docs.length });

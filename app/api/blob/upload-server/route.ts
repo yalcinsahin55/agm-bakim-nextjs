@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { put } from "@vercel/blob";
@@ -15,7 +16,7 @@ const maxPdfSize = 10 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const db = await getDb();
-  const user = await getCurrentUser(request, db.collection("users") as any);
+  const user = await getCurrentUser(request, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   const rateLimited = await enforceApiRateLimit(request, "blob-upload", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;

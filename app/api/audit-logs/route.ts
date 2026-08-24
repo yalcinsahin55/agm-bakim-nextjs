@@ -1,3 +1,4 @@
+import { auditLogsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import type { NextRequest } from "next/server";
@@ -14,7 +15,7 @@ function escapeRegex(value: string): string {
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
-  const user = await getCurrentUser(req, db.collection("users") as any);
+  const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu kayıtları görme yetkiniz yok." }, { status: 403 });
 
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
   }
 
   await ensureAppIndexes(db);
-  const logs = db.collection("audit_logs") as any;
+  const logs = auditLogsCollection(db);
   const projection = includeDetails ? undefined : { before: 0, after: 0 };
   const [items, total] = await Promise.all([
     logs.find(query, projection ? { projection } : undefined)

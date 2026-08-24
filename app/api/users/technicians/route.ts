@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
     await ensureAppIndexes(db);
-    const user = await getCurrentUser(req, db.collection("users") as any);
+    const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!canWriteMaintenance(user.role)) {
       return NextResponse.json({ error: "Teknisyen listesine erişim yetkiniz yok." }, { status: 403 });

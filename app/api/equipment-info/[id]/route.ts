@@ -1,3 +1,4 @@
+import { equipmentInfoCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -12,7 +13,7 @@ const FIELDS = ["kaver_tipi", "hava_filtresi", "krankcase", "esanjor_tipi", "dun
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) {
@@ -21,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const rateLimited = await enforceApiRateLimit(req, "equipment-info-update", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const col = db.collection("equipment_info") as any;
+  const col = equipmentInfoCollection(db);
   const existing = await col.findOne({ _id: id });
   if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 

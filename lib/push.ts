@@ -8,6 +8,12 @@ export interface PushPayload {
   tag?: string;
 }
 
+function getErrorStatusCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const statusCode = (error as { statusCode?: unknown }).statusCode;
+  return typeof statusCode === "number" ? statusCode : undefined;
+}
+
 export interface PushSubscriptionRecord {
   _id?: string;
   user_id: string;
@@ -55,8 +61,8 @@ export async function sendPushToUser(db: Db, userId: string, payload: PushPayloa
     try {
       await webpush.sendNotification(record.subscription, JSON.stringify(payload));
       sent += 1;
-    } catch (error: any) {
-      const statusCode = error?.statusCode;
+    } catch (error: unknown) {
+      const statusCode = getErrorStatusCode(error);
       if (statusCode === 404 || statusCode === 410) {
         await collection.deleteOne({ endpoint: record.endpoint });
       } else {

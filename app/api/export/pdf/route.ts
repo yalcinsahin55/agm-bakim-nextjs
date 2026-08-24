@@ -1,3 +1,4 @@
+import { enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
@@ -31,7 +32,7 @@ function pdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
 async function createPdf(req: NextRequest) {
   const db = await getDb();
   await ensureAppIndexes(db);
-  const user = await getCurrentUser(req, db.collection("users") as any);
+  const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "export-pdf", 12, 10 * 60 * 1000, user._id);
@@ -41,12 +42,12 @@ async function createPdf(req: NextRequest) {
   const engineFilter = searchParams.get("engine_id");
   const query = await buildMaintenanceRecordQuery(db, searchParams);
 
-  const engines = await (db.collection("engines") as any).find({}, { projection: { _id: 1, name: 1 } }).toArray();
-  const selectedEngine = engineFilter ? engines.find((engine: any) => engine._id === engineFilter || engine.name === engineFilter) : null;
-  const recordsCollection = db.collection("maintenance_records") as any;
+  const engines = await enginesCollection(db).find({}, { projection: { _id: 1, name: 1 } }).toArray();
+  const selectedEngine = engineFilter ? engines.find((engine) => engine._id === engineFilter || engine.name === engineFilter) : null;
+  const recordsCol = recordsCollection(db);
   const [total, records] = await Promise.all([
-    recordsCollection.countDocuments(query),
-    recordsCollection.find(query, { projection: { photos_b64: 0, photos: 0, videos: 0 } }).sort({ maintenance_start_at: -1, created_at: -1, _id: -1 }).limit(MAX_ROWS).toArray(),
+    recordsCol.countDocuments(query),
+    recordsCol.find(query, { projection: { photos_b64: 0, photos: 0, videos: 0 } }).sort({ maintenance_start_at: -1, created_at: -1, _id: -1 }).limit(MAX_ROWS).toArray(),
   ]);
 
   const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
@@ -102,7 +103,7 @@ async function createPdf(req: NextRequest) {
     doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text("Seçilen filtrelere uygun bakım kaydı bulunamadı.", left, doc.y + 12);
   } else {
     tableHeading();
-    records.forEach((record: any, index: number) => {
+    records.forEach((record, index) => {
       drawRow([
         getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
         record.engine_name || "",
@@ -112,7 +113,7 @@ async function createPdf(req: NextRequest) {
         record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
         formatMaintenanceDuration(record.maintenance_duration_minutes),
         record.technician_name ? `${record.technician_name}${record.technician_type ? ` · ${TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || "Mekanik"}` : ""}` : "",
-        Array.isArray(record.technician_contributions) ? record.technician_contributions.filter((contribution: any) => contribution.contribution_role === "support").map((contribution: any) => `${contribution.full_name} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(", ") : Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => technician.full_name).join(", ") : "",
+        Array.isArray(record.technician_contributions) ? record.technician_contributions.filter((contribution) => contribution.contribution_role === "support").map((contribution) => `${contribution.full_name} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(", ") : Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => technician.full_name).join(", ") : "",
         record.technician_note || "",
         record.manager_confirmation_status === "pending" ? "Bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski",
       ], index % 2 === 1);

@@ -1,6 +1,7 @@
+import { enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Filter } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
@@ -14,6 +15,9 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import type { MaintenanceRecordDocument, MaintenanceTypeDocument } from "@/lib/dbTypes";
+import type { MaintenanceTechnicianContribution } from "@/lib/types";
+import type { TechnicianOption } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +47,7 @@ async function getRecords(req: NextRequest) {
   try {
     const db = await getDb();
     await ensureAppIndexes(db);
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -63,7 +67,7 @@ async function getRecords(req: NextRequest) {
     const cursorRequest = Boolean(cursor);
     const legacyRequest = Boolean(legacyLimit && !searchParams.has("page") && !searchParams.has("page_size") && !cursorRequest);
 
-    const query: Record<string, any> = {};
+    const query: Filter<MaintenanceRecordDocument> = {};
     if (engineId) query.engine_id = engineId;
     if (typeLabel) query.type_label = typeLabel;
     if (typeKey) query.type_key = typeKey;
@@ -79,7 +83,7 @@ async function getRecords(req: NextRequest) {
       ];
     }
 
-    const recordsCol = db.collection("maintenance_records") as any;
+    const recordsCol = recordsCollection(db);
     if (cursorRequest && cursor) {
       const cursorDate = new Date(cursor.createdAt);
       const cursorId = new ObjectId(cursor.id);
@@ -134,7 +138,7 @@ async function postRecord(req: NextRequest) {
   try {
     const db = await getDb();
     await ensureAppIndexes(db);
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (user.role === "goruntuleyici") {
@@ -162,9 +166,9 @@ async function postRecord(req: NextRequest) {
       return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
     }
 
-    const enginesCol = db.collection("engines") as any;
-    const typesCol = db.collection("maintenance_types") as any;
-    const recordsCol = db.collection("maintenance_records") as any;
+    const enginesCol = enginesCollection(db);
+    const typesCol = maintenanceTypesCollection(db);
+    const recordsCol = recordsCollection(db);
 
     if (completion_confirmation === true) {
       const checklistComplete = Array.isArray(checklist) && checklist.length > 0 && checklist.every((entry) => entry.completed === true);
@@ -213,7 +217,7 @@ async function postRecord(req: NextRequest) {
       ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
       : user.full_name;
     let responsibleTechnicianType = useExternalService ? undefined : normalizeTechnicianType(user.technician_type);
-    let responsibleTechnicianOption: any = useExternalService ? null : { id: user._id, full_name: user.full_name, technician_type: responsibleTechnicianType, ...normalizeTechnicianPermissions(user as any, responsibleTechnicianType) };
+    let responsibleTechnicianOption: TechnicianOption | null = useExternalService ? null : { id: user._id, full_name: user.full_name, technician_type: responsibleTechnicianType || normalizeTechnicianType(user.technician_type), ...normalizeTechnicianPermissions(user, responsibleTechnicianType || normalizeTechnicianType(user.technician_type)) };
     if (!useExternalService && typeof responsible_technician_id === "string") {
       const resolvedResponsible = await resolveTechnicianOptions(db, [responsible_technician_id]);
       if (!resolvedResponsible || resolvedResponsible.length !== 1) {
@@ -226,10 +230,10 @@ async function postRecord(req: NextRequest) {
     }
     const requestedTypeKeys = [...new Set([type_key, ...(extra_types || []).map((item) => item.type_key)])];
     const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
-    const maintenanceTypeByKey = new Map(maintenanceTypes.map((item: any) => [String(item._id), item]));
+    const maintenanceTypeByKey = new Map<string, MaintenanceTypeDocument>(maintenanceTypes.map((item) => [String(item._id), item]));
     const missingType = requestedTypeKeys.find((key) => !maintenanceTypeByKey.has(key));
     if (missingType) return NextResponse.json({ error: "Seçilen bakım türü bulunamadı." }, { status: 404 });
-    const selectedTypes = requestedTypeKeys.map((key) => maintenanceTypeByKey.get(key));
+    const selectedTypes = requestedTypeKeys.map((key) => maintenanceTypeByKey.get(key)).filter((type): type is MaintenanceTypeDocument => type !== undefined);
     if (!useExternalService) {
       const validationRole = user.role === "yonetici" || typeof responsible_technician_id === "string" ? "responsible" : "support";
       if (!selectedTypes.every((type) => canTechnicianWorkOnType(responsibleTechnicianOption, type, validationRole))) {
@@ -244,11 +248,11 @@ async function postRecord(req: NextRequest) {
       return NextResponse.json({ error: "Seçilen yardımcı teknisyenlerden biri bu bakım türü için yetkili değil." }, { status: 403 });
     }
     const otherTechnicians = resolvedOtherTechnicians.map(({ id, full_name, technician_type }) => ({ id, full_name, technician_type }));
-    const technicianContributions = useExternalService ? [] : [
-      { id: responsibleTechnicianId, full_name: responsibleTechnicianName, technician_type: responsibleTechnicianType, contribution_role: "responsible", duration_minutes: maintenanceDurationMinutes || 0 },
+    const technicianContributions: MaintenanceTechnicianContribution[] = useExternalService ? [] : [
+      { id: responsibleTechnicianId, full_name: responsibleTechnicianName, technician_type: responsibleTechnicianType, contribution_role: "responsible" as const, duration_minutes: maintenanceDurationMinutes || 0 },
       ...otherTechnicians.map((technician) => ({
         ...technician,
-        contribution_role: "support",
+        contribution_role: "support" as const,
         duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], maintenanceDurationMinutes ?? 0),
       })),
     ];
@@ -261,9 +265,14 @@ async function postRecord(req: NextRequest) {
 
     const createdAt = backdated && record_date ? new Date(record_date) : new Date();
     const groupId = new ObjectId().toString();
+    const normalizedChecklist = Array.isArray(checklist)
+      ? checklist
+        .map((item) => ({ label: typeof item.label === "string" ? item.label.trim() : "", completed: item.completed === true }))
+        .filter((item): item is { label: string; completed: boolean } => item.label.length > 0)
+      : [];
 
     async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown) {
-      const rec: any = {
+      const rec: MaintenanceRecordDocument = {
         engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
         hour_at_completion,
         ...(maintenanceStartAt && maintenanceEndAt && maintenanceDurationMinutes ? {
@@ -277,7 +286,7 @@ async function postRecord(req: NextRequest) {
         photos_b64: isPrimary ? (photos_b64 || []) : [],
         photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
-        checklist: isPrimary ? (checklist || []) : [],
+        checklist: isPrimary ? normalizedChecklist : [],
         ...(isPrimary && completion_confirmation === true ? { completion_confirmed_at: new Date() } : {}),
         manager_confirmation_status: managerConfirmationStatus,
         ...(shouldConfirmOnCreate && managerConfirmedAt ? {

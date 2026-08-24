@@ -1,3 +1,4 @@
+import { equipmentInfoCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
       console.error("Seed uyarısı (sayfa çalışmaya devam ediyor):", seedError);
     }
 
-    const items = await (db.collection("equipment_info") as any).find().toArray();
+    const items = await equipmentInfoCollection(db).find().toArray();
     return NextResponse.json(items);
   } catch (error) {
     console.error("equipment-info GET hatası:", error);
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!isAdmin(user.role)) {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });
     }
 
-    const col = db.collection("equipment_info") as any;
+    const col = equipmentInfoCollection(db);
     const name = engine_name.trim();
     const existing = await col.findOne({ _id: name });
     if (existing) {

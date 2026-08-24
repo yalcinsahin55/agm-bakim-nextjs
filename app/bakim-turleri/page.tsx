@@ -29,7 +29,7 @@ export default function BakimTurleriPage() {
       setItems(data.items);
       setTypes(data.types);
       setLoading(false);
-      if (data.types.length) setSelectedKey([...data.types].sort((a: any, b: any) => a.label.localeCompare(b.label, "tr"))[0].key);
+      if (data.types.length) setSelectedKey([...data.types].sort((a, b) => a.label.localeCompare(b.label, "tr"))[0].key);
     } catch (error) {
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       else setLoading(false);

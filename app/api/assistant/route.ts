@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
@@ -16,7 +17,7 @@ function jsonError(error: string, status: number, headers?: HeadersInit) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
-    const user = await getCurrentUser(req, db.collection("users") as any);
+    const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return jsonError("Giriş gerekli", 401);
     if (!hasPermission(user.role, "reports:read")) return jsonError("Bakım raporlarını görme yetkiniz yok.", 403);
 

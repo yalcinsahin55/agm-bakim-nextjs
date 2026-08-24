@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     if (rateLimited) return rateLimited;
 
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await usersCol.findOne({
       $or: [{ _id: normalizedIdentifier }, { email: normalizedIdentifier }, { phone_normalized: normalizedIdentifier }, { phone: normalizedIdentifier }],
     });

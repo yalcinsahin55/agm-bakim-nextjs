@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 async function getUser(req: NextRequest) {
   const db = await getDb();
-  const user = await getCurrentUser(req, db.collection("users") as any);
+  const user = await getCurrentUser(req, usersCollection(db));
   return { db, user };
 }
 

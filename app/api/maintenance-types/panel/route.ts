@@ -1,3 +1,4 @@
+import { enginesCollection, maintenanceTypesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const db = await getDb();
 
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -23,10 +24,10 @@ export async function GET(req: NextRequest) {
   }
 
   const [engines, types] = await Promise.all([
-    (db.collection("engines") as any).find({}, {
+    enginesCollection(db).find({}, {
       projection: { _id: 1, name: 1, hours: 1, load_kw: 1 },
     }).toArray(),
-    (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }, {
+    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, {
       projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 },
     }).toArray(),
   ]);

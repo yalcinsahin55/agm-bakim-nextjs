@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -24,7 +25,7 @@ function isAllowedPathname(pathname: unknown): pathname is string {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const db = await getDb();
-  const user = await getCurrentUser(request, db.collection("users") as any);
+  const user = await getCurrentUser(request, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canWriteMaintenance(user.role)) return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
   const rateLimited = await enforceApiRateLimit(request, "blob-upload-legacy", 60, 10 * 60 * 1000, user._id);

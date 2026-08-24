@@ -1,3 +1,4 @@
+import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest) {
   try {
     const db = await getDb();
-    const user = await getCurrentUser(req, db.collection("users") as any);
+    const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
     await db.collection("notifications").updateMany(

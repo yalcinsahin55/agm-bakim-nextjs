@@ -1,3 +1,4 @@
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -23,7 +24,7 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const db = await getDb();
     await ensureAppIndexes(db);
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!hasPermission(user.role, "reports:read")) return NextResponse.json({ error: "Rapor görme yetkiniz yok." }, { status: 403 });
@@ -35,7 +36,7 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
     const to = searchParams.get("to");
     const match: Record<string, unknown> = { engine_id: id };
     if (typeLabel) match.type_label = typeLabel;
-    const recordsCol = db.collection("maintenance_records") as any;
+    const recordsCol = recordsCollection(db);
     const pipeline: Record<string, unknown>[] = [
       { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       { $match: match },

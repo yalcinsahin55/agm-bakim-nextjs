@@ -1,3 +1,4 @@
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -11,7 +12,7 @@ async function getIntervalSummary(req: NextRequest) {
   try {
     const db = await getDb();
     await ensureAppIndexes(db);
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -19,7 +20,7 @@ async function getIntervalSummary(req: NextRequest) {
     const match: Record<string, string> = {};
     if (engineId) match.engine_id = engineId;
 
-    const recordsCol = db.collection("maintenance_records") as any;
+    const recordsCol = recordsCollection(db);
     const groups = await recordsCol.aggregate([
       { $match: match },
       { $sort: { engine_id: 1, type_key: 1, created_at: 1, _id: 1 } },

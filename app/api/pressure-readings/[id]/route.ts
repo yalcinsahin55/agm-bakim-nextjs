@@ -1,3 +1,4 @@
+import { pressureReadingsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
@@ -19,7 +20,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (rateLimited) return rateLimited;
 
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Geçersiz ölçüm kaydı." }, { status: 400 });
-  const col = db.collection("pressure_readings") as any;
+  const col = pressureReadingsCollection(db);
   const doc = await col.findOne({ _id: new ObjectId(id) });
   if (!doc) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 

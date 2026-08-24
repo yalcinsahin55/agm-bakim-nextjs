@@ -4,6 +4,7 @@ import JSZip from "jszip";
 export const MAX_EXCEL_ROWS = 50_000;
 export const MAX_EXCEL_COLUMNS = 100;
 export const MAX_EXCEL_SHEETS = 100;
+type ExcelJSLoadBuffer = Parameters<ExcelJS.Workbook["xlsx"]["load"]>[0];
 
 async function removeLegacyCommentMetadata(buffer: Buffer): Promise<Buffer> {
   const zip = await JSZip.loadAsync(buffer);
@@ -32,7 +33,7 @@ async function removeLegacyCommentMetadata(buffer: Buffer): Promise<Buffer> {
 export async function loadExcelWorkbook(buffer: Buffer): Promise<ExcelJS.Workbook> {
   const normalizedBuffer = await removeLegacyCommentMetadata(buffer);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(normalizedBuffer as any);
+  await workbook.xlsx.load(normalizedBuffer as unknown as ExcelJSLoadBuffer);
   if (workbook.worksheets.length > MAX_EXCEL_SHEETS) {
     throw new Error("Çok fazla çalışma sayfası.");
   }
@@ -46,7 +47,11 @@ export function cellToValue(value: unknown): unknown {
   if ("text" in cell && typeof cell.text === "string") return cell.text;
   if ("hyperlink" in cell && typeof cell.hyperlink === "string") return cell.hyperlink;
   if (Array.isArray(cell.richText)) {
-    return cell.richText.map((part: any) => String(part?.text || "")).join("");
+    return cell.richText.map((part: unknown) => {
+      if (!part || typeof part !== "object") return "";
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : String(text ?? "");
+    }).join("");
   }
   return value;
 }

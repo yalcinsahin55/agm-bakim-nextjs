@@ -1,3 +1,4 @@
+import { enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -17,7 +18,7 @@ interface EngineUpdate {
 export async function PATCH(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!isAdmin(user.role)) {
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const enginesCol = db.collection("engines") as any;
+    const enginesCol = enginesCollection(db);
     const stamp = new Date();
     let changed = 0;
 

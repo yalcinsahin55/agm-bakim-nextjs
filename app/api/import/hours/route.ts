@@ -1,3 +1,4 @@
+import { enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
@@ -18,7 +19,7 @@ function parseMetric(value: unknown): number | null {
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!isAdmin(user.role)) {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "MOTOR ve MOTOR ÇALIŞMA SAATİ sütunları bulunamadı." }, { status: 400 });
   }
 
-  const enginesCol = db.collection("engines") as any;
+  const enginesCol = enginesCollection(db);
   const stamp = import_date ? new Date(import_date) : new Date();
   if (Number.isNaN(stamp.getTime())) return NextResponse.json({ error: "Geçersiz içe aktarma tarihi." }, { status: 400 });
   let updated = 0;

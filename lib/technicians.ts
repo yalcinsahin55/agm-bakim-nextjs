@@ -1,5 +1,6 @@
+import { usersCollection } from "@/lib/dbCollections";
 import type { Db } from "mongodb";
-import type { TechnicianType, TechnicianPermissions, WorkDomain } from "@/lib/types";
+import type { TechnicianType, TechnicianPermissions, WorkDomain, User } from "@/lib/types";
 
 export const TECHNICIAN_TYPE_LABELS: Record<TechnicianType, string> = {
   mekanik: "Mekanik teknisyen",
@@ -68,7 +69,7 @@ export interface TechnicianOption {
 export const EXTERNAL_SERVICE_TECHNICIAN_ID = "__external_service__" as const;
 export const EXTERNAL_SERVICE_TECHNICIAN_NAME = "Dış Hizmet / Harici Servis";
 
-const TECHNICIAN_ROLES = ["teknisyen", "planlamaci"];
+const TECHNICIAN_ROLES: User["role"][] = ["teknisyen", "planlamaci"];
 
 /** Aynı kişinin büyük-küçük harf, Unicode ve fazla boşluk farklarını tek anahtarda birleştirir. */
 export function normalizeTechnicianName(value: unknown): string {
@@ -86,15 +87,17 @@ const TECHNICIAN_PROJECTION = {
   allowed_work_domains: 1,
 };
 
-function toTechnicianOption(user: any): TechnicianOption | null {
+type TechnicianSource = Pick<User, "_id" | "full_name" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">;
+
+function toTechnicianOption(user: TechnicianSource): TechnicianOption | null {
   if (user?._id == null || typeof user.full_name !== "string" || !user.full_name.trim()) return null;
   const technician_type = normalizeTechnicianType(user.technician_type);
-  const permissions = normalizeTechnicianPermissions(user as Partial<TechnicianPermissions>, technician_type);
+  const permissions = normalizeTechnicianPermissions(user, technician_type);
   return { id: String(user._id), full_name: user.full_name.trim(), technician_type, ...permissions };
 }
 
 export async function listActiveTechnicians(db: Db): Promise<TechnicianOption[]> {
-  const users = await db.collection("users").find(
+  const users = await usersCollection(db).find(
     {
       role: { $in: TECHNICIAN_ROLES },
       active: { $ne: false },
@@ -117,7 +120,7 @@ export async function resolveTechnicianOptions(db: Db, ids: unknown): Promise<Te
 
   // Kayıt oluşturma/düzenleme sırasında tüm teknisyen listesini tekrar okumak yerine
   // yalnızca gönderilen kimlikleri doğrula; dropdown ekranları listActiveTechnicians kullanır.
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const users = await usersCol.find(
     {
       _id: { $in: uniqueIds },
@@ -128,7 +131,7 @@ export async function resolveTechnicianOptions(db: Db, ids: unknown): Promise<Te
     { projection: TECHNICIAN_PROJECTION },
   ).toArray();
   const options: TechnicianOption[] = users
-    .map((user: any) => toTechnicianOption(user))
+    .map((user) => toTechnicianOption(user))
     .filter((technician: TechnicianOption | null): technician is TechnicianOption => technician !== null);
   const byId = new Map<string, TechnicianOption>(options.map((technician) => [technician.id, technician]));
   if (uniqueIds.some((id) => !byId.has(id))) return null;

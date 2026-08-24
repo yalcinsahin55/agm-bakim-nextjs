@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 import type { User } from "@/lib/types";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { auditLogsCollection } from "@/lib/dbCollections";
 
 export type AuditAction = "create" | "update" | "delete" | "login" | "export" | "upload";
 
@@ -27,7 +28,7 @@ function compact(value: unknown): unknown {
 
 export async function writeAuditLog(db: Db, input: AuditInput): Promise<void> {
   await ensureAppIndexes(db);
-  const collection = db.collection("audit_logs") as any;
+  const collection = auditLogsCollection(db);
   await collection.insertOne({
     user_id: input.user._id,
     user_name: input.user.full_name,

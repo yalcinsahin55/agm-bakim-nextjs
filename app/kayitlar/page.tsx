@@ -12,7 +12,7 @@ import Lightbox from "@/components/Lightbox";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
-import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, getMaintenanceRecordDate, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 
 interface Engine {
@@ -249,7 +249,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
-  const [technicians, setTechnicians] = useState<Array<{ id: string; full_name: string; technician_type?: "mekanik" | "elektromekanik"; can_be_responsible?: boolean; can_be_support?: boolean; allowed_work_domains?: Array<"mechanical" | "electrical" | "commissioning"> }>>([]);
+  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
   const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
@@ -259,7 +259,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
   const selectedMaintenanceTypes = maintenanceTypes.filter((type) => type.key === record.type_key || (record.extra_types || []).some((extra) => extra.type_key === type.key));
-  const canWorkOnSelectedTypes = (technician: any, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
+  const canWorkOnSelectedTypes = (technician: TechnicianOption, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
   const responsibleTechnicians = technicians.filter((technician) => canWorkOnSelectedTypes(technician, "responsible"));
   const supportTechnicians = technicians.filter((technician) => technician.id !== responsibleTechnicianId && canWorkOnSelectedTypes(technician, "support"));
 
@@ -384,7 +384,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
           "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
         );
         setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
@@ -393,7 +393,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
           continue;
         }
         console.error("Video yükleme hatası:", err);
-        toast.error(`${f.name} yüklenemedi: ${err?.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
+        const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
+        toast.error(`${f.name} yüklenemedi: ${message}`);
       }
     }
     e.target.value = "";
@@ -870,7 +871,7 @@ export default function KayitlarPage() {
               const videos = r.videos || [];
               const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
               // user._id veya user.id kontrolü (MongoDB standartlarına göre _id kullanılır)
-              const canEdit = user && (user.role === "yonetici" || (user as any)?._id === r.technician_id || (user as any)?.id === r.technician_id);
+              const canEdit = user && (user.role === "yonetici" || user.id === r.technician_id || user._id === r.technician_id);
               return (
                 <div key={r._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
                   {!photos.length && !videos.length && (

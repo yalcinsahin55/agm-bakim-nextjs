@@ -1,3 +1,4 @@
+import { maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (user.role !== "yonetici") {
@@ -23,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
 
   const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible, restore } = await req.json();
 
-  const typesCol = db.collection("maintenance_types") as any;
+  const typesCol = maintenanceTypesCollection(db);
   const type = await typesCol.findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 
@@ -77,7 +78,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   }
 
   if (label && label.trim() !== type.label) {
-    await (db.collection("maintenance_records") as any).updateMany({ type_key: key }, { $set: { type_label: label.trim() } });
+    await recordsCollection(db).updateMany({ type_key: key }, { $set: { type_label: label.trim() } });
   }
 
   invalidateMaintenancePanelServerCache();
@@ -87,7 +88,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (user.role !== "yonetici") {
@@ -96,12 +97,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
   const rateLimited = await enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const type = await (db.collection("maintenance_types") as any).findOne({ _id: key });
+  const type = await maintenanceTypesCollection(db).findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 
   // Geçmiş bakım kayıtları hiçbir koşulda silinmez. Tür yalnızca gizlenir;
   // böylece yanlış silme durumunda tarihçe ve raporlar korunur.
-  await (db.collection("maintenance_types") as any).updateOne(
+  await maintenanceTypesCollection(db).updateOne(
     { _id: key },
     { $set: { is_deleted: true, deleted_at: new Date() } },
   );

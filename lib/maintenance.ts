@@ -1,3 +1,4 @@
+import { maintenanceTypesCollection, recordsCollection } from "@/lib/dbCollections";
 import type { Db } from "mongodb";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
@@ -42,8 +43,8 @@ export async function recomputeLastMaintenance(
   fallbackState?: unknown,
 ): Promise<void> {
   if (!isSafeMongoPathSegment(engineId) || !isSafeMongoPathSegment(typeKey)) return;
-  const recordsCol = db.collection("maintenance_records") as any;
-  const typesCol = db.collection("maintenance_types") as any;
+  const recordsCol = recordsCollection(db);
+  const typesCol = maintenanceTypesCollection(db);
   const recordFilter = { engine_id: engineId, type_key: typeKey };
   const statePath = `engine_states.${engineId}`;
 

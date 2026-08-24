@@ -3,6 +3,7 @@ import type { Notification, User } from "./types";
 import { buildItems, STATUS_LABELS, type PanelItem } from "./status";
 import { sendPushToUser } from "./push";
 import { ensureAppIndexes } from "./dbIndexes";
+import { enginesCollection, maintenanceTypesCollection, notificationsCollection, usersCollection } from "@/lib/dbCollections";
 
 function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineName: string, typeLabel: string, remaining: number) {
   if (status === "gecikmis") {
@@ -23,24 +24,33 @@ function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineNa
   };
 }
 
-async function loadActionableItems(db: Db): Promise<PanelItem[]> {
+type ActionablePanelItem = PanelItem & { status: Exclude<PanelItem["status"], "normal"> };
+
+function isActionableItem(item: PanelItem): item is ActionablePanelItem {
+  return item.status !== "normal";
+}
+
+async function loadActionableItems(db: Db): Promise<ActionablePanelItem[]> {
   const [engines, types] = await Promise.all([
-    db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } }).toArray(),
-    db.collection("maintenance_types").find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
+    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } }).toArray(),
+    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
-  return buildItems(engines as any, types as any).filter((item) => item.status !== "normal");
+  return buildItems(engines, types).filter(isActionableItem);
 }
 
 export async function listUserNotifications(db: Db, userId: string, limit?: number): Promise<Notification[]> {
-  const cursor = db.collection("notifications")
+  const cursor = notificationsCollection(db)
     .find({ user_id: userId })
     .sort({ read_at: 1, created_at: -1 });
   const notifications = (typeof limit === "number" ? cursor.limit(limit) : cursor).toArray();
-  return (await notifications) as unknown as Notification[];
+  return (await notifications).map((notification) => ({
+    ...notification,
+    _id: notification._id == null ? undefined : String(notification._id),
+  }));
 }
 
-async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[], listAfterSync = true): Promise<Notification[] | null> {
-  const collection = db.collection("notifications");
+async function syncUserNotifications(db: Db, user: User, actionable: ActionablePanelItem[], listAfterSync = true): Promise<Notification[] | null> {
+  const collection = notificationsCollection(db);
   const now = new Date();
   const activeKeys = actionable.map((item) => `maintenance:${user._id}:${item.engine_id}:${item.type_key}`);
 
@@ -60,10 +70,10 @@ async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[]
       { projection: { dedupe_key: 1, status: 1 } },
     ).toArray()
     : [];
-  const existingByKey = new Map(existingRows.map((row: any) => [String(row.dedupe_key), row]));
+  const existingByKey = new Map(existingRows.map((row) => [String(row.dedupe_key), row] as const));
   const updates = actionable.map((item) => {
     const dedupeKey = `maintenance:${user._id}:${item.engine_id}:${item.type_key}`;
-    const text = notificationText(item.status as "gecikmis" | "kritik" | "yaklasiyor", item.engine_name, item.type_label, item.remaining);
+    const text = notificationText(item.status, item.engine_name, item.type_label, item.remaining);
     return {
       dedupeKey,
       text,
@@ -75,7 +85,7 @@ async function syncUserNotifications(db: Db, user: User, actionable: PanelItem[]
           update: {
             $set: {
               user_id: user._id,
-              type: "maintenance",
+              type: "maintenance" as const,
               status: item.status,
               title: text.title,
               message: text.message,
@@ -115,7 +125,7 @@ export async function syncMaintenanceNotifications(db: Db, user: User): Promise<
 export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<{ users: number; actionable: number }> {
   await ensureAppIndexes(db);
   const [users, actionable] = await Promise.all([
-    db.collection("users").find(
+    usersCollection(db).find(
       { active: { $ne: false }, approved: { $ne: false } },
       { projection: { _id: 1, full_name: 1, role: 1 } },
     ).toArray(),
@@ -123,7 +133,7 @@ export async function syncMaintenanceNotificationsForAllUsers(db: Db): Promise<{
   ]);
   for (const user of users) {
     // Cron yalnızca üretim/güncelleme yapar; kullanıcı bildirim listesini ayrıca okumaz.
-    await syncUserNotifications(db, user as unknown as User, actionable, false);
+    await syncUserNotifications(db, user, actionable, false);
   }
   return { users: users.length, actionable: actionable.length };
 }

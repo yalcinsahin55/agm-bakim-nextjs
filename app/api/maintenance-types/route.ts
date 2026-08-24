@@ -1,3 +1,4 @@
+import { enginesCollection, maintenanceTypesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -5,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +21,14 @@ function slugifyKey(label: string): string {
 export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
     const includeDeleted = req.nextUrl.searchParams.get("include_deleted") === "true";
     const canIncludeDeleted = includeDeleted && user.role === "yonetici";
     const typeFilter = canIncludeDeleted ? {} : { is_deleted: { $ne: true } };
-    const types = await (db.collection("maintenance_types") as any).find(typeFilter).toArray();
+    const types = await maintenanceTypesCollection(db).find(typeFilter).toArray();
     return NextResponse.json(types);
   } catch (error) {
     console.error("Bakım türleri getirilirken hata:", error);
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (user.role !== "yonetici") {
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Geçersiz isim. Lütfen Türkçe karakterler ve harfler kullanın." }, { status: 400 });
     }
 
-    const typesCol = db.collection("maintenance_types") as any;
+    const typesCol = maintenanceTypesCollection(db);
     const existing = await typesCol.findOne({ _id: key });
     if (existing) {
       return NextResponse.json({ error: "Bu veya çok benzer isimde bir bakım türü zaten var." }, { status: 409 });
@@ -75,13 +77,13 @@ export async function POST(req: NextRequest) {
         };
       });
     } else if (apply_to_all) {
-      const engines = await (db.collection("engines") as any).find().toArray();
-      engines.forEach((e: any) => {
+      const engines = await enginesCollection(db).find().toArray();
+      engines.forEach((e) => {
         if (isSafeMongoPathSegment(e._id)) engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0, tracking_source: "manual" };
       });
     }
 
-    const doc = {
+    const doc: MaintenanceTypeDocument = {
       _id: key,
       key,
       label: label.trim(),

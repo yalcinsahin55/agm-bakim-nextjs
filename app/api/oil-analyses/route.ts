@@ -1,3 +1,4 @@
+import { enginesCollection, oilAnalysesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -5,13 +6,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { isAllowedPdfUrl } from "@/lib/pdfSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import type { OilAnalysisDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
     const engineId = searchParams.get("engine_id");
     const query = engineId ? { engine_id: engineId } : {};
 
-    const analyses = await (db.collection("oil_analyses") as any)
+    const analyses = await oilAnalysesCollection(db)
       .find(query, { projection: { pdf_b64: 0 } })
       .sort({ analysis_date: -1 })
       .toArray();
@@ -33,7 +35,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!isAdmin(user.role)) return NextResponse.json({ error: "Bu işlem yalnızca yöneticiler içindir." }, { status: 403 });
@@ -54,10 +56,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Geçersiz PDF formatı." }, { status: 400 });
     }
 
-    const engine = await (db.collection("engines") as any).findOne({ _id: engine_id });
+    const engine = await enginesCollection(db).findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
-    const doc: Record<string, unknown> = {
+    const doc: OilAnalysisDocument = {
       engine_id,
       engine_name: engine.name,
       analysis_date: analysis_date ? new Date(analysis_date) : new Date(),
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
     };
     if (pdf_url) doc.pdf_url = pdf_url;
     else doc.pdf_b64 = pdf_b64;
-    const res = await (db.collection("oil_analyses") as any).insertOne(doc);
+    const res = await oilAnalysesCollection(db).insertOne(doc);
     return NextResponse.json({ ok: true, id: res.insertedId });
   } catch (error) {
     console.error("Yağ analizi eklenirken hata:", error);

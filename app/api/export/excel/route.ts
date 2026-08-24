@@ -1,3 +1,4 @@
+import { enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import type { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
@@ -28,7 +29,7 @@ function uniqueSheetName(label: string, used: Set<string>): string {
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return new Response(JSON.stringify({ error: "Giriş gerekli" }), { status: 401 });
   if (!hasPermission(user.role, "reports:read")) return new Response(JSON.stringify({ error: "Rapor görme yetkiniz yok." }), { status: 403 });
@@ -40,11 +41,11 @@ export async function GET(req: NextRequest) {
   const typeFilter = searchParams.get("type_label");
   const recordQuery = await buildMaintenanceRecordQuery(db, searchParams);
 
-  const allEngines = await (db.collection("engines") as any).find().toArray();
-  allEngines.sort((a: any, b: any) => engineSortKey(a.name) - engineSortKey(b.name));
-  const engines = engineFilter ? allEngines.filter((engine: any) => engine._id === engineFilter || engine.name === engineFilter) : allEngines;
-  const types = await (db.collection("maintenance_types") as any).find({ is_deleted: { $ne: true } }).toArray();
-  const items = buildItems(engines, types).filter((item: any) => !typeFilter || item.type_label === typeFilter);
+  const allEngines = await enginesCollection(db).find().toArray();
+  allEngines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
+  const engines = engineFilter ? allEngines.filter((engine) => engine._id === engineFilter || engine.name === engineFilter) : allEngines;
+  const types = await maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }).toArray();
+  const items = buildItems(engines, types).filter((item) => !typeFilter || item.type_label === typeFilter);
 
   const workbook = new ExcelJS.Workbook();
   const usedSheetNames = new Set<string>();
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     addRows(worksheet, escapeSpreadsheetRows(rows));
   };
 
-  const engineRows = engines.map((e: any) => ({
+  const engineRows = engines.map((e) => ({
     "MOTOR": e.name, "MOTOR ÇALIŞMA SAATİ": e.hours, "YÜK (kW)": e.load_kw || 0,
   }));
   addDataSheet("Motor Saatleri", engineRows);
@@ -77,10 +78,10 @@ export async function GET(req: NextRequest) {
     addDataSheet(label, sheetRows);
   });
 
-  const history = await (db.collection("maintenance_records") as any).find(recordQuery, {
+  const history = await recordsCollection(db).find(recordQuery, {
     projection: { photos_b64: 0, photos: 0, videos: 0 },
   }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(5000).toArray();
-  const historyRows = history.map((record: any) => ({
+  const historyRows = history.map((record) => ({
     "TARİH": getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
     "MOTOR": record.engine_name || "",
     "BAKIM TÜRÜ": record.type_label || "",
@@ -90,8 +91,8 @@ export async function GET(req: NextRequest) {
     "TOPLAM SÜRE": formatMaintenanceDuration(record.maintenance_duration_minutes),
     "SORUMLU TEKNİSYEN": record.technician_name || "",
     "SORUMLU TEKNİSYEN TÜRÜ": TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || (record.technician_source === "external_service" ? "Dış hizmet" : "Mekanik teknisyen"),
-    "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician: any) => `${technician.full_name}${technician.technician_type ? ` (${TECHNICIAN_TYPE_LABELS[technician.technician_type as "mekanik" | "elektromekanik"]})` : ""}`).join(", ") : "",
-    "TEKNİSYEN KATKILARI": Array.isArray(record.technician_contributions) ? record.technician_contributions.map((contribution: any) => `${contribution.full_name} · ${contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(" | ") : "",
+    "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => `${technician.full_name}${technician.technician_type ? ` (${TECHNICIAN_TYPE_LABELS[technician.technician_type as "mekanik" | "elektromekanik"]})` : ""}`).join(", ") : "",
+    "TEKNİSYEN KATKILARI": Array.isArray(record.technician_contributions) ? record.technician_contributions.map((contribution) => `${contribution.full_name} · ${contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(" | ") : "",
     "NOT": record.technician_note || "",
     "YÖNETİCİ TEYİDİ": record.manager_confirmation_status === "pending" ? "Teyit bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski kayıt",
     "TEYİT EDEN YÖNETİCİ": record.manager_confirmed_by_name || "",

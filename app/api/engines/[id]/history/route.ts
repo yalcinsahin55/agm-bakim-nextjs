@@ -1,11 +1,14 @@
+import { enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { Collection } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import type { EngineDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +43,18 @@ function sortHistory(history: HistoryEntry[]): HistoryEntry[] {
   return [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-async function persistHistory(enginesCol: any, engine: any, history: HistoryEntry[]) {
+async function persistHistory(enginesCol: Collection<EngineDocument>, engine: EngineDocument, history: HistoryEntry[]) {
   const sorted = sortHistory(history);
-  const update: Record<string, any> = { history: sorted, updated_at: new Date() };
+  const storedHistory = sorted.map((entry) => ({
+    date: entry.date,
+    hours: entry.hours,
+    load_kw: typeof entry.load_kw === "number" ? entry.load_kw : engine.load_kw,
+  }));
+  const update: Partial<EngineDocument> = { history: storedHistory, updated_at: new Date() };
   // Geçmişteki en güncel kayıt, motorun güncel çalışma saati ve yükünü de temsil eder.
   if (sorted.length > 0) {
-    update.hours = sorted[sorted.length - 1].hours;
-    if (typeof sorted[sorted.length - 1].load_kw === "number") {
-      update.load_kw = sorted[sorted.length - 1].load_kw;
-    }
+    update.hours = storedHistory[storedHistory.length - 1].hours;
+    update.load_kw = storedHistory[storedHistory.length - 1].load_kw;
   }
   await enginesCol.updateOne({ _id: engine._id }, { $set: update });
   return update;
@@ -58,12 +64,12 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
   try {
     const { id } = await context.params;
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
     const { limit, page, skip } = parsePageParams(req);
-    const enginesCol = db.collection("engines") as any;
+    const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne(
       { _id: id },
       { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } },
@@ -124,7 +130,7 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
   try {
     const { id } = await context.params;
     const db = await getDb();
-    const usersCol = db.collection("users") as any;
+    const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!isAdmin(user.role)) {
@@ -134,12 +140,12 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
     if (rateLimited) return rateLimited;
 
     const body = await req.json();
-    const enginesCol = db.collection("engines") as any;
+    const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne({ _id: id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
     // Hedefli düzenleme/silme sırasında legacy alanları veya eski biçimleri sessizce düşürme.
-    const currentHistory = Array.isArray(engine.history) ? sortHistory(engine.history as HistoryEntry[]) : [];
+    const currentHistory = Array.isArray(engine.history) ? sortHistory(engine.history) : [];
     let nextHistory: HistoryEntry[];
 
     if (Array.isArray(body.history)) {

@@ -1,3 +1,4 @@
+import { oilAnalysesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
@@ -11,13 +12,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
   if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Geçersiz analiz kaydı." }, { status: 400 });
 
-  const doc = await (db.collection("oil_analyses") as any).findOne(
+  const doc = await oilAnalysesCollection(db).findOne(
     { _id: new ObjectId(id) },
     { projection: { pdf_url: 1, pdf_b64: 1, pdf_filename: 1 } },
   );
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
-  const usersCol = db.collection("users") as any;
+  const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
@@ -37,7 +38,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const rateLimited = await enforceApiRateLimit(req, "oil-analysis-delete", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const col = db.collection("oil_analyses") as any;
+  const col = oilAnalysesCollection(db);
   const doc = await col.findOne({ _id: new ObjectId(id) });
   if (!doc) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
