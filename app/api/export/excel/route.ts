@@ -147,23 +147,30 @@ async function getExcelExport(req: NextRequest) {
   const history = await recordsCollection(db).find(recordQuery, {
     projection: { photos_b64: 0, photos: 0, videos: 0 },
   }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(5000).toArray();
-  const historyRows = history.map((record) => ({
-    "TARİH": getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
-    "MOTOR": record.engine_name || "",
-    "BAKIM TÜRÜ": record.type_label || "",
-    "MOTOR SAATİ": record.hour_at_completion || 0,
-    "BAŞLANGIÇ": record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
-    "BİTİŞ": record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
-    "TOPLAM SÜRE": formatMaintenanceDuration(record.maintenance_duration_minutes),
-    "SORUMLU TEKNİSYEN": record.technician_name || "",
-    "SORUMLU TEKNİSYEN TÜRÜ": TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || (record.technician_source === "external_service" ? "Dış hizmet" : "Mekanik teknisyen"),
-    "DİĞER TEKNİSYENLER": Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => `${technician.full_name}${technician.technician_type ? ` (${TECHNICIAN_TYPE_LABELS[technician.technician_type as "mekanik" | "elektromekanik"]})` : ""}`).join(", ") : "",
-    "TEKNİSYEN KATKILARI": Array.isArray(record.technician_contributions) ? record.technician_contributions.map((contribution) => `${contribution.full_name} · ${contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(" | ") : "",
-    "NOT": record.technician_note || "",
-    "YÖNETİCİ TEYİDİ": record.manager_confirmation_status === "pending" ? "Teyit bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski kayıt",
-    "TEYİT EDEN YÖNETİCİ": record.manager_confirmed_by_name || "",
-    "TEYİT TARİHİ": record.manager_confirmed_at ? new Date(record.manager_confirmed_at).toLocaleString("tr-TR") : "",
-  }));
+  const seenHistoryGroups = new Set<string>();
+  const historyRows = history.map((record) => {
+    const groupKey = String(record.group_id || record._id);
+    const isFirstGroupRow = !seenHistoryGroups.has(groupKey);
+    seenHistoryGroups.add(groupKey);
+    return {
+      "TARİH": getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
+      "MOTOR": record.engine_name || "",
+      "BAKIM TÜRÜ": record.type_label || "",
+      "MOTOR SAATİ": record.hour_at_completion || 0,
+      "BAŞLANGIÇ": record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
+      "BİTİŞ": record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
+      "ORTAK BAKIM OLAYI": isFirstGroupRow ? "İlk satır · ortak süre" : "Aynı grouped olay",
+      "TOPLAM SÜRE": isFirstGroupRow ? formatMaintenanceDuration(record.maintenance_duration_minutes) : "Yukarıdaki ilk satırda",
+      "SORUMLU TEKNİSYEN": record.technician_name || "",
+      "SORUMLU TEKNİSYEN TÜRÜ": TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || (record.technician_source === "external_service" ? "Dış hizmet" : "Mekanik teknisyen"),
+      "DİĞER TEKNİSYENLER": isFirstGroupRow && Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => `${technician.full_name}${technician.technician_type ? ` (${TECHNICIAN_TYPE_LABELS[technician.technician_type as "mekanik" | "elektromekanik"]})` : ""}`).join(", ") : isFirstGroupRow ? "" : "Aynı grouped olay",
+      "TEKNİSYEN KATKILARI": isFirstGroupRow && Array.isArray(record.technician_contributions) ? record.technician_contributions.map((contribution) => `${contribution.full_name} · ${contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(" | ") : isFirstGroupRow ? "" : "Aynı ortak katkı",
+      "NOT": record.technician_note || "",
+      "YÖNETİCİ TEYİDİ": record.manager_confirmation_status === "pending" ? "Teyit bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski kayıt",
+      "TEYİT EDEN YÖNETİCİ": record.manager_confirmed_by_name || "",
+      "TEYİT TARİHİ": record.manager_confirmed_at ? new Date(record.manager_confirmed_at).toLocaleString("tr-TR") : "",
+    };
+  });
   addDataSheet("Bakım Geçmişi", historyRows);
 
   const buffer = await workbook.xlsx.writeBuffer();

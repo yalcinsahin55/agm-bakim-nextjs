@@ -30,6 +30,8 @@ interface MaintenanceType {
   work_domains?: Array<"mechanical" | "electrical" | "commissioning">;
   allow_electromechanical_support?: boolean;
   allow_electromechanical_responsible?: boolean;
+  engine_scope?: "all" | "explicit";
+  engine_states?: Record<string, { period_hours?: number; last_maintenance_hour?: number; tracking_source?: string }>;
 }
 
 interface VideoItem {
@@ -74,6 +76,7 @@ interface MaintenanceRecord {
   manager_confirmed_by_name?: string;
   manager_confirmed_by_role?: string;
   group_id?: string | null;
+  group_types?: Array<{ type_key: string; type_label: string }>;
 }
 
 function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
@@ -251,6 +254,9 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
+  const [groupTypes, setGroupTypes] = useState<Array<{ type_key: string; type_label: string }>>(() => record.extra_types || []);
+  const [extraKeys, setExtraKeys] = useState<string[]>([]);
+  const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
   const initialResponsibleContribution = (record.technician_contributions || []).find((contribution) => contribution.contribution_role === "responsible");
   const initialResponsibleMinutes = typeof initialResponsibleContribution?.duration_minutes === "number" ? initialResponsibleContribution.duration_minutes : record.maintenance_duration_minutes;
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
@@ -261,7 +267,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const [busy, setBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
-  const selectedMaintenanceTypes = maintenanceTypes.filter((type) => type.key === record.type_key || (record.extra_types || []).some((extra) => extra.type_key === type.key));
+  const historicalTypeKeys = useMemo(() => new Set([record.type_key, ...(record.extra_types || []).map((extra) => extra.type_key), ...groupTypes.map((type) => type.type_key)]), [record.type_key, record.extra_types, groupTypes]);
+  const selectedTypeKeys = useMemo(() => new Set([...historicalTypeKeys, ...extraKeys]), [historicalTypeKeys, extraKeys]);
+  const selectedMaintenanceTypes = maintenanceTypes.filter((type) => selectedTypeKeys.has(type.key));
+  const availableExtraTypes = maintenanceTypes.filter((type) => !historicalTypeKeys.has(type.key));
+  const trackedExtraTypeKeys = useMemo(() => new Set(maintenanceTypes.filter((type) => type.engine_scope === "all" || Boolean(type.engine_states?.[record.engine_id])).map((type) => type.key)), [maintenanceTypes, record.engine_id]);
   const canWorkOnSelectedTypes = (technician: TechnicianOption, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
   const responsibleTechnicians = technicians.filter((technician) => canWorkOnSelectedTypes(technician, "responsible"));
   const supportTechnicians = technicians.filter((technician) => technician.id !== responsibleTechnicianId && canWorkOnSelectedTypes(technician, "support"));
@@ -296,7 +306,16 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
     fetch("/api/maintenance-types")
       .then(async (response) => { if (response.ok) setMaintenanceTypes(await response.json()); })
       .catch(() => {});
-  }, []);
+    fetch(`/api/records/${record._id}?include_group=true`)
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json() as { group_types?: Array<{ type_key?: unknown; type_label?: unknown }> };
+        if (Array.isArray(data.group_types)) {
+          setGroupTypes(data.group_types.filter((type): type is { type_key: string; type_label: string } => typeof type?.type_key === "string" && typeof type?.type_label === "string"));
+        }
+      })
+      .catch(() => {});
+  }, [record._id]);
 
   function removePhoto(index: number): void {
     const photo = photos[index];
@@ -306,6 +325,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
     }
     setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function toggleExtra(key: string, checked: boolean): void {
+    setExtraKeys((current) => checked ? [...new Set([...current, key])] : current.filter((currentKey) => currentKey !== key));
+    if (checked && extraPeriods[key] === undefined) {
+      const type = maintenanceTypes.find((item) => item.key === key);
+      setExtraPeriods((current) => ({ ...current, [key]: type?.default_period_hours || 1000 }));
+    }
   }
 
   function removeVideo(index: number): void {
@@ -408,6 +435,17 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       toast.error("Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin.");
       return;
     }
+    const selectedExtraTypes = extraKeys.flatMap((key) => {
+      const type = maintenanceTypes.find((item) => item.key === key);
+      if (!type) return [];
+      const tracked = trackedExtraTypeKeys.has(key);
+      const period = tracked ? undefined : Number(extraPeriods[key]);
+      return [{ type_key: key, type_label: type.label, ...(period !== undefined ? { period } : {}) }];
+    });
+    if (selectedExtraTypes.some((type) => type.period !== undefined && (!Number.isFinite(type.period) || type.period <= 0))) {
+      toast.error("Motor için henüz tanımlı olmayan ek bakım türlerine geçerli bir periyot saati girin.");
+      return;
+    }
     const responsibleDurationMinutes = isAdmin && technicianSource !== "external_service" ? hoursInputToMinutes(String(responsibleTechnicianDuration)) : null;
     if (isAdmin && technicianSource !== "external_service" && (!responsibleDurationMinutes || responsibleDurationMinutes <= 0)) {
       toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
@@ -436,6 +474,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
       responsible_technician_duration: isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null ? responsibleDurationMinutes : undefined,
+      extra_types: selectedExtraTypes,
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -533,6 +572,17 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
         <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan kişileri seç.</div>
         <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{supportTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: normalizeTechnicianContributionDuration(current[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60) } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi ({isAdmin ? "saat" : "dk"})<input type="number" min="0" max={isAdmin ? 8784 : 366 * 24 * 60} step={isAdmin ? "0.25" : "15"} value={isAdmin ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: isAdmin ? (hoursInputToMinutes(event.target.value) ?? 0) : Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
+      </div>}
+
+      {availableExtraTypes.length > 0 && <div className="rounded-lg border border-purple-400/30 bg-purple-400/5 p-2.5">
+        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Birlikte tamamlanan bakım türünü sonradan ekle</div>
+        <p className="mt-0.5 text-[10px] leading-4 text-faint">Seçtiğiniz türler bu kayıtla aynı bakım olayına bağlanır; başlangıç-bitiş zamanı ve teknisyen katkıları ortak kalır. Bu nedenle aynı anda yapılan bakım türleri teknisyen süresini ikinci kez artırmaz.</p>
+        {groupTypes.length > 0 && <div className="mt-2 rounded-lg bg-panel2 px-2 py-1.5 text-[10px] text-purple-200">Bu olayda zaten kayıtlı: {[...new Set([record.type_label, ...groupTypes.map((type) => type.type_label)])].join(" · ")}</div>}
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{availableExtraTypes.map((type) => {
+          const checked = extraKeys.includes(type.key);
+          const tracked = trackedExtraTypeKeys.has(type.key);
+          return <div key={type.key} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9px] text-faint">· periyot isteyecek</span>}</label>{checked && !tracked && <label className="mt-1.5 ml-6 block text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" min="1" step="1" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-md border border-border bg-panel px-2 py-1.5 text-[10.5px] font-mono text-text" /></label>}</div>;
+        })}</div>
       </div>}
 
       {offlineMedia.length > 0 && (

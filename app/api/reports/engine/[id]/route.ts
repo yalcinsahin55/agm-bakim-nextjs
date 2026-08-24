@@ -51,14 +51,19 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
       $facet: {
         metadata: [{ $count: "total" }],
         stats: [
-          {
-            $group: {
-              _id: null,
-              first_date: { $min: "$maintenance_date" },
-              last_date: { $max: "$maintenance_date" },
-              total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
-            },
-          },
+          { $set: { __maintenance_group_key: { $cond: [{ $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] }, "$group_id", { $toString: "$_id" }] } } },
+          { $group: {
+            _id: "$__maintenance_group_key",
+            first_date: { $min: "$maintenance_date" },
+            last_date: { $max: "$maintenance_date" },
+            total_duration_minutes: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } },
+          } },
+          { $group: {
+            _id: null,
+            first_date: { $min: "$first_date" },
+            last_date: { $max: "$last_date" },
+            total_duration_minutes: { $sum: "$total_duration_minutes" },
+          } },
         ],
         records: [
           { $sort: { maintenance_date: -1, _id: -1 } },

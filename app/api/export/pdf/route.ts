@@ -200,7 +200,11 @@ async function createPdf(req: NextRequest) {
     doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text("Seçilen filtrelere uygun bakım kaydı bulunamadı.", left, doc.y + 12);
   } else {
     tableHeading();
+    const seenRecordGroups = new Set<string>();
     records.forEach((record, index) => {
+      const groupKey = String(record.group_id || record._id);
+      const isFirstGroupRow = !seenRecordGroups.has(groupKey);
+      seenRecordGroups.add(groupKey);
       drawRow([
         getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "",
         record.engine_name || "",
@@ -208,9 +212,11 @@ async function createPdf(req: NextRequest) {
         record.hour_at_completion !== undefined && record.hour_at_completion !== null ? Number(record.hour_at_completion).toLocaleString("tr-TR") : "",
         record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "",
         record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "",
-        formatMaintenanceDuration(record.maintenance_duration_minutes),
+        isFirstGroupRow ? formatMaintenanceDuration(record.maintenance_duration_minutes) : "Aynı ortak olay",
         record.technician_name ? `${record.technician_name}${record.technician_type ? ` · ${TECHNICIAN_TYPE_LABELS[record.technician_type as "mekanik" | "elektromekanik"] || "Mekanik"}` : ""}` : "",
-        Array.isArray(record.technician_contributions) ? record.technician_contributions.filter((contribution) => contribution.contribution_role === "support").map((contribution) => `${contribution.full_name} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(", ") : Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => technician.full_name).join(", ") : "",
+        isFirstGroupRow
+          ? Array.isArray(record.technician_contributions) ? record.technician_contributions.filter((contribution) => contribution.contribution_role === "support").map((contribution) => `${contribution.full_name} · ${formatMaintenanceDuration(contribution.duration_minutes)}`).join(", ") : Array.isArray(record.other_technicians) ? record.other_technicians.map((technician) => technician.full_name).join(", ") : ""
+          : "Aynı ortak katkı",
         record.technician_note || "",
         record.manager_confirmation_status === "pending" ? "Bekliyor" : record.manager_confirmation_status === "confirmed" ? "Teyitli" : "Eski",
       ], index % 2 === 1);

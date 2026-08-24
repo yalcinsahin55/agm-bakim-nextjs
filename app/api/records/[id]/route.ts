@@ -46,6 +46,18 @@ async function getRecord(req: NextRequest, { params }: { params: Promise<{ id: s
     includeMedia ? undefined : { projection: { photos_b64: 0, videos: 0 } },
   );
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
+  if (req.nextUrl.searchParams.get("include_group") === "true" && record.group_id) {
+    const groupTypes = await recordsCollection(db).find(
+      { group_id: record.group_id },
+      { projection: { type_key: 1, type_label: 1 }, limit: 50 },
+    ).toArray();
+    return NextResponse.json({
+      ...record,
+      group_types: groupTypes
+        .filter((item) => typeof item.type_key === "string" && typeof item.type_label === "string")
+        .map((item) => ({ type_key: item.type_key, type_label: item.type_label })),
+    });
+  }
   return NextResponse.json(record);
 }
 
@@ -111,8 +123,9 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Sorumlu teknisyen için 0’dan büyük çalışma süresi girilmelidir." }, { status: 400 });
   }
   const externalServiceName = typeof external_service_name === "string" ? external_service_name.trim() : (record.external_service_name || "");
-  const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 } }).toArray()).map((item) => item.type_key) : [];
+  const groupedTypeKeys = record.group_id ? (await recordsCol.find({ group_id: record.group_id }, { projection: { type_key: 1 }, limit: 50 }).toArray()).map((item) => item.type_key) : [];
   const historicalTypeKeys = [...new Set([record.type_key, ...groupedTypeKeys])];
+  const nextGroupId = record.group_id || (Array.isArray(extra_types) && extra_types.length > 0 ? new ObjectId().toString() : null);
   const historicalTypeKeySet = new Set(historicalTypeKeys);
   const requestedExtraTypeKeys = Array.isArray(extra_types)
     ? extra_types.map((item) => item.type_key).filter((key: unknown): key is string => typeof key === "string" && key.length > 0)
@@ -207,7 +220,10 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
       nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: fallbackTechnicianType, ...normalizeTechnicianPermissions({}, fallbackTechnicianType) };
     }
     const responsibleOption = nextResponsibleOption;
-    if (!keepHistoricalResponsible && responsibleOption && !selectedTypeDocs.every((type) => canTechnicianWorkOnType(responsibleOption, type, "responsible"))) {
+    const responsibleTypesToValidate = keepHistoricalResponsible
+      ? selectedTypeDocs.filter((type) => !historicalTypeKeySet.has(String(type._id)))
+      : selectedTypeDocs;
+    if (responsibleOption && responsibleTypesToValidate.length > 0 && !responsibleTypesToValidate.every((type) => canTechnicianWorkOnType(responsibleOption, type, "responsible"))) {
       return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }
@@ -247,6 +263,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Kişi çalışma süresi toplam bakım süresini aşamaz." }, { status: 400 });
   }
   update.technician_contributions = technicianContributions;
+  if (typeof nextGroupId === "string") update.group_id = nextGroupId;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
   if (typeof technician_note === "string") update.technician_note = technician_note;
@@ -256,7 +273,34 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
   const { $unset: unset, ...setFields } = update;
+  const sharedSetFields: Record<string, unknown> = {
+    technician_id: nextResponsibleId,
+    technician_name: nextResponsibleName,
+    technician_source: useExternalService ? "external_service" : "internal",
+    other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
+    other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
+    technician_contributions: technicianContributions,
+  };
+  if (typeof nextGroupId === "string") sharedSetFields.group_id = nextGroupId;
+  if (!useExternalService && nextResponsibleType) sharedSetFields.technician_type = nextResponsibleType;
+  if (useExternalService && externalServiceName) sharedSetFields.external_service_name = externalServiceName;
+  if (typeof hour_at_completion === "number") sharedSetFields.hour_at_completion = hour_at_completion;
+  if (time_tracking_version === 2) {
+    sharedSetFields.time_tracking_version = 2;
+    sharedSetFields.maintenance_start_at = nextStartAt;
+    sharedSetFields.maintenance_end_at = nextEndAt;
+    sharedSetFields.maintenance_duration_minutes = nextDurationMinutes;
+  }
+  const sharedUnset: Record<string, ""> = {};
+  if (useExternalService) sharedUnset.technician_type = "";
+  if (useExternalService ? !externalServiceName : true) sharedUnset.external_service_name = "";
+  const groupFilter = record.group_id ? { group_id: record.group_id, _id: { $ne: record._id } } : null;
+  const sharedUpdate = {
+    $set: sharedSetFields,
+    ...(Object.keys(sharedUnset).length > 0 ? { $unset: sharedUnset } : {}),
+  };
   await recordsCol.updateOne({ _id: record._id }, { $set: setFields, ...(unset ? { $unset: unset } : {}) });
+  if (groupFilter) await recordsCol.updateMany(groupFilter, sharedUpdate);
   await writeAuditLog(db, {
     user,
     action: "update",
@@ -268,8 +312,6 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
-    await recomputeLastMaintenance(db, record.engine_id, record.type_key);
-
     const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne({ _id: record.engine_id });
     if (engine && hour_at_completion > engine.hours) {
@@ -285,18 +327,13 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Bu kaydı düzenlerken birlikte tamamlanan ama daha önce hiç kaydedilmemiş başka bakımlar da ekleniyorsa,
-  // her biri için ayrı kayıt oluşturulur ve aynı gruba bağlanır.
+  // her biri için ayrı kayıt oluşturulur ve aynı gruba bağlanır. Kardeş kayıtlar ortak olay
+  // alanlarıyla güncellendiği için kişi bazlı çalışma süresi bakım türü başına çoğalmaz.
   if (Array.isArray(extra_types) && extra_types.length > 0) {
-    let groupId = record.group_id;
-    if (!groupId) {
-      groupId = new ObjectId().toString();
-      await recordsCol.updateOne({ _id: record._id }, { $set: { group_id: groupId } });
-    }
+    const groupId = nextGroupId || record.group_id;
+    if (!groupId) return NextResponse.json({ error: "Bakım grubu oluşturulamadı." }, { status: 500 });
     const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
-    const extraTechnicianContributions: MaintenanceTechnicianContribution[] = useExternalService ? [] : [
-      { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, contribution_role: "responsible" as const, duration_minutes: responsibleDurationMinutes },
-      ...effectiveOtherTechnicians.map((technician) => ({ ...technician, contribution_role: "support" as const, duration_minutes: normalizeTechnicianContributionDuration(other_technician_durations?.[technician.id], nextDurationMinutes ?? 0) })),
-    ];
+    const extraTechnicianContributions: MaintenanceTechnicianContribution[] = technicianContributions;
     const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
     const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
     const typesCol = maintenanceTypesCollection(db);
@@ -321,9 +358,10 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
           { upsert: true }
         );
       }
+      const extraType = selectedTypeDocs.find((type) => String(type._id) === ex.type_key);
       await recordsCol.insertOne({
         engine_id: record.engine_id, engine_name: record.engine_name,
-        type_key: ex.type_key, type_label: ex.type_label,
+        type_key: ex.type_key, type_label: extraType?.label || ex.type_label,
         hour_at_completion: finalHour,
         ...(nextStartAt && nextEndAt && nextDurationMinutes ? {
           time_tracking_version: 2,
@@ -331,8 +369,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
           maintenance_end_at: nextEndAt,
           maintenance_duration_minutes: nextDurationMinutes,
         } : {}),
-        note: "", technician_note: "",
-        photos_b64: [], photos: [], videos: [],
+        note: "", technician_note: "", photos_b64: [], photos: [], videos: [],
         manager_confirmation_status: extraManagerConfirmationStatus,
         ...(extraManagerConfirmedAt ? {
           manager_confirmed_at: extraManagerConfirmedAt,
@@ -350,8 +387,14 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
         created_at: record.created_at, backdated: !!record.backdated,
         group_id: groupId, grouped_with: record.type_label,
       });
-      await recomputeLastMaintenance(db, record.engine_id, ex.type_key);
     }
+  }
+
+  const affectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
+  if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
+    await Promise.all(affectedTypeKeys.map((typeKey) => recomputeLastMaintenance(db, record.engine_id, typeKey)));
+  } else if (Array.isArray(extra_types) && extra_types.length > 0) {
+    await Promise.all(requestedExtraTypeKeys.map((typeKey) => recomputeLastMaintenance(db, record.engine_id, typeKey)));
   }
 
   invalidateMaintenancePanelServerCache();
