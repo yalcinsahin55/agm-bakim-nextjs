@@ -264,7 +264,7 @@ async function createPdf(result: AssistantToolResponse, question: string): Promi
   doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text("Bu rapor salt okunur AGM Bakım verilerinden oluşturulmuştur.", doc.page.margins.left, doc.page.height - 28, { width, align: "left" });
 
   const buffer = await pdfBuffer(doc);
-  return new NextResponse(responseArrayBuffer(buffer), {
+  return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
@@ -304,5 +304,8 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/assistant/export", () => getAssistantExport(req), { request: req });
+  return withApiTiming("GET /api/assistant/export", () => getAssistantExport(req), { request: req }).catch((error) => {
+    console.error("GET /api/assistant/export hatası:", error instanceof Error ? error.name : "UnknownError");
+    return jsonError("PDF/Excel raporu hazırlanırken bir hata oluştu.", 500);
+  });
 }
