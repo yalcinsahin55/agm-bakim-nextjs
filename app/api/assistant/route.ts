@@ -78,7 +78,7 @@ async function postAssistant(req: NextRequest) {
       },
     }, { headers: { "X-RateLimit-Remaining": String(rate.remaining) } });
   } catch (error) {
-    console.error("POST /api/assistant hatası:", error);
+    console.error("POST /api/assistant hatası:", error instanceof Error ? error.name : "UnknownError");
     return jsonError("Asistan verileri hazırlanırken bir hata oluştu.", 500);
   }
 }

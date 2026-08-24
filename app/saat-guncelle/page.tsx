@@ -9,13 +9,17 @@ import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import type { Engine } from "@/lib/types";
+
+type EngineRow = Pick<Engine, "_id" | "name" | "hours" | "load_kw">;
+type EngineEditValue = { hours?: string; load_kw?: string };
 
 export default function SaatGuncellePage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const [engines, setEngines] = useState([]);
+  const [engines, setEngines] = useState<EngineRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [values, setValues] = useState({});
+  const [values, setValues] = useState<Record<string, EngineEditValue>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -32,7 +36,7 @@ export default function SaatGuncellePage() {
         return;
       }
       setLoadError("");
-      setEngines(data);
+      setEngines(data as EngineRow[]);
     } catch {
       setEngines([]);
       setLoadError("Motor listesi yüklenemedi. Lütfen tekrar deneyin.");
@@ -44,12 +48,12 @@ export default function SaatGuncellePage() {
   useEffect(() => { load(); }, []); // eslint-disable-line
 
   const sorted = useMemo(
-    () => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)),
+    () => [...engines].sort((a: EngineRow, b: EngineRow) => engineSortKey(a.name) - engineSortKey(b.name)),
     [engines]
   );
 
-  function setValue(id, field, val) {
-    setValues((prev) => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
+  function setValue(id: string, field: keyof EngineEditValue, val: string): void {
+    setValues((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), [field]: val } }));
   }
 
   const changedEngines = sorted.filter((e) => {
@@ -69,7 +73,7 @@ export default function SaatGuncellePage() {
     const loadingToast = toast.loading("Saatler güncelleniyor...");
     try {
       const updates = changedEngines.map((e) => {
-        const v = values[e._id];
+        const v = values[e._id] || {};
         return {
           engine_id: e._id,
           hours: v.hours !== undefined && v.hours !== "" ? Number(v.hours) : undefined,
@@ -144,7 +148,7 @@ export default function SaatGuncellePage() {
 
         <div className="flex flex-col gap-2 mb-24">
           {sorted.map((e) => {
-            const v = values[e._id] || {};
+            const v: EngineEditValue = values[e._id] || {};
             const isChanged = changedEngines.some((c) => c._id === e._id);
             return (
               <div

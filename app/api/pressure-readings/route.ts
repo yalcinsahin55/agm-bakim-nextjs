@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const readings = await pressureReadingsCollection(db).find(query).sort({ reading_date: 1 }).toArray();
     return NextResponse.json(readings);
   } catch (error) {
-    console.error("Karter basınç verileri getirilirken hata:", error);
+    console.error("Karter basınç verileri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Karter basınç verileri yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     const res = await pressureReadingsCollection(db).insertMany(docs);
     return NextResponse.json({ ok: true, inserted: res.insertedCount });
   } catch (error) {
-    console.error("Karter basıncı eklenirken hata:", error);
+    console.error("Karter basıncı eklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Karter basıncı kaydedilirken bir hata oluştu." }, { status: 500 });
   }
 }

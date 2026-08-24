@@ -19,6 +19,9 @@ const statusOptions: Array<{ value: "Tümü" | StatusKey; label: string }> = [
   { value: "yaklasiyor", label: STATUS_LABELS.yaklasiyor },
   { value: "normal", label: STATUS_LABELS.normal },
 ];
+const statusCards: Array<{ value: StatusKey; label: string }> = statusOptions.filter(
+  (option): option is { value: StatusKey; label: string } => option.value !== "Tümü",
+);
 
 function formatHours(value: number): string {
   return value.toLocaleString("tr-TR", { maximumFractionDigits: 0 });
@@ -124,7 +127,7 @@ export default function TahminPage() {
         </section>
 
         <section aria-label="Bakım durumu özeti" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {statusOptions.slice(1).map((status) => (
+          {statusCards.map((status) => (
             <button
               key={status.value}
               type="button"

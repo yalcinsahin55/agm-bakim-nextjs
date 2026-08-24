@@ -8,7 +8,8 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
-const FIELDS = ["kaver_tipi", "hava_filtresi", "krankcase", "esanjor_tipi", "dungs", "radyator_tipi", "not"];
+const FIELDS = ["kaver_tipi", "hava_filtresi", "krankcase", "esanjor_tipi", "dungs", "radyator_tipi", "not"] as const;
+type EquipmentInfoField = typeof FIELDS[number];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,10 +27,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await col.findOne({ _id: id });
   if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
-  const body = await req.json();
-  const update: Record<string, any> = {};
-  for (const f of FIELDS) {
-    if (f in body) update[f] = body[f] || null;
+  const body = await req.json().catch(() => ({}));
+  const update: Partial<Record<EquipmentInfoField, string | null>> = {};
+  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  for (const field of FIELDS) {
+    if (field in input) {
+      const value = input[field];
+      update[field] = typeof value === "string" && value.trim() ? value.trim() : null;
+    }
   }
 
   await col.updateOne({ _id: id }, { $set: update });

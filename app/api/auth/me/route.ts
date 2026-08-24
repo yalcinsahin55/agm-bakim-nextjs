@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const isTechnician = user.role === "teknisyen" || user.role === "planlamaci";
   const technician_type = isTechnician ? normalizeTechnicianType(user.technician_type) : undefined;
-  const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type) : undefined;
+  const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type ?? "mekanik") : undefined;
   return NextResponse.json({
     id: user._id,
     full_name: user.full_name,

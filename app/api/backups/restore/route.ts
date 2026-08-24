@@ -87,7 +87,7 @@ async function postBackupRestore(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, summary, mode: "merge" });
   } catch (error) {
-    console.error("POST /api/backups/restore hatası:", error);
+    console.error("POST /api/backups/restore hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Yedek geri yüklenemedi. Dosya biçimini kontrol edin." }, { status: 400 });
   }
 }

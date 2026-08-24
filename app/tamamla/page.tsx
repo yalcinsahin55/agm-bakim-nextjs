@@ -290,7 +290,7 @@ export default function TamamlaPage() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setPhotoBusy(true);
-    const uploaded = [];
+    const uploaded: string[] = [];
     for (const f of files) {
       try {
         const compressed = await compressImage(f);
@@ -385,8 +385,8 @@ export default function TamamlaPage() {
             setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
             continue;
           }
-          console.error("Video yükleme hatası:", err);
-          toast.error(`${f.name} yüklenemedi: ${err && err.message ? err.message.slice(0, 100) : "bilinmeyen hata"}`);
+          const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
+          toast.error(`${f.name} yüklenemedi: ${message}`);
         }
       }
     } finally {
@@ -428,14 +428,15 @@ export default function TamamlaPage() {
     if (source === "external_service") setOtherTechnicianIds([]);
   }
 
-  function changeResponsibleTechnician(id) {
+  function changeResponsibleTechnician(id: string): void {
     setResponsibleTechnicianId(id);
     setOtherTechnicianIds((current) => current.filter((currentId) => currentId !== id));
   }
 
   const currentUserId = user?._id || user?.id || "";
-  const selectedMaintenanceTypes = [chosenType, ...extraKeys.map((key) => types.find((item) => item.key === key))].filter(Boolean);
-  const isEligibleForRole = (technician, role) => selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
+  const selectedMaintenanceTypes = [chosenType, ...extraKeys.map((key) => types.find((item) => item.key === key))]
+    .filter((type): type is MaintenanceType => Boolean(type));
+  const isEligibleForRole = (technician: TechnicianOption, role: "responsible" | "support"): boolean => selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
   const responsibleTechnicians = technicians.filter((technician) => isEligibleForRole(technician, "responsible"));
   const effectiveResponsibleTechnicianId = responsibleTechnicianId || currentUserId;
   const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && isEligibleForRole(technician, "support"));
@@ -499,13 +500,14 @@ export default function TamamlaPage() {
     todayStart.setHours(0, 0, 0, 0);
     const isBackdated = Number.isFinite(startDate.getTime()) && startDate.getTime() < todayStart.getTime();
 
-    const extra_types = extraKeys.map((k) => {
+    const extra_types = extraKeys.flatMap((k) => {
       const t = types.find((tt) => tt.key === k);
+      if (!t) return [];
       const trackedForEngine = trackedKeys.has(k);
-      return {
+      return [{
         type_key: k, type_label: t.label,
         period: trackedForEngine ? undefined : Number(extraPeriods[k]),
-      };
+      }];
     });
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");

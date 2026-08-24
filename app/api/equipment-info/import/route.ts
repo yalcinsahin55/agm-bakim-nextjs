@@ -15,7 +15,11 @@ function normalizeName(name: unknown): string {
   return String(name).trim().replace(/-/g, " ").replace(/\s+/g, " ");
 }
 
-const COLUMN_MAP: Record<string, string> = {
+type EquipmentInfoField = "kaver_tipi" | "hava_filtresi" | "krankcase" | "esanjor_tipi" | "dungs" | "radyator_tipi" | "not";
+
+type EquipmentInfoImport = { engine_name: string } & Partial<Record<EquipmentInfoField, string | null>>;
+
+const COLUMN_MAP: Record<string, EquipmentInfoField> = {
   "KAVER TİPİ": "kaver_tipi",
   "HAVA FİLTRESİ": "hava_filtresi",
   "KRANKCASE": "krankcase",
@@ -66,8 +70,8 @@ export async function POST(req: NextRequest) {
   const motorCol = header.indexOf("MOTOR NO");
   if (motorCol === -1) return NextResponse.json({ error: "'Motor No' sütunu bulunamadı." }, { status: 400 });
 
-  const colIndex: Record<string, number> = {};
-  Object.entries(COLUMN_MAP).forEach(([label, key]) => {
+  const colIndex: Partial<Record<EquipmentInfoField, number>> = {};
+  (Object.entries(COLUMN_MAP) as Array<[string, EquipmentInfoField]>).forEach(([label, key]) => {
     const idx = header.indexOf(label);
     if (idx !== -1) colIndex[key] = idx;
   });
@@ -79,8 +83,11 @@ export async function POST(req: NextRequest) {
     const nameRaw = row[motorCol];
     if (!nameRaw || !String(nameRaw).toUpperCase().includes("AGM")) continue;
     const name = normalizeName(nameRaw);
-    const info: Record<string, any> = { engine_name: name };
-    Object.entries(colIndex).forEach(([key, idx]) => { info[key] = row[idx] ?? null; });
+    const info: EquipmentInfoImport = { engine_name: name };
+    (Object.entries(colIndex) as Array<[EquipmentInfoField, number]>).forEach(([key, idx]) => {
+      const value = row[idx];
+      info[key] = value === null || value === undefined ? null : String(value).trim() || null;
+    });
     await col.updateOne({ _id: name }, { $set: info }, { upsert: true });
     updated++;
   }

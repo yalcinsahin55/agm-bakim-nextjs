@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       .toArray();
     return NextResponse.json(analyses);
   } catch (error) {
-    console.error("Yağ analizleri getirilirken hata:", error);
+    console.error("Yağ analizleri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Yağ analizleri yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const res = await oilAnalysesCollection(db).insertOne(doc);
     return NextResponse.json({ ok: true, id: res.insertedId });
   } catch (error) {
-    console.error("Yağ analizi eklenirken hata:", error);
+    console.error("Yağ analizi eklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Yağ analizi eklenirken bir hata oluştu." }, { status: 500 });
   }
 }

@@ -107,7 +107,7 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
       },
     });
   } catch (error) {
-    console.error("GET /api/reports/engine/[id] hatası:", error);
+    console.error("GET /api/reports/engine/[id] hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor raporu hazırlanırken bir hata oluştu." }, { status: 500 });
   }
 }

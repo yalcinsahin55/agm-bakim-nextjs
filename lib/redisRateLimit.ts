@@ -232,7 +232,7 @@ export async function checkDistributedRateLimit(
     );
     return parseReply(reply, request);
   } catch (error) {
-    console.error("[RateLimit] Redis check failed:", error instanceof Error ? error.message : "unknown error");
+    console.error("[RateLimit] Redis check failed:", error instanceof Error ? error.name : "UnknownError");
     if (shouldFailClosed(failureMode)) return infrastructureDecision(request);
     return localDecision(request, checkRateLimit(buildRedisKey(request.scope, request.identifier), request.limit, request.windowMs));
   }
@@ -269,7 +269,7 @@ export async function checkDistributedRateLimitBatch(
     );
     return parseReply(reply, primary);
   } catch (error) {
-    console.error("[RateLimit] Redis composite check failed:", error instanceof Error ? error.message : "unknown error");
+    console.error("[RateLimit] Redis composite check failed:", error instanceof Error ? error.name : "UnknownError");
     if (shouldFailClosed(failureMode)) return infrastructureDecision(primary);
     const result = checkRateLimitBatch(requests.map((request) => ({
       key: buildRedisKey(request.scope, request.identifier),

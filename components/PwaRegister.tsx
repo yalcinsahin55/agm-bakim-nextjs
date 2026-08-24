@@ -7,12 +7,12 @@ export default function PwaRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch((error) => {
-        console.warn("Service Worker kaydedilemedi:", error);
+        console.warn("Service Worker kaydedilemedi:", error instanceof Error ? error.name : "UnknownError");
       });
     }
 
     const sync = () => {
-      if (navigator.onLine) void syncOfflineQueue().catch((error) => console.warn("Çevrimdışı kayıt senkronizasyonu başarısız:", error));
+      if (navigator.onLine) void syncOfflineQueue().catch((error) => console.warn("Çevrimdışı kayıt senkronizasyonu başarısız:", error instanceof Error ? error.name : "UnknownError"));
     };
     const handleWorkerMessage = (event: MessageEvent) => {
       if (event.data?.type === "AGM_OFFLINE_SYNC") sync();

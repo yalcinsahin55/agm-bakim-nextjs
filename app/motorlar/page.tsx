@@ -130,7 +130,7 @@ export default function MotorlarPage() {
     return sorted.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(query));
   }, [searchTerm, sorted]);
 
-  async function toggleEngine(engineId) {
+  async function toggleEngine(engineId: string): Promise<void> {
     if (openId === engineId) {
       setOpenId(null);
       return;

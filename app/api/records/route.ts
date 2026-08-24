@@ -129,7 +129,7 @@ async function getRecords(req: NextRequest) {
       totalPages: Math.max(Math.ceil(total / pageSize), 1),
     });
   } catch (error) {
-    console.error("GET /api/records hatası:", error);
+    console.error("GET /api/records hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Kayıtlar getirilirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -142,6 +142,7 @@ async function postRecord(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const currentUser = user;
     if (user.role === "goruntuleyici") {
       return NextResponse.json({ error: "Görüntüleyici rolü bakım tamamlayamaz." }, { status: 403 });
     }
@@ -201,6 +202,7 @@ async function postRecord(req: NextRequest) {
     if (!isSafeMongoPathSegment(engine_id)) return NextResponse.json({ error: "Geçersiz motor kimliği." }, { status: 400 });
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
+    const engineName = engine.name;
 
     const useExternalService = technician_source === "external_service";
     if (useExternalService && user.role !== "yonetici") {
@@ -243,7 +245,7 @@ async function postRecord(req: NextRequest) {
     const selectedTypes = requestedTypeKeys.map((key) => maintenanceTypeByKey.get(key)).filter((type): type is MaintenanceTypeDocument => type !== undefined);
     if (!useExternalService) {
       const validationRole = user.role === "yonetici" || typeof responsible_technician_id === "string" ? "responsible" : "support";
-      if (!selectedTypes.every((type) => canTechnicianWorkOnType(responsibleTechnicianOption, type, validationRole))) {
+      if (!responsibleTechnicianOption || !selectedTypes.every((type) => canTechnicianWorkOnType(responsibleTechnicianOption, type, validationRole))) {
         return NextResponse.json({ error: "Seçilen teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
       }
     }
@@ -288,7 +290,7 @@ async function postRecord(req: NextRequest) {
 
     async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown) {
       const rec: MaintenanceRecordDocument = {
-        engine_id, engine_name: engine.name, type_key: tKey, type_label: tLabel,
+        engine_id, engine_name: engineName, type_key: tKey, type_label: tLabel,
         hour_at_completion,
         ...(maintenanceStartAt && maintenanceEndAt && maintenanceDurationMinutes ? {
           time_tracking_version: 2,
@@ -306,9 +308,9 @@ async function postRecord(req: NextRequest) {
         manager_confirmation_status: managerConfirmationStatus,
         ...(shouldConfirmOnCreate && managerConfirmedAt ? {
           manager_confirmed_at: managerConfirmedAt,
-          manager_confirmed_by_id: user._id,
-          manager_confirmed_by_name: user.full_name,
-          manager_confirmed_by_role: user.role,
+          manager_confirmed_by_id: currentUser._id,
+          manager_confirmed_by_name: currentUser.full_name,
+          manager_confirmed_by_role: currentUser.role,
         } : {}),
         technician_id: responsibleTechnicianId,
         technician_name: responsibleTechnicianName,
@@ -379,7 +381,7 @@ async function postRecord(req: NextRequest) {
     await refreshUserMaintenanceNotificationsBestEffort(db, user);
     return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });
   } catch (error) {
-    console.error("POST /api/records hatası:", error);
+    console.error("POST /api/records hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bakım kaydı oluşturulurken bir hata oluştu." }, { status: 500 });
   }
 }

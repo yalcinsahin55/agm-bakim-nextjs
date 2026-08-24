@@ -71,7 +71,7 @@ async function postRegister(req: NextRequest) {
     });
     return res;
   } catch (error) {
-    console.error("Kayıt olma hatası:", error);
+    console.error("Kayıt olma hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Kayıt işlemi sırasında bir hata oluştu." }, { status: 500 });
   }
 }

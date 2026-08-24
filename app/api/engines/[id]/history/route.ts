@@ -121,7 +121,7 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
       },
     });
   } catch (error) {
-    console.error("Motor saat geçmişi getirilirken hata:", error);
+    console.error("Motor saat geçmişi getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor saat geçmişi yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -175,7 +175,7 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
     invalidateMaintenancePanelServerCache();
     return NextResponse.json({ ok: true, hours: update.hours ?? engine.hours });
   } catch (error) {
-    console.error("Motor saat geçmişi güncellenirken hata:", error);
+    console.error("Motor saat geçmişi güncellenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor saat geçmişi güncellenirken bir hata oluştu." }, { status: 500 });
   }
 }

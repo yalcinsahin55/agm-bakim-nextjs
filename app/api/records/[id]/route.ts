@@ -203,9 +203,11 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (!nextResponsibleOption) {
       const resolvedCurrentResponsible = await resolveTechnicianOptions(db, [nextResponsibleId]);
-      nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: nextResponsibleType, ...normalizeTechnicianPermissions({}, nextResponsibleType) };
+      const fallbackTechnicianType = nextResponsibleType || "mekanik";
+      nextResponsibleOption = resolvedCurrentResponsible?.[0] || { id: nextResponsibleId, full_name: nextResponsibleName, technician_type: fallbackTechnicianType, ...normalizeTechnicianPermissions({}, fallbackTechnicianType) };
     }
-    if (!keepHistoricalResponsible && nextResponsibleOption && !selectedTypeDocs.every((type) => canTechnicianWorkOnType(nextResponsibleOption, type, "responsible"))) {
+    const responsibleOption = nextResponsibleOption;
+    if (!keepHistoricalResponsible && responsibleOption && !selectedTypeDocs.every((type) => canTechnicianWorkOnType(responsibleOption, type, "responsible"))) {
       return NextResponse.json({ error: "Seçilen sorumlu teknisyen, bu bakım türlerinden en az biri için yetkili değil." }, { status: 403 });
     }
   }

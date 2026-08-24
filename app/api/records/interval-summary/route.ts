@@ -79,7 +79,7 @@ async function getIntervalSummary(req: NextRequest) {
 
     return NextResponse.json({ groups });
   } catch (error) {
-    console.error("GET /api/records/interval-summary hatası:", error);
+    console.error("GET /api/records/interval-summary hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bakım aralıkları özetlenirken bir hata oluştu." }, { status: 500 });
   }
 }

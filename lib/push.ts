@@ -66,7 +66,7 @@ export async function sendPushToUser(db: Db, userId: string, payload: PushPayloa
       if (statusCode === 404 || statusCode === 410) {
         await collection.deleteOne({ endpoint: record.endpoint });
       } else {
-        console.error("Web Push gönderilemedi:", error);
+        console.error("Web Push gönderilemedi:", error instanceof Error ? error.name : "UnknownError");
       }
     }
   }

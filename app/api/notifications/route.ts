@@ -23,7 +23,7 @@ async function getNotifications(req: NextRequest) {
     const unreadCount = notifications.filter((notification) => !notification.read_at).length;
     return NextResponse.json({ notifications, unreadCount });
   } catch (error) {
-    console.error("Bildirimler yüklenirken hata:", error);
+    console.error("Bildirimler yüklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bildirimler yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }

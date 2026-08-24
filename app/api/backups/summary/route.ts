@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       latest_maintenance_at: latestRecord?.created_at || null,
     });
   } catch (error) {
-    console.error("GET /api/backups/summary hatası:", error);
+    console.error("GET /api/backups/summary hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Yedekleme özeti yüklenemedi." }, { status: 500 });
   }
 }

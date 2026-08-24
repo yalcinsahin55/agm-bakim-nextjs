@@ -1,11 +1,12 @@
 import { auditLogsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
+import { ObjectId, type Filter } from "mongodb";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import type { AuditAction, AuditLogDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,9 @@ export async function GET(req: NextRequest) {
   const from = (searchParams.get("from") || "").trim();
   const to = (searchParams.get("to") || "").trim();
   const includeDetails = searchParams.get("details") === "1";
-  const query: Record<string, any> = {};
+  const query: Filter<AuditLogDocument> = {};
 
-  if (action) query.action = action;
+  if (action) query.action = action as AuditAction;
   if (entity) query.entity = entity;
   if (userId) query.user_id = userId;
   if (logId) query._id = ObjectId.isValid(logId) ? new ObjectId(logId) : logId;

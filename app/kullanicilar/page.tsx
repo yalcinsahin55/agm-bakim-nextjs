@@ -8,9 +8,11 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { ROLE_LABELS } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import type { RoleKey } from "@/lib/status";
+import type { TechnicianType } from "@/lib/types";
 
-const ROLES = ["yonetici", "teknisyen", "goruntuleyici"];
-const TECHNICIAN_TYPES = [
+const ROLES: RoleKey[] = ["yonetici", "teknisyen", "goruntuleyici"];
+const TECHNICIAN_TYPES: Array<{ value: TechnicianType; label: string }> = [
   { value: "mekanik", label: "Mekanik teknisyen" },
   { value: "elektromekanik", label: "Elektromekanik teknisyen" },
 ];
@@ -20,23 +22,23 @@ type UserRow = {
   full_name: string;
   phone?: string;
   email?: string;
-  role: string;
-  technician_type?: string;
+  role: RoleKey;
+  technician_type?: TechnicianType;
   approved?: boolean;
   active?: boolean;
 };
 
 type UserStatusFilter = "all" | "active" | "inactive";
 
-const ROLE_COLORS = {
+const ROLE_COLORS: Record<RoleKey, string> = {
   yonetici: "text-amber bg-amber/10 border-amber/30",
   planlamaci: "text-teal bg-teal/10 border-teal/30",
   teknisyen: "text-green bg-green/10 border-green/30",
   goruntuleyici: "text-muted bg-panel2 border-border",
 };
 
-function initials(name) {
-  return (name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+function initials(name: string): string {
+  return (name || "?").split(" ").map((part: string) => part[0]).slice(0, 2).join("").toUpperCase();
 }
 
 export default function KullanicilarPage() {
@@ -46,11 +48,11 @@ export default function KullanicilarPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
-  const [roleFilter, setRoleFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState<RoleKey | "all">("all");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
   const [saving, setSaving] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
 
   async function load() {
@@ -102,7 +104,7 @@ export default function KullanicilarPage() {
     }
   }
 
-  async function updateUser(id, patch) {
+  async function updateUser(id: string, patch: Record<string, unknown>) {
     const loadingToast = toast.loading("Güncelleniyor...");
     try {
       const res = await fetch(`/api/users/${id}`, {
@@ -123,7 +125,7 @@ export default function KullanicilarPage() {
     }
   }
 
-  async function deleteUser(u) {
+  async function deleteUser(u: UserRow) {
     const loadingToast = toast.loading("Kullanıcı kalıcı olarak siliniyor...");
     try {
       const res = await fetch(`/api/users/${u.id}`, {
@@ -222,7 +224,7 @@ export default function KullanicilarPage() {
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)} aria-label="Kullanıcı durum filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
               <option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option>
             </select>
-            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="Kullanıcı rol filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value === "all" ? "all" : event.target.value as RoleKey)} aria-label="Kullanıcı rol filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
               <option value="all">Tüm roller</option>{ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
             </select>
             <span className="col-span-2 self-center text-[10px] text-faint sm:col-span-1 sm:text-right">{visibleUsers.length} kayıt gösteriliyor</span>
@@ -242,10 +244,10 @@ export default function KullanicilarPage() {
             <input placeholder="👤 Adı Soyadı" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
             <input type="tel" inputMode="tel" placeholder="📱 Telefon (05xx xxx xx xx)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
             <input type="password" placeholder="🔒 Şifre" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as RoleKey })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
-            {form.role === "teknisyen" && <select value={form.technician_type} onChange={(e) => setForm({ ...form, technician_type: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+            {form.role === "teknisyen" && <select value={form.technician_type} onChange={(e) => setForm({ ...form, technician_type: e.target.value as TechnicianType })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>}
             <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
@@ -284,15 +286,15 @@ export default function KullanicilarPage() {
                 </button>
               </div>
               <div className="mb-2 flex min-w-0 items-center gap-2">
-                <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item))} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
+                <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current ? current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item) : current)} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
                 <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="shrink-0 whitespace-nowrap rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
               </div>
               <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
+                <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value as RoleKey })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
                   {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
-                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition sm:min-w-[180px] sm:flex-1" aria-label={`${u.full_name} teknisyen türü`}>
+                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value as TechnicianType })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition sm:min-w-[180px] sm:flex-1" aria-label={`${u.full_name} teknisyen türü`}>
                   {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                 </select>}
                 <label className="flex min-h-10 items-center gap-1.5 text-[11px] text-muted cursor-pointer sm:shrink-0">

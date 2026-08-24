@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(await listActiveTechnicians(db));
   } catch (error) {
-    console.error("GET /api/users/technicians hatası:", error);
+    console.error("GET /api/users/technicians hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Teknisyen listesi yüklenemedi." }, { status: 500 });
   }
 }

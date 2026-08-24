@@ -127,7 +127,7 @@ async function postConfirmation(req: NextRequest, { params }: { params: Promise<
   const contributionById = new Map(submittedContributions.map((item) => [item.id, item.duration_minutes]));
   const normalizedContributions = expectedContributions.map((item) => {
     const durationMinutes = contributionById.get(item.id);
-    return { ...item, duration_minutes: durationMinutes };
+    return { ...item, duration_minutes: durationMinutes ?? 0 };
   });
   if (!isExternalService) {
     for (const contribution of normalizedContributions) {

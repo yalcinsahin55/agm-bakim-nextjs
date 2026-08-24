@@ -395,7 +395,6 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
           setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
           continue;
         }
-        console.error("Video yükleme hatası:", err);
         const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
         toast.error(`${f.name} yüklenemedi: ${message}`);
       }

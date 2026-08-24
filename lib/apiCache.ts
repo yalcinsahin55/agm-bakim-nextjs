@@ -42,7 +42,7 @@ export async function cachedFetch<T = unknown>(url: string, ttlMs = 30000): Prom
     .then(async (res) => {
       if (!res.ok) throw new ApiFetchError(res.status);
       const data = (await res.json()) as T;
-      cache.set(url, { data, time: Date.now(), promise: null });
+      cache.set(url, { data, time: Date.now() });
       return data;
     })
     .catch((err) => {

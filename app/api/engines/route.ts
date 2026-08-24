@@ -51,7 +51,7 @@ async function getEngines(req: NextRequest) {
     engines.sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name));
     return NextResponse.json(engines);
   } catch (error) {
-    console.error("Motorlar getirilirken hata:", error);
+    console.error("Motorlar getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motorlar yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -101,7 +101,7 @@ async function postEngine(req: NextRequest) {
     invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {
-    console.error("Motor eklenirken hata:", error);
+    console.error("Motor eklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor eklenirken bir hata oluştu." }, { status: 500 });
   }
 }

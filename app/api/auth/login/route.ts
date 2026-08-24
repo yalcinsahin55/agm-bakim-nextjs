@@ -52,7 +52,7 @@ async function postLogin(req: NextRequest) {
     const token = await createSessionToken(user._id);
     const isTechnician = user.role === "teknisyen" || user.role === "planlamaci";
     const technician_type = isTechnician ? normalizeTechnicianType(user.technician_type) : undefined;
-    const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type) : undefined;
+    const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type ?? "mekanik") : undefined;
     const res = NextResponse.json({
       ok: true,
       user: { id: user._id, full_name: user.full_name, phone: user.phone || user.phone_normalized, email: user.email, role: user.role, technician_type, ...(technicianPermissions || {}) },
@@ -66,7 +66,7 @@ async function postLogin(req: NextRequest) {
     });
     return res;
   } catch (error) {
-    console.error("Giriş hatası:", error);
+    console.error("Giriş hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Giriş sırasında bir hata oluştu." }, { status: 500 });
   }
 }

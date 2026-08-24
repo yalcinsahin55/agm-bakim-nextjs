@@ -7,8 +7,11 @@ import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
+
+type EngineStateInput = { period_hours?: unknown; last_maintenance_hour?: unknown };
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
@@ -28,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   const type = await typesCol.findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 
-  const update: Record<string, any> = {};
+  const update: Partial<MaintenanceTypeDocument> = {};
   const unset: Record<string, ""> = {};
   if (restore === true) {
     update.is_deleted = false;
@@ -40,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   if (allow_electromechanical_support !== undefined) update.allow_electromechanical_support = allow_electromechanical_support === true;
   if (allow_electromechanical_responsible !== undefined) update.allow_electromechanical_responsible = allow_electromechanical_responsible === true;
   if (Object.keys(update).length || Object.keys(unset).length) {
-    const updateOperation: Record<string, Record<string, unknown>> = {};
+    const updateOperation: { $set?: Partial<MaintenanceTypeDocument>; $unset?: Record<string, ""> } = {};
     if (Object.keys(update).length) updateOperation.$set = update;
     if (Object.keys(unset).length) updateOperation.$unset = unset;
     await typesCol.updateOne({ _id: key }, updateOperation);
@@ -56,11 +59,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
 
   // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
   if (engine_states && typeof engine_states === "object") {
-    for (const [engId, st] of Object.entries(engine_states as Record<string, any>)) {
+    for (const [engId, rawState] of Object.entries(engine_states as Record<string, unknown>)) {
       if (!isSafeMongoPathSegment(engId)) continue;
-      const set: Record<string, any> = {};
-      if (typeof st?.period_hours === "number") set[`engine_states.${engId}.period_hours`] = st.period_hours;
-      if (typeof st?.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = st.last_maintenance_hour;
+      const state = rawState && typeof rawState === "object" ? rawState as EngineStateInput : {};
+      const set: Record<string, unknown> = {};
+      if (typeof state.period_hours === "number") set[`engine_states.${engId}.period_hours`] = state.period_hours;
+      if (typeof state.last_maintenance_hour === "number") set[`engine_states.${engId}.last_maintenance_hour`] = state.last_maintenance_hour;
       set[`engine_states.${engId}.tracking_source`] = "manual";
       if (Object.keys(set).length) await typesCol.updateOne({ _id: key }, { $set: set });
     }

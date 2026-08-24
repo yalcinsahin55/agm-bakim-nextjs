@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Push aboneliği kaydedilirken hata:", error);
+    console.error("Push aboneliği kaydedilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Push aboneliği kaydedilemedi." }, { status: 500 });
   }
 }
@@ -75,7 +75,7 @@ export async function DELETE(req: NextRequest) {
     await db.collection("push_subscriptions").deleteOne({ endpoint, user_id: user._id });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Push aboneliği silinirken hata:", error);
+    console.error("Push aboneliği silinirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Push aboneliği silinemedi." }, { status: 500 });
   }
 }

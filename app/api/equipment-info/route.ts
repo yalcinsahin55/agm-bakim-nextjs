@@ -15,16 +15,10 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    // ✨ ÖNEMLİ DÜZELTME: Seed hatası verse bile sayfa çökmesin
-    try {
-    } catch (seedError) {
-      console.error("Seed uyarısı (sayfa çalışmaya devam ediyor):", seedError);
-    }
-
     const items = await equipmentInfoCollection(db).find().toArray();
     return NextResponse.json(items);
   } catch (error) {
-    console.error("equipment-info GET hatası:", error);
+    console.error("equipment-info GET hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Veriler yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -63,7 +57,7 @@ export async function POST(req: NextRequest) {
     await col.insertOne(doc);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("equipment-info POST hatası:", error);
+    console.error("equipment-info POST hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor bilgi kartı eklenirken bir hata oluştu." }, { status: 500 });
   }
 }

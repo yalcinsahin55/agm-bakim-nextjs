@@ -77,7 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
   } catch (error) {
-    console.error("PDF sunma hatası:", error);
+    console.error("PDF sunma hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "PDF görüntülenirken bir hata oluştu." }, { status: 500 });
   }
 }

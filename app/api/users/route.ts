@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(users.map((u) => {
       const isTechnician = u.role === "teknisyen" || u.role === "planlamaci";
       const technician_type = isTechnician ? normalizeTechnicianType(u.technician_type) : undefined;
-      const permissions = isTechnician ? normalizeTechnicianPermissions(u, technician_type) : undefined;
+      const permissions = isTechnician ? normalizeTechnicianPermissions(u, technician_type ?? "mekanik") : undefined;
       return {
         id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
         technician_type, ...(permissions || {}),
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       };
     }));
   } catch (error) {
-    console.error("Kullanıcılar getirilirken hata:", error);
+    console.error("Kullanıcılar getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Kullanıcı listesi yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, approved: false });
   } catch (error) {
-    console.error("Kullanıcı eklenirken hata:", error);
+    console.error("Kullanıcı eklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Kullanıcı eklenirken bir hata oluştu." }, { status: 500 });
   }
 }

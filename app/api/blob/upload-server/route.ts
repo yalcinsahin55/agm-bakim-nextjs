@@ -57,7 +57,7 @@ async function postUpload(request: NextRequest) {
     });
     return NextResponse.json({ url: blob.url });
   } catch (error) {
-    console.error("Sunucu dosya yükleme hatası:", error);
+    console.error("Sunucu dosya yükleme hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Blob depolama isteği başarısız oldu. Vercel Production Blob token’ını kontrol edin." }, { status: 502 });
   }
 }

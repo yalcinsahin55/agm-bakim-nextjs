@@ -15,7 +15,7 @@ async function createIndexSafely(
   try {
     await collection.createIndex(keys, options as never);
   } catch (error) {
-    console.warn("[DB indexes] Index hazırlanamadı; mevcut index/veri kontrol edilmeli:", error);
+    console.warn("[DB indexes] Index hazırlanamadı; mevcut index/veri kontrol edilmeli:", error instanceof Error ? error.name : "UnknownError");
   }
 }
 

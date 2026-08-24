@@ -1,6 +1,7 @@
 import { enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { UpdateFilter } from "mongodb";
 import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
+import type { EngineDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +79,7 @@ async function postImportHours(req: NextRequest) {
     const existing = await enginesCol.findOne({ _id: name });
     if (!existing) continue;
 
-    const setFields: Record<string, any> = { updated_at: stamp };
+    const setFields: Partial<Pick<EngineDocument, "hours" | "load_kw" | "updated_at">> = { updated_at: stamp };
     let hoursChanged = false;
     let loadChanged = false;
     if (hours !== existing.hours) { setFields.hours = hours; hoursChanged = true; }
@@ -85,13 +87,13 @@ async function postImportHours(req: NextRequest) {
       const newLoad = parseMetric(row[loadCol]);
       if (newLoad !== null && newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
     }
-    const updateOp: Record<string, any> = { $set: setFields };
+    const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
     if (hoursChanged || loadChanged) {
       updateOp.$push = {
         history: {
           date: stamp.toISOString(),
           hours: hoursChanged ? hours : existing.hours,
-          load_kw: loadChanged ? setFields.load_kw : (existing.load_kw || 0),
+          load_kw: loadChanged && typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
         },
       };
     }

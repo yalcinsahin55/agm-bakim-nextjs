@@ -120,8 +120,8 @@ export interface PressureReading {
   engine_id: string;
   engine_name: string;
   reading_date: Date | string;
-  load_kw: number;
-  pressure_bar: number;
+  load_kw: number | null;
+  pressure_bar: number | null;
   status?: string | null;
   new_type?: boolean;
   note?: string | null;

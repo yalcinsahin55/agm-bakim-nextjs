@@ -78,11 +78,11 @@ export default function BakimTuruYonetimiPage() {
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
   function setAddRow(id: string, field: "last" | "period", value: string) {
-    setAddRows((prev) => ({ ...prev, [id]: { last: "", period: "", included: true, ...prev[id], [field]: value } }));
+    setAddRows((prev) => ({ ...prev, [id]: { last: prev[id]?.last ?? "", period: prev[id]?.period ?? "", included: prev[id]?.included ?? true, [field]: value } }));
   }
 
   function setEditRow(id: string, field: "last" | "period", value: string) {
-    setEditRows((prev) => ({ ...prev, [id]: { last: "", period: "", included: false, ...prev[id], [field]: value } }));
+    setEditRows((prev) => ({ ...prev, [id]: { last: prev[id]?.last ?? "", period: prev[id]?.period ?? "", included: prev[id]?.included ?? false, [field]: value } }));
   }
 
   function toggleDomain(domains: WorkDomain[], setter: (next: WorkDomain[]) => void, domain: WorkDomain) {
@@ -324,7 +324,7 @@ export default function BakimTuruYonetimiPage() {
             <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1">
               {sortedEngines.map((e) => (
                 <div key={e._id} className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 items-center">
-                  <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={addRows[e._id]?.included ?? true} onChange={(event) => setAddRows((prev) => ({ ...prev, [e._id]: { last: "", period: "", ...prev[e._id], included: event.target.checked } }))} /></label>
+                  <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={addRows[e._id]?.included ?? true} onChange={(event) => setAddRows((prev) => ({ ...prev, [e._id]: { last: prev[e._id]?.last ?? "", period: prev[e._id]?.period ?? "", included: event.target.checked } }))} /></label>
                   <span className="text-[11.5px] font-semibold text-text">{e.name}</span>
                   <input
                     type="number"
@@ -410,7 +410,7 @@ export default function BakimTuruYonetimiPage() {
                       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
                         {sortedEngines.map((e) => (
                           <div key={e._id} className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 items-center">
-                            <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={editRows[e._id]?.included ?? false} onChange={(event) => setEditRows((prev) => ({ ...prev, [e._id]: { last: "", period: "", ...prev[e._id], included: event.target.checked } }))} /></label>
+                            <label className="flex items-center justify-center" title={`${e.name} bakım kapsamına dahil olsun`}><input type="checkbox" checked={editRows[e._id]?.included ?? false} onChange={(event) => setEditRows((prev) => ({ ...prev, [e._id]: { last: prev[e._id]?.last ?? "", period: prev[e._id]?.period ?? "", included: event.target.checked } }))} /></label>
                             <span className="text-[11.5px] font-semibold text-text">{e.name}</span>
                             <input
                               type="number"

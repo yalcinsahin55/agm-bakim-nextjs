@@ -1,12 +1,14 @@
 import { enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { UpdateFilter } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import type { EngineDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +63,7 @@ export async function PATCH(req: NextRequest) {
       const existing = await enginesCol.findOne({ _id: engineId });
       if (!existing) continue;
 
-      const setFields: Record<string, any> = {};
+      const setFields: Partial<Pick<EngineDocument, "hours" | "load_kw" | "updated_at">> = {};
       let pushHistory = false;
       let hoursChanged = false;
       let loadChanged = false;
@@ -78,13 +80,15 @@ export async function PATCH(req: NextRequest) {
       pushHistory = hoursChanged || loadChanged;
 
       setFields.updated_at = stamp;
-      const updateOp: Record<string, any> = { $set: setFields };
+      const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
       if (pushHistory) {
+        const nextHours = hoursChanged && typeof u.hours === "number" ? u.hours : existing.hours;
+        const nextLoadKw = loadChanged && typeof u.load_kw === "number" ? u.load_kw : (existing.load_kw || 0);
         updateOp.$push = {
           history: {
             date: stamp.toISOString(),
-            hours: hoursChanged ? u.hours : existing.hours,
-            load_kw: loadChanged ? u.load_kw : (existing.load_kw || 0),
+            hours: nextHours,
+            load_kw: nextLoadKw,
           },
         };
       }
@@ -98,7 +102,7 @@ export async function PATCH(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, changed });
   } catch (error) {
-    console.error("Motor saatleri güncellenirken hata:", error);
+    console.error("Motor saatleri güncellenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Motor saatleri güncellenirken bir hata oluştu." }, { status: 500 });
   }
 }

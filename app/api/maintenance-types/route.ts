@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const types = await maintenanceTypesCollection(db).find(typeFilter).toArray();
     return NextResponse.json(types);
   } catch (error) {
-    console.error("Bakım türleri getirilirken hata:", error);
+    console.error("Bakım türleri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bakım türleri yüklenirken bir hata oluştu." }, { status: 500 });
   }
 }
@@ -68,11 +68,12 @@ export async function POST(req: NextRequest) {
     // 🎯 Motor bazlı durumlar (yeni özellik) — yoksa eski apply_to_all davranışı
     let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number; tracking_source: "manual" }> = {};
     if (engine_states && typeof engine_states === "object") {
-      Object.entries(engine_states).forEach(([engId, st]: [string, any]) => {
+      Object.entries(engine_states as Record<string, unknown>).forEach(([engId, rawState]) => {
         if (!isSafeMongoPathSegment(engId)) return;
+        const state = rawState && typeof rawState === "object" ? rawState as { last_maintenance_hour?: unknown; period_hours?: unknown } : {};
         engineStates[engId] = {
-          last_maintenance_hour: Number(st?.last_maintenance_hour) || 0,
-          period_hours: Number(st?.period_hours) || 0,
+          last_maintenance_hour: Number(state.last_maintenance_hour) || 0,
+          period_hours: Number(state.period_hours) || 0,
           tracking_source: "manual",
         };
       });
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
     invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {
-    console.error("Bakım türü eklenirken hata:", error);
+    console.error("Bakım türü eklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bakım türü eklenirken bir hata oluştu." }, { status: 500 });
   }
 }

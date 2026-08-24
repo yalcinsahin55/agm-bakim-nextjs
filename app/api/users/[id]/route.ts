@@ -9,8 +9,11 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { withApiTiming } from "@/lib/performance";
+import type { UserDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
+
+type UserUpdateFields = Partial<Pick<UserDocument, "role" | "active" | "approved" | "phone" | "phone_normalized" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">>;
 
 async function getAuthorizedAdmin(req: NextRequest) {
   const db = await getDb();
@@ -34,8 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (user._id === id && (active === false || approved === false)) {
     return NextResponse.json({ error: "Kendi yönetici erişiminizi pasifleştiremez veya onayını kaldıramazsınız." }, { status: 400 });
   }
-  const update: Record<string, any> = {};
-  const unset: Record<string, any> = {};
+  const update: UserUpdateFields = {};
+  const unset: Record<string, ""> = {};
   if (role !== undefined) {
     const normalizedRole = normalizeRole(role);
     if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });

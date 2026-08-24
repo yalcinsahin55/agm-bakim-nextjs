@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const result = await syncMaintenanceNotificationsForAllUsers(db);
     return NextResponse.json({ ok: true, ...result, refreshedAt: new Date().toISOString() });
   } catch (error) {
-    console.error("Cron bildirim yenileme hatası:", error);
+    console.error("Cron bildirim yenileme hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bildirimler yenilenemedi." }, { status: 500 });
   }
 }
