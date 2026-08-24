@@ -17,6 +17,7 @@ import { addRows } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const MAX_QUESTION_LENGTH = 300;
 const MAX_EXPORT_ROWS = 500;

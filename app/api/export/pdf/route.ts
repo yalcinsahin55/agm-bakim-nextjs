@@ -16,6 +16,7 @@ import { buildForecastExportContext, forecastExportTitle, type ForecastExportCon
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const MAX_ROWS = 5_000;
 const COLUMN_WIDTHS = [38, 52, 64, 36, 46, 46, 42, 46, 46, 48, 59];
