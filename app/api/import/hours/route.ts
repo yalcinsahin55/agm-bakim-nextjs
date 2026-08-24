@@ -8,6 +8,7 @@ import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ function parseMetric(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 5_000_000 ? parsed : null;
 }
 
-export async function POST(req: NextRequest) {
+async function postImportHours(req: NextRequest) {
   const db = await getDb();
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
@@ -99,4 +100,8 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, updated });
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/import/hours", () => postImportHours(req), { request: req });
 }

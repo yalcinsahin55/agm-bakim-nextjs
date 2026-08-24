@@ -11,6 +11,7 @@ import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
 import { escapeSpreadsheetRows } from "@/lib/spreadsheetSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { addRows } from "@/lib/excel";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ function uniqueSheetName(label: string, used: Set<string>): string {
   return name;
 }
 
-export async function GET(req: NextRequest) {
+async function getExcelExport(req: NextRequest) {
   const db = await getDb();
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
@@ -111,4 +112,8 @@ export async function GET(req: NextRequest) {
       "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+export async function GET(req: NextRequest) {
+  return withApiTiming("GET /api/export/excel", () => getExcelExport(req), { request: req });
 }

@@ -6,6 +6,7 @@ import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_BACKUP_REQUEST_BYTES } from "@/lib/requestLimits";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ function getIdentity(document: Record<string, unknown>): string | null {
   return null;
 }
 
-export async function POST(req: NextRequest) {
+async function postBackupRestore(req: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -89,4 +90,8 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/backups/restore hatası:", error);
     return NextResponse.json({ error: "Yedek geri yüklenemedi. Dosya biçimini kontrol edin." }, { status: 400 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/backups/restore", () => postBackupRestore(req), { request: req });
 }

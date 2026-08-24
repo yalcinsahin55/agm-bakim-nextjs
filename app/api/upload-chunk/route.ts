@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ function isInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value);
 }
 
-export async function POST(req: NextRequest) {
+async function postUploadChunk(req: NextRequest) {
   const db = await getDb();
   await ensureAppIndexes(db);
   const usersCol = usersCollection(db);
@@ -78,4 +79,8 @@ export async function POST(req: NextRequest) {
 
   await col.deleteMany({ upload_id, owner_id: user._id });
   return NextResponse.json({ ok: true, url: blob.url });
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/upload-chunk", () => postUploadChunk(req), { request: req });
 }

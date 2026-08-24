@@ -8,10 +8,11 @@ import { getClientIp } from "@/lib/rate-limit";
 import { loginSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+async function postLogin(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
 
@@ -68,4 +69,8 @@ export async function POST(req: NextRequest) {
     console.error("Giriş hatası:", error);
     return NextResponse.json({ error: "Giriş sırasında bir hata oluştu." }, { status: 500 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/auth/login", () => postLogin(req), { request: req });
 }

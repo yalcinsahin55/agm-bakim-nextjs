@@ -7,10 +7,11 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { registerSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+async function postRegister(req: NextRequest) {
   // 🔒 IP başına 10 dakikada en fazla 3 kayıt denemesi
   const rateLimited = await enforceApiRateLimit(req, "register", 3, 10 * 60 * 1000);
   if (rateLimited) return rateLimited;
@@ -73,4 +74,8 @@ export async function POST(req: NextRequest) {
     console.error("Kayıt olma hatası:", error);
     return NextResponse.json({ error: "Kayıt işlemi sırasında bir hata oluştu." }, { status: 500 });
   }
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/auth/register", () => postRegister(req), { request: req });
 }

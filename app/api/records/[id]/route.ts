@@ -16,6 +16,7 @@ import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelSer
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { recordSchema, formatZodError } from "@/lib/schemas";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
+import { withApiTiming } from "@/lib/performance";
 import type { MaintenanceTechnicianContribution, User } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ function canModify(user: User, record: MaintenanceRecordDocument): boolean {
   return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function getRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return NextResponse.json(record);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
@@ -339,7 +340,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function deleteRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
@@ -369,4 +370,17 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true });
+}
+
+
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withApiTiming("GET /api/records/[id]", () => getRecord(req, context), { request: req });
+}
+
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withApiTiming("PATCH /api/records/[id]", () => patchRecord(req, context), { request: req });
+}
+
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withApiTiming("DELETE /api/records/[id]", () => deleteRecord(req, context), { request: req });
 }

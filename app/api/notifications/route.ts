@@ -29,5 +29,5 @@ async function getNotifications(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/notifications", () => getNotifications(req));
+  return withApiTiming("GET /api/notifications", () => getNotifications(req), { request: req });
 }

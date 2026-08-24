@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName, normalizeTechnicianType, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ type TechnicianAggregateRow = {
   support_duration_minutes?: number;
 };
 
-export async function GET(req: NextRequest) {
+async function getAnalyticsSummary(req: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -208,4 +209,8 @@ export async function GET(req: NextRequest) {
     periodMissingDuration: periodRow.missing_duration || 0,
     periodTechnicianTasks: periodRow.technician_tasks || 0,
   });
+}
+
+export async function GET(req: NextRequest) {
+  return withApiTiming("GET /api/analytics/summary", () => getAnalyticsSummary(req), { request: req });
 }

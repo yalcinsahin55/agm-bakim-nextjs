@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { withApiTiming } from "@/lib/performance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ const allowedContentTypes = new Set(["image/jpeg", "image/png", "image/webp", "a
 const maxPhotoSize = 4 * 1024 * 1024;
 const maxPdfSize = 10 * 1024 * 1024;
 
-export async function POST(request: NextRequest) {
+async function postUpload(request: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(request, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
@@ -59,4 +60,8 @@ export async function POST(request: NextRequest) {
     console.error("Sunucu dosya yükleme hatası:", error);
     return NextResponse.json({ error: "Blob depolama isteği başarısız oldu. Vercel Production Blob token’ını kontrol edin." }, { status: 502 });
   }
+}
+
+export async function POST(request: NextRequest) {
+  return withApiTiming("POST /api/blob/upload-server", () => postUpload(request), { request });
 }

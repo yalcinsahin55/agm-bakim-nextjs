@@ -135,5 +135,5 @@ async function createPdf(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/export/pdf", () => createPdf(req));
+  return withApiTiming("GET /api/export/pdf", () => createPdf(req), { request: req });
 }

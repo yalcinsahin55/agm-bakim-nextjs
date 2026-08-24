@@ -113,5 +113,5 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  return withApiTiming("GET /api/reports/engine/[id]", () => getEngineReport(req, context));
+  return withApiTiming("GET /api/reports/engine/[id]", () => getEngineReport(req, context), { request: req });
 }

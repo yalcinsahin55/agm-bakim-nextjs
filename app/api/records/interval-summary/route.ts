@@ -85,5 +85,5 @@ async function getIntervalSummary(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/records/interval-summary", () => getIntervalSummary(req));
+  return withApiTiming("GET /api/records/interval-summary", () => getIntervalSummary(req), { request: req });
 }

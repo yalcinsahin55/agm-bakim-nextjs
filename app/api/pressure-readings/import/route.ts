@@ -9,6 +9,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
 import type { PressureReadingDocument } from "@/lib/dbTypes";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ function normalizeName(name: unknown): string {
   return String(name).trim().replace(/-/g, " ").replace(/\s+/g, " ");
 }
 
-export async function POST(req: NextRequest) {
+async function postImportPressureReadings(req: NextRequest) {
   const db = await getDb();
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
@@ -114,4 +115,8 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, inserted: docs.length });
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/pressure-readings/import", () => postImportPressureReadings(req), { request: req });
 }

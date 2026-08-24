@@ -181,9 +181,9 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  return withApiTiming("GET /api/engines/[id]/history", () => getHistory(req, context));
+  return withApiTiming("GET /api/engines/[id]/history", () => getHistory(req, context), { request: req });
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  return withApiTiming("PATCH /api/engines/[id]/history", () => patchHistory(req, context));
+  return withApiTiming("PATCH /api/engines/[id]/history", () => patchHistory(req, context), { request: req });
 }

@@ -369,9 +369,9 @@ async function postRecord(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/records", () => getRecords(req));
+  return withApiTiming("GET /api/records", () => getRecords(req), { request: req });
 }
 
 export async function POST(req: NextRequest) {
-  return withApiTiming("POST /api/records", () => postRecord(req));
+  return withApiTiming("POST /api/records", () => postRecord(req), { request: req });
 }

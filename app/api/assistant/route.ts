@@ -7,6 +7,7 @@ import { getClientIp } from "@/lib/rate-limit";
 import { checkDistributedRateLimit } from "@/lib/redisRateLimit";
 import { evaluateAssistantQuestion, ASSISTANT_POLICY_VERSION, ASSISTANT_RATE_LIMIT, ASSISTANT_RATE_WINDOW_MS } from "@/lib/assistantPolicy";
 import { runAssistantTool } from "@/lib/assistantTools";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ function jsonError(error: string, status: number, headers?: HeadersInit) {
   return NextResponse.json({ ok: false, error }, { status, headers });
 }
 
-export async function POST(req: NextRequest) {
+async function postAssistant(req: NextRequest) {
   try {
     const db = await getDb();
     const user = await getCurrentUser(req, usersCollection(db));
@@ -80,4 +81,8 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/assistant hatası:", error);
     return jsonError("Asistan verileri hazırlanırken bir hata oluştu.", 500);
   }
+}
+
+export async function POST(req: NextRequest) {
+  return withApiTiming("POST /api/assistant", () => postAssistant(req), { request: req });
 }

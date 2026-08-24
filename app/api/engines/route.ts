@@ -107,9 +107,9 @@ async function postEngine(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  return withApiTiming("GET /api/engines", () => getEngines(req));
+  return withApiTiming("GET /api/engines", () => getEngines(req), { request: req });
 }
 
 export async function POST(req: NextRequest) {
-  return withApiTiming("POST /api/engines", () => postEngine(req));
+  return withApiTiming("POST /api/engines", () => postEngine(req), { request: req });
 }

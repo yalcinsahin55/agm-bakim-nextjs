@@ -10,6 +10,7 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ function contributionRows(record: MaintenanceRecordDocument): StoredContribution
   return rows;
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function postConfirmation(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = await getDb();
   await ensureAppIndexes(db);
@@ -178,4 +179,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   return NextResponse.json({ ok: true, alreadyConfirmed: false, confirmed_at: confirmedAt, confirmed_by_name: user.full_name, confirmed_ids: confirmedIds, confirmed_count: confirmedCount, technician_contributions: normalizedContributions });
+}
+
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withApiTiming("POST /api/records/[id]/confirm", () => postConfirmation(req, context), { request: req });
 }
