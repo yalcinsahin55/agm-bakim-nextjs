@@ -280,7 +280,7 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
   const db = await getDb();
   const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return jsonError("Giriş gerekli", 401);
-  if (!hasPermission(user.role, "reports:read")) return jsonError("Bakım raporlarını görme yetkiniz yok.", 403);
+  if (!hasPermission(user.role, "assistant:read")) return jsonError("Bakım asistanı raporlarını indirme yetkiniz yok.", 403);
 
   const rate = await checkDistributedRateLimit({
     scope: "assistant-export",

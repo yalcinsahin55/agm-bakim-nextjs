@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/api/assistant/export": ["./public/fonts/**/*"],
+    "/api/export/pdf": ["./public/fonts/**/*"],
+  },
 
   async headers() {
     return [

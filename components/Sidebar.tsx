@@ -29,6 +29,7 @@ const ADMIN_VIEWER_ITEMS: MenuItem[] = [
 const TECHNICIAN_ITEMS: MenuItem[] = [
   { href: "/tamamla", label: "Bakım Tamamla", icon: "✅" },
   { href: "/kayitlar", label: "Bakım Kayıtları", icon: "📋" },
+  { href: "/asistan", label: "Bakım Asistanı", icon: "✦" },
 ];
 
 export default function Sidebar() {
