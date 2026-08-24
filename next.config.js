@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingIncludes: {
-    "/api/assistant/export": ["./public/fonts/**/*"],
+    "/api/assistant/export": ["./public/fonts/**/*", "./public/yesil-global-logo.jpg"],
     "/api/export/pdf": ["./public/fonts/**/*"],
   },
 

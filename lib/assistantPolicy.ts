@@ -75,6 +75,8 @@ export interface AssistantQuery {
   teamOnly?: boolean;
   latestOnly?: boolean;
   unreadOnly?: boolean;
+  /** Export sırasında seçilen bakım türlerini sonuç kümesinden dışlamak için kullanılır. */
+  excludedTypeLabels?: string[];
 }
 
 export interface AssistantPolicyResult {

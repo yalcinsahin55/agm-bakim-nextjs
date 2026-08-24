@@ -1,5 +1,7 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { getPdfFontPaths } from "@/lib/pdfFonts";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -14,6 +16,7 @@ import { usersCollection } from "@/lib/dbCollections";
 import { escapeSpreadsheetRows } from "@/lib/spreadsheetSecurity";
 import { addRows } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
+import { exportColumnLabel, exportSheetLabel, getExportColumnValue, getAvailableColumns, normalizeExportOptions, type AssistantExportOptions, type ExportColumnId } from "@/lib/assistantExport";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -110,23 +113,38 @@ function scalarRows(result: AssistantToolResponse): ExportRow[] {
   return rows;
 }
 
-function arraySheets(result: AssistantToolResponse): Array<{ name: string; rows: ExportRow[] }> {
-  const keys = result.intent === "technician_performance" && result.data.selected_technician
-    ? ["activities", "by_type", "by_engine"]
-    : result.intent === "engine_data" && result.data.performance_mode === true
-      ? ["performance_daily"]
-      : INTENT_ARRAY_KEYS[result.intent] || [];
+function comparableExportValue(value: unknown): string {
+  return value === null || value === undefined ? "" : String(value).normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "").replace(/ı/g, "i").toLocaleLowerCase("tr-TR").trim();
+}
+
+function sortExportItems(items: unknown[], sort: AssistantExportOptions["sort"]): unknown[] {
+  const key = sort === "engine" ? "engine" : sort === "type" ? "type" : sort === "technician" ? "technician" : "date";
+  return [...items].sort((left, right) => {
+    const a = left && typeof left === "object" ? getExportColumnValue(left as Record<string, unknown>, key === "date" ? "date" : key) : "";
+    const b = right && typeof right === "object" ? getExportColumnValue(right as Record<string, unknown>, key === "date" ? "date" : key) : "";
+    const aValue = key === "date" ? new Date(String(a || "")).getTime() || 0 : comparableExportValue(a);
+    const bValue = key === "date" ? new Date(String(b || "")).getTime() || 0 : comparableExportValue(b);
+    if (aValue < bValue) return sort === "date_desc" ? 1 : -1;
+    if (aValue > bValue) return sort === "date_desc" ? -1 : 1;
+    return 0;
+  });
+}
+
+function arraySheets(result: AssistantToolResponse, options: AssistantExportOptions): Array<{ name: string; rows: ExportRow[] }> {
+  const keys = options.sheets.length ? options.sheets : INTENT_ARRAY_KEYS[result.intent] || [];
+  const columns = options.columns.length ? options.columns : getAvailableColumns(result.intent);
   return keys.flatMap((key) => {
     const value = result.data[key];
     if (!Array.isArray(value) || value.length === 0) return [];
-    const values = value.slice(0, MAX_EXPORT_ROWS);
+    const values = sortExportItems(value.slice(0, MAX_EXPORT_ROWS), options.sort);
     const rows = values.map((item) => {
       if (item && typeof item === "object" && !Array.isArray(item)) {
-        return Object.fromEntries(Object.entries(item as Record<string, unknown>).map(([field, fieldValue]) => [displayLabel(field), formatValue(fieldValue)]));
+        const record = item as Record<string, unknown>;
+        return Object.fromEntries(columns.map((column) => [exportColumnLabel(column), formatValue(getExportColumnValue(record, column))]));
       }
       return { Değer: formatValue(item) };
     });
-    return [{ name: INTENT_ARRAY_LABELS[key] || displayLabel(key), rows }];
+    return [{ name: exportSheetLabel(key), rows }];
   });
 }
 
@@ -153,18 +171,43 @@ function pdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   });
 }
 
-function responseArrayBuffer(buffer: Buffer): ArrayBuffer {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-}
-
 function reportTitle(result: AssistantToolResponse): string {
   return result.title || "Bakım Asistanı Raporu";
 }
 
-function applyForecastExclusions(result: AssistantToolResponse, rawExcludedTypes: string | null): AssistantToolResponse {
-  if (result.intent !== "maintenance_forecast" || !rawExcludedTypes) return result;
-  const excluded = rawExcludedTypes.split(",").map((value) => value.trim()).filter(Boolean);
-  if (excluded.length === 0) return result;
+function loadDefaultExportLogo(): { buffer: Buffer; extension: "jpeg" } | null {
+  const logoPath = path.join(process.cwd(), "public", "yesil-global-logo.jpg");
+  return existsSync(logoPath) ? { buffer: readFileSync(logoPath), extension: "jpeg" } : null;
+}
+
+async function fetchExportLogo(url: string | null): Promise<{ buffer: Buffer; extension: "png" | "jpeg" } | null> {
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" || !/(^|\.)public\.blob\.vercel-storage\.com$/i.test(parsed.hostname)) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3_000);
+  try {
+    const response = await fetch(parsed, { cache: "no-store", signal: controller.signal });
+    const contentType = response.headers.get("content-type") || "";
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (!response.ok || !/^image\/(?:png|jpeg)$/i.test(contentType) || contentLength > 1_500_000) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength === 0 || buffer.byteLength > 1_500_000) return null;
+    return { buffer, extension: contentType.toLowerCase().includes("jpeg") ? "jpeg" : "png" };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function applyForecastExclusions(result: AssistantToolResponse, excluded: string[]): AssistantToolResponse {
+  if (result.intent !== "maintenance_forecast" || excluded.length === 0) return result;
   const data = { ...result.data };
   const items = Array.isArray(data.items) ? data.items : [];
   const visibleItems = items.filter((item) => {
@@ -183,27 +226,83 @@ function applyForecastExclusions(result: AssistantToolResponse, rawExcludedTypes
   return { ...result, summary: `${result.summary} Hariç tutulan bakım türleri: ${excluded.join(", ")}.`, data };
 }
 
-async function createExcel(result: AssistantToolResponse, question: string): Promise<Response> {
+function typeIsExcluded(value: unknown, excluded: string[]): boolean {
+  return typeof value === "string" && excluded.some((item) => item.localeCompare(value, "tr", { sensitivity: "base" }) === 0);
+}
+
+function applyExportTypeExclusions(result: AssistantToolResponse, excluded: string[]): AssistantToolResponse {
+  if (excluded.length === 0) return result;
+  if (result.intent === "maintenance_forecast") return applyForecastExclusions(result, excluded);
+  const data = { ...result.data };
+  if (Array.isArray(data.items)) {
+    data.items = data.items.filter((item) => {
+      if (!item || typeof item !== "object") return false;
+      const record = item as Record<string, unknown>;
+      return !typeIsExcluded(record.type, excluded) && !typeIsExcluded(record.type_label, excluded);
+    });
+  }
+  if (Array.isArray(data.types)) {
+    data.types = data.types.filter((item) => item && typeof item === "object" && !typeIsExcluded((item as Record<string, unknown>).type, excluded));
+  }
+  if (Array.isArray(data.daily_records)) {
+    data.daily_records = data.daily_records.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const record = item as Record<string, unknown>;
+      const types = Array.isArray(record.types) ? record.types.filter((type) => !typeIsExcluded(type, excluded)) : record.types;
+      return { ...record, ...(Array.isArray(types) ? { types, count: types.length } : {}) };
+    }).filter((item) => !item || typeof item !== "object" || !Array.isArray((item as Record<string, unknown>).types) || ((item as Record<string, unknown>).types as unknown[]).length > 0);
+  }
+  if (result.intent === "overdue") {
+    data.count = Array.isArray(data.items) ? data.items.length : 0;
+    data.displayed_count = data.count;
+  }
+  if (result.intent === "maintenance_health") {
+    const counts = Array.isArray(data.items) ? data.items.reduce<Record<string, number>>((accumulator, item) => {
+      const status = item && typeof item === "object" ? String((item as Record<string, unknown>).status || "normal") : "normal";
+      accumulator[status] = (accumulator[status] || 0) + 1;
+      return accumulator;
+    }, {}) : {};
+    data.counts = counts;
+  }
+  return { ...result, summary: `${result.summary} Hariç tutulan bakım türleri: ${excluded.join(", ")}.`, data };
+}
+
+async function createExcel(result: AssistantToolResponse, question: string, options: AssistantExportOptions): Promise<Response> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "AGM Bakım Merkezi";
   workbook.created = new Date();
+  const customLogo = options.includeLogo ? await fetchExportLogo(options.logoUrl) : null;
+  const logo = customLogo || (options.includeLogo ? loadDefaultExportLogo() : null);
+  let logoId: number | null = null;
+  if (logo) {
+    try {
+      logoId = workbook.addImage({ base64: logo.buffer.toString("base64"), extension: logo.extension });
+    } catch {
+      logoId = null;
+    }
+  }
   const usedSheetNames = new Set<string>();
   const addDataSheet = (name: string, rows: ExportRow[]) => {
     const worksheet = workbook.addWorksheet(uniqueSheetName(name, usedSheetNames));
     addRows(worksheet, escapeSpreadsheetRows(rows));
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
     if (rows.length > 0) worksheet.autoFilter = { from: "A1", to: `${String.fromCharCode(64 + Math.min(26, Object.keys(rows[0]).length))}${rows.length + 1}` };
+    return worksheet;
   };
 
-  addDataSheet("Cevap Özeti", [
+  const summarySheet = addDataSheet("Cevap Özeti", [
     { Alan: "Soru", Değer: question },
     { Alan: "Rapor", Değer: reportTitle(result) },
     { Alan: "Açıklama", Değer: result.summary },
+    { Alan: "Şablon", Değer: options.preset },
+    { Alan: "Sıralama", Değer: options.sort },
+    { Alan: "Marka", Değer: options.includeLogo ? "AGM Bakım Merkezi" : "Dahil edilmedi" },
     { Alan: "Üretim tarihi", Değer: new Date().toLocaleString("tr-TR") },
   ]);
+  if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 140, height: 60 } });
   const scalar = scalarRows(result);
   if (scalar.length > 0) addDataSheet("Cevap Alanları", scalar);
-  const sheets = arraySheets(result);
+  const sheets = arraySheets(result, options);
   sheets.forEach((sheet) => addDataSheet(sheet.name, sheet.rows));
   if (sheets.length === 0 && scalar.length === 0) addDataSheet("Sonuçlar", [{ Değer: result.summary }]);
 
@@ -220,20 +319,45 @@ async function createExcel(result: AssistantToolResponse, question: string): Pro
   });
 }
 
-async function createPdf(result: AssistantToolResponse, question: string): Promise<Response> {
+async function createPdf(result: AssistantToolResponse, question: string, options: AssistantExportOptions): Promise<Response> {
   const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
-  const doc = new PDFDocument({ size: "A4", margins: { top: 42, bottom: 42, left: 42, right: 42 }, font: fontRegular, autoFirstPage: true });
+  const customLogo = options.includeLogo ? await fetchExportLogo(options.logoUrl) : null;
+  const logo = customLogo || (options.includeLogo ? loadDefaultExportLogo() : null);
+  const margin = options.margin === "narrow" ? 28 : 42;
+  const doc = new PDFDocument({ size: options.pageSize, layout: options.orientation, margins: { top: margin, bottom: margin, left: margin, right: margin }, font: fontRegular, autoFirstPage: true });
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   const heading = () => {
-    doc.font(fontBold).fontSize(15).fillColor("#111827").text("Avcıkoru Santrali Motor Bakım Merkezi", doc.page.margins.left, 30, { width });
-    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(reportTitle(result), doc.page.margins.left, 52, { width });
-    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleString("tr-TR")}`, doc.page.margins.left, 68, { width });
+    const titleOffset = options.includeLogo ? 34 : 0;
+    if (options.includeLogo) {
+      let renderedCustomLogo = false;
+      if (logo) {
+        try {
+          doc.image(logo.buffer, doc.page.margins.left, 34, { fit: [24, 24], align: "center", valign: "center" });
+          renderedCustomLogo = true;
+        } catch {
+          renderedCustomLogo = false;
+        }
+      }
+      if (!renderedCustomLogo) {
+        doc.save().circle(doc.page.margins.left + 12, 46, 12).fillColor("#e8952f").fill();
+        doc.font(fontBold).fontSize(6.5).fillColor("#111827").text("AGM", doc.page.margins.left + 2, 42, { width: 20, align: "center" });
+        doc.restore();
+      }
+    }
+    doc.font(fontBold).fontSize(15).fillColor("#111827").text("Avcıkoru Santrali Motor Bakım Merkezi", doc.page.margins.left + titleOffset, 30, { width: width - titleOffset });
+    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(reportTitle(result), doc.page.margins.left + titleOffset, 52, { width: width - titleOffset });
+    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleString("tr-TR")}`, doc.page.margins.left + titleOffset, 68, { width: width - titleOffset });
     doc.moveTo(doc.page.margins.left, 84).lineTo(doc.page.margins.left + width, 84).strokeColor("#9ca3af").lineWidth(0.7).stroke();
     doc.y = 98;
   };
+  const writeFooter = () => {
+    if (!options.includeFooter) return;
+    doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text("Salt okunur AGM Bakım raporu · Soru kapsamıyla sınırlıdır.", doc.page.margins.left, doc.page.height - doc.page.margins.bottom + 10, { width });
+  };
   const ensureSpace = (height: number) => {
-    if (doc.y + height > doc.page.height - doc.page.margins.bottom) {
+    if (doc.y + height > doc.page.height - doc.page.margins.bottom - 18) {
+      writeFooter();
       doc.addPage();
       heading();
     }
@@ -253,15 +377,15 @@ async function createPdf(result: AssistantToolResponse, question: string): Promi
   writeLine(result.summary);
 
   scalarRows(result).forEach((row) => writeLine(`${row.Alan}: ${row.Değer}`));
-  arraySheets(result).forEach((sheet) => {
+  arraySheets(result, options).forEach((sheet) => {
     writeLine(sheet.name, true);
     sheet.rows.forEach((row, index) => {
       const content = Object.entries(row).map(([key, value]) => `${key}: ${formatValue(value)}`).join(" · ");
       writeLine(`${index + 1}. ${content}`);
     });
   });
-  if (scalarRows(result).length === 0 && arraySheets(result).length === 0) writeLine("Sonuç ayrıntısı bulunamadı.");
-  doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text("Bu rapor salt okunur AGM Bakım verilerinden oluşturulmuştur.", doc.page.margins.left, doc.page.height - 28, { width, align: "left" });
+  if (scalarRows(result).length === 0 && arraySheets(result, options).length === 0) writeLine("Sonuç ayrıntısı bulunamadı.");
+  writeFooter();
 
   const buffer = await pdfBuffer(doc);
   return new Response(new Uint8Array(buffer), {
@@ -299,8 +423,24 @@ async function getAssistantExport(req: NextRequest): Promise<Response> {
 
   const policy = evaluateAssistantQuestion(question);
   if (!policy.ok || !policy.query) return jsonError(policy.message || "Bu soru rapora dönüştürülemedi.", 400);
-  const result = applyForecastExclusions(await runAssistantTool(db, policy.query, { userId: user._id }), searchParams.get("exclude_type_label"));
-  return format === "pdf" ? createPdf(result, question) : createExcel(result, question);
+  const baseResult = await runAssistantTool(db, policy.query, { userId: user._id });
+  const options = normalizeExportOptions(policy.query.intent, baseResult.data, {
+    preset: searchParams.get("preset"),
+    columns: searchParams.get("columns"),
+    sheets: searchParams.get("sheets"),
+    orientation: searchParams.get("orientation"),
+    page_size: searchParams.get("page_size"),
+    margin: searchParams.get("margin"),
+    sort: searchParams.get("sort"),
+    include_logo: searchParams.get("include_logo"),
+    include_footer: searchParams.get("include_footer"),
+    exclude_type_label: searchParams.get("exclude_type_label"),
+  });
+  const query = options.excludedTypes.length ? { ...policy.query, excludedTypeLabels: options.excludedTypes } : policy.query;
+  const result = options.excludedTypes.length
+    ? applyExportTypeExclusions(await runAssistantTool(db, query, { userId: user._id }), options.excludedTypes)
+    : baseResult;
+  return format === "pdf" ? createPdf(result, question, options) : createExcel(result, question, options);
 }
 
 export async function GET(req: NextRequest) {

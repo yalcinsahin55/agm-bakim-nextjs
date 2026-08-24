@@ -158,6 +158,7 @@ async function buildRecordMatch(db: Db, query: AssistantQuery, extra: Record<str
   if (query.recordFilters?.includes("unconfirmed")) clauses.push({ manager_confirmation_status: "pending" });
   const type = await resolveMaintenanceType(db, query);
   if (query.maintenanceTypeQuery) clauses.push(type ? { $or: [{ type_key: type.key }, { type_label: type.label }] } : { type_key: "__assistant_no_matching_type__" });
+  if (query.excludedTypeLabels?.length) clauses.push({ type_label: { $nin: query.excludedTypeLabels.slice(0, 30) } });
   if (query.statusFilter) {
     const pairs = await statusPairs(db, query.statusFilter);
     clauses.push(pairs.length ? { $or: pairs } : { engine_id: "__assistant_no_matching_status__" });
@@ -287,6 +288,7 @@ async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<Ass
     .filter((item) => item.status === "gecikmis")
     .filter((item) => !query.engineQuery || (selectedEngine && item.engine_id === String(selectedEngine._id)))
     .filter((item) => !query.maintenanceTypeQuery || (selectedType && item.type_key === String(selectedType.key)))
+    .filter((item) => !query.excludedTypeLabels?.some((excluded) => excluded.localeCompare(item.type_label, "tr", { sensitivity: "base" }) === 0))
     .sort((a, b) => a.remaining - b.remaining);
   const overdue = matchingOverdue.slice(0, 200);
   return {
@@ -332,6 +334,7 @@ async function getMaintenanceForecast(db: Db, query: AssistantQuery): Promise<As
     maintenancePeriodHours: targetPeriod,
     engineId: selectedEngine ? String(selectedEngine._id) : undefined,
     typeLabel: selectedType?.label || query.maintenanceTypeQuery,
+    excludedTypeLabels: query.excludedTypeLabels,
   });
   if (scheduledStatus) forecasts = forecasts.filter((item) => item.status === scheduledStatus);
 
@@ -870,6 +873,7 @@ async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<Assi
   const items = buildItems(engines, types)
     .filter((item) => !query.engineQuery || (selectedEngine && item.engine_id === String(selectedEngine._id)))
     .filter((item) => !query.maintenanceTypeQuery || (selectedType && item.type_key === String(selectedType.key)))
+    .filter((item) => !query.excludedTypeLabels?.some((excluded) => excluded.localeCompare(item.type_label, "tr", { sensitivity: "base" }) === 0))
     .filter((item) => !requestedStatus || item.status === requestedStatus)
     .sort((a, b) => a.remaining - b.remaining || a.engine_name.localeCompare(b.engine_name, "tr"));
   const counts = items.reduce<Record<string, number>>((result, item) => { result[item.status] = (result[item.status] || 0) + 1; return result; }, {});
