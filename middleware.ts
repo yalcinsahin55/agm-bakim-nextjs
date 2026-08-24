@@ -5,7 +5,9 @@ import { jwtVerify } from "jose";
 const COOKIE_NAME = "agm_session";
 
 const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/fonts", "/sw.js"];
-const PUBLIC_EXACT_PATHS = new Set(["/icon.svg", "/manifest.json", "/manifest.webmanifest"]);
+// `/api/cron/refresh` session cookie değil, route içinde CRON_SECRET Bearer doğrulaması kullanır.
+// Middleware yalnızca isteği route’a ulaştırır; secret kontrolü cron route’unda kalır.
+const PUBLIC_EXACT_PATHS = new Set(["/icon.svg", "/manifest.json", "/manifest.webmanifest", "/api/cron/refresh"]);
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_EXACT_PATHS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

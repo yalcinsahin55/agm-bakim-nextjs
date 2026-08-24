@@ -108,7 +108,7 @@ export default function NotificationsPage() {
 
   async function markRead(id: string) {
     try {
-      const response = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+      const response = await fetch(`/api/notifications/${encodeURIComponent(id)}`, { method: "PATCH" });
       if (!response.ok) throw new Error("Bildirim okunamadı");
       setNotifications((current) => current.map((item) => item._id === id ? { ...item, read_at: new Date().toISOString() } : item));
       window.dispatchEvent(new Event("notifications:changed"));

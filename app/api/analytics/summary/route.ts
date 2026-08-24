@@ -53,7 +53,8 @@ async function getAnalyticsSummary(req: NextRequest) {
   const aggregate = <T extends Document>(pipeline: Document[]) => records.aggregate<T>(pipeline, { allowDiskUse: true });
   const activeTechniciansPromise = listActiveTechnicians(db);
 
-  const dateMatch = engineSince ? [{ $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } }, { $match: { maintenance_date: { $gte: engineSince } } }] : [];
+  const normalizeMaintenanceDateStage = { $set: { maintenance_date: { $convert: { input: { $ifNull: ["$maintenance_start_at", "$created_at"] }, to: "date", onError: null, onNull: null } } } };
+  const dateMatch = engineSince ? [normalizeMaintenanceDateStage, { $match: { maintenance_date: { $gte: engineSince } } }] : [];
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
   const contributionStages = (role: "responsible" | "support") => [
@@ -96,9 +97,9 @@ async function getAnalyticsSummary(req: NextRequest) {
   ];
   const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
     aggregate<MonthlyAggregateRow>([
-      { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
+      normalizeMaintenanceDateStage,
       { $match: { maintenance_date: { $gte: since } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date" } }, count: { $sum: 1 } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date", timezone: "Europe/Istanbul" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]).toArray(),
     aggregate<EngineAggregateRow>([
@@ -114,7 +115,7 @@ async function getAnalyticsSummary(req: NextRequest) {
       { $limit: 12 },
     ]).toArray(),
     aggregate<TotalsAggregateRow>([
-      { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
+      normalizeMaintenanceDateStage,
       {
         $group: {
           _id: null,

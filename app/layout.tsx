@@ -2,7 +2,6 @@ import "@/app/globals.css";
 import { Toaster } from "sonner";
 import type { ReactNode } from "react";
 import Sidebar from "@/components/Sidebar";
-import BottomNav from "@/components/BottomNav";
 import PwaRegister from "@/components/PwaRegister";
 import RoleGuard from "@/components/RoleGuard";
 
@@ -39,8 +38,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
         
-        {/* Mobil alt menü - sadece mobilde görünür */}
-        <BottomNav />
         
         <PwaRegister />
         <Toaster position="top-center" theme="dark" richColors closeButton />

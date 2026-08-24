@@ -22,20 +22,27 @@ export function useCurrentUser() {
   const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setError(null);
     cachedFetch<CurrentUser>("/api/auth/me", 30_000)
       .then((data) => {
-        if (alive) setUser(data);
-      })
-      .catch((error: unknown) => {
         if (!alive) return;
-        if (error instanceof ApiFetchError && error.status === 401) {
-          router.push("/login");
+        setUser(data);
+        setError(null);
+      })
+      .catch((requestError: unknown) => {
+        if (!alive) return;
+        if (requestError instanceof ApiFetchError && requestError.status === 401) {
+          setUser(null);
+          router.replace("/login");
           return;
         }
         setUser(null);
+        setError("Oturum doğrulanamadı. Lütfen tekrar giriş yapın.");
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -44,5 +51,5 @@ export function useCurrentUser() {
     return () => { alive = false; };
   }, [router]);
 
-  return { user, loading };
+  return { user, loading, error };
 }
