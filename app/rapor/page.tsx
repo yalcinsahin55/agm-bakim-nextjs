@@ -62,6 +62,22 @@ interface ReportResponse {
   summary: ReportSummary;
 }
 
+function formatReportDateTime(value: string | Date | undefined | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString("tr-TR") : "—";
+}
+
+function formatRecordDate(record: ReportRecord): string {
+  const date = getMaintenanceRecordDate(record.maintenance_start_at, record.created_at);
+  return date ? date.toLocaleDateString("tr-TR") : "—";
+}
+
+function getTechnicianNames(record: ReportRecord): string {
+  const names = record.other_technicians?.map((technician) => technician.full_name).filter(Boolean) || [];
+  return names.length ? names.join(", ") : "—";
+}
+
 export default function RaporPage() {
   const router = useRouter();
   const [engines, setEngines] = useState<Engine[]>([]);
@@ -146,7 +162,7 @@ export default function RaporPage() {
     return (
       <div>
         <TopBar title="Motor Bakım Raporu" />
-        <div className="px-4 py-4"><Skeleton className="h-12 w-full rounded-xl mb-4" /><Skeleton className="h-96 rounded-card" /></div>
+        <div className="px-4 py-4"><Skeleton className="mb-4 h-12 w-full rounded-xl" /><Skeleton className="h-96 rounded-card" /></div>
         <BottomNav />
       </div>
     );
@@ -154,38 +170,71 @@ export default function RaporPage() {
 
   return (
     <div>
-      <style>{`@media print { aside, header, nav, .print-hide { display: none !important; } main { padding: 0 !important; margin: 0 !important; } body { background: #fff !important; } #rapor { border: none !important; box-shadow: none !important; border-radius: 0 !important; } } @page { margin: 12mm; }`}</style>
+      <style>{`@media print { aside, header, nav, .print-hide { display: none !important; } main { padding: 0 !important; margin: 0 !important; } body { background: #fff !important; } #rapor { border: none !important; box-shadow: none !important; border-radius: 0 !important; } .report-mobile-list { display: none !important; } .report-desktop-table { display: block !important; overflow: visible !important; } } @page { margin: 12mm; }`}</style>
       <div className="print-hide"><TopBar title="Motor Bakım Raporu" subtitle="Yazdırılabilir bakım geçmişi" /></div>
-      <div className="px-4 py-4 print-hide">
+      <div className="print-hide px-4 py-4">
         <div className="flex gap-2">
-          <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="flex-1 bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+          <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
             {engines.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </select>
-          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
+          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber px-4 py-2.5 text-[13px] font-extrabold text-[#1a1206] transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
         </div>
-        <p className="text-[10.5px] text-faint mt-2">Önizleme en yeni 50 kaydı hızlı açar. Yazdır seçildiğinde seçili motorun tam geçmişi yüklenir; tarayıcı penceresinde "PDF olarak kaydet" seçebilirsiniz.</p>
+        <p className="mt-2 text-[10.5px] text-faint">Önizleme en yeni 50 kaydı hızlı açar. Yazdır seçildiğinde seçili motorun tam geçmişi yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>
 
-      <div className="px-4 pb-8">
-        {loadingRecords ? <div className="text-center py-16 text-muted text-sm">Kayıtlar yükleniyor...</div> : (
-          <div id="rapor" className="bg-white text-gray-900 rounded-xl border border-gray-300 shadow-xl p-6 md:p-8">
-            <div className="text-center border-b-2 border-gray-800 pb-4 mb-5"><div className="text-[18px] font-extrabold uppercase tracking-wide">Avcıkoru Santrali Bakım Merkezi</div><div className="text-[12px] text-gray-600 mt-1">Motor Bakım Raporu</div><div className="text-[10px] text-gray-500 mt-1">Rapor Tarihi: {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</div></div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 text-[11px]">
-              <div className="border border-gray-300 rounded p-2"><div className="text-gray-500 text-[9px] uppercase font-bold">Motor</div><div className="font-bold text-[13px]">{engine?.name || "—"}</div></div>
-              <div className="border border-gray-300 rounded p-2"><div className="text-gray-500 text-[9px] uppercase font-bold">Güncel Saat</div><div className="font-bold font-mono text-[13px]">{(engine?.hours || 0).toLocaleString("tr-TR")} sa</div></div>
-              <div className="border border-gray-300 rounded p-2"><div className="text-gray-500 text-[9px] uppercase font-bold">Yük</div><div className="font-bold font-mono text-[13px]">{(engine?.load_kw || 0).toLocaleString("tr-TR")} kW</div></div>
-              <div className="border border-gray-300 rounded p-2"><div className="text-gray-500 text-[9px] uppercase font-bold">Toplam Bakım</div><div className="font-bold font-mono text-[13px]">{stats.total}</div></div>
+      <div className="px-4 pb-28 md:pb-8">
+        {loadingRecords ? <div className="py-16 text-center text-sm text-muted">Kayıtlar yükleniyor...</div> : (
+          <div id="rapor" className="rounded-xl border border-gray-300 bg-white p-4 text-gray-900 shadow-xl sm:p-6 md:p-8">
+            <div className="mb-5 border-b-2 border-gray-800 pb-4 text-center"><div className="text-[18px] font-extrabold uppercase tracking-wide">Avcıkoru Santrali Bakım Merkezi</div><div className="mt-1 text-[12px] text-gray-600">Motor Bakım Raporu</div><div className="mt-1 text-[10px] text-gray-500">Rapor Tarihi: {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</div></div>
+
+            <div className="mb-5 grid min-w-0 grid-cols-2 gap-3 text-[11px] md:grid-cols-4">
+              <div className="min-w-0 rounded border border-gray-300 p-2"><div className="text-[9px] font-bold uppercase text-gray-500">Motor</div><div className="break-words text-[13px] font-bold">{engine?.name || "—"}</div></div>
+              <div className="min-w-0 rounded border border-gray-300 p-2"><div className="text-[9px] font-bold uppercase text-gray-500">Güncel Saat</div><div className="break-words font-mono text-[13px] font-bold">{(engine?.hours || 0).toLocaleString("tr-TR")} sa</div></div>
+              <div className="min-w-0 rounded border border-gray-300 p-2"><div className="text-[9px] font-bold uppercase text-gray-500">Yük</div><div className="break-words font-mono text-[13px] font-bold">{(engine?.load_kw || 0).toLocaleString("tr-TR")} kW</div></div>
+              <div className="min-w-0 rounded border border-gray-300 p-2"><div className="text-[9px] font-bold uppercase text-gray-500">Toplam Bakım</div><div className="break-words font-mono text-[13px] font-bold">{stats.total}</div></div>
             </div>
 
-            {info && <div className="mb-5"><div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Teknik Bilgiler</div><div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-[10.5px]">{INFO_FIELDS.map(([key, label]) => info[key as InfoKey] ? <div key={key}><span className="text-gray-500">{label}:</span> <b>{info[key as InfoKey]}</b></div> : null)}{info.not && <div className="col-span-2 md:col-span-3"><span className="text-gray-500">Not:</span> {info.not}</div>}</div></div>}
+            {info && <section className="mb-5"><div className="mb-2 border-b border-gray-400 pb-1 text-[11px] font-extrabold uppercase tracking-wide">Teknik Bilgiler</div><div className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-2 text-[10.5px] sm:grid-cols-2 md:grid-cols-3">{INFO_FIELDS.map(([key, label]) => info[key as InfoKey] ? <div key={key} className="min-w-0 break-words"><span className="text-gray-500">{label}:</span> <b>{info[key as InfoKey]}</b></div> : null)}{info.not && <div className="col-span-1 min-w-0 break-words sm:col-span-2 md:col-span-3"><span className="text-gray-500">Not:</span> {info.not}</div>}</div></section>}
 
-            <div className="mb-5 text-[10.5px] text-gray-700"><div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Özet</div>{stats.last ? <p>Bu motor için kayıtlı <b>{stats.total}</b> bakım bulunmaktadır. Son bakım <b>{getMaintenanceRecordDate(stats.last.maintenance_start_at, stats.last.created_at)?.toLocaleDateString("tr-TR") || "—"}</b> tarihinde (<b>{stats.last.type_label}</b>) yapılmıştır. Bakımlar arası ortalama süre <b>{stats.avgDays} gün</b>dür. Kayıtlı toplam bakım süresi <b>{formatMaintenanceDuration(reportSummary.total_duration_minutes)}</b>dir.</p> : <p>Bu motor için henüz bakım kaydı bulunmamaktadır.</p>}</div>
+            <section className="mb-5 text-[10.5px] text-gray-700"><div className="mb-2 border-b border-gray-400 pb-1 text-[11px] font-extrabold uppercase tracking-wide">Özet</div>{stats.last ? <p className="break-words">Bu motor için kayıtlı <b>{stats.total}</b> bakım bulunmaktadır. Son bakım <b>{formatRecordDate(stats.last)}</b> tarihinde (<b>{stats.last.type_label || "Belirtilmemiş"}</b>) yapılmıştır. Bakımlar arası ortalama süre <b>{stats.avgDays} gün</b>dür. Kayıtlı toplam bakım süresi <b>{formatMaintenanceDuration(reportSummary.total_duration_minutes)}</b>dir.</p> : <p>Bu motor için henüz bakım kaydı bulunmamaktadır.</p>}</section>
 
-            <div className="text-[11px] font-extrabold uppercase tracking-wide border-b border-gray-400 pb-1 mb-2">Bakım Geçmişi</div>
-            {stats.sortedDesc.length === 0 ? <p className="text-[10.5px] text-gray-500">Gösterilecek kayıt yok.</p> : <table className="w-full text-[10px] border-collapse"><thead><tr className="bg-gray-100"><th className="border border-gray-300 px-1.5 py-1 text-left">#</th><th className="border border-gray-300 px-1.5 py-1 text-left">Tarih</th><th className="border border-gray-300 px-1.5 py-1 text-left">Bakım Türü</th><th className="border border-gray-300 px-1.5 py-1 text-right">Saat</th><th className="border border-gray-300 px-1.5 py-1 text-left">Başlangıç</th><th className="border border-gray-300 px-1.5 py-1 text-left">Bitiş</th><th className="border border-gray-300 px-1.5 py-1 text-left">Süre</th><th className="border border-gray-300 px-1.5 py-1 text-left">Sorumlu Teknisyen</th><th className="border border-gray-300 px-1.5 py-1 text-left">Diğer Teknisyenler</th></tr></thead><tbody>{stats.sortedDesc.map((record, index) => <tr key={record._id} className={index % 2 === 1 ? "bg-gray-50" : ""}><td className="border border-gray-300 px-1.5 py-1 text-gray-500">{index + 1}</td><td className="border border-gray-300 px-1.5 py-1">{getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "—"}</td><td className="border border-gray-300 px-1.5 py-1 font-semibold">{record.type_label}</td><td className="border border-gray-300 px-1.5 py-1 text-right font-mono">{record.hour_at_completion.toLocaleString("tr-TR")}</td><td className="border border-gray-300 px-1.5 py-1">{record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "—"}</td><td className="border border-gray-300 px-1.5 py-1">{record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "—"}</td><td className="border border-gray-300 px-1.5 py-1">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</td><td className="border border-gray-300 px-1.5 py-1">{record.technician_name || "—"}</td><td className="border border-gray-300 px-1.5 py-1">{record.other_technicians?.map((technician) => technician.full_name).join(", ") || "—"}</td></tr>)}</tbody></table>}
-            {reportTruncated && <p className="mt-3 text-[10px] text-red-700">Bu yazdırma çıktısı en fazla 5.000 kayıt içerir.</p>}
+            <section>
+              <div className="mb-2 border-b border-gray-400 pb-1 text-[11px] font-extrabold uppercase tracking-wide">Bakım Geçmişi</div>
+              {stats.sortedDesc.length === 0 ? <p className="text-[10.5px] text-gray-500">Gösterilecek kayıt yok.</p> : <>
+                <div className="report-mobile-list space-y-3 md:hidden">
+                  {stats.sortedDesc.map((record, index) => (
+                    <article key={record._id} className="rounded-lg border border-gray-300 bg-gray-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Bakım türü</div>
+                          <div className="mt-0.5 break-words text-[13px] font-bold leading-5 text-gray-900">{record.type_label || "Belirtilmemiş"}</div>
+                        </div>
+                        <div className="shrink-0 text-right"><div className="text-[9px] font-bold uppercase tracking-wide text-gray-500">Kayıt</div><div className="font-mono text-[12px] font-semibold text-gray-700">#{index + 1}</div></div>
+                      </div>
+                      <div className="mt-3 grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 border-t border-gray-200 pt-3">
+                        <div className="min-w-0"><div className="text-[9px] uppercase text-gray-500">Tarih</div><div className="mt-0.5 break-words text-[11px] font-medium">{formatRecordDate(record)}</div></div>
+                        <div className="min-w-0 text-right"><div className="text-[9px] uppercase text-gray-500">Motor saati</div><div className="mt-0.5 break-words font-mono text-[11px] font-semibold">{record.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
+                        <div className="min-w-0"><div className="text-[9px] uppercase text-gray-500">Başlangıç</div><div className="mt-0.5 break-words text-[11px] leading-4">{formatReportDateTime(record.maintenance_start_at)}</div></div>
+                        <div className="min-w-0 text-right"><div className="text-[9px] uppercase text-gray-500">Bitiş</div><div className="mt-0.5 break-words text-[11px] leading-4">{formatReportDateTime(record.maintenance_end_at)}</div></div>
+                        <div className="min-w-0"><div className="text-[9px] uppercase text-gray-500">Süre</div><div className="mt-0.5 break-words text-[11px] font-semibold">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</div></div>
+                        <div className="min-w-0"><div className="text-[9px] uppercase text-gray-500">Sorumlu teknisyen</div><div className="mt-0.5 break-words text-[11px]">{record.technician_name || "—"}</div></div>
+                      </div>
+                      <div className="mt-3 border-t border-gray-200 pt-2"><div className="text-[9px] uppercase text-gray-500">Diğer teknisyenler</div><div className="mt-0.5 break-words text-[11px] leading-4">{getTechnicianNames(record)}</div></div>
+                    </article>
+                  ))}
+                </div>
+                <div className="report-desktop-table hidden overflow-x-auto md:block">
+                  <table className="w-full table-fixed border-collapse text-[10px]">
+                    <thead><tr className="bg-gray-100"><th className="w-[4%] border border-gray-300 px-1.5 py-1 text-left">#</th><th className="w-[10%] border border-gray-300 px-1.5 py-1 text-left">Tarih</th><th className="w-[15%] border border-gray-300 px-1.5 py-1 text-left">Bakım Türü</th><th className="w-[9%] border border-gray-300 px-1.5 py-1 text-right">Saat</th><th className="w-[15%] border border-gray-300 px-1.5 py-1 text-left">Başlangıç</th><th className="w-[15%] border border-gray-300 px-1.5 py-1 text-left">Bitiş</th><th className="w-[10%] border border-gray-300 px-1.5 py-1 text-left">Süre</th><th className="w-[12%] border border-gray-300 px-1.5 py-1 text-left">Sorumlu Teknisyen</th><th className="w-[10%] border border-gray-300 px-1.5 py-1 text-left">Diğer Teknisyenler</th></tr></thead>
+                    <tbody>{stats.sortedDesc.map((record, index) => <tr key={record._id} className={index % 2 === 1 ? "bg-gray-50" : ""}><td className="align-top break-words border border-gray-300 px-1.5 py-2 text-gray-500">{index + 1}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{formatRecordDate(record)}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2 font-semibold">{record.type_label || "Belirtilmemiş"}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2 text-right font-mono">{record.hour_at_completion.toLocaleString("tr-TR")}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{formatReportDateTime(record.maintenance_start_at)}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{formatReportDateTime(record.maintenance_end_at)}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{record.technician_name || "—"}</td><td className="align-top break-words border border-gray-300 px-1.5 py-2">{getTechnicianNames(record)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              </>}
+            </section>
+
+            {reportTruncated && <p className="mt-3 text-[10px] text-red-700">Bu yazdırma çıktısı en fazla 5.000 kayıtla sınırlandı; daha eski kayıtları ayrı sayfalarda görüntüleyin.</p>}
             {!reportAll && reportTotal > records.length && <p className="mt-3 text-[10px] text-gray-500">Önizleme: en yeni {records.length} kayıt gösteriliyor. Tam geçmiş yazdırma sırasında yüklenir.</p>}
-            <div className="grid grid-cols-2 gap-8 mt-10 text-[10px] text-gray-600"><div className="border-t border-gray-400 pt-1 text-center">Hazırlayan</div><div className="border-t border-gray-400 pt-1 text-center">Onaylayan</div></div>
+            <div className="mt-10 grid grid-cols-2 gap-8 text-[10px] text-gray-600"><div className="border-t border-gray-400 pt-1 text-center">Hazırlayan</div><div className="border-t border-gray-400 pt-1 text-center">Onaylayan</div></div>
           </div>
         )}
       </div>
