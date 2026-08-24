@@ -166,11 +166,30 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
       $facet: {
         totals: [
           {
+            $set: {
+              __maintenance_group_key: {
+                $cond: [
+                  { $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] },
+                  "$group_id",
+                  { $toString: "$_id" },
+                ],
+              },
+            },
+          },
+          {
+            $group: {
+              _id: "$__maintenance_group_key",
+              record_count: { $sum: 1 },
+              external_record_count: { $sum: { $cond: [externalExpression(), 1, 0] } },
+              duration: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } },
+            },
+          },
+          {
             $group: {
               _id: null,
-              total: { $sum: 1 },
-              external: { $sum: { $cond: [externalExpression(), 1, 0] } },
-              duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
+              total: { $sum: "$record_count" },
+              external: { $sum: "$external_record_count" },
+              duration: { $sum: "$duration" },
             },
           },
         ],
@@ -360,6 +379,13 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     ],
   };
   const contributionProject = {
+    group_key: {
+      $cond: [
+        { $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] },
+        "$group_id",
+        { $toString: "$_id" },
+      ],
+    },
     contributions: {
       $cond: [
         { $and: [{ $isArray: "$technician_contributions" }, { $gt: [{ $size: { $ifNull: ["$technician_contributions", []] } }, 0] }] },
@@ -375,7 +401,8 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       { $project: contributionProject },
       { $unwind: "$contributions" },
       contributionMatch("responsible"),
-      { $group: { _id: "$contributions.id", technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+      { $group: { _id: { group_key: "$group_key", technician_id: "$contributions.id" }, technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, duration: { $max: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+      { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, count: { $sum: 1 }, duration: { $sum: "$duration" } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
     ]).toArray() : Promise.resolve([]),
@@ -384,7 +411,8 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       { $project: contributionProject },
       { $unwind: "$contributions" },
       contributionMatch("support"),
-      { $group: { _id: "$contributions.id", technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+      { $group: { _id: { group_key: "$group_key", technician_id: "$contributions.id" }, technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, duration: { $max: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+      { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, count: { $sum: 1 }, duration: { $sum: "$duration" } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
     ]).toArray() : Promise.resolve([]),
@@ -417,13 +445,14 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
         : { $or: [{ technician_id: selected.id }, { "other_technicians.id": selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }, { "other_technicians.full_name": { $regex: selectedName, $options: "i" } }] };
     const selectedMatch = { $and: [match, participation] };
     const selectedRecords = await records.find(selectedMatch, {
-      projection: { _id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, technician_type: 1, other_technicians: 1, technician_contributions: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
+      projection: { _id: 1, group_id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, technician_type: 1, other_technicians: 1, technician_contributions: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
     }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(50).toArray();
     const typeCounts = new Map<string, number>();
     const typeEngineCounts = new Map<string, Map<string, { engine_id: string; engine: string; count: number }>>();
     const engineCounts = new Map<string, { engine_id: string; engine: string; count: number }>();
     const engineTypeCounts = new Map<string, Map<string, number>>();
-    activities = selectedRecords.map((record) => {
+    const activityGroups = new Map<string, { id: string; engine_id: string | null; engine: string; types: string[]; role: string; start_at: unknown; duration_minutes: number; created_at: unknown }>();
+    selectedRecords.forEach((record) => {
       const contribution = Array.isArray(record.technician_contributions) ? record.technician_contributions.find((item) => String(item.id) === selected.id || normalizeTechnicianName(item.full_name) === normalizeTechnicianName(selected.full_name)) : null;
       const isResponsible = contribution ? contribution.contribution_role === "responsible" : String(record.technician_id) === selected.id || normalizeTechnicianName(record.technician_name) === normalizeTechnicianName(selected.full_name);
       const type = record.type_label || "Bilinmeyen";
@@ -441,17 +470,26 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       const engineTypes = engineTypeCounts.get(engineKey) || new Map<string, number>();
       engineTypes.set(type, (engineTypes.get(type) || 0) + 1);
       engineTypeCounts.set(engineKey, engineTypes);
-      return {
-        id: String(record._id),
-        engine_id: record.engine_id || null,
-        engine,
-        type,
-        role: isResponsible ? "Sorumlu" : "Yardımcı",
-        start_at: record.maintenance_start_at || null,
-        duration_minutes: Number(contribution?.duration_minutes ?? record.maintenance_duration_minutes ?? 0),
-        created_at: record.maintenance_start_at || record.created_at || null,
-      };
+      const groupKey = String(record.group_id || record._id);
+      const activity = activityGroups.get(groupKey);
+      const durationMinutes = Number(contribution?.duration_minutes ?? record.maintenance_duration_minutes ?? 0);
+      if (activity) {
+        if (!activity.types.includes(type)) activity.types.push(type);
+        activity.duration_minutes = Math.max(activity.duration_minutes, durationMinutes);
+      } else {
+        activityGroups.set(groupKey, {
+          id: groupKey,
+          engine_id: record.engine_id || null,
+          engine,
+          types: [type],
+          role: isResponsible ? "Sorumlu" : "Yardımcı",
+          start_at: record.maintenance_start_at || null,
+          duration_minutes: durationMinutes,
+          created_at: record.maintenance_start_at || record.created_at || null,
+        });
+      }
     });
+    activities = [...activityGroups.values()].map((activity) => ({ ...activity, type: activity.types.join(" + ") }));
     activityByType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([type, count]) => ({ type, count, engines: [...(typeEngineCounts.get(type)?.values() || [])].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")) }));
     activityByEngine = [...engineCounts.values()].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")).map((engine) => ({ ...engine, type_stats: [...(engineTypeCounts.get(engine.engine_id)?.entries() || [])].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count || a.type.localeCompare(b.type, "tr")) }));
   }
@@ -462,7 +500,13 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       { $match: detailMatch },
       { $facet: {
         byType: [{ $group: { _id: "$type_label", count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 20 }],
-        byEngine: [{ $group: { _id: { engine_id: "$engine_id", engine: "$engine_name" }, count: { $sum: 1 } } }, { $sort: { count: -1, "_id.engine": 1 } }, { $limit: 20 }],
+        byEngine: [
+          { $set: { __maintenance_group_key: { $cond: [{ $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] }, "$group_id", { $toString: "$_id" }] } } },
+          { $group: { _id: { engine_id: "$engine_id", engine: "$engine_name", group_key: "$__maintenance_group_key" } } },
+          { $group: { _id: { engine_id: "$_id.engine_id", engine: "$_id.engine" }, count: { $sum: 1 } } },
+          { $sort: { count: -1, "_id.engine": 1 } },
+          { $limit: 20 },
+        ],
       } },
     ]).toArray();
     return {
@@ -494,9 +538,15 @@ async function getExternalServiceSummary(db: Db, query: AssistantQuery): Promise
     { $match: match },
     {
       $facet: {
-        totals: [{ $group: { _id: null, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } }],
+        totals: [
+          { $set: { __maintenance_group_key: { $cond: [{ $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] }, "$group_id", { $toString: "$_id" }] } } },
+          { $group: { _id: "$__maintenance_group_key", record_count: { $sum: 1 }, duration: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+          { $group: { _id: null, count: { $sum: "$record_count" }, duration: { $sum: "$duration" } } },
+        ],
         services: [
-          { $group: { _id: { $ifNull: ["$external_service_name", "$technician_name"] }, count: { $sum: 1 }, duration: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+          { $set: { __maintenance_group_key: { $cond: [{ $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] }, "$group_id", { $toString: "$_id" }] } } },
+          { $group: { _id: { group_key: "$__maintenance_group_key", service: { $ifNull: ["$external_service_name", "$technician_name"] } }, record_count: { $sum: 1 }, duration: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+          { $group: { _id: "$_id.service", count: { $sum: "$record_count" }, duration: { $sum: "$duration" } } },
           { $sort: { count: -1, _id: 1 } },
           { $limit: 12 },
         ],

@@ -61,6 +61,13 @@ async function getAnalyticsSummary(req: NextRequest) {
     ...technicianRecordMatch,
     {
       $project: {
+        group_key: {
+          $cond: [
+            { $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] },
+            "$group_id",
+            { $toString: "$_id" },
+          ],
+        },
         contributions: {
           $cond: [
             { $and: [{ $isArray: "$technician_contributions" }, { $gt: [{ $size: { $ifNull: ["$technician_contributions", []] } }, 0] }] },
@@ -83,7 +90,8 @@ async function getAnalyticsSummary(req: NextRequest) {
     },
     { $unwind: "$contributions" },
     { $match: { "contributions.contribution_role": role } },
-    { $group: { _id: "$contributions.id", technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, [`${role}_count`]: { $sum: 1 }, [`${role}_duration_minutes`]: { $sum: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+    { $group: { _id: { group_key: "$group_key", technician_id: "$contributions.id" }, technician: { $first: "$contributions.full_name" }, technician_type: { $first: "$contributions.technician_type" }, duration_minutes: { $max: { $ifNull: ["$contributions.duration_minutes", 0] } } } },
+    { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, [`${role}_count`]: { $sum: 1 }, [`${role}_duration_minutes`]: { $sum: "$duration_minutes" } } },
     { $sort: { [`${role}_count`]: -1, technician: 1 } },
   ];
   const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
@@ -121,25 +129,46 @@ async function getAnalyticsSummary(req: NextRequest) {
     aggregate<PeriodTotalsAggregateRow>([
       ...dateMatch,
       {
+        $set: {
+          __maintenance_group_key: {
+            $cond: [
+              { $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] },
+              "$group_id",
+              { $toString: "$_id" },
+            ],
+          },
+        },
+      },
+      {
         $group: {
-          _id: null,
-          total: { $sum: 1 },
-          total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } },
-          technician_duration_minutes: { $sum: { $cond: [internalTechnicianExpr, {
+          _id: "$__maintenance_group_key",
+          record_count: { $sum: 1 },
+          total_duration_minutes: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } },
+          technician_duration_minutes: { $max: { $cond: [internalTechnicianExpr, {
             $cond: [
               { $and: [{ $isArray: "$technician_contributions" }, { $gt: [{ $size: { $ifNull: ["$technician_contributions", []] } }, 0] }] },
               { $sum: { $map: { input: "$technician_contributions", as: "contribution", in: { $ifNull: ["$$contribution.duration_minutes", 0] } } } },
               { $multiply: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] }] },
             ],
           }, 0] } },
-          missing_duration: { $sum: { $cond: [internalTechnicianExpr, { $cond: [{ $gt: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, 0] }, 0, 1] }, 0] } },
-          technician_tasks: { $sum: { $cond: [internalTechnicianExpr, {
+          missing_duration: { $max: { $cond: [internalTechnicianExpr, { $cond: [{ $gt: [{ $ifNull: ["$maintenance_duration_minutes", 0] }, 0] }, 0, 1] }, 0] } },
+          technician_tasks: { $max: { $cond: [internalTechnicianExpr, {
             $cond: [
               { $and: [{ $isArray: "$technician_contributions" }, { $gt: [{ $size: { $ifNull: ["$technician_contributions", []] } }, 0] }] },
               { $size: "$technician_contributions" },
               { $add: [1, { $size: { $ifNull: ["$other_technicians", []] } }] },
             ],
           }, 0] } },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$record_count" },
+          total_duration_minutes: { $sum: "$total_duration_minutes" },
+          technician_duration_minutes: { $sum: "$technician_duration_minutes" },
+          missing_duration: { $sum: "$missing_duration" },
+          technician_tasks: { $sum: "$technician_tasks" },
         },
       },
     ]).toArray(),

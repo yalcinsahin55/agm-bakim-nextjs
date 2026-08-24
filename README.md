@@ -409,6 +409,40 @@ node scripts/migrate-technician-source.mjs \
 
 Script yalnızca `technician_source`, `technician_id`, `technician_name` ve `external_service_name` alanlarına dokunur; motor, bakım türü, tarih-saat, medya, not, kontrol listesi ve ekip teknisyeni alanlarını değiştirmez. `migration-output/` klasörü `.gitignore` içinde tutulduğu için rapor ve yedekler GitHub’a gönderilmez. Migration tamamlandıktan sonra Teknisyen Raporu’nu yenileyerek isim varyasyonlarının tek satırda birleştiğini, dış hizmet kayıtlarının ise teknisyen metriklerine dahil olmadığını kontrol edin.
 
+## Birlikte tamamlanan eski bakımlarda süre tekilleştirme
+
+Aynı işlem sırasında birden fazla bakım türü tamamlandığında uygulama bu türleri ayrı bakım kaydı olarak saklamaya devam eder. Ancak aynı `group_id` altındaki kayıtlar Teknisyen Raporu, analitik özetler ve Bakım Asistanı teknisyen istatistiklerinde tek bir ekip çalışması olarak sayılır. Böylece kişi katkı süresi ve görev toplamı, aynı bakım türü sayısı kadar çoğalmaz; bakım türü bazlı kayıt sayıları ise ayrı kalır.
+
+Geçmişte birlikte tamamlanan eski kayıtlarda `group_id` bulunmuyorsa, önce ayrı ve erişimi kısıtlı MongoDB yedeği alın. Ardından varsayılan dry-run ile yalnızca güçlü eşleşmeleri önizleyin:
+
+```bash
+node scripts/migrate-grouped-maintenance-records.mjs \
+  --report=migration-output/grouped-maintenance-preview.json
+```
+
+Araç; aynı motor, tarih-saat, motor çalışma saati, sorumlu/ekip izi ve ortak grouped/client işaretlerine sahip birden fazla bakım türünü aday grup olarak değerlendirir. Mevcut `group_id` taşıyan kayıtlara dokunmaz. Belirsiz veya zayıf eşleşmeler değiştirilmez. Apply modunda yalnızca eksik `group_id` alanı yazılır; teknisyen, süre, bakım türü, medya ve tarih alanları değişmez:
+
+```bash
+node scripts/migrate-grouped-maintenance-records.mjs \
+  --report=migration-output/grouped-maintenance-apply.json \
+  --backup=migration-output/grouped-maintenance-backup.json \
+  --max-changes=1000 \
+  --apply \
+  --confirm=APPLY-GROUPED-MAINTENANCE-MIGRATION
+```
+
+Apply işlemi explicit onay, değişiklik üst sınırı ve atomik backup olmadan çalışmaz. Apply sırasında beklenmeyen hata olursa script uygulanan kayıtları otomatik geri almaya çalışır. Gerekirse yalnızca oluşturulan backup ile geri alabilirsiniz:
+
+```bash
+node scripts/migrate-grouped-maintenance-records.mjs \
+  --rollback=migration-output/grouped-maintenance-backup.json \
+  --max-changes=1000 \
+  --apply \
+  --confirm=ROLLBACK-GROUPED-MAINTENANCE-MIGRATION
+```
+
+Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süresini yenileyin. Aynı grouped bakımın tür satırları ayrı görünebilir; bu beklenen davranıştır. Süre ve kişi görevi toplamları ise grup başına bir kez hesaplanır.
+
 ## Geliştirme ve doğrulama komutları
 
 | Komut | Açıklama |
