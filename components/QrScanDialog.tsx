@@ -9,6 +9,10 @@ interface QrScanDialogProps {
   onDetected: (target: string) => void;
 }
 
+interface ScannerControls {
+  stop: () => void;
+}
+
 function normalizeScanTarget(rawValue: string): string | null {
   try {
     const url = new URL(rawValue.trim(), window.location.origin);
@@ -27,9 +31,45 @@ function normalizeScanTarget(rawValue: string): string | null {
   }
 }
 
+function cameraErrorMessage(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : error instanceof Error ? error.name : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Chrome kamera iznini bu site için reddetmiş görünüyor. Adres çubuğundaki kilit simgesinden Kamera → İzin ver seçip sayfayı yenile.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "Kullanılabilir bir kamera bulunamadı. Telefon kamerasını kapatıp tekrar dene.";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "Kamera başka bir uygulama veya sekme tarafından kullanılıyor olabilir. Diğer kamera kullanan uygulamaları kapatıp tekrar dene.";
+  }
+  if (name === "SecurityError") {
+    return "Kamera yalnızca güvenli bağlantıda açılabilir. Uygulamayı https:// bağlantısından açıp tekrar dene.";
+  }
+  return "Kamera akışı başlatılamadı. Chrome sekmesini yenileyip tekrar dene.";
+}
+
+async function requestCamera(): Promise<MediaStream> {
+  const preferred = {
+    audio: false,
+    video: {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
+  } satisfies MediaStreamConstraints;
+  try {
+    return await navigator.mediaDevices.getUserMedia(preferred);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "OverconstrainedError") {
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    }
+    throw error;
+  }
+}
+
 export default function QrScanDialog({ open, onClose, onDetected }: QrScanDialogProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const controlsRef = useRef<ScannerControls | null>(null);
   const onDetectedRef = useRef(onDetected);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -41,43 +81,83 @@ export default function QrScanDialog({ open, onClose, onDetected }: QrScanDialog
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let activeStream: MediaStream | null = null;
     setError("");
-    setScanning(true);
+    setScanning(false);
     controlsRef.current?.stop();
     controlsRef.current = null;
     const reader = new BrowserQRCodeReader();
     const video = videoRef.current;
     if (!video) return () => { cancelled = true; };
 
-    reader.decodeFromConstraints(
-      { audio: false, video: { facingMode: { ideal: "environment" } } },
-      video,
-      (result) => {
-        if (cancelled || !result) return;
-        const target = normalizeScanTarget(result.getText());
-        if (!target) {
-          setError("Bu QR kod AGM Bakım motor veya bakım bağlantısı değil.");
+    const stopActiveStream = () => {
+      activeStream?.getTracks().forEach((track) => track.stop());
+      activeStream = null;
+      video.pause();
+      video.srcObject = null;
+    };
+
+    const start = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Bu tarayıcı kamera erişimini desteklemiyor. Güncel Chrome ile tekrar dene.");
+        return;
+      }
+      if (!window.isSecureContext) {
+        setError("Kamera yalnızca güvenli bağlantıda açılabilir. Uygulamayı https:// bağlantısından açıp tekrar dene.");
+        return;
+      }
+      try {
+        activeStream = await requestCamera();
+        if (cancelled) {
+          stopActiveStream();
           return;
         }
-        cancelled = true;
-        controlsRef.current?.stop();
-        controlsRef.current = null;
-        setScanning(false);
-        onDetectedRef.current(target);
-      },
-    ).then((controls) => {
-      if (cancelled) controls.stop();
-      else controlsRef.current = controls;
-    }).catch(() => {
-      if (cancelled) return;
-      setScanning(false);
-      setError("Kamera açılamadı. Tarayıcı kamera iznini kontrol edip tekrar dene.");
-    });
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = activeStream;
+        await video.play();
+        if (cancelled) {
+          stopActiveStream();
+          return;
+        }
+        const scanControls = reader.scan(video, (result) => {
+          if (cancelled || !result) return;
+          const target = normalizeScanTarget(result.getText());
+          if (!target) {
+            setError("Bu QR kod AGM Bakım motor veya bakım bağlantısı değil.");
+            return;
+          }
+          cancelled = true;
+          controlsRef.current?.stop();
+          controlsRef.current = null;
+          setScanning(false);
+          onDetectedRef.current(target);
+        }, () => {
+          // QR bulunamadığında ZXing her kare için hata verebilir; bu normaldir.
+        });
+        controlsRef.current = {
+          stop: () => {
+            scanControls.stop();
+            stopActiveStream();
+          },
+        };
+        setScanning(true);
+      } catch (reason: unknown) {
+        stopActiveStream();
+        if (!cancelled) {
+          setScanning(false);
+          setError(cameraErrorMessage(reason));
+        }
+      }
+    };
 
+    void start();
     return () => {
       cancelled = true;
       controlsRef.current?.stop();
       controlsRef.current = null;
+      stopActiveStream();
       setScanning(false);
     };
   }, [open]);
@@ -94,8 +174,8 @@ export default function QrScanDialog({ open, onClose, onDetected }: QrScanDialog
           </div>
           <button type="button" onClick={onClose} className="h-8 w-8 rounded-lg border border-border text-muted transition hover:bg-panel2 hover:text-text" aria-label="QR okutmayı kapat">✕</button>
         </div>
-        <div className="relative mt-4 overflow-hidden rounded-xl border border-border bg-black aspect-square">
-          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline aria-label="QR kod kamera görüntüsü" />
+        <div className="relative mt-4 aspect-square overflow-hidden rounded-xl border border-border bg-black">
+          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline autoPlay aria-label="QR kod kamera görüntüsü" />
           <div className="pointer-events-none absolute inset-10 rounded-2xl border-2 border-amber/80" />
           {!scanning && !error && <div className="absolute inset-0 flex items-center justify-center bg-black/50 px-5 text-center text-[11px] text-white">Kamera hazırlanıyor...</div>}
         </div>
