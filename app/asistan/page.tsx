@@ -159,14 +159,26 @@ function periodDateQuery(period?: string): Record<string, string> {
   return { from: localDateString(start), to: localDateString(now) };
 }
 
-function exportFileName(kind: "pdf" | "excel"): string {
+function exportFileName(kind: "pdf" | "excel", exportQuery: Record<string, string>): string {
+  if (exportQuery.forecast === "1") return kind === "pdf" ? "AGM_Bakim_Tahmin_Plani.pdf" : "AGM_Bakim_Tahmin_Plani.xlsx";
   return kind === "pdf" ? "AGM_Bakim_Asistan_Raporu.pdf" : "AGM_Bakim_Asistan_Raporu.xlsx";
 }
 
 function buildExportQuery(intent: string | undefined, period: string | undefined, dateRange: { from: string; to: string } | null | undefined, data: Record<string, unknown> | undefined): Record<string, string> {
-  if (!intent || intent === "help" || intent === "overdue" || intent === "maintenance_forecast") return {};
+  if (!intent || intent === "help" || intent === "overdue") return {};
   const query = dateRange ? { from: dateRange.from, to: dateRange.to } : periodDateQuery(period);
   const filters = data?.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
+  if (intent === "maintenance_forecast") {
+    query.forecast = "1";
+    if (typeof filters.target_year === "number") query.target_year = String(filters.target_year);
+    if (typeof filters.maintenance_period_hours === "number") query.maintenance_period_hours = String(filters.maintenance_period_hours);
+    if (typeof filters.engine_id === "string" && filters.engine_id) query.engine_id = filters.engine_id;
+    if (typeof filters.maintenance_type === "string" && filters.maintenance_type) query.type_label = filters.maintenance_type;
+    if (typeof filters.status === "string" && filters.status) query.status = filters.status;
+    const excludedTypes = Array.isArray(data?.excluded_type_labels) ? data.excluded_type_labels.filter((value): value is string => typeof value === "string") : [];
+    if (excludedTypes.length) query.exclude_type_label = excludedTypes.join(",");
+    return query;
+  }
   if (intent === "external_service") query.source = "external_service";
   if (intent === "technician_performance") {
     const selected = data?.selected_technician as Record<string, unknown> | null | undefined;
@@ -207,7 +219,7 @@ function ExportActions({ exportQuery }: { exportQuery: Record<string, string> })
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = exportFileName(kind);
+      link.download = exportFileName(kind, exportQuery);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -229,6 +241,8 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
   if (typeof filters.engine === "string" && filters.engine) items.push(`Motor: ${filters.engine}`);
   if (typeof filters.maintenance_type === "string" && filters.maintenance_type) items.push(`Tür: ${filters.maintenance_type}`);
   if (typeof filters.target_year === "number") items.push(`Plan yılı: ${filters.target_year}`);
+  const excludedTypeLabels = Array.isArray(data.excluded_type_labels) ? data.excluded_type_labels.filter((value): value is string => typeof value === "string") : [];
+  if (excludedTypeLabels.length) items.push(`Hariç: ${excludedTypeLabels.join(", ")}`);
   if (typeof filters.maintenance_period_hours === "number") items.push(`Periyot: ${filters.maintenance_period_hours.toLocaleString("tr-TR")} saat`);
   if (filters.role === "responsible") items.push("Rol: Sorumlu");
   if (filters.role === "support") items.push("Rol: Yardımcı");
@@ -251,7 +265,7 @@ function AppliedFilters({ data, dateRange }: { data: Record<string, unknown>; da
   return <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Uygulanan filtreler"><span className="text-[9px] font-bold uppercase tracking-wide text-faint">Filtreler:</span>{items.map((item) => <span key={item} className="rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] text-muted">{item}</span>)}</div>;
 }
 
-function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent?: string }) {
+function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: Record<string, unknown>; intent?: string; onForecastExcludedTypesChange?: (excludedTypes: string[]) => void }) {
   const [expandedEngineId, setExpandedEngineId] = useState<string | null>(null);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [expandedTechnicianId, setExpandedTechnicianId] = useState<string | null>(null);
@@ -300,30 +314,38 @@ function ResultDetails({ data, intent }: { data: Record<string, unknown>; intent
   }
 
   if (intent === "maintenance_forecast") {
-    const overdueCount = Number(data.overdue_count || 0);
-    const scheduledCount = Number(data.scheduled_count || 0);
-    const targetYearCount = Number(data.target_year_count || 0);
-    const beforeTargetYearCount = Number(data.before_target_year_count || 0);
     const targetYear = Number(data.target_year || 0);
-    const totalCount = Number(data.total || 0);
     const filters = data.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
     const periodHours = typeof filters.maintenance_period_hours === "number" ? filters.maintenance_period_hours : 0;
-    const periodGroups = Array.isArray(data.grouped_by_period) ? data.grouped_by_period as Array<Record<string, unknown>> : [];
-    const visibleForecasts = forecastItems;
+    const forecastTypeOptions = [...new Set(forecastItems.map((item) => stringValue(item.type, "")).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
+    const excludedTypeLabels = Array.isArray(data.excluded_type_labels) ? data.excluded_type_labels.filter((value): value is string => typeof value === "string") : [];
+    const visibleForecasts = forecastItems.filter((item) => !excludedTypeLabels.some((excluded) => excluded.localeCompare(stringValue(item.type, ""), "tr", { sensitivity: "base" }) === 0));
+    const visibleOverdueCount = visibleForecasts.filter((item) => String(item.category) === "overdue").length;
+    const visibleScheduledCount = visibleForecasts.length - visibleOverdueCount;
+    const visibleTargetYearCount = targetYear > 0 ? visibleForecasts.filter((item) => Number(item.forecast_year) === targetYear).length : 0;
+    const visibleBeforeTargetYearCount = targetYear > 0 ? visibleForecasts.filter((item) => String(item.category) === "before_target_year").length : 0;
+    const visiblePeriodGroups = Object.values(visibleForecasts.reduce<Record<string, { period_hours: number; count: number }>>((groups, item) => {
+      const key = String(item.period_hours);
+      groups[key] = groups[key] || { period_hours: Number(item.period_hours || 0), count: 0 };
+      groups[key].count += 1;
+      return groups;
+    }, {})).sort((a, b) => a.period_hours - b.period_hours);
     return <div className="mt-3 grid gap-2">
       <div className={`grid grid-cols-2 gap-1.5 ${targetYear > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
-        <div className="rounded-lg border border-red/25 bg-red/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Tamamlanmamış</div><div className="mt-1 font-mono text-base font-bold text-red">{overdueCount}</div></div>
+        <div className="rounded-lg border border-red/25 bg-red/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Tamamlanmamış</div><div className="mt-1 font-mono text-base font-bold text-red">{visibleOverdueCount}</div></div>
         {targetYear > 0 ? <>
-          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Hedef yıl</div><div className="mt-1 font-mono text-base font-bold text-amber">{targetYearCount}</div></div>
-          <div className="rounded-lg border border-teal/25 bg-teal/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Öncesi</div><div className="mt-1 font-mono text-base font-bold text-teal">{beforeTargetYearCount}</div></div>
-          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif plan</div><div className="mt-1 font-mono text-base font-bold text-text">{scheduledCount}</div></div>
+          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Hedef yıl</div><div className="mt-1 font-mono text-base font-bold text-amber">{visibleTargetYearCount}</div></div>
+          <div className="rounded-lg border border-teal/25 bg-teal/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Öncesi</div><div className="mt-1 font-mono text-base font-bold text-teal">{visibleBeforeTargetYearCount}</div></div>
+          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif plan</div><div className="mt-1 font-mono text-base font-bold text-text">{visibleScheduledCount}</div></div>
         </> : <>
-          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">{periodHours ? `${periodHours.toLocaleString("tr-TR")} saatlik toplam` : "Toplam plan"}</div><div className="mt-1 font-mono text-base font-bold text-amber">{totalCount}</div></div>
-          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif tahmin</div><div className="mt-1 font-mono text-base font-bold text-text">{scheduledCount}</div></div>
+          <div className="rounded-lg border border-amber/25 bg-amber/5 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">{periodHours ? `${periodHours.toLocaleString("tr-TR")} saatlik toplam` : "Toplam plan"}</div><div className="mt-1 font-mono text-base font-bold text-amber">{visibleForecasts.length}</div></div>
+          <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif tahmin</div><div className="mt-1 font-mono text-base font-bold text-text">{visibleScheduledCount}</div></div>
         </>}
       </div>
-      {periodGroups.length > 0 && <div className="flex flex-wrap gap-1.5"><span className="self-center text-[9px] font-bold uppercase tracking-wide text-faint">Periyotlar:</span>{periodGroups.map((group) => <span key={String(group.period_hours)} className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] text-muted">{Number(group.period_hours || 0).toLocaleString("tr-TR")} saat · {Number(group.count || 0)} bakım</span>)}</div>}
+      {visiblePeriodGroups.length > 0 && <div className="flex flex-wrap gap-1.5"><span className="self-center text-[9px] font-bold uppercase tracking-wide text-faint">Periyotlar:</span>{visiblePeriodGroups.map((group) => <span key={String(group.period_hours)} className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] text-muted">{Number(group.period_hours || 0).toLocaleString("tr-TR")} saat · {Number(group.count || 0)} bakım</span>)}</div>}
+      {forecastTypeOptions.length > 0 && onForecastExcludedTypesChange && <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Rapor dışında bırakılacak bakım türleri</div><div className="flex flex-wrap gap-x-3 gap-y-1.5">{forecastTypeOptions.map((type) => <label key={type} className="flex items-center gap-1.5 text-[10px] text-muted"><input type="checkbox" checked={excludedTypeLabels.some((excluded) => excluded.localeCompare(type, "tr", { sensitivity: "base" }) === 0)} onChange={(event) => { const next = event.target.checked ? [...excludedTypeLabels, type] : excludedTypeLabels.filter((excluded) => excluded.localeCompare(type, "tr", { sensitivity: "base" }) !== 0); onForecastExcludedTypesChange([...new Set(next)]); }} />{type}</label>)}</div><div className="mt-1.5 text-[9px] text-faint">Seçtiğin türler hem ekrandaki listeden hem de indirilen PDF/Excel raporundan çıkarılır.</div></div>}
       <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[9.5px] leading-4 text-faint">Tahmin, mevcut motor saati ve bakım periyoduna göre yapılır. Uygulamadaki varsayım: motor günde 24 saat çalışır; gerçek çalışma planı değişirse tarih de değişir. Gecikmiş kayıtlar hedef yıldan bağımsız olarak listenin başında tutulur.</div>
+      {visibleForecasts.length === 0 && <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10px] text-muted">Seçilen filtrelerle gösterilecek tahmini bakım bulunamadı.</div>}
       <div className="grid gap-1.5">{visibleForecasts.map((item) => {
         const category = String(item.category || "target_year");
         const overdue = category === "overdue";
@@ -412,6 +434,14 @@ export default function AssistantPage() {
     setQuestion((current) => current || initialQuestion);
   }, [initialQuestion, loading, shouldAutoSend, user]);
 
+  function updateForecastExcludedTypes(messageId: string, excludedTypes: string[]) {
+    setMessages((current) => current.map((message) => {
+      if (message.id !== messageId || !message.data || message.intent !== "maintenance_forecast") return message;
+      const nextData = { ...message.data, excluded_type_labels: [...new Set(excludedTypes)] };
+      return { ...message, data: nextData, exportQuery: buildExportQuery(message.intent, message.period, message.dateRange, nextData) };
+    }));
+  }
+
   async function ask(value: string) {
     const nextQuestion = value.trim();
     if (!nextQuestion || !canAsk) return;
@@ -450,5 +480,5 @@ export default function AssistantPage() {
 
   if (loading) return <div className="min-h-screen bg-bg p-4 text-sm text-muted">Bakım Asistanı yükleniyor...</div>;
 
-  return <div className="min-h-screen pb-20"><TopBar title="Bakım Asistanı" subtitle="Salt okunur rapor yardımcısı" /><main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4"><div className="rounded-card border border-amber/30 bg-gradient-to-br from-panel to-panel2 p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-base font-extrabold text-text">Raporlarını sor</div><p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Asistan yalnızca AGM Bakım’daki rapor ve bakım verilerini okur. Kayıt oluşturmaz, düzenlemez, silmez ve teknisyen atamaz.</p></div><span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2.5 py-1 text-[9px] font-bold text-green">SALT OKUNUR</span></div></div><section aria-label="Hızlı sorular"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Hızlı sorular</div><div className="flex gap-2 overflow-x-auto pb-1">{QUICK_QUESTIONS.map((item) => <button key={item} type="button" onClick={() => void ask(item)} disabled={!canAsk} className="flex-shrink-0 rounded-full border border-border bg-panel px-3 py-2 text-[10px] font-semibold text-muted transition hover:border-amber/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">{item}</button>)}</div></section><section aria-label="Asistan konuşması" className="flex flex-col gap-3">{messages.map((message) => <div key={message.id} id={message.id} className={`scroll-mt-24 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`w-full max-w-3xl rounded-card border p-3.5 ${message.role === "user" ? "border-amber/30 bg-amber/10 sm:max-w-xl" : message.error ? "border-red/30 bg-red/5" : "border-border bg-panel"}`}><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{message.role === "user" ? "Sen" : message.title || "Bakım Asistanı"}</div>{message.role === "assistant" && message.intent && <span className="text-[9px] text-faint">{message.dateRange ? `${formatDateOnly(message.dateRange.from)} – ${formatDateOnly(message.dateRange.to)}` : message.period === "month" ? "Bu ay" : message.period === "3months" ? "Son 3 ay" : message.period === "year" ? "Bu yıl" : "Tümü"}</span>}</div><div className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-text">{message.text}</div>{message.data && message.intent && <AppliedFilters data={message.data} dateRange={message.dateRange} />}{message.data && message.intent && <ResultDetails data={message.data} intent={message.intent} />}{message.role === "assistant" && message.intent && detailHref(message.intent) && <Link href={detailHref(message.intent)!} className="mt-3 inline-flex text-[10px] font-bold text-amber hover:underline">Detay raporunu aç →</Link>}{message.role === "assistant" && message.exportQuery && Object.keys(message.exportQuery).length > 0 && <ExportActions exportQuery={message.exportQuery} />}{message.generatedAt && <div className="mt-2 text-[9px] text-faint">Rapor verisi: {formatDate(message.generatedAt)}</div>}</div></div>)}{sending && <div className="flex justify-start"><div className="rounded-card border border-border bg-panel px-3.5 py-3 text-[11px] text-muted">Raporlar okunuyor...</div></div>}</section><form onSubmit={submit} className="sticky bottom-16 z-10 rounded-card border border-border bg-bg/95 p-2 shadow-xl backdrop-blur"><div className="flex gap-2"><VoiceInputButton disabled={!canAsk} onTranscript={(text) => setQuestion((current) => `${current.trim()}${current.trim() ? " " : ""}${text.trim()}`.slice(0, 300))} /><input value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={handleKeyDown} maxLength={300} disabled={!canAsk} placeholder="Örn. Bu ay kaç bakım yapıldı?" aria-label="Bakım asistanına soru yazın" className="min-w-0 flex-1 rounded-xl border border-border bg-panel px-3 py-2.5 text-[12px] text-text outline-none placeholder:text-faint focus:border-amber/60" /><button type="submit" disabled={!canAsk || !question.trim()} className="rounded-xl bg-amber px-4 py-2.5 text-[11px] font-bold text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">{sending ? "..." : "Sor"}</button></div><div className="mt-1 px-1 text-right text-[9px] text-faint">{question.length}/300 · Yalnızca rapor okuma</div></form></main><BottomNav /></div>;
+  return <div className="min-h-screen pb-20"><TopBar title="Bakım Asistanı" subtitle="Salt okunur rapor yardımcısı" /><main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4"><div className="rounded-card border border-amber/30 bg-gradient-to-br from-panel to-panel2 p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-base font-extrabold text-text">Raporlarını sor</div><p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Asistan yalnızca AGM Bakım’daki rapor ve bakım verilerini okur. Kayıt oluşturmaz, düzenlemez, silmez ve teknisyen atamaz.</p></div><span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2.5 py-1 text-[9px] font-bold text-green">SALT OKUNUR</span></div></div><section aria-label="Hızlı sorular"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Hızlı sorular</div><div className="flex gap-2 overflow-x-auto pb-1">{QUICK_QUESTIONS.map((item) => <button key={item} type="button" onClick={() => void ask(item)} disabled={!canAsk} className="flex-shrink-0 rounded-full border border-border bg-panel px-3 py-2 text-[10px] font-semibold text-muted transition hover:border-amber/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">{item}</button>)}</div></section><section aria-label="Asistan konuşması" className="flex flex-col gap-3">{messages.map((message) => <div key={message.id} id={message.id} className={`scroll-mt-24 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`w-full max-w-3xl rounded-card border p-3.5 ${message.role === "user" ? "border-amber/30 bg-amber/10 sm:max-w-xl" : message.error ? "border-red/30 bg-red/5" : "border-border bg-panel"}`}><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">{message.role === "user" ? "Sen" : message.title || "Bakım Asistanı"}</div>{message.role === "assistant" && message.intent && <span className="text-[9px] text-faint">{message.dateRange ? `${formatDateOnly(message.dateRange.from)} – ${formatDateOnly(message.dateRange.to)}` : message.period === "month" ? "Bu ay" : message.period === "3months" ? "Son 3 ay" : message.period === "year" ? "Bu yıl" : "Tümü"}</span>}</div><div className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-text">{message.text}</div>{message.data && message.intent && <AppliedFilters data={message.data} dateRange={message.dateRange} />}{message.data && message.intent && <ResultDetails data={message.data} intent={message.intent} onForecastExcludedTypesChange={message.intent === "maintenance_forecast" ? (excludedTypes) => updateForecastExcludedTypes(message.id, excludedTypes) : undefined} />}{message.role === "assistant" && message.intent && detailHref(message.intent) && <Link href={detailHref(message.intent)!} className="mt-3 inline-flex text-[10px] font-bold text-amber hover:underline">Detay raporunu aç →</Link>}{message.role === "assistant" && message.exportQuery && Object.keys(message.exportQuery).length > 0 && <ExportActions exportQuery={message.exportQuery} />}{message.generatedAt && <div className="mt-2 text-[9px] text-faint">Rapor verisi: {formatDate(message.generatedAt)}</div>}</div></div>)}{sending && <div className="flex justify-start"><div className="rounded-card border border-border bg-panel px-3.5 py-3 text-[11px] text-muted">Raporlar okunuyor...</div></div>}</section><form onSubmit={submit} className="sticky bottom-16 z-10 rounded-card border border-border bg-bg/95 p-2 shadow-xl backdrop-blur"><div className="flex gap-2"><VoiceInputButton disabled={!canAsk} onTranscript={(text) => setQuestion((current) => `${current.trim()}${current.trim() ? " " : ""}${text.trim()}`.slice(0, 300))} /><input value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={handleKeyDown} maxLength={300} disabled={!canAsk} placeholder="Örn. Bu ay kaç bakım yapıldı?" aria-label="Bakım asistanına soru yazın" className="min-w-0 flex-1 rounded-xl border border-border bg-panel px-3 py-2.5 text-[12px] text-text outline-none placeholder:text-faint focus:border-amber/60" /><button type="submit" disabled={!canAsk || !question.trim()} className="rounded-xl bg-amber px-4 py-2.5 text-[11px] font-bold text-bg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">{sending ? "..." : "Sor"}</button></div><div className="mt-1 px-1 text-right text-[9px] text-faint">{question.length}/300 · Yalnızca rapor okuma</div></form></main><BottomNav /></div>;
 }

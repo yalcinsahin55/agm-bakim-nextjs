@@ -11,6 +11,7 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
+import { buildForecastExportContext, forecastExportTitle, type ForecastExportContext } from "@/lib/forecastExport";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,99 @@ function pdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   });
 }
 
+function safeFilenamePart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "rapor";
+}
+
+async function createForecastPdf(user: { full_name?: string | null }, context: ForecastExportContext): Promise<Response> {
+  const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
+  const boldFont = path.join(process.cwd(), "public/fonts/agm-noto-sans-bold.ttf");
+  const hasFonts = fs.existsSync(regularFont) && fs.existsSync(boldFont);
+  const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 30, right: 30 }, autoFirstPage: true });
+  const fontRegular = hasFonts ? regularFont : "Helvetica";
+  const fontBold = hasFonts ? boldFont : "Helvetica-Bold";
+  const left = doc.page.margins.left;
+  const columnWidths = [58, 86, 55, 55, 48, 56, 70, 65];
+  const columnLabels = ["Motor", "Bakım Türü", "Periyot", "Motor Saati", "Son Bakım", "Kalan/Gecikme", "Tahmini Tarih", "Durum"];
+  const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+  const title = forecastExportTitle(context);
+  const excluded = context.excludedTypeLabels.length ? context.excludedTypeLabels.join(", ") : "Yok";
+
+  function pageHeading() {
+    doc.font(fontBold).fontSize(14).fillColor("#111827").text("Avcıkoru Santrali Bakım Merkezi", left, 30, { width: tableWidth });
+    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(title, left, 50, { width: tableWidth });
+    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleDateString("tr-TR")} · Satır: ${context.rows.length}${context.targetYear ? ` · Hedef yıl: ${context.targetYear}` : ""}${context.periodHours ? ` · Periyot: ${context.periodHours.toLocaleString("tr-TR")} saat` : ""}`, left, 67, { width: tableWidth });
+    doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Tamamlanmamış: ${context.summary.overdue_count} · Aktif plan: ${context.summary.scheduled_count} · Hariç tutulan bakım türleri: ${excluded}`, left, 79, { width: tableWidth });
+    doc.moveTo(left, 94).lineTo(left + tableWidth, 94).strokeColor("#9ca3af").lineWidth(0.7).stroke();
+    doc.y = 106;
+  }
+
+  function tableHeading() {
+    const top = doc.y;
+    doc.rect(left, top, tableWidth, 22).fill("#e5e7eb");
+    let x = left;
+    columnLabels.forEach((label, index) => {
+      doc.font(fontBold).fontSize(7.1).fillColor("#1f2937").text(label, x + 3, top + 7, { width: columnWidths[index] - 6, lineBreak: false });
+      x += columnWidths[index];
+    });
+    doc.y = top + 22;
+  }
+
+  function drawRow(values: string[], shaded: boolean) {
+    const availableHeights = values.map((value, index) => doc.heightOfString(value || "—", { width: columnWidths[index] - 6, lineGap: 1 }));
+    const rowHeight = Math.max(24, Math.min(62, Math.max(...availableHeights) + 10));
+    if (doc.y + rowHeight > doc.page.height - doc.page.margins.bottom - 14) {
+      doc.addPage();
+      pageHeading();
+      tableHeading();
+    }
+    const top = doc.y;
+    if (shaded) doc.rect(left, top, tableWidth, rowHeight).fill("#f9fafb");
+    let x = left;
+    values.forEach((value, index) => {
+      doc.font(fontRegular).fontSize(7.2).fillColor("#111827").text(value || "—", x + 3, top + 5, { width: columnWidths[index] - 6, height: rowHeight - 7, lineGap: 1, ellipsis: true });
+      x += columnWidths[index];
+    });
+    doc.moveTo(left, top + rowHeight).lineTo(left + tableWidth, top + rowHeight).strokeColor("#d1d5db").lineWidth(0.35).stroke();
+    doc.y = top + rowHeight;
+  }
+
+  pageHeading();
+  if (context.rows.length === 0) {
+    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text("Seçilen tahmin filtrelerine uygun bakım bulunamadı.", left, doc.y + 12);
+  } else {
+    tableHeading();
+    context.rows.forEach((row, index) => {
+      const category = row.category === "overdue" ? "Tamamlanmamış" : row.category === "before_target_year" ? "Hedef yıldan önce" : context.targetYear ? `${row.forecast_year} planı` : "Tahmini plan";
+      const remaining = row.category === "overdue" ? `${row.overdue_hours.toLocaleString("tr-TR")} saat gecikmiş` : `${row.remaining_hours.toLocaleString("tr-TR")} saat kaldı`;
+      drawRow([
+        row.engine,
+        row.type,
+        `${row.period_hours.toLocaleString("tr-TR")} saat`,
+        row.current_hours.toLocaleString("tr-TR"),
+        row.last_maintenance_hours.toLocaleString("tr-TR"),
+        remaining,
+        row.category === "overdue" ? "—" : row.estimated_date_label,
+        category,
+      ], index % 2 === 1);
+    });
+  }
+
+  doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Varsayım: motor günde 24 saat çalışır. Oluşturan: ${user.full_name || "AGM Bakım Merkezi"}`, left, doc.page.height - 28, { width: tableWidth, align: "left" });
+  const buffer = await pdfBuffer(doc);
+  const suffix = context.periodHours ? `${context.periodHours}h` : context.targetYear ? String(context.targetYear) : "plan";
+  const filename = `AGM_Bakim_Tahmin_Plani_${safeFilenamePart(suffix)}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  return new Response(new Blob([buffer as unknown as BlobPart], { type: "application/pdf" }), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 async function createPdf(req: NextRequest) {
   const db = await getDb();
   await ensureAppIndexes(db);
@@ -39,6 +133,9 @@ async function createPdf(req: NextRequest) {
   if (rateLimited) return rateLimited;
 
   const { searchParams } = new URL(req.url);
+  if (searchParams.get("forecast") === "1") {
+    return createForecastPdf(user, await buildForecastExportContext(db, searchParams));
+  }
   const engineFilter = searchParams.get("engine_id");
   const query = await buildMaintenanceRecordQuery(db, searchParams);
 

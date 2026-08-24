@@ -12,6 +12,7 @@ import { escapeSpreadsheetRows } from "@/lib/spreadsheetSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { addRows } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
+import { buildForecastExportContext, forecastExportTitle, type ForecastExportContext } from "@/lib/forecastExport";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,67 @@ function uniqueSheetName(label: string, used: Set<string>): string {
   return name;
 }
 
+async function createForecastExcel(context: ForecastExportContext): Promise<Response> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "AGM Bakım Merkezi";
+  workbook.created = new Date();
+  const usedSheetNames = new Set<string>();
+  const addDataSheet = (name: string, rows: Record<string, unknown>[]) => {
+    const worksheet = workbook.addWorksheet(uniqueSheetName(name, usedSheetNames));
+    addRows(worksheet, escapeSpreadsheetRows(rows));
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
+    worksheet.autoFilter = { from: "A1", to: `${String.fromCharCode(64 + Math.min(26, Object.keys(rows[0] || {}).length))}${Math.max(1, rows.length + 1)}` };
+  };
+
+  const summary = context.summary;
+  addDataSheet("Rapor Özeti", [
+    { "ALAN": "Rapor", "DEĞER": forecastExportTitle(context) },
+    { "ALAN": "Rapor tarihi", "DEĞER": new Date().toLocaleDateString("tr-TR") },
+    { "ALAN": "Hesaplama tarihi", "DEĞER": summary.current_date },
+    { "ALAN": "Hedef yıl", "DEĞER": context.targetYear || "Belirtilmedi" },
+    { "ALAN": "Periyot filtresi", "DEĞER": context.periodHours ? `${context.periodHours.toLocaleString("tr-TR")} saat` : "Tümü" },
+    { "ALAN": "Toplam satır", "DEĞER": summary.total },
+    { "ALAN": "Tamamlanmamış/gecikmiş", "DEĞER": summary.overdue_count },
+    { "ALAN": "Aktif tahmini plan", "DEĞER": summary.scheduled_count },
+    { "ALAN": "Hedef yıldan önce", "DEĞER": summary.before_target_year_count },
+    { "ALAN": "Hedef yıl içi", "DEĞER": summary.target_year_count },
+    { "ALAN": "Hariç tutulan bakım türleri", "DEĞER": context.excludedTypeLabels.length ? context.excludedTypeLabels.join(", ") : "Yok" },
+    { "ALAN": "Hesaplama varsayımı", "DEĞER": "Motor günde 24 saat çalışır; kalan saat / 24 = yaklaşık gün" },
+  ]);
+
+  addDataSheet("Tahmini Bakım Planı", context.rows.map((row) => ({
+    "MOTOR": row.engine,
+    "BAKIM TÜRÜ": row.type,
+    "PERİYOT SAATİ": row.period_hours,
+    "MOTOR SAATİ": row.current_hours,
+    "SON BAKIM SAATİ": row.last_maintenance_hours,
+    "KALAN SAAT": row.category === "overdue" ? 0 : row.remaining_hours,
+    "GECİKME SAATİ": row.overdue_hours,
+    "TAHMİNİ TARİH": row.category === "overdue" ? "Tamamlanmamış" : row.estimated_date_label,
+    "TAHMİN YILI": row.forecast_year,
+    "DURUM": row.category === "overdue" ? "Tamamlanmamış" : row.category === "before_target_year" ? "Hedef yıldan önce" : row.category === "target_year" ? "Hedef yıl" : "Tahmini plan",
+    "GÜNCEL DURUM": row.status_label,
+  })));
+
+  addDataSheet("Periyot Özeti", summary.grouped_by_period.map((group) => ({
+    "PERİYOT SAATİ": group.period_hours,
+    "BAKIM SAYISI": group.count,
+  })));
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const suffix = context.periodHours ? `${context.periodHours}h` : context.targetYear ? String(context.targetYear) : "plan";
+  const filename = `AGM_Bakim_Tahmin_Plani_${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  return new Response(Buffer.from(buffer as ArrayBuffer), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 async function getExcelExport(req: NextRequest) {
   const db = await getDb();
   const usersCol = usersCollection(db);
@@ -38,6 +100,9 @@ async function getExcelExport(req: NextRequest) {
   if (rateLimited) return rateLimited;
 
   const { searchParams } = new URL(req.url);
+  if (searchParams.get("forecast") === "1") {
+    return createForecastExcel(await buildForecastExportContext(db, searchParams));
+  }
   const engineFilter = searchParams.get("engine_id");
   const typeFilter = searchParams.get("type_label");
   const recordQuery = await buildMaintenanceRecordQuery(db, searchParams);
