@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -86,29 +87,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function deleteUser(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { db, usersCol, user, response } = await getAuthorizedAdmin(req);
   if (response) return response;
-  const rateLimited = await enforceApiRateLimit(req, "user-deactivate", 20, 10 * 60 * 1000, user._id);
+  const rateLimited = await enforceApiRateLimit(req, "user-delete", 20, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
-  if (user._id === id) return NextResponse.json({ error: "Kendi hesabınızı pasifleştiremezsiniz." }, { status: 400 });
+  if (user._id === id) return NextResponse.json({ error: "Kendi hesabınızı silemezsiniz." }, { status: 400 });
+
+  const body: unknown = await req.json().catch(() => ({}));
+  const confirmation = body && typeof body === "object" && !Array.isArray(body)
+    ? (body as { confirm?: unknown }).confirm
+    : undefined;
+  if (confirmation !== "DELETE") {
+    return NextResponse.json({ error: "Kalıcı silme için DELETE onayı gereklidir." }, { status: 400 });
+  }
 
   const before = await usersCol.findOne({ _id: id }, { projection: { password_hash: 0 } });
   if (!before) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
-  const result = await usersCol.updateOne(
-    { _id: id },
-    { $set: { active: false, approved: false, deactivated_at: new Date(), deactivated_by: user._id } },
-  );
-  if (result.matchedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+
+  if (normalizeRole(before.role) === "yonetici") {
+    const remainingActiveManagers = await usersCol.countDocuments({
+      _id: { $ne: id },
+      role: "yonetici",
+      active: { $ne: false },
+      approved: { $ne: false },
+    });
+    if (remainingActiveManagers === 0) {
+      return NextResponse.json({ error: "Sistemde en az bir aktif yönetici hesabı kalmalıdır." }, { status: 400 });
+    }
+  }
+
+  const deletedAt = new Date();
+  const result = await usersCol.deleteOne({ _id: id });
+  if (result.deletedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
   await writeAuditLog(db, {
     user,
-    action: "update",
+    action: "delete",
     entity: "user",
     entityId: id,
-    summary: `${before.full_name || "Kullanıcı"} hesabı pasifleştirildi; geçmiş bakım kayıtları korundu.`,
+    summary: `${before.full_name || "Kullanıcı"} hesabı kalıcı olarak silindi; geçmiş bakım kayıtları korundu.`,
     before,
-    after: { active: false, approved: false, deactivated_at: new Date() },
+    after: { deleted: true, deleted_at: deletedAt },
   });
-  return NextResponse.json({ ok: true, deactivated: true });
+  return NextResponse.json({ ok: true, deleted: true });
+}
+
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withApiTiming("DELETE /api/users/[id]", () => deleteUser(req, context), { request: req });
 }

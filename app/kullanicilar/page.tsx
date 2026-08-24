@@ -123,18 +123,22 @@ export default function KullanicilarPage() {
     }
   }
 
-  async function deactivateUser(u) {
-    const loadingToast = toast.loading("Kullanıcı pasifleştiriliyor...");
+  async function deleteUser(u) {
+    const loadingToast = toast.loading("Kullanıcı kalıcı olarak siliniyor...");
     try {
-      const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.dismiss(loadingToast);
-        toast.error(data.error || "Kullanıcı pasifleştirilemedi.");
+        toast.error(data.error || "Kullanıcı silinemedi.");
         return;
       }
       toast.dismiss(loadingToast);
-      toast.success("Kullanıcı pasifleştirildi; bakım geçmişi korundu.");
+      toast.success("Kullanıcı kalıcı olarak silindi; bakım geçmişi korundu.");
       setConfirmDeleteId(null);
       load();
     } catch {
@@ -296,14 +300,14 @@ export default function KullanicilarPage() {
                   Aktif
                 </label>
                 {u.id === currentUser?.id ? (
-                  <button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Pasifleştir</button>
+                  <button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Silinemez</button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <button onClick={() => deactivateUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet</button>
+                    <button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</button>
                     <button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</button>
                   </>
                 ) : (
-                  <button onClick={() => setConfirmDeleteId(u.id)} className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition sm:w-auto">Pasifleştir</button>
+                  <button onClick={() => setConfirmDeleteId(u.id)} title="Bu kullanıcıyı kalıcı olarak sil" className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition sm:w-auto">Kalıcı sil</button>
                 )}
               </div>
             </div>
