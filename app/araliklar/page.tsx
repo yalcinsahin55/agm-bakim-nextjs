@@ -39,18 +39,56 @@ interface GroupDetails {
   totalPages: number;
 }
 
+interface EngineSummary {
+  _id: string;
+  name: string;
+  maintenance_count?: number;
+}
+
+function formatDate(value: string | Date | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("tr-TR");
+}
+
+function formatDateTime(value: string | Date | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function latestDate(groups: SummaryGroup[]): string {
+  const latest = groups
+    .map((group) => new Date(group.last?.created_at).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((a, b) => b - a)[0];
+  return latest ? formatDate(new Date(latest)) : "—";
+}
+
 export default function AraliklarPage() {
   const router = useRouter();
   const [groups, setGroups] = useState<SummaryGroup[]>([]);
+  const [engines, setEngines] = useState<EngineSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [engineFilter, setEngineFilter] = useState("Tümü");
+  const [engineFilter, setEngineFilter] = useState("");
+  const [engineSearch, setEngineSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("Tümü");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, GroupDetails>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    cachedFetch<{ groups: SummaryGroup[] }>("/api/records/interval-summary", 15_000)
-      .then((data) => setGroups(data.groups || []))
+    Promise.all([
+      cachedFetch<{ groups: SummaryGroup[] }>("/api/records/interval-summary", 15_000),
+      cachedFetch<EngineSummary[]>("/api/engines?include_maintenance_counts=true", 15_000),
+    ])
+      .then(([summary, engineData]) => {
+        const loadedGroups = Array.isArray(summary.groups) ? summary.groups : [];
+        const loadedEngines = Array.isArray(engineData) ? engineData : [];
+        setGroups(loadedGroups);
+        setEngines(loadedEngines);
+        setEngineFilter(loadedEngines[0]?.name || "");
+      })
       .catch((error) => {
         if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       })
@@ -96,85 +134,87 @@ export default function AraliklarPage() {
     () => [...groups].sort((a, b) => engineSortKey(a.engine_name) - engineSortKey(b.engine_name) || a.type_label.localeCompare(b.type_label, "tr")),
     [groups],
   );
-  const engineNames = useMemo(
-    () => Array.from(new Set(groups.map((group) => group.engine_name))).sort((a, b) => engineSortKey(a) - engineSortKey(b)),
+  const sortedEngines = useMemo(
+    () => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name) || a.name.localeCompare(b.name, "tr")),
+    [engines],
+  );
+  const visibleEngines = useMemo(() => {
+    const search = engineSearch.trim().toLocaleLowerCase("tr-TR");
+    return search ? sortedEngines.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(search)) : sortedEngines;
+  }, [engineSearch, sortedEngines]);
+  const typeNames = useMemo(
+    () => Array.from(new Set(groups.map((group) => group.type_label))).sort((a, b) => a.localeCompare(b, "tr")),
     [groups],
   );
-  const filteredGroups = engineFilter === "Tümü" ? sortedGroups : sortedGroups.filter((group) => group.engine_name === engineFilter);
+  const filteredGroups = useMemo(
+    () => sortedGroups.filter((group) => (!engineFilter || group.engine_name === engineFilter) && (typeFilter === "Tümü" || group.type_label === typeFilter)),
+    [engineFilter, sortedGroups, typeFilter],
+  );
+  const selectedEngine = sortedEngines.find((engine) => engine.name === engineFilter);
+  const selectedRecordTotal = filteredGroups.reduce((total, group) => total + Number(group.count || 0), 0);
+  const selectedGroupCount = filteredGroups.length;
 
   if (loading) {
     return (
-      <div>
-        <TopBar title="Bakım Aralıkları" />
-        <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-4" />
-          <div className="flex flex-col gap-3"><Skeleton className="h-40 rounded-card" /><Skeleton className="h-40 rounded-card" /></div>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
-  if (groups.length === 0) {
-    return (
-      <div>
-        <TopBar title="Bakım Aralıkları" />
-        <div className="px-4 py-4">
-          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">⏱️</div>
-            <p className="text-sm text-muted">Henüz tamamlanmış bakım yok.</p>
-            <p className="text-xs text-faint mt-1">İlk bakımı kaydettiğinizde burada birikmeye başlayacak.</p>
+      <div className="min-h-screen pb-20">
+        <TopBar title="Bakım Aralıkları" subtitle="Motor bakım geçmişi ve periyot analizi" />
+        <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
+          <div className="grid gap-3 xl:grid-cols-[minmax(330px,0.34fr)_minmax(0,0.66fr)]">
+            <Skeleton className="min-h-[520px] rounded-2xl" />
+            <Skeleton className="min-h-[520px] rounded-2xl" />
           </div>
-        </div>
+        </main>
         <BottomNav />
       </div>
     );
   }
 
   return (
-    <div>
-      <TopBar title="Bakım Aralıkları" subtitle={`${filteredGroups.length} grup listeleniyor`} />
-      <div className="px-4 py-4">
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
-          <button onClick={() => setEngineFilter("Tümü")} className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${engineFilter === "Tümü" ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text"}`}>Tüm Motorlar</button>
-          {engineNames.map((name) => <button key={name} onClick={() => setEngineFilter(name)} className={`flex-shrink-0 px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${engineFilter === name ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text"}`}>{name}</button>)}
+    <div className="min-h-screen pb-20">
+      <TopBar title="Bakım Aralıkları" subtitle={`${sortedEngines.length} motor · ${filteredGroups.length} bakım grubu listeleniyor`} />
+      <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
+        <div className="mb-4 flex flex-col justify-between gap-3 border-b border-border pb-4 lg:flex-row lg:items-end">
+          <div>
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Kayıt analizi</div>
+            <h1 className="text-xl font-extrabold tracking-tight text-text md:text-2xl">Bakım aralıklarını incele</h1>
+            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Tüm motorları tek ekranda seçin; seçilen motorun bakım gruplarını, kayıt sayılarını ve saat farklarını hemen görüntüleyin.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label className="sr-only" htmlFor="engine-search">Motor ara</label>
+            <input id="engine-search" value={engineSearch} onChange={(event) => setEngineSearch(event.target.value)} placeholder="Motor ara..." className="w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text outline-none focus:border-amber sm:w-40" />
+            <label className="sr-only" htmlFor="type-filter">Bakım türü filtrele</label>
+            <select id="type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text outline-none focus:border-amber">
+              <option value="Tümü">Bakım türü: Tümü</option>
+              {typeNames.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+            <button type="button" onClick={() => { setEngineFilter(""); setTypeFilter("Tümü"); }} className={`rounded-lg border px-3 py-2.5 text-[11px] font-bold transition ${!engineFilter && typeFilter === "Tümü" ? "border-amber bg-amber text-[#161006]" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-text"}`}>Tüm motorlar</button>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          {filteredGroups.map((group) => {
-            const groupDetails = details[group.key];
-            const expanded = expandedKey === group.key;
-            const entries = groupDetails?.records || [];
-            return (
-              <section key={group.key} className="bg-panel border border-border rounded-card overflow-hidden hover:border-borderlt transition-all animate-fade-in">
-                <button type="button" onClick={() => toggleGroup(group)} className="w-full text-left flex items-center justify-between gap-2 p-3 bg-panel2 border-b border-border">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <EngineBadge name={group.engine_name} size={26} />
-                    <div className="min-w-0"><div className="text-[12.5px] font-bold text-text truncate">{group.type_label}</div><div className="text-[10.5px] text-faint">{group.engine_name} · {group.count} kayıt</div></div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {group.average_interval !== null && <div className="text-right"><div className="font-mono text-[14px] font-bold text-amber">{group.average_interval.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} sa</div><div className="text-[8.5px] text-faint uppercase">Ortalama</div></div>}
-                    <span className="text-muted text-sm" aria-hidden="true">{expanded ? "⌃" : "⌄"}</span>
-                  </div>
-                </button>
+        <div className="grid gap-3 xl:grid-cols-[minmax(330px,0.34fr)_minmax(0,0.66fr)]">
+          <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="engine-list-heading">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">Motor seçimi</div><h2 id="engine-list-heading" className="mt-1 text-base font-extrabold text-text">Motorlar</h2><p className="mt-1 text-[10px] text-muted">{visibleEngines.length} / {sortedEngines.length} motor görünür · seçim için tıklayın</p></div>
+              <span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">PC LİSTESİ</span>
+            </div>
+            {visibleEngines.length > 0 ? <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-5">{visibleEngines.map((engine) => { const selected = engine.name === engineFilter; return <button type="button" key={engine._id} onClick={() => { setEngineFilter(engine.name); setExpandedKey(null); }} className={`min-w-0 rounded-lg border px-1.5 py-2 text-center transition ${selected ? "border-amber bg-amber/10 text-amber" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-text"}`} aria-pressed={selected}><span className="block truncate text-[10.5px] font-bold">{engine.name}</span><span className={`mt-0.5 block text-[8.5px] ${selected ? "text-amber/80" : "text-faint"}`}>{Number(engine.maintenance_count || 0)} kayıt</span></button>; })}</div> : <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-[10.5px] text-muted">Aramanızla eşleşen motor bulunamadı.</div>}
+            {engineSearch && <button type="button" onClick={() => setEngineSearch("")} className="mt-3 text-[10px] font-bold text-amber hover:underline">Tüm motorları göster →</button>}
+          </section>
 
-                {!expanded && <div className="px-3 py-2.5 text-[11px] text-muted">Detay kayıtlarını görmek için grubu açın.</div>}
-                {expanded && detailLoading === group.key && <div className="px-3 py-3 text-[11px] text-muted">Kayıtlar yükleniyor...</div>}
-                {expanded && detailLoading !== group.key && (
-                  <>
-                    {entries.map((entry, index) => {
-                      const previous = index > 0 ? entries[index - 1] : null;
-                      const delta = previous ? entry.hour_at_completion - previous.hour_at_completion : null;
-                      return <div key={entry._id} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-panel2/50 transition-colors"><div className="w-5 h-5 rounded-full bg-green/10 flex items-center justify-center flex-shrink-0"><span className="text-[10px] font-extrabold text-green">{(groupDetails?.page ? (groupDetails.page - 1) * 50 : 0) + index + 1}</span></div><div className="flex-1 text-[11.5px] text-text min-w-0">{new Date(entry.created_at).toLocaleDateString("tr-TR")} · {entry.hour_at_completion.toLocaleString("tr-TR")} sa{entry.technician_name ? ` · ${entry.technician_name}` : ""}</div>{delta === null ? <span className="text-[10.5px] font-bold text-faint">MİLAD</span> : <span className="font-mono text-[12.5px] font-bold text-teal">{delta.toLocaleString("tr-TR")} sa</span>}</div>;
-                    })}
-                    {groupDetails && groupDetails.totalPages > 1 && <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border"><button type="button" disabled={groupDetails.page <= 1} onClick={() => void loadDetails(group, groupDetails.page - 1)} className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted disabled:opacity-40">Önceki</button><span className="text-[11px] text-muted">Sayfa {groupDetails.page} / {groupDetails.totalPages}</span><button type="button" disabled={groupDetails.page >= groupDetails.totalPages} onClick={() => void loadDetails(group, groupDetails.page + 1)} className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted disabled:opacity-40">Sonraki</button></div>}
-                  </>
-                )}
-              </section>
-            );
-          })}
+          <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="selected-engine-heading">
+            <div className="flex flex-col justify-between gap-3 border-b border-border pb-3 sm:flex-row sm:items-start">
+              <div className="flex items-start gap-2.5"><EngineBadge name={selectedEngine?.name || "Tümü"} size={34} /><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">{selectedEngine ? "Seçili motor" : "Tüm motorlar"}</div><h2 id="selected-engine-heading" className="mt-1 text-xl font-extrabold text-text">{selectedEngine?.name || "Tüm Motorlar"}</h2></div></div>
+              <div className="flex gap-2 text-right"><div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[8.5px] uppercase tracking-wide text-faint">Bakım grubu</div><div className="mt-1 font-mono text-base font-bold text-amber">{selectedGroupCount}</div></div><div className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="text-[8.5px] uppercase tracking-wide text-faint">Toplam kayıt</div><div className="mt-1 font-mono text-base font-bold text-amber">{selectedRecordTotal}</div></div><div className="hidden rounded-lg border border-border bg-panel2 px-2.5 py-2 sm:block"><div className="text-[8.5px] uppercase tracking-wide text-faint">Son kayıt</div><div className="mt-1 font-mono text-[11px] font-bold text-teal">{latestDate(filteredGroups)}</div></div></div>
+            </div>
+
+            <div className="mt-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">Bakım aralıkları</div><h3 className="mt-1 text-base font-extrabold text-text">Bakım grupları</h3></div><div className="text-[10px] text-faint">{typeFilter === "Tümü" ? "Tüm bakım türleri" : typeFilter}</div></div>
+            {filteredGroups.length > 0 ? <div className="mt-3 overflow-x-auto rounded-xl border border-border"><div className="min-w-[680px]"><div className="grid grid-cols-[1.5fr_0.55fr_0.8fr_0.8fr_0.8fr] gap-2 bg-panel2 px-3 py-2 text-[9px] font-bold uppercase tracking-wide text-faint"><span>Bakım türü</span><span>Kayıt</span><span>Ortalama aralık</span><span>İlk kayıt</span><span>Son kayıt</span></div>{filteredGroups.map((group) => { const groupDetails = details[group.key]; const expanded = expandedKey === group.key; const entries = groupDetails?.records || []; return <div key={group.key} className="border-t border-border"><button type="button" onClick={() => toggleGroup(group)} className="grid w-full grid-cols-[1.5fr_0.55fr_0.8fr_0.8fr_0.8fr] gap-2 px-3 py-3 text-left transition hover:bg-panel2/70"><span className="min-w-0 truncate text-[10.5px] font-bold text-text">{group.type_label}</span><span className="text-[10px] text-muted">{group.count}</span><span className="font-mono text-[10px] text-amber">{group.average_interval === null ? "—" : `${group.average_interval.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} sa`}</span><span className="text-[10px] text-muted">{formatDate(group.first?.created_at)}</span><span className="flex items-center justify-between gap-2 text-[10px] text-muted"><span>{formatDate(group.last?.created_at)}</span><span className="text-amber">{expanded ? "⌃" : "⌄"}</span></span></button>{expanded && <div className="border-t border-border bg-panel2/40">{detailLoading === group.key ? <div className="px-3 py-3 text-[10.5px] text-muted">Kayıtlar yükleniyor...</div> : entries.length > 0 ? <>{entries.map((entry, index) => { const previous = index > 0 ? entries[index - 1] : null; const delta = previous ? entry.hour_at_completion - previous.hour_at_completion : null; return <div key={entry._id} className="grid grid-cols-[28px_1.2fr_0.8fr_0.8fr] items-center gap-2 border-t border-border/70 px-3 py-2 text-[10px]"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-green/10 font-mono text-[9px] font-bold text-green">{(groupDetails?.page ? (groupDetails.page - 1) * 50 : 0) + index + 1}</span><span className="min-w-0 truncate text-muted">{formatDateTime(entry.created_at)}{entry.technician_name ? ` · ${entry.technician_name}` : ""}</span><span className="font-mono text-text">{entry.hour_at_completion.toLocaleString("tr-TR")} sa</span><span className="text-right font-mono font-bold text-teal">{delta === null ? "MİLAD" : `+${delta.toLocaleString("tr-TR")} sa`}</span></div>; })}{groupDetails && groupDetails.totalPages > 1 && <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2"><button type="button" disabled={groupDetails.page <= 1} onClick={() => void loadDetails(group, groupDetails.page - 1)} className="rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-muted disabled:opacity-40">Önceki</button><span className="text-[10px] text-muted">Sayfa {groupDetails.page} / {groupDetails.totalPages}</span><button type="button" disabled={groupDetails.page >= groupDetails.totalPages} onClick={() => void loadDetails(group, groupDetails.page + 1)} className="rounded-lg border border-border px-3 py-1.5 text-[10px] font-bold text-muted disabled:opacity-40">Sonraki</button></div>}</> : <div className="px-3 py-3 text-[10.5px] text-muted">Bu bakım grubunda görüntülenecek detay kaydı bulunamadı.</div>}</div>}</div>; })}</div></div> : <div className="mt-3 rounded-xl border border-dashed border-border px-3 py-12 text-center"><div className="text-sm font-bold text-muted">Bu seçimle eşleşen bakım aralığı bulunamadı.</div><p className="mt-1 text-[10px] text-faint">Bu motor için henüz tamamlanmış kayıt olmayabilir veya bakım türü filtresini değiştirebilirsiniz.</p></div>}
+            <div className="mt-3 flex items-center justify-between gap-2 text-[10px] text-faint"><span>Bir bakım türünü seçerek kayıt ayrıntılarını ve saat farklarını görüntüleyin.</span><span className="hidden sm:inline">Motor değiştirmek için sol listeden seçim yapın.</span></div>
+          </section>
         </div>
-      </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-border bg-panel px-3 py-2.5 text-[10px] text-muted"><span><b className="text-amber">{selectedEngine?.name || "Tüm motorlar"}</b> seçili</span><span className="hidden sm:inline">Toplam {sortedEngines.length} motor · {groups.length} bakım grubu</span></div>
+      </main>
       <BottomNav />
     </div>
   );

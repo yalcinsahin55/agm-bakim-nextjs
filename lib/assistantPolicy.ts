@@ -476,18 +476,19 @@ function inferIntent(question: string): AssistantIntent {
   if (EQUIPMENT_INFO_PATTERNS.some((pattern) => pattern.test(question))) return "equipment_info";
   if (TECHNICIAN_DIRECTORY_PATTERNS.some((pattern) => pattern.test(question))) return "technician_directory";
   if (NOTIFICATION_PATTERNS.some((pattern) => pattern.test(question))) return "notification_summary";
+  if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
+  const asksForTeam = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question);
+  if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question)) && !EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) && !asksForTeam) return "technician_performance";
+  const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
+    || INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question))
+    || /fotoğraf|fotoğraflı|video|videolu|not\s+içeren|kontrol\s+listesi|\bekip\b/iu.test(question);
+  if (hasCombinedRecordFilter) return "summary";
   if (MAINTENANCE_HEALTH_PATTERNS.some((pattern) => pattern.test(question))) return "maintenance_health";
   const engineQuery = extractEngineQuery(question);
   if (extractMaintenancePeriodHours(question)) return "maintenance_forecast";
   if (ENGINE_DATA_PATTERNS.some((pattern) => pattern.test(question)) && (Boolean(engineQuery) || /\bmotor(?:lar|ların)?\b/iu.test(question))) return "engine_data";
   if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
-  if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
-  if (/(?:\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen)/iu.test(question) && /bakım/iu.test(question)) return "summary";
-  if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question))) return "technician_performance";
-  const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
-    || INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question))
-    || /fotoğraf|fotoğraflı|video|videolu|not\s+içeren|kontrol\s+listesi|\bekip\b/iu.test(question);
-  if (hasCombinedRecordFilter) return "summary";
+  if (asksForTeam && /bakım/iu.test(question)) return "summary";
   if (OVERDUE_PATTERNS.some((pattern) => pattern.test(question))) return "overdue";
   if (engineQuery && ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
   if (SUMMARY_PATTERNS.some((pattern) => pattern.test(question))) return "summary";
