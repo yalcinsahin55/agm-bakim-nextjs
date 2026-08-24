@@ -681,14 +681,12 @@ async function getPressureReadings(db: Db, query: AssistantQuery): Promise<Assis
   if (selectedEngine) match.engine_id = String(selectedEngine._id);
   else if (query.engineQuery) match.engine_id = "__assistant_no_matching_engine__";
   const readings = await pressureReadingsCollection(db).find(match, { projection: { _id: 1, engine_id: 1, engine_name: 1, reading_date: 1, load_kw: 1, pressure_bar: 1, status: 1, new_type: 1, note: 1, created_at: 1 } }).sort({ reading_date: -1, created_at: -1 }).limit(100).toArray();
-  const values = readings.map((reading) => Number(reading.pressure_bar)).filter(Number.isFinite);
-  const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   return {
     intent: "pressure_readings",
     period: query.period,
     title: selectedEngine ? `${selectedEngine.name} karter basınç okumaları` : "Karter basınç okumaları",
-    summary: `${readings.length} basınç ölçümü bulundu${average === null ? "." : `; ortalama basınç ${average.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} bar.`}`,
-    data: { date_range: query.dateRange || null, average_pressure_bar: average, readings: readings.map((reading) => ({ id: String(reading._id), engine_id: reading.engine_id, engine: reading.engine_name, reading_date: formatUnknownDate(reading.reading_date), load_kw: reading.load_kw === null || reading.load_kw === undefined ? null : Number(reading.load_kw), pressure_bar: reading.pressure_bar === null || reading.pressure_bar === undefined ? null : Number(reading.pressure_bar), status: reading.status || null, new_type: reading.new_type === true, note: reading.note || null })) },
+    summary: `${readings.length} basınç ölçümü bulundu.`,
+    data: { date_range: query.dateRange || null, readings: readings.map((reading) => ({ id: String(reading._id), engine_id: reading.engine_id, engine: reading.engine_name, reading_date: formatUnknownDate(reading.reading_date), load_kw: reading.load_kw === null || reading.load_kw === undefined ? null : Number(reading.load_kw), pressure_bar: reading.pressure_bar === null || reading.pressure_bar === undefined ? null : Number(reading.pressure_bar), status: reading.status || null, new_type: reading.new_type === true, note: reading.note || null })) },
   };
 }
 
