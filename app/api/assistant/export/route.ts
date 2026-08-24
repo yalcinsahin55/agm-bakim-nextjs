@@ -1,7 +1,6 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
+import { getPdfFontPaths } from "@/lib/pdfFonts";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -56,7 +55,7 @@ function displayLabel(value: string): string {
 }
 
 const INTENT_ARRAY_KEYS: Record<string, string[]> = {
-  summary: ["by_engine", "by_type"],
+  summary: ["by_engine", "by_type", "daily_records"],
   overdue: ["items"],
   engine_history: ["records"],
   technician_performance: ["activities", "by_type", "by_engine", "technicians"],
@@ -70,6 +69,7 @@ const INTENT_ARRAY_KEYS: Record<string, string[]> = {
   technician_directory: ["technicians"],
   notification_summary: ["notifications"],
   maintenance_health: ["items"],
+  performance_daily: ["performance_daily"],
 };
 
 const INTENT_ARRAY_LABELS: Record<string, string> = {
@@ -86,6 +86,8 @@ const INTENT_ARRAY_LABELS: Record<string, string> = {
   analyses: "Yağ Analizleri",
   infos: "Motor Bilgi Kartları",
   notifications: "Bildirimler",
+  performance_daily: "Günlük Motor Performansı",
+  daily_records: "Gün Gün Yapılan Bakımlar",
 };
 
 function scalarRows(result: AssistantToolResponse): ExportRow[] {
@@ -111,7 +113,9 @@ function scalarRows(result: AssistantToolResponse): ExportRow[] {
 function arraySheets(result: AssistantToolResponse): Array<{ name: string; rows: ExportRow[] }> {
   const keys = result.intent === "technician_performance" && result.data.selected_technician
     ? ["activities", "by_type", "by_engine"]
-    : INTENT_ARRAY_KEYS[result.intent] || [];
+    : result.intent === "engine_data" && result.data.performance_mode === true
+      ? ["performance_daily"]
+      : INTENT_ARRAY_KEYS[result.intent] || [];
   return keys.flatMap((key) => {
     const value = result.data[key];
     if (!Array.isArray(value) || value.length === 0) return [];
@@ -217,12 +221,8 @@ async function createExcel(result: AssistantToolResponse, question: string): Pro
 }
 
 async function createPdf(result: AssistantToolResponse, question: string): Promise<Response> {
-  const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
-  const boldFont = path.join(process.cwd(), "public/fonts/agm-noto-sans-bold.ttf");
-  const hasFonts = false;
+  const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
   const doc = new PDFDocument({ size: "A4", margins: { top: 42, bottom: 42, left: 42, right: 42 }, autoFirstPage: true });
-  const fontRegular = hasFonts ? regularFont : "Helvetica";
-  const fontBold = hasFonts ? boldFont : "Helvetica-Bold";
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   const heading = () => {

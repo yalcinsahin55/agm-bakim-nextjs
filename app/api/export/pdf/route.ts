@@ -1,6 +1,5 @@
 import { enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
-import fs from "fs";
-import path from "path";
+import { getPdfFontPaths } from "@/lib/pdfFonts";
 import PDFDocument from "pdfkit";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -36,12 +35,8 @@ function safeFilenamePart(value: string): string {
 }
 
 async function createForecastPdf(user: { full_name?: string | null }, context: ForecastExportContext): Promise<Response> {
-  const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
-  const boldFont = path.join(process.cwd(), "public/fonts/agm-noto-sans-bold.ttf");
-  const hasFonts = fs.existsSync(regularFont) && fs.existsSync(boldFont);
+  const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
   const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 30, right: 30 }, autoFirstPage: true });
-  const fontRegular = hasFonts ? regularFont : "Helvetica";
-  const fontBold = hasFonts ? boldFont : "Helvetica-Bold";
   const left = doc.page.margins.left;
   const columnWidths = [58, 86, 55, 55, 48, 56, 70, 65];
   const columnLabels = ["Motor", "Bakım Türü", "Periyot", "Motor Saati", "Son Bakım", "Kalan/Gecikme", "Tahmini Tarih", "Durum"];
@@ -149,12 +144,8 @@ async function createPdf(req: NextRequest) {
     recordsCol.find(query, { projection: { photos_b64: 0, photos: 0, videos: 0 } }).sort({ maintenance_start_at: -1, created_at: -1, _id: -1 }).limit(MAX_ROWS).toArray(),
   ]);
 
-  const regularFont = path.join(process.cwd(), "public/fonts/agm-noto-sans.ttf");
-  const boldFont = path.join(process.cwd(), "public/fonts/agm-noto-sans-bold.ttf");
-  const hasFonts = fs.existsSync(regularFont) && fs.existsSync(boldFont);
+  const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
   const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 36, right: 36 }, autoFirstPage: true });
-  const fontRegular = hasFonts ? regularFont : "Helvetica";
-  const fontBold = hasFonts ? boldFont : "Helvetica-Bold";
   const title = selectedEngine ? `${selectedEngine.name} Bakım Geçmişi` : "Tüm Motorların Bakım Geçmişi";
   const left = doc.page.margins.left;
   const tableWidth = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);

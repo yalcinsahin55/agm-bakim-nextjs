@@ -174,7 +174,7 @@ function exportFileName(kind: "pdf" | "excel", exportQuery: Record<string, strin
 }
 
 function buildExportQuery(intent: string | undefined, period: string | undefined, dateRange: { from: string; to: string } | null | undefined, data: Record<string, unknown> | undefined): Record<string, string> {
-  const exportableIntents = new Set(["summary", "technician_performance", "external_service", "engine_history", "maintenance_forecast"]);
+  const exportableIntents = new Set(["summary", "technician_performance", "external_service", "engine_history", "maintenance_forecast", "engine_data"]);
   if (!intent || !exportableIntents.has(intent)) return {};
   const query = dateRange ? { from: dateRange.from, to: dateRange.to } : periodDateQuery(period);
   const filters = data?.filters && typeof data.filters === "object" ? data.filters as Record<string, unknown> : {};
@@ -295,6 +295,7 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   const overdueItems = intent === "overdue" ? allResultItems : [];
   const forecastItems = intent === "maintenance_forecast" ? allResultItems : [];
   const records = Array.isArray(data.records) ? data.records as Array<Record<string, unknown>> : [];
+  const dailyMaintenanceRecords = intent === "summary" && Array.isArray(data.daily_records) ? data.daily_records as Array<Record<string, unknown>> : [];
   const technicians = Array.isArray(data.technicians) ? data.technicians as Array<Record<string, unknown>> : [];
   const services = Array.isArray(data.services) ? data.services as Array<Record<string, unknown>> : [];
   const engines = Array.isArray(data.engines) ? data.engines as Array<Record<string, unknown>> : [];
@@ -320,6 +321,7 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
   })}</div>;
   const examples = Array.isArray(data.examples) ? data.examples.filter((item): item is string => typeof item === "string") : [];
   const engineRows = Array.isArray(data.engines) ? data.engines as Array<Record<string, unknown>> : [];
+  const performanceDaily = Array.isArray(data.performance_daily) ? data.performance_daily as Array<Record<string, unknown>> : [];
   const catalogTypes = Array.isArray(data.types) ? data.types as Array<Record<string, unknown>> : [];
   const pressureRows = Array.isArray(data.readings) ? data.readings as Array<Record<string, unknown>> : [];
   const oilRows = Array.isArray(data.analyses) ? data.analyses as Array<Record<string, unknown>> : [];
@@ -344,6 +346,26 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
 
   if (examples.length > 0) {
     return <div className="mt-3 grid gap-1.5">{examples.map((example) => <div key={example} className="rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10.5px] text-muted">{example}</div>)}</div>;
+  }
+
+  if (intent === "engine_data" && data.performance_mode === true) {
+    const averageHours = typeof data.average_hours === "number" ? data.average_hours : null;
+    const averageLoad = typeof data.average_load_kw === "number" ? data.average_load_kw : null;
+    if (!performanceDaily.length) return <ResultEmpty>Seçilen dönem için motor çalışma saati ve yük geçmişi bulunamadı.</ResultEmpty>;
+    return <div className="mt-3 grid min-w-0 gap-2">
+      <div className="rounded-lg border border-teal/30 bg-teal/10 p-3">
+        <div className="text-[9px] font-bold uppercase tracking-wide text-teal">Dönem ortalaması</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          <div className="rounded-md border border-teal/20 bg-panel2 px-2.5 py-2"><div className="text-[8.5px] text-faint">Ortalama motor saati</div><div className="font-mono text-[12px] font-bold text-text">{averageHours === null ? "Veri yok" : `${averageHours.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} saat`}</div></div>
+          <div className="rounded-md border border-teal/20 bg-panel2 px-2.5 py-2"><div className="text-[8.5px] text-faint">Ortalama yük</div><div className="font-mono text-[12px] font-bold text-text">{averageLoad === null ? "Veri yok" : `${averageLoad.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} kW`}</div></div>
+          <div className="rounded-md border border-teal/20 bg-panel2 px-2.5 py-2"><div className="text-[8.5px] text-faint">Ölçüm / gün</div><div className="font-mono text-[12px] font-bold text-text">{Number(data.performance_observations || performanceDaily.length)} / {Number(data.performance_days || 0)}</div></div>
+        </div>
+      </div>
+      <div className="min-w-0 rounded-lg border border-border bg-panel2 p-2.5">
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Gün gün motor performansı</div>
+        <div className="grid min-w-0 gap-1.5">{performanceDaily.map((entry, index) => { const load = typeof entry.load_kw === "number" ? `${entry.load_kw.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} kW` : "Yük verisi yok"; return <div key={`${String(entry.engine_id)}-${String(entry.date)}-${index}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 py-1.5 last:border-0"><div className="min-w-0"><div className="break-words text-[10.5px] font-bold text-text">{formatDateOnly(entry.date)} · {stringValue(entry.engine)}</div><div className="text-[9px] text-faint">Günlük son ölçüm · {Number(entry.measurements || 1)} kayıt</div></div><div className="flex-shrink-0 text-right font-mono text-[10px] text-muted">{Number(entry.hours || 0).toLocaleString("tr-TR")} saat · {load}</div></div>; })}</div>
+      </div>
+    </div>;
   }
 
   if (intent === "engine_data") {
@@ -449,12 +471,13 @@ function ResultDetails({ data, intent, onForecastExcludedTypesChange }: { data: 
     })}</div>;
   }
 
-  if (selectedTechnicianSummary || activities.length > 0 || technicians.length > 0 || (topTechnician && intent === "technician_performance")) {
+  if (selectedTechnicianSummary || activities.length > 0 || dailyMaintenanceRecords.length > 0 || technicians.length > 0 || (topTechnician && intent === "technician_performance")) {
     return <div className="mt-3 grid gap-2">
       {selectedTechnicianSummary}
       {topTechnician && intent === "technician_performance" && !selectedTechnician && <div className="rounded-lg border border-amber/30 bg-amber/10 p-2.5"><button type="button" onClick={() => setExpandedTechnicianId(expandedTechnicianId === topTechnicianId ? null : topTechnicianId)} aria-expanded={expandedTechnicianId === topTechnicianId} className="w-full text-left"><div className="text-[9px] font-bold uppercase tracking-wide text-amber">En çok görev alan teknisyen</div><div className="mt-1 flex items-center justify-between gap-2"><span className="truncate text-[11.5px] font-bold text-text">{stringValue(topTechnician.full_name)}</span><span className="font-mono text-[10.5px] font-bold text-amber">{Number(topTechnician.total_tasks || 0)} görev · {expandedTechnicianId === topTechnicianId ? "kapat ↑" : "detay →"}</span></div></button>{expandedTechnicianId === topTechnicianId && <div className="mt-2 grid gap-2 border-t border-amber/20 pt-2 sm:grid-cols-2"><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Bakım türleri</div>{topTechnicianByType.length ? topTechnicianByType.map((row) => <div key={String(row.type)} className="flex justify-between gap-2 border-b border-amber/10 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.type)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Bakım türü detayı yok.</div>}</div><div><div className="mb-1 text-[9px] font-bold uppercase tracking-wide text-amber">Çalışılan motorlar</div>{topTechnicianByEngine.length ? topTechnicianByEngine.map((row) => <div key={String(row.engine_id)} className="flex justify-between gap-2 border-b border-amber/10 py-1 last:border-0"><span className="truncate text-[10px] text-muted">{stringValue(row.engine)}</span><span className="font-mono text-[10px] text-text">{Number(row.count || 0)} kayıt</span></div>) : <div className="text-[10px] text-muted">Motor detayı yok.</div>}</div></div>}</div>}
       {activities.length > 0 && <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Çalışılan bakım ve motorlar</div>{activities.slice(0, 12).map((activity) => { const activityId = String(activity.id); const expanded = expandedActivityId === activityId; return <div key={activityId} className="border-b border-border last:border-0"><button type="button" onClick={() => setExpandedActivityId(expanded ? null : activityId)} aria-expanded={expanded} className="flex w-full items-start justify-between gap-2 py-1.5 text-left hover:text-amber"><div className="min-w-0"><div className="truncate text-[10.5px] font-bold text-text">{stringValue(activity.type)}</div><div className="truncate text-[9.5px] text-muted">{stringValue(activity.engine)} · {stringValue(activity.role)}</div></div><div className="flex-shrink-0 text-right text-[9px] text-faint">{formatDate(activity.created_at)}<br />{formatMinutes(activity.duration_minutes)} · {expanded ? "kapat ↑" : "detay →"}</div></button>{expanded && <div className="mb-2 grid gap-1 rounded-md border border-amber/20 bg-amber/5 px-2.5 py-2 text-[9.5px] text-muted"><div><span className="text-faint">Motor:</span> {stringValue(activity.engine)}</div><div><span className="text-faint">Bakım türü:</span> {stringValue(activity.type)}</div><div><span className="text-faint">Katkı rolü:</span> {stringValue(activity.role)} · <span className="text-faint">Çalışma süresi:</span> {formatMinutes(activity.duration_minutes)}</div><div><span className="text-faint">Başlangıç:</span> {formatDate(activity.start_at)} · <span className="text-faint">Kayıt:</span> {formatDate(activity.created_at)}</div></div>}</div>; })}</div>}
       {byEngine.length > 0 || byType.length > 0 ? breakdowns : null}
+      {dailyMaintenanceRecords.length > 0 && <div className="min-w-0 rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Gün gün yapılan bakımlar</div><div className="grid min-w-0 gap-1.5">{dailyMaintenanceRecords.slice(0, 80).map((item, index) => { const types = Array.isArray(item.types) ? item.types.filter((value): value is string => typeof value === "string" && value.trim().length > 0) : []; return <div key={`${String(item.event_id || item.date)}-${String(item.engine_id || "engine")}-${index}`} className="flex min-w-0 flex-wrap items-start justify-between gap-2 border-b border-border/70 py-1.5 last:border-0"><div className="min-w-0"><div className="break-words text-[10.5px] font-bold text-text">{formatDateOnly(item.date)} · {stringValue(item.engine)}</div><div className="break-words text-[9.5px] text-muted">{types.length ? types.join(" + ") : "Bakım türü belirtilmemiş"}</div><div className="text-[9px] text-faint">{Number(item.count || 0)} tür · {stringValue(item.source, "internal") === "external_service" ? "Dış hizmet" : "İç ekip"}</div></div><div className="flex-shrink-0 text-right font-mono text-[9.5px] text-muted">{formatMinutes(item.duration_minutes)}<br />ortak olay</div></div>; })}</div>{dailyMaintenanceRecords.length > 80 && <div className="mt-2 text-[9px] text-faint">Toplam {dailyMaintenanceRecords.length} olay bulundu; ekranda ilk 80 olay gösteriliyor.</div>}</div>}
       {technicians.length > 0 && !activities.length ? technicianRanking : null}
     </div>;
   }

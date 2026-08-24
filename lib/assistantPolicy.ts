@@ -59,6 +59,7 @@ export interface AssistantQuery {
   intent: AssistantIntent;
   period: AssistantPeriod;
   engineQuery?: string;
+  enginePerformance?: boolean;
   maintenanceTypeQuery?: string;
   serviceQuery?: string;
   dateRange?: AssistantDateRange;
@@ -128,6 +129,12 @@ const EXTERNAL_SERVICE_PATTERNS = [
   /servisten\s+hizmet/iu,
   /servis\s+firması/iu,
   /servisi?\s+(?:hangi|kaç|nerede|tarafından)/iu,
+];
+
+const MOTOR_PERFORMANCE_PATTERNS = [
+  /\bmotor(?:lar|ların|ların)?\s+performans(?:ı|ı|ları|larını)?/iu,
+  /\bperformans(?:ı|ları|larını)?\b[^?]{0,50}\bmotor(?:lar|ların|ları)?\b/iu,
+  /\bmotor(?:lar|ların|ları)?\b[^?]{0,80}\b(?:gün\s+gün|ortalama|yük(?:ü|leri)?|çalışma\s+saat(?:i|leri)?)\b[^?]{0,40}\b(?:nasıl|nasıldı|ne|kaç)/iu,
 ];
 
 const TECHNICIAN_PATTERNS = [
@@ -245,6 +252,8 @@ const SUMMARY_PATTERNS = [
   /en\s+(?:uzun|kısa)\s+süren/iu,
   /hangi\s+bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
   /bakımlar?\s+(yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
+  /\byapılan\s+bakımlar?\b/iu,
+  /bakım\s+tür(?:ü|leri)?\b[^?]{0,80}\b(?:yapıldı|yapılmış|tamamlandı|gerçekleşti)/iu,
   /hangi\s+motorlarda?\s+(?:bakım|çalışma|iş)/iu,
   /hangi\s+motorlarda?\s+.{2,80}\s+bakım/iu,
   /(?:yapılan|yapılmış)\s+motorlar?/iu,
@@ -352,6 +361,56 @@ function dateRange(from: string, to = from): AssistantDateRange {
   return from <= to ? { from, to } : { from: to, to: from };
 }
 
+type CalendarQuarter = 1 | 2 | 3 | 4;
+
+function quarterNumber(value: string): CalendarQuarter | null {
+  const normalized = value.toLocaleLowerCase("tr-TR").replace(/\./g, "");
+  if (["ilk", "birinci", "1"].includes(normalized)) return 1;
+  if (["ikinci", "2"].includes(normalized)) return 2;
+  if (["üçüncü", "3"].includes(normalized)) return 3;
+  if (["son", "dördüncü", "4"].includes(normalized)) return 4;
+  return null;
+}
+
+function calendarQuarterRange(year: number, quarter: CalendarQuarter): AssistantDateRange | undefined {
+  const startMonth = (quarter - 1) * 3 + 1;
+  const from = dateKey(year, startMonth, 1);
+  const lastDay = new Date(Date.UTC(year, startMonth + 2, 0)).getUTCDate();
+  const to = dateKey(year, startMonth + 2, lastDay);
+  return from && to ? dateRange(from, to) : undefined;
+}
+
+function parseQuarterRange(question: string, currentYear: number): AssistantDateRange | undefined {
+  const previousQuarter = /\bgeçen\s+çeyrek\b/iu.test(question);
+  const currentQuarter = /\bbu\s+çeyrek\b/iu.test(question);
+  if (previousQuarter || currentQuarter) {
+    const today = currentTurkeyDateKey();
+    const monthIndex = Number(today.slice(5, 7)) - 1;
+    const currentQuarterNumber = Math.floor(monthIndex / 3) + 1;
+    let quarter = currentQuarterNumber as CalendarQuarter;
+    let year = currentYear;
+    if (previousQuarter) {
+      if (quarter === 1) {
+        quarter = 4;
+        year -= 1;
+      } else {
+        quarter = (quarter - 1) as CalendarQuarter;
+      }
+    }
+    return calendarQuarterRange(year, quarter);
+  }
+
+  const termPattern = "(ilk|birinci|ikinci|üçüncü|dördüncü|son|1\\.?|2\\.?|3\\.?|4\\.?)";
+  const beforeYear = question.match(new RegExp(`(?<!\\d)((?:20|21)\\d{2})(?:['’][a-zçğıöşü]+)?\\s*${termPattern}\\s*çeyrek`, "iu"));
+  const afterYear = question.match(new RegExp(`${termPattern}\\s*çeyrek[^?]{0,30}?(?<!\\d)((?:20|21)\\d{2})(?!\\d)`, "iu"));
+  const generic = question.match(new RegExp(`${termPattern}\\s*çeyrek`, "iu"));
+  const term = beforeYear?.[2] || afterYear?.[1] || generic?.[1];
+  const quarter = term ? quarterNumber(term) : null;
+  if (!quarter) return undefined;
+  const year = Number(beforeYear?.[1] || afterYear?.[2] || currentYear);
+  return calendarQuarterRange(year, quarter);
+}
+
 function parseDateRange(question: string): AssistantDateRange | undefined {
   const currentYear = Number(currentTurkeyDateKey().slice(0, 4));
   const numericDates: string[] = [];
@@ -365,6 +424,9 @@ function parseDateRange(question: string): AssistantDateRange | undefined {
   }
   if (numericDates.length >= 2) return dateRange(numericDates[0], numericDates[1]);
   if (numericDates.length === 1) return dateRange(numericDates[0]);
+
+  const quarterRange = parseQuarterRange(question, currentYear);
+  if (quarterRange) return quarterRange;
 
   const sameMonthRange = question.match(new RegExp(`(?<!\\d)(\\d{1,2})\\s*[-–]\\s*(\\d{1,2})\\s+(${TURKISH_MONTH_PATTERN})(?:['’][a-zçğıöşü]+)?(?:\\s+(\\d{4}))?`, "iu"));
   if (sameMonthRange) {
@@ -478,6 +540,7 @@ function inferIntent(question: string): AssistantIntent {
   if (NOTIFICATION_PATTERNS.some((pattern) => pattern.test(question))) return "notification_summary";
   if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
   const asksForTeam = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question);
+  if (MOTOR_PERFORMANCE_PATTERNS.some((pattern) => pattern.test(question))) return "engine_data";
   if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question)) && !EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) && !asksForTeam) return "technician_performance";
   const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
     || INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question))
@@ -551,6 +614,7 @@ export function evaluateAssistantQuestion(value: unknown): AssistantPolicyResult
       targetYear: extractTargetYear(question),
       maintenancePeriodHours: extractMaintenancePeriodHours(question),
       engineQuery: extractEngineQuery(question),
+      enginePerformance: MOTOR_PERFORMANCE_PATTERNS.some((pattern) => pattern.test(question)),
       dateRange: parseDateRange(question),
       ...parseFilters(question),
     },

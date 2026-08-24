@@ -13,20 +13,30 @@ export interface AssistantToolResponse {
   data: Record<string, unknown>;
 }
 
-type SummaryTotalsRow = { total?: number; external?: number; duration?: number };
+type SummaryTotalsRow = { total?: number; unique_events?: number; external?: number; duration?: number };
 type SummaryEngineRow = { _id?: string; engine?: string; count?: number; type_stats?: Array<{ type?: string; count?: number }> };
 type SummaryTypeRow = { _id?: string; count?: number; engines?: Array<{ engine_id?: string; engine?: string; count?: number }> };
-type SummaryAggregateRow = { totals?: SummaryTotalsRow[]; byEngine?: SummaryEngineRow[]; byType?: SummaryTypeRow[] };
+type SummaryDailyRow = { _id?: { date?: Date | string; engine_id?: string; engine?: string; group_key?: string }; types?: string[]; count?: number; duration?: number; source?: string };
+type SummaryAggregateRow = { totals?: SummaryTotalsRow[]; byEngine?: SummaryEngineRow[]; byType?: SummaryTypeRow[]; daily?: SummaryDailyRow[] };
 type TechnicianAggregateRow = { _id?: unknown; technician?: string; technician_type?: unknown; count?: number; duration?: number };
 type TechnicianDetailTypeRow = { _id?: string; count?: number };
 type TechnicianDetailEngineRow = { _id?: { engine_id?: string; engine?: string }; count?: number };
 type ExternalServiceAggregateRow = { totals?: Array<{ count?: number; duration?: number }>; services?: Array<{ _id?: string; count?: number; duration?: number }>; engines?: Array<{ _id?: string; engine?: string; count?: number }> };
 
+function currentTurkeyDateKey(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function periodStart(period: AssistantPeriod): Date | null {
-  const now = new Date();
-  if (period === "month") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  if (period === "3months") return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1));
-  if (period === "year") return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const today = currentTurkeyDateKey();
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7)) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return null;
+  if (period === "month") return new Date(Date.UTC(year, month, 1));
+  if (period === "3months") return new Date(Date.UTC(year, month - 2, 1));
+  if (period === "year") return new Date(Date.UTC(year, 0, 1));
   return null;
 }
 
@@ -42,30 +52,36 @@ function dateKeyStart(value: string): Date | null {
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
+function dateRangeClauses(field: "maintenance_start_at" | "created_at", from: Date, to?: Date): Array<Record<string, unknown>> {
+  const dateRange: Record<string, unknown> = { $gte: from };
+  if (to) dateRange.$lt = to;
+  const isoRange: Record<string, unknown> = { $gte: from.toISOString() };
+  if (to) isoRange.$lt = to.toISOString();
+  return [{ [field]: dateRange }, { [field]: isoRange }];
+}
+
 function periodMatch(query: AssistantQuery): Record<string, unknown> {
+  const buildRangeMatch = (from: Date, to?: Date): Record<string, unknown> => ({
+    $or: [
+      ...dateRangeClauses("maintenance_start_at", from, to),
+      {
+        $and: [
+          { $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }] },
+          { $or: dateRangeClauses("created_at", from, to) },
+        ],
+      },
+    ],
+  });
   if (query.dateRange) {
     const from = dateKeyStart(query.dateRange.from);
     const to = dateKeyStart(query.dateRange.to);
     if (from && to) {
       to.setUTCDate(to.getUTCDate() + 1);
-      const createdAtRange = { created_at: { $gte: from, $lt: to } };
-      return {
-        $and: [{
-          $or: [
-            { maintenance_start_at: { $gte: from, $lt: to } },
-            { $and: [{ $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }] }, createdAtRange] },
-          ],
-        }],
-      };
+      return buildRangeMatch(from, to);
     }
   }
   const start = periodStart(query.period);
-  return start ? {
-    $or: [
-      { maintenance_start_at: { $gte: start } },
-      { $and: [{ $or: [{ maintenance_start_at: { $exists: false } }, { maintenance_start_at: null }] }, { created_at: { $gte: start } }] },
-    ],
-  } : {};
+  return start ? buildRangeMatch(start) : {};
 }
 
 function escapeRegex(value: string): string {
@@ -193,6 +209,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
             $group: {
               _id: null,
               total: { $sum: "$record_count" },
+              unique_events: { $sum: 1 },
               external: { $sum: "$external_record_count" },
               duration: { $sum: "$duration" },
             },
@@ -210,24 +227,47 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
           { $sort: { count: -1, _id: 1 } },
           { $limit: 100 },
         ],
+        daily: [
+          { $set: { __maintenance_group_key: { $cond: [{ $and: [{ $ne: ["$group_id", null] }, { $ne: ["$group_id", ""] }] }, "$group_id", { $toString: "$_id" }] }, __maintenance_date: { $convert: { input: { $ifNull: ["$maintenance_start_at", "$created_at"] }, to: "date", onError: null, onNull: null } } } },
+          { $match: { __maintenance_date: { $ne: null } } },
+          { $set: { __maintenance_day: { $dateToString: { date: "$__maintenance_date", timezone: "Europe/Istanbul", format: "%Y-%m-%d" } } } },
+          { $group: { _id: { date: "$__maintenance_day", engine_id: "$engine_id", engine: "$engine_name", group_key: "$__maintenance_group_key" }, types: { $addToSet: "$type_label" }, count: { $sum: 1 }, duration: { $max: { $ifNull: ["$maintenance_duration_minutes", 0] } }, source: { $first: "$technician_source" } } },
+          { $sort: { "_id.date": 1, "_id.engine": 1, "_id.group_key": 1 } },
+          { $limit: 500 },
+        ],
       },
     },
   ]).toArray();
   const totals = row?.totals?.[0] || { total: 0, external: 0, duration: 0 };
   const total = Number(totals.total || 0);
   const external = Number(totals.external || 0);
+  const uniqueEvents = Number(totals.unique_events || 0);
+  const eventSummary = uniqueEvents !== total ? ` ${uniqueEvents} ortak bakım olayı.` : "";
+  const daily = (row?.daily || []).map((item) => ({
+    event_id: item._id?.group_key || null,
+    date: item._id?.date || null,
+    engine_id: item._id?.engine_id || null,
+    engine: item._id?.engine || "Bilinmeyen",
+    types: (item.types || []).filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), "tr")),
+    count: Number(item.count || 0),
+    duration_minutes: Number(item.duration || 0),
+    source: item.source || "internal",
+  }));
   return {
     intent: "summary",
     period: query.period,
     title: "Bakım özeti",
-    summary: `${periodLabel(query)} ${total} bakım kaydı bulundu. Bunun ${external} tanesi dış hizmet kaydıdır.`,
+    summary: `${periodLabel(query)} ${total} bakım kaydı bulundu.${eventSummary} Bunun ${external} tanesi dış hizmet kaydıdır.`,
     data: {
       period: query.period,
       date_range: query.dateRange || null,
       filters: { engine: selectedEngine?.name || query.engineQuery || null, engine_id: selectedEngine ? String(selectedEngine._id) : null, maintenance_type: query.maintenanceTypeQuery || null, source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       total_records: total,
+      unique_events: uniqueEvents,
       external_service_records: external,
       recorded_duration_minutes: Number(totals.duration || 0),
+      daily_records: daily,
+      daily_record_count: daily.length,
       recorded_duration_text: formatMinutes(Number(totals.duration || 0)),
       by_engine: (row?.byEngine || []).map((item) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0), type_stats: (item.type_stats || []).filter((type) => Boolean(type.type)).sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || String(a.type).localeCompare(String(b.type), "tr")) })),
       by_type: (row?.byType || []).map((item) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0), engines: (item.engines || []).filter((engine) => Boolean(engine.engine_id)).sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || String(a.engine).localeCompare(String(b.engine), "tr")) })),
@@ -635,22 +675,83 @@ function isDateInAssistantQuery(value: unknown, query: AssistantQuery): boolean 
   return !start || date >= start;
 }
 
+function historyDayKey(value: unknown): string | null {
+  const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatPerformanceNumber(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "veri yok" : value.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+}
+
 async function getEngineData(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
+  const performanceMode = query.enginePerformance === true;
   const filter = selectedEngine ? { _id: String(selectedEngine._id) } : query.engineQuery ? { _id: "__assistant_no_matching_engine__" } : {};
   const engines = await enginesCollection(db).find(filter, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).sort({ name: 1 }).limit(100).toArray();
+  const dailyByEngine = new Map<string, { engine_id: string; engine: string; date: string; timestamp: number; hours: number; load_kw: number | null; measurements: number }>();
   const rows = engines.map((engine) => {
     const allHistory = Array.isArray(engine.history) ? engine.history : [];
-    const filteredHistory = query.dateRange || query.period !== "all" ? allHistory.filter((entry) => isDateInAssistantQuery(entry.date, query)).slice(-20) : allHistory.slice(-5);
-    const history = filteredHistory.map((entry) => ({ date: formatUnknownDate(entry.date), hours: Number(entry.hours || 0), load_kw: Number(entry.load_kw || 0) }));
+    const filteredHistory = query.dateRange || query.period !== "all"
+      ? allHistory.filter((entry) => isDateInAssistantQuery(entry.date, query)).slice(-366)
+      : allHistory.slice(-30);
+    const performanceHistory = performanceMode ? filteredHistory : [];
+    performanceHistory.forEach((entry) => {
+      const date = historyDayKey(entry.date);
+      const timestamp = new Date(String(entry.date)).getTime();
+      if (!date || !Number.isFinite(timestamp)) return;
+      const engineId = String(engine._id);
+      const key = `${engineId}|${date}`;
+      const load = typeof entry.load_kw === "number" && Number.isFinite(entry.load_kw) ? entry.load_kw : null;
+      const previous = dailyByEngine.get(key);
+      if (!previous) {
+        dailyByEngine.set(key, { engine_id: engineId, engine: String(engine.name || engineId), date, timestamp, hours: Number(entry.hours || 0), load_kw: load, measurements: 1 });
+      } else {
+        previous.measurements += 1;
+        if (timestamp >= previous.timestamp) {
+          previous.timestamp = timestamp;
+          previous.hours = Number(entry.hours || 0);
+          previous.load_kw = load;
+        }
+      }
+    });
+    const history = filteredHistory.map((entry) => ({ date: formatUnknownDate(entry.date), hours: Number(entry.hours || 0), load_kw: typeof entry.load_kw === "number" && Number.isFinite(entry.load_kw) ? entry.load_kw : null }));
     return { engine_id: String(engine._id), engine: engine.name, hours: Number(engine.hours || 0), load_kw: Number(engine.load_kw || 0), updated_at: formatUnknownDate(engine.updated_at), latest_history: history.at(-1) || null, history };
   });
+  const performanceDaily = performanceMode ? [...dailyByEngine.values()]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.engine.localeCompare(b.engine, "tr"))
+    .map(({ timestamp: _timestamp, ...entry }) => entry) : [];
+  const hoursValues = performanceDaily.map((entry) => entry.hours).filter((value) => Number.isFinite(value));
+  const loadValues = performanceDaily.map((entry) => entry.load_kw).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const averageHours = hoursValues.length ? hoursValues.reduce((sum, value) => sum + value, 0) / hoursValues.length : null;
+  const averageLoad = loadValues.length ? loadValues.reduce((sum, value) => sum + value, 0) / loadValues.length : null;
+  const performancePeriod = periodLabel(query);
+  const performanceSummary = performanceDaily.length > 0
+    ? `${performancePeriod} ${performanceDaily.length} motor-günlük ölçüm bulundu. Dönem ortalaması: ${formatPerformanceNumber(averageHours)} motor saati ve ${formatPerformanceNumber(averageLoad)} kW yük.`
+    : `${performancePeriod} için motor çalışma saati ve yük geçmişi bulunamadı.`;
+  const summary = performanceMode ? performanceSummary : selectedEngine
+    ? `${selectedEngine.name} için çalışma saati, yük ve son saat geçmişi hazırlandı.`
+    : `${rows.length} motorun çalışma saati, yük ve son saat geçmişi hazırlandı.`;
   return {
     intent: "engine_data",
     period: query.period,
-    title: selectedEngine ? `${selectedEngine.name} motor bilgileri` : "Motor çalışma ve yük bilgileri",
-    summary: selectedEngine ? `${selectedEngine.name} için çalışma saati, yük ve son saat geçmişi hazırlandı.` : `${rows.length} motorun çalışma saati, yük ve son saat geçmişi hazırlandı.`,
-    data: { date_range: query.dateRange || null, engines: rows },
+    title: performanceMode ? (selectedEngine ? `${selectedEngine.name} motor performansı` : "Motor performansı") : (selectedEngine ? `${selectedEngine.name} motor bilgileri` : "Motor çalışma ve yük bilgileri"),
+    summary,
+    data: {
+      date_range: query.dateRange || null,
+      ...(performanceMode ? {
+        performance_mode: true,
+        performance_daily: performanceDaily,
+        performance_days: new Set(performanceDaily.map((entry) => entry.date)).size,
+        performance_observations: performanceDaily.length,
+        average_hours: averageHours,
+        average_load_kw: averageLoad,
+      } : { performance_mode: false }),
+      engines: rows,
+    },
   };
 }
 
