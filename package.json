@@ -11,8 +11,6 @@
   "dependencies": {
     "@upstash/redis": "1.38.2",
     "@vercel/blob": "^2.8.0",
-    "@zxing/browser": "0.1.5",
-    "@zxing/library": "0.21.3",
     "bcryptjs": "^2.4.3",
     "exceljs": "4.4.0",
     "jose": "^5.9.6",
