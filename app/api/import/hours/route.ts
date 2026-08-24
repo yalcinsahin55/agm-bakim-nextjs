@@ -69,6 +69,10 @@ async function postImportHours(req: NextRequest) {
   const enginesCol = enginesCollection(db);
   const stamp = import_date ? new Date(import_date) : new Date();
   if (Number.isNaN(stamp.getTime())) return NextResponse.json({ error: "Geçersiz içe aktarma tarihi." }, { status: 400 });
+  const engineIds = [...new Set(rows.map((row) => String(row[nameCol] || "").trim()).filter(Boolean))];
+  const existingEngines = await enginesCol.find({ _id: { $in: engineIds } }).toArray();
+  const workingEngines = new Map(existingEngines.map((engine) => [String(engine._id), engine]));
+  const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
   let updated = 0;
 
   for (const row of rows) {
@@ -76,7 +80,7 @@ async function postImportHours(req: NextRequest) {
     const hours = parseMetric(row[hourCol]);
     if (!name || hours === null) continue;
 
-    const existing = await enginesCol.findOne({ _id: name });
+    const existing = workingEngines.get(name);
     if (!existing) continue;
 
     const setFields: Partial<Pick<EngineDocument, "hours" | "load_kw" | "updated_at">> = { updated_at: stamp };
@@ -97,9 +101,22 @@ async function postImportHours(req: NextRequest) {
         },
       };
     }
-    await enginesCol.updateOne({ _id: name }, updateOp);
+    operations.push({ updateOne: { filter: { _id: name }, update: updateOp } });
+    workingEngines.set(name, {
+      ...existing,
+      ...setFields,
+      ...(hoursChanged || loadChanged ? {
+        history: [...(Array.isArray(existing.history) ? existing.history : []), {
+          date: stamp.toISOString(),
+          hours: typeof setFields.hours === "number" ? setFields.hours : existing.hours,
+          load_kw: typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
+        }],
+      } : {}),
+    });
     updated++;
   }
+
+  if (operations.length > 0) await enginesCol.bulkWrite(operations, { ordered: true });
 
   return NextResponse.json({ ok: true, updated });
 }

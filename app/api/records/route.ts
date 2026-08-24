@@ -44,6 +44,13 @@ function encodeRecordCursor(record: { created_at?: Date | string; _id?: unknown 
   return Buffer.from(JSON.stringify({ createdAt: date.toISOString(), id: String(record._id) }), "utf8").toString("base64url");
 }
 
+function parseDateOnly(value: string): Date | null {
+  const [year, month, day] = value.split("-").map(Number);
+  if (![year, month, day].every(Number.isInteger)) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? date : null;
+}
+
 async function getRecords(req: NextRequest) {
   try {
     const db = await getDb();
@@ -289,7 +296,12 @@ async function postRecord(req: NextRequest) {
     const managerConfirmationStatus = shouldConfirmOnCreate ? "confirmed" : "pending";
     const managerConfirmedAt = shouldConfirmOnCreate ? new Date() : undefined;
 
-    const createdAt = backdated && record_date ? new Date(record_date) : new Date();
+    let createdAt = new Date();
+    if (backdated && record_date) {
+      const parsedRecordDate = parseDateOnly(record_date);
+      if (!parsedRecordDate) return NextResponse.json({ error: "Geriye dönük bakım tarihi geçerli bir takvim tarihi olmalıdır." }, { status: 400 });
+      createdAt = parsedRecordDate;
+    }
     const groupId = new ObjectId().toString();
     const normalizedChecklist = Array.isArray(checklist)
       ? checklist

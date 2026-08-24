@@ -7,7 +7,7 @@ import { normalizeWorkDomains } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
-import { buildEngineStateUpdate, isObjectRecord, mergeEngineState } from "@/lib/maintenance";
+import { buildEngineStateUpdate, canUpdateEngineStateNested, isObjectRecord, mergeEngineState } from "@/lib/maintenance";
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
@@ -51,27 +51,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   }
 
   let currentEngineStates: unknown = type.engine_states;
-  if (apply_period_to_all && typeof default_period_hours === "number") {
-    const engineIds = Object.keys(isObjectRecord(currentEngineStates) ? currentEngineStates : {});
-    for (const engId of engineIds) {
-      if (!isSafeMongoPathSegment(engId)) continue;
-      const patch = { period_hours: default_period_hours, tracking_source: "manual" as const };
-      await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engId, patch) });
-      currentEngineStates = mergeEngineState(currentEngineStates, engId, patch);
+  const applyEngineStatePatches = async (patches: Array<{ engineId: string; patch: Record<string, unknown> }>) => {
+    if (patches.length === 0) return;
+    const canBulkWriteNested = patches.every(({ engineId }) => canUpdateEngineStateNested(currentEngineStates, engineId));
+    if (canBulkWriteNested) {
+      await typesCol.bulkWrite(patches.map(({ engineId, patch }) => ({
+        updateOne: { filter: { _id: key }, update: { $set: buildEngineStateUpdate(currentEngineStates, engineId, patch) } },
+      })));
+      patches.forEach(({ engineId, patch }) => {
+        currentEngineStates = mergeEngineState(currentEngineStates, engineId, patch);
+      });
+      return;
     }
+    // Malformed legacy engine_states belgelerinde buildEngineStateUpdate tüm alanı
+    // güvenli biçimde yeniden kurar; bu durumda sıralı fallback veri kaybını önler.
+    for (const { engineId, patch } of patches) {
+      await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engineId, patch) });
+      currentEngineStates = mergeEngineState(currentEngineStates, engineId, patch);
+    }
+  };
+
+  if (apply_period_to_all && typeof default_period_hours === "number") {
+    const patches = Object.keys(isObjectRecord(currentEngineStates) ? currentEngineStates : {})
+      .filter(isSafeMongoPathSegment)
+      .map((engineId) => ({ engineId, patch: { period_hours: default_period_hours, tracking_source: "manual" } }));
+    await applyEngineStatePatches(patches);
   }
 
   // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
   if (isObjectRecord(engine_states)) {
-    for (const [engId, rawState] of Object.entries(engine_states)) {
-      if (!isSafeMongoPathSegment(engId)) continue;
-      const state = rawState && typeof rawState === "object" ? rawState as EngineStateInput : {};
-      const patch: Record<string, unknown> = { tracking_source: "manual" };
-      if (typeof state.period_hours === "number") patch.period_hours = state.period_hours;
-      if (typeof state.last_maintenance_hour === "number") patch.last_maintenance_hour = state.last_maintenance_hour;
-      await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engId, patch) });
-      currentEngineStates = mergeEngineState(currentEngineStates, engId, patch);
-    }
+    const patches = Object.entries(engine_states)
+      .filter(([engineId]) => isSafeMongoPathSegment(engineId))
+      .map(([engineId, rawState]) => {
+        const state = rawState && typeof rawState === "object" ? rawState as EngineStateInput : {};
+        const patch: Record<string, unknown> = { tracking_source: "manual" };
+        if (typeof state.period_hours === "number") patch.period_hours = state.period_hours;
+        if (typeof state.last_maintenance_hour === "number") patch.last_maintenance_hour = state.last_maintenance_hour;
+        return { engineId, patch };
+      });
+    await applyEngineStatePatches(patches);
   }
 
   const removeEngineIds = Array.isArray(remove_engine_ids)
