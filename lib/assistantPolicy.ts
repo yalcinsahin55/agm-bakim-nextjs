@@ -125,6 +125,8 @@ const TECHNICIAN_PATTERNS = [
   /['’](?:in|ın|ün|un|nin|nın|nün|nun)\s+.{0,80}\bbakım/iu,
   /en\s+(çok|fazla)\s+(çalış|görev)/iu,
   /kim\s+(en\s+çok\s+)?(çalıştı|çalışmış|görev\s+(aldı|yaptı))/iu,
+  /\bne\s+kadar(?:\s+süre)?\s+(?:çalıştı|çalışmış|çalışmıştır)/iu,
+  /\b(?:toplam|kaç)\s+saat\s+(?:çalıştı|çalışmış)/iu,
 ];
 
 const FORECAST_PATTERNS = [
@@ -321,6 +323,15 @@ function parseDateRange(question: string): AssistantDateRange | undefined {
   }
 
   const today = currentTurkeyDateKey();
+  const recentRange = question.match(/\bson\s+(bir|\d+)\s+(gün|hafta)\b/iu);
+  if (recentRange) {
+    const quantity = recentRange[1].toLocaleLowerCase("tr-TR") === "bir" ? 1 : Number(recentRange[1]);
+    const unit = recentRange[2].toLocaleLowerCase("tr-TR");
+    if (Number.isInteger(quantity) && quantity > 0 && quantity <= 52) {
+      const days = unit === "hafta" ? quantity * 7 : quantity;
+      return dateRange(shiftDateKey(today, -(days - 1)), today);
+    }
+  }
   if (/geçen\s+hafta/iu.test(question) || /bu\s+hafta/iu.test(question)) {
     const weekday = new Date(`${today}T00:00:00.000Z`).getUTCDay();
     const monday = shiftDateKey(today, -(weekday + 6) % 7);

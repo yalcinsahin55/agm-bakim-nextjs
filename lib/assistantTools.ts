@@ -518,16 +518,30 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     };
   }));
   const totalTasks = resultRows.reduce((sum, item) => sum + item.responsible_count + item.support_count, 0);
+  const totalResponsibleTasks = resultRows.reduce((sum, item) => sum + item.responsible_count, 0);
+  const totalSupportTasks = resultRows.reduce((sum, item) => sum + item.support_count, 0);
   const totalDuration = resultRows.reduce((sum, item) => sum + item.duration_minutes, 0);
   const topTechnician = resultRows[0];
+  const selectedSummary = selected
+    ? {
+      id: selected.id,
+      full_name: selected.full_name,
+      technician_type: selected.technician_type,
+      responsible_tasks: resultRows[0]?.responsible_count || 0,
+      support_tasks: resultRows[0]?.support_count || 0,
+      total_tasks: totalTasks,
+      duration_minutes: totalDuration,
+      duration_text: formatMinutes(totalDuration),
+    }
+    : null;
   return {
     intent: "technician_performance",
     period: query.period,
     title: selected ? `${selected.full_name} teknisyen özeti` : "Teknisyen performans özeti",
     summary: selected
-      ? `${selected.full_name} için ${periodLabel(query)} döneminde ${totalTasks} görev ve ${formatMinutes(totalDuration)} katkı süresi bulundu. ${activityByType.length} farklı bakım türünde çalıştı.`
+      ? `${selected.full_name}, ${periodLabel(query)} döneminde kayıtlara göre toplam ${formatMinutes(totalDuration)} çalıştı. ${totalTasks} görevde yer aldı; ${resultRows[0]?.responsible_count || 0} sorumlu, ${resultRows[0]?.support_count || 0} yardımcı görev.`
       : `${periodLabel(query)} ${totalTasks} teknisyen görevi ve ${formatMinutes(totalDuration)} toplam katkı süresi bulundu.${topTechnician ? ` En çok görev alan teknisyen: ${topTechnician.technician} (${topTechnician.responsible_count + topTechnician.support_count} görev).` : ""}`,
-    data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selected ? { id: selected.id, full_name: selected.full_name } : null, top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), technician_details: technicianDetails, activities, by_type: activityByType, by_engine: activityByEngine },
+    data: { period: query.period, date_range: query.dateRange || null, filters: { engine: selectedEngine ? selectedEngine.name : query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, role: query.technicianRole || "any", source: "internal", evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) }, selected_technician: selectedSummary, total_tasks: totalTasks, total_responsible_tasks: totalResponsibleTasks, total_support_tasks: totalSupportTasks, total_duration_minutes: totalDuration, total_duration_text: formatMinutes(totalDuration), top_technician: topTechnician ? { id: topTechnician.technician_id, full_name: topTechnician.technician, total_tasks: topTechnician.responsible_count + topTechnician.support_count } : null, technicians: resultRows.slice(0, 12), technician_details: technicianDetails, activities, by_type: activityByType, by_engine: activityByEngine },
   };
 }
 
