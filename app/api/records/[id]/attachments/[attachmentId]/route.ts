@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { usersCollection, recordsCollection } from "@/lib/dbCollections";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { isAllowedReportAttachmentUrl } from "@/lib/reportAttachments";
+import { fetchStoredBlob } from "@/lib/blobStorage";
 import { withApiTiming } from "@/lib/performance";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 
@@ -57,7 +58,7 @@ async function getAttachment(request: NextRequest, { params }: AttachmentRouteCo
   const attachment = record.report_attachments?.find((item) => item.id === attachmentId);
   if (!attachment || !isAllowedReportAttachmentUrl(attachment.url)) return NextResponse.json({ error: "Rapor eki bulunamadı." }, { status: 404 });
 
-  const upstream = await fetch(attachment.url, { redirect: "error", cache: "no-store" }).catch(() => null);
+  const upstream = await fetchStoredBlob(attachment.url);
   if (!upstream?.ok || !upstream.body) return NextResponse.json({ error: "Rapor eki depolamadan okunamadı." }, { status: 502 });
 
   const download = request.nextUrl.searchParams.get("download") === "1";

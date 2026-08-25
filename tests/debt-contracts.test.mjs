@@ -180,6 +180,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const create = await source("app/api/records/route.ts");
   const update = await source("app/api/records/[id]/route.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
+  const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
+  const pdfSecurity = await source("lib/pdfSecurity.ts");
+  const blobStorage = await source("lib/blobStorage.ts");
   const queue = await source("lib/offlineQueue.ts");
   const complete = await source("app/tamamla/page.tsx");
   const records = await source("app/kayitlar/page.tsx");
@@ -217,8 +220,16 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(create, /report_attachments: isPrimary/);
   assert.match(update, /update\.report_attachments = normalizedReportAttachments/);
   assert.match(fileRoute, /record-attachment-read/);
+  assert.match(fileRoute, /fetchStoredBlob/);
   assert.match(fileRoute, /Content-Disposition/);
   assert.match(fileRoute, /Cache-Control.*private, no-store/);
+  assert.match(oilFileRoute, /fetchStoredBlob/);
+  assert.match(pdfSecurity, /\.private\.blob\.vercel-storage\.com/);
+  assert.match(pdfSecurity, /\.blob\.vercel-storage\.com/);
+  assert.match(blobStorage, /from "@vercel\/blob"/);
+  assert.match(blobStorage, /MEDIA_READ_WRITE_TOKEN/);
+  assert.match(blobStorage, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(blobStorage, /access: "private"/);
   assert.match(queue, /kind: "photo" \| "video" \| "report"/);
   assert.match(queue, /job\.payload\.report_attachments/);
   assert.match(queue, /uploadReportAttachment/);

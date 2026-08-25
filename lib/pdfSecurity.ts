@@ -1,5 +1,9 @@
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
-const DEFAULT_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+const DEFAULT_BLOB_HOST_SUFFIXES = [
+  ".public.blob.vercel-storage.com",
+  ".private.blob.vercel-storage.com",
+  ".blob.vercel-storage.com",
+] as const;
 
 function configuredAllowedHosts(): string[] {
   return (process.env.PDF_ALLOWED_HOSTS || "")
@@ -15,7 +19,7 @@ export function isAllowedPdfUrl(value: unknown): value is string {
     if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
     const hostname = url.hostname.toLowerCase();
     const explicitHosts = configuredAllowedHosts();
-    return hostname.endsWith(DEFAULT_BLOB_HOST_SUFFIX) || explicitHosts.includes(hostname);
+    return DEFAULT_BLOB_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix)) || explicitHosts.includes(hostname);
   } catch {
     return false;
   }

@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedPdfUrl, looksLikePdf, MAX_PDF_BYTES, readPdfResponse } from "@/lib/pdfSecurity";
+import { fetchStoredBlob } from "@/lib/blobStorage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -45,12 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (!isAllowedPdfUrl(doc.pdf_url)) {
         return NextResponse.json({ error: "PDF bağlantısı güvenli depolama alanında değil." }, { status: 422 });
       }
-      const upstream = await fetch(doc.pdf_url, {
-        cache: "no-store",
-        redirect: "error",
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!upstream.ok) return NextResponse.json({ error: "Blob PDF dosyası okunamadı." }, { status: 502 });
+      const upstream = await fetchStoredBlob(doc.pdf_url);
+      if (!upstream?.ok || !upstream.body) return NextResponse.json({ error: "Blob PDF dosyası okunamadı." }, { status: 502 });
       bytes = await readPdfResponse(upstream);
     } else if (typeof doc.pdf_b64 === "string") {
       bytes = decodePdfData(doc.pdf_b64);
