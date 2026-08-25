@@ -48,6 +48,29 @@ const GROUP_CONFIG: Record<GroupStatus, { title: string; icon: string; summaryNo
 const STATUS_ORDER: GroupStatus[] = ["gecikmis", "kritik", "yaklasiyor"];
 const INITIAL_VISIBLE_ITEMS = 3;
 
+function getNotificationTimestamp(notification: Notification): number {
+  const value = notification.last_notified_at ?? notification.created_at;
+  const timestamp = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortNewestFirst(notifications: Notification[]): Notification[] {
+  return [...notifications].sort((a, b) => getNotificationTimestamp(b) - getNotificationTimestamp(a));
+}
+
+function formatNotificationDate(notification: Notification): string {
+  const value = notification.last_notified_at ?? notification.created_at;
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Tarih bilinmiyor";
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function getGroupSummary(notifications: Notification[]): string {
   const engines = new Set<string>();
   const types = new Set<string>();
@@ -63,9 +86,10 @@ function getGroupSummary(notifications: Notification[]): string {
 }
 
 function groupNotifications(notifications: Notification[]): NotificationGroup[] {
+  const newestFirst = sortNewestFirst(notifications);
   return STATUS_ORDER
     .map((status) => {
-      const grouped = notifications.filter((notification) => notification.status === status);
+      const grouped = newestFirst.filter((notification) => notification.status === status);
       if (grouped.length === 0) return null;
       return {
         status,
@@ -75,7 +99,8 @@ function groupNotifications(notifications: Notification[]): NotificationGroup[] 
         notifications: grouped,
       };
     })
-    .filter((group): group is NotificationGroup => Boolean(group));
+    .filter((group): group is NotificationGroup => Boolean(group))
+    .sort((a, b) => getNotificationTimestamp(b.notifications[0]) - getNotificationTimestamp(a.notifications[0]));
 }
 
 export default function NotificationsPage() {
@@ -133,7 +158,7 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter((item) => !item.read_at).length;
   const groupedNotifications = useMemo(() => groupNotifications(notifications), [notifications]);
-  const systemNotifications = useMemo(() => notifications.filter((notification) => notification.status === "system"), [notifications]);
+  const systemNotifications = useMemo(() => sortNewestFirst(notifications.filter((notification) => notification.status === "system")), [notifications]);
   const counts = useMemo(() => ({
     gecikmis: notifications.filter((item) => item.status === "gecikmis").length,
     kritik: notifications.filter((item) => item.status === "kritik").length,
@@ -221,7 +246,10 @@ export default function NotificationsPage() {
                       {visibleNotifications.map((notification, index) => (
                         <div key={notification._id || notification.dedupe_key || `${group.status}-${index}`} className={`flex min-h-[62px] items-center gap-2.5 px-3.5 py-2.5 ${index > 0 ? "border-t border-border/60" : ""} ${notification.read_at ? "opacity-60" : ""}`}>
                           <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border text-sm ${config.iconClassName}`} aria-hidden="true">{config.icon}</span>
-                          <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted">{notification.message}</span>
+                          <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted">
+                            <span className="block">{notification.message}</span>
+                            <span className="mt-1 block text-[9.5px] leading-none text-faint">Geldi: {formatNotificationDate(notification)}</span>
+                          </span>
                           <span className="flex flex-shrink-0 flex-col items-end gap-1">
                             {notification.href && <Link href={notification.href} onClick={() => notification._id && void markRead(notification._id)} className="text-[11px] font-bold text-teal hover:text-amber">Detay</Link>}
                             {!notification.read_at && notification._id && <button onClick={() => void markRead(notification._id!)} className="text-[9.5px] font-semibold text-faint hover:text-text">Okundu</button>}
@@ -253,7 +281,10 @@ export default function NotificationsPage() {
                 </button>
                 {expandedGroups.system && systemNotifications.map((notification, index) => (
                   <div key={notification._id || `system-${index}`} className={`flex items-center gap-2.5 border-t border-border/60 px-3.5 py-3 ${notification.read_at ? "opacity-60" : ""}`}>
-                    <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted">{notification.message}</span>
+                    <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted">
+                      <span className="block">{notification.message}</span>
+                      <span className="mt-1 block text-[9.5px] leading-none text-faint">Geldi: {formatNotificationDate(notification)}</span>
+                    </span>
                     {!notification.read_at && notification._id && <button onClick={() => void markRead(notification._id!)} className="flex-shrink-0 text-[10px] font-semibold text-faint hover:text-text">Okundu</button>}
                   </div>
                 ))}

@@ -176,4 +176,6 @@ export interface Notification {
   read_at?: Date | string | null;
   created_at: Date | string;
   updated_at?: Date | string;
+  /** Bildirimin kullanıcıya yeni bir olay olarak son üretildiği zaman. */
+  last_notified_at?: Date | string;
 }

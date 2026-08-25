@@ -39,11 +39,17 @@ async function loadActionableItems(db: Db): Promise<ActionablePanelItem[]> {
 }
 
 export async function listUserNotifications(db: Db, userId: string, limit?: number): Promise<Notification[]> {
-  const cursor = notificationsCollection(db)
-    .find({ user_id: userId })
-    .sort({ read_at: 1, created_at: -1 });
-  const notifications = (typeof limit === "number" ? cursor.limit(limit) : cursor).toArray();
-  return (await notifications).map((notification) => ({
+  // last_notified_at, bakım durumu gerçekten yeni bir uyarı ürettiğinde güncellenir.
+  // Eski belgelerde bu alan bulunmayabileceği için created_at güvenli geri dönüş alanıdır.
+  const pipeline = [
+    { $match: { user_id: userId } },
+    { $set: { notification_sort_at: { $ifNull: ["$last_notified_at", "$created_at"] } } },
+    { $sort: { notification_sort_at: -1, created_at: -1, _id: -1 } },
+    ...(typeof limit === "number" ? [{ $limit: limit }] : []),
+    { $unset: "notification_sort_at" },
+  ];
+  const notifications = await notificationsCollection(db).aggregate<Notification>(pipeline).toArray();
+  return notifications.map((notification) => ({
     ...notification,
     _id: notification._id == null ? undefined : String(notification._id),
   }));
@@ -74,11 +80,13 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
   const updates = actionable.map((item) => {
     const dedupeKey = `maintenance:${user._id}:${item.engine_id}:${item.type_key}`;
     const text = notificationText(item.status, item.engine_name, item.type_label, item.remaining);
+    const previous = existingByKey.get(dedupeKey);
+    const isNewNotification = !previous || previous.status !== item.status;
     return {
       dedupeKey,
       text,
       status: item.status,
-      previous: existingByKey.get(dedupeKey),
+      previous,
       update: {
         updateOne: {
           filter: { dedupe_key: dedupeKey },
@@ -91,8 +99,9 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
               message: text.message,
               href: "/dashboard",
               updated_at: now,
+              ...(isNewNotification ? { last_notified_at: now } : {}),
             },
-            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, read_at: null },
+            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, last_notified_at: now, read_at: null },
           },
           upsert: true,
         },

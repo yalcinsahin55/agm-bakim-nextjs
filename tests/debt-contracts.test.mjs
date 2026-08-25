@@ -60,6 +60,17 @@ test("notification refresh is POST-only and the page uses the mutation-safe rout
   assert.doesNotMatch(notificationBell, /notifications\?refresh=1/);
 });
 
+test("notifications are ordered by their latest notification event", async () => {
+  const notificationModule = await source("lib/notifications.ts");
+  const notificationsPage = await source("app/bildirimler/page.tsx");
+  assert.match(notificationModule, /last_notified_at/);
+  assert.match(notificationModule, /\$ifNull: \["\$last_notified_at", "\$created_at"\]/);
+  assert.match(notificationModule, /notification_sort_at: -1, created_at: -1, _id: -1/);
+  assert.match(notificationsPage, /function sortNewestFirst\(notifications: Notification\[\]\)/);
+  assert.match(notificationsPage, /last_notified_at \?\? notification\.created_at/);
+  assert.match(notificationsPage, /Geldi: \{formatNotificationDate\(notification\)\}/);
+});
+
 test("backup and upload large-payload paths use bounded processing", async () => {
   const backupExport = await source("app/api/backups/export/route.ts");
   const backupRestore = await source("app/api/backups/restore/route.ts");
