@@ -186,6 +186,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const nextConfig = await source("next.config.js");
   const mediaUpload = await source("lib/mediaUpload.ts");
   const uploadPresigned = await source("app/api/blob/upload-presigned/route.ts");
+  const mediaUrls = await source("lib/mediaUrls.ts");
+  const mediaRoute = await source("app/api/media/file/route.ts");
   const chunkUpload = await source("lib/chunkUpload.ts");
   const queue = await source("lib/offlineQueue.ts");
   const complete = await source("app/tamamla/page.tsx");
@@ -247,6 +249,11 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(uploadPresigned, /video\/\*/);
   assert.match(uploadPresigned, /maximumSizeInBytes: VIDEO_MAX_BYTES/);
   assert.match(chunkUpload, /uploadMaintenanceMedia\(file, "video"\)/);
+  assert.match(mediaUrls, /api\/media\/file\?kind=\$\{kind\}&url=/);
+  assert.match(mediaUrls, /private\.blob\.vercel-storage\.com/);
+  assert.match(mediaRoute, /fetchStoredBlob/);
+  assert.match(mediaRoute, /Giriş gerekli/);
+  assert.match(mediaRoute, /Content-Disposition.*inline/);
   assert.match(queue, /kind: "photo" \| "video" \| "report"/);
   assert.match(queue, /job\.payload\.report_attachments/);
   assert.match(queue, /uploadReportAttachment/);
@@ -255,6 +262,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.doesNotMatch(complete, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(records, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(oilPage, /\/api\/blob\/upload-server/);
+  assert.match(complete, /getMediaDisplayUrl/);
+  assert.match(records, /getMediaDisplayUrl/);
   assert.match(records, /\/api\/records\/\$\{selectedRecord\._id\}\/attachments\/\$\{encodeURIComponent\(attachment\.id\)\}/);
 });
 

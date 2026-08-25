@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
+import { getMediaDisplayUrl } from "@/lib/mediaUrls";
 import { queueRecord, type QueuedMedia } from "@/lib/offlineQueue";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -148,9 +149,9 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: stri
 
 function getPhotoSrc(photo: string, previews: Record<string, string> = {}): string {
   if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
-  return photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")
-    ? photo
-    : `data:image/jpeg;base64,${photo}`;
+  return photo.startsWith("http://") || photo.startsWith("https://")
+    ? getMediaDisplayUrl(photo, "image")
+    : photo.startsWith("data:") ? photo : `data:image/jpeg;base64,${photo}`;
 }
 
 function makeOfflineId(): string {
@@ -162,7 +163,7 @@ function makeOfflineId(): string {
 function getVideoSrc(v: VideoItem | string, previews: Record<string, string> = {}): string {
   const url = typeof v === "string" ? v : v?.url;
   if (url?.startsWith("offline:")) return previews[url.slice("offline:".length)] || "";
-  if (url) return url;
+  if (url) return getMediaDisplayUrl(url, "video");
   if (typeof v !== "string" && v?.data_b64) return `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
   return "";
 }
