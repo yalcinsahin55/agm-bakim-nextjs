@@ -95,6 +95,7 @@ async function postImportHours(req: NextRequest) {
       const newLoad = parseMetric(row[loadCol]);
       if (newLoad !== null && newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
     }
+    if (!hoursChanged && !loadChanged) continue;
     const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
     const nextLoadKw = loadChanged && typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0);
     if (hoursChanged || loadChanged) {

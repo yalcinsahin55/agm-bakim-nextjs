@@ -66,6 +66,7 @@ test("record date and bulk update safeguards stay in place", async () => {
   assert.match(engineHours, /writeAuditLog/);
   assert.match(importHours, /enginesCol\.bulkWrite/);
   assert.match(importHours, /writeAuditLog/);
+  assert.match(importHours, /if \(!hoursChanged && !loadChanged\) continue/);
 });
 
 test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async () => {
