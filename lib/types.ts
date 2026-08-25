@@ -81,6 +81,16 @@ export interface MaintenanceTechnicianContribution {
   duration_minutes: number;
 }
 
+export interface ReportAttachment {
+  id: string;
+  url: string;
+  filename: string;
+  mime: "application/pdf" | "application/vnd.ms-excel" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/msword" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  size: number;
+  uploaded_at: Date | string;
+  uploaded_by_id?: string;
+}
+
 export interface MaintenanceRecord {
   _id: string;
   engine_id: string;
@@ -97,6 +107,7 @@ export interface MaintenanceRecord {
   photos_b64?: string[];
   photos?: string[];
   videos?: (VideoRef | string)[];
+  report_attachments?: ReportAttachment[];
   pressure_reading?: number;
   technician_id: string;
   technician_name: string;

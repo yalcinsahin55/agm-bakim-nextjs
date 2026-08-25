@@ -34,7 +34,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 | Alan | Özellikler |
 |---|---|
 | Motor yönetimi | Motor listesi, çalışma saati, yük bilgisi, saat geçmişi ve motor bazlı bakım durumu |
-| Bakım kayıtları | Bakım türü, motor saati, not, kontrol listesi, fotoğraf/video kanıtı, yönetici teyidi ve bakım geçmişi |
+| Bakım kayıtları | Bakım türü, motor saati, not, kontrol listesi, fotoğraf/video kanıtı, PDF/Excel/Word rapor ekleri, yönetici teyidi ve bakım geçmişi |
 | Zaman takibi | Başlangıç ve bitiş için tam tarih+saat, çok günlü/haftalık bakım desteği ve otomatik toplam süre hesabı |
 | Ekip çalışması | Sorumlu teknisyen ile bakımda çalışan diğer teknisyenlerin ayrı tutulması; mekanik/elektromekanik türleri ve kişi bazlı katkı süreleri |
 | Dış servis | Garanti veya harici servis bakımlarının yönetici tarafından kaydedilmesi; bu kayıtların teknisyen performansından ayrılması |
@@ -78,7 +78,7 @@ Dağıtık rate limit için production’da `UPSTASH_REDIS_REST_URL`, `UPSTASH_R
 1. Kullanıcı motoru ve bakım türünü seçer. QR bağlantısı kullanılmışsa bu seçimlerden biri veya ikisi otomatik doldurulabilir.
 2. Motor çalışma saati girilir. Birincil bakım türünün yanı sıra aynı işlemde tamamlanan ek bakım türleri seçilebilir.
 3. Yeni kayıtlarda bakım tarihi ayrıca seçilmez; bakım başlangıç ve bitiş tarih+saatleri tek tarih kaynağıdır. Bitiş zamanı başlangıçtan önce olamaz.
-4. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf veya video kanıtlarından en az biri eklenir.
+4. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtlarından en az biri eklenir.
 5. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur. Yönetici bakım tamamlıyorsa sorumlu/yetkili bakımcıyı ayrıca seçebilir; bu alan teknisyenlere açılmaz.
 6. Kayıt çevrimiçiyse API’ye gönderilir; bağlantı yoksa IndexedDB kuyruğuna alınır ve bağlantı geri geldiğinde senkronize edilir.
 7. Sunucu tarafı motoru, bakım türünü, kanıtları, teknisyenleri ve zaman alanlarını doğrular; bakım süresini kendisi hesaplayarak kaydeder.
@@ -178,11 +178,11 @@ Bakım tamamlama formu bağlantı olmadığında kaydı tarayıcıdaki IndexedDB
 - Mevcut kayıtlar silinmez.
 - Eski payload biçimleri desteklenir.
 - Yeni v2 kayıtlarında başlangıç ve bitiş tarih+saatleri korunur.
-- Medya yükleme başarısızsa kayıt ve medya kuyruğu kullanıcıya bildirilmeye devam eder.
+- Medya veya PDF/Excel/Word rapor eki yükleme başarısızsa kayıt ve dosya kuyruğu kullanıcıya bildirilmeye devam eder.
 
 ## Medya depolama
 
-Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır. Kayıt listeleri ve `GET /api/records/:id` varsayılan olarak ağır `photos_b64`/`videos` alanlarını taşımaz; kayıt detayında medya gerektiğinde `include_media=true` kullanılır.
+Yeni fotoğraf ve video dosyaları Vercel Blob Storage’a yüklenir; MongoDB’de büyük medya byte’ları tutulmaz. MongoDB’de dosya URL’si ve gerekli metadata saklanır. Eski kayıtlardaki base64 fotoğraf/video biçimleri geriye dönük görüntüleme için desteklenir. Yeni kayıt ve düzenleme API’lerinde legacy base64 medya toplamı 8 MB ile sınırlandırılmıştır; yeni yüklemelerde Blob akışı kullanılmalıdır. Kayıt listeleri ve `GET /api/records/:id` varsayılan olarak ağır `photos_b64`/`videos` alanlarını taşımaz; kayıt detayında medya gerektiğinde `include_media=true` kullanılır. Bakım tamamlama ve kayıt düzenleme ekranlarında PDF, `.xls/.xlsx` ve `.doc/.docx` rapor ekleri Vercel Blob’a yüklenir; MongoDB’de yalnızca güvenli metadata tutulur. Dosya başına 20 MB, kayıt başına 10 dosya sınırı vardır. Rapor ekleri kayıt detayında authenticated same-origin proxy üzerinden PDF için önizlenebilir, Excel/Word için indirilebilir; liste endpointine dosya byte’ları eklenmez.
 
 Tamamlanmayan parçalı video yüklemeleri `video_chunks.at` alanındaki 24 saatlik TTL index’i ile otomatik temizlenir. Başarısız veya yarım kalmış bir video yüklemesinin parçaları kalıcı olarak birikmez. Chunk kayıtları kullanıcı kimliğine bağlanır; bir kullanıcının yükleme parçaları başka bir kullanıcı tarafından okunamaz veya birleştirilemez. Çevrimdışı PATCH tekrarlarında ek bakım kayıtları deterministik idempotency anahtarıyla kontrol edilir; aynı ek bakım ikinci kez oluşturulmaz.
 

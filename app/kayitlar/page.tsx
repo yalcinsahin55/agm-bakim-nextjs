@@ -9,7 +9,10 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
+import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import type { ReportAttachment } from "@/lib/types";
+import { formatReportAttachmentSize } from "@/lib/reportAttachments";
 import { engineSortKey } from "@/lib/status";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
@@ -77,6 +80,7 @@ interface MaintenanceRecord {
   manager_confirmed_by_role?: string;
   group_id?: string | null;
   group_types?: Array<{ type_key: string; type_label: string }>;
+  report_attachments?: ReportAttachment[];
 }
 
 function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
@@ -250,6 +254,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
   const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
+  const [reportAttachments, setReportAttachments] = useState<ReportAttachment[]>(record.report_attachments || []);
+  const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
@@ -344,6 +350,19 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
     }
     setVideos((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  function handleOfflineReportFile(file: File, attachment: ReportAttachment): void {
+    const id = attachment.url.startsWith("offline:") ? attachment.url.slice("offline:".length) : makeOfflineId();
+    setOfflineMedia((current) => [...current, { id, kind: "report", name: attachment.filename, type: attachment.mime, blob: file }]);
+    createOfflinePreview(id, file);
+  }
+
+  function removeReportAttachment(attachment: ReportAttachment): void {
+    if (!attachment.url.startsWith("offline:")) return;
+    const id = attachment.url.slice("offline:".length);
+    revokeOfflinePreview(id);
+    setOfflineMedia((current) => current.filter((media) => media.id !== id));
   }
 
   async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
@@ -466,6 +485,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       technician_note: techNote,
       photos,
       videos,
+      report_attachments: reportAttachments,
       pressure_reading: pressure !== "" ? Number(pressure) : undefined,
       other_technician_ids: technicianSource === "external_service" ? [] : otherTechnicianIds.filter((id) => supportTechnicians.some((technician) => technician.id === id)),
       other_technician_durations: technicianSource === "external_service" ? {} : Object.fromEntries(otherTechnicianIds.filter((id) => supportTechnicians.some((technician) => technician.id === id)).map((id) => [id, normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes)])
@@ -480,7 +500,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
       if (!navigator.onLine || offlineMedia.length > 0) {
         await queueRecord(payload, offlineMedia, { method: "PATCH", endpoint: `/api/records/${record._id}` });
         toast.dismiss(loadingToast);
-        toast.success(navigator.onLine ? "Güncelleme senkronizasyon kuyruğuna alındı." : "İnternet yok. Güncelleme güvenle kuyruğa alındı.");
+        toast.success(navigator.onLine ? "Güncelleme ve rapor ekleri senkronizasyon kuyruğuna alındı." : "İnternet yok. Güncelleme ve rapor ekleri güvenle kuyruğa alındı.");
         onSaved();
         return;
       }
@@ -587,9 +607,10 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
 
       {offlineMedia.length > 0 && (
         <div className="rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-2 text-[10.5px] text-amber">
-          {offlineMedia.length} medya bağlantı gelince yüklenecek; kaydettiğinde güncelleme kuyruğa alınır.
+          {offlineMedia.length} medya/rapor eki bağlantı gelince yüklenecek; kaydettiğinde güncelleme kuyruğa alınır.
         </div>
       )}
+      <ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={busy} />
       {photos.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           {photos.map((p, idx) => (
@@ -640,7 +661,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
         </button>
         <button
           onClick={save}
-          disabled={busy}
+          disabled={busy || reportAttachmentBusy}
           className="flex-1 py-2.5 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition"
         >
           {busy ? (
@@ -1001,6 +1022,7 @@ export default function KayitlarPage() {
                   {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
                   {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
                   {r.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {r.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
+                  {r.report_attachments?.length ? <div className="mt-1 text-[11px] text-purple-200">📄 {r.report_attachments.length} detaylı rapor eki</div> : null}
 
                   <div className="flex flex-wrap gap-2 mt-2">
                     <button
@@ -1160,6 +1182,7 @@ export default function KayitlarPage() {
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
             {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}
+            {selectedRecord.report_attachments?.length ? <div className="mt-4 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3"><div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div><div className="flex flex-col gap-1.5">{selectedRecord.report_attachments.map((attachment) => <a key={attachment.id} href={`/api/records/${selectedRecord._id}/attachments/${encodeURIComponent(attachment.id)}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10.5px] text-text hover:border-purple-300"><span className="min-w-0 truncate font-bold">{attachment.filename}</span><span className="flex-shrink-0 text-[9px] text-faint">{attachment.mime === "application/pdf" ? "PDF" : attachment.mime.includes("spreadsheet") || attachment.mime.includes("excel") ? "Excel" : "Word"} · {formatReportAttachmentSize(attachment.size)} ↗</span></a>)}</div></div> : null}
             {((selectedRecord.photos || selectedRecord.photos_b64 || []).length > 0 || (selectedRecord.videos || []).length > 0) && (
               <div className="mt-4">
                 <div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">Medya</div>

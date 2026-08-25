@@ -13,6 +13,7 @@ import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTe
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
+import { normalizeReportAttachments } from "@/lib/reportAttachments";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { recordSchema, formatZodError } from "@/lib/schemas";
@@ -85,10 +86,17 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
 
   if (legacyMediaTooLarge(photos_b64, videos)) {
     return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
+  }
+  if (report_attachments?.some((attachment) => attachment.url.startsWith("offline:"))) {
+    return NextResponse.json({ error: "Rapor eklerinden biri henüz senkronize edilmedi. İnternet bağlantısını kontrol edip tekrar deneyin." }, { status: 400 });
+  }
+  const normalizedReportAttachments = report_attachments === undefined ? undefined : normalizeReportAttachments(report_attachments, user._id);
+  if (report_attachments && normalizedReportAttachments && normalizedReportAttachments.length !== report_attachments.length) {
+    return NextResponse.json({ error: "Rapor eklerinden biri geçersiz veya güvenilir Blob URL’si değil." }, { status: 400 });
   }
 
   type RecordUpdate = Partial<MaintenanceRecordDocument> & { $unset?: Record<string, ""> };
@@ -270,6 +278,7 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   if (Array.isArray(photos_b64)) update.photos_b64 = photos_b64;
   if (Array.isArray(photos)) update.photos = photos;
   if (Array.isArray(videos)) update.videos = videos;
+  if (Array.isArray(normalizedReportAttachments)) update.report_attachments = normalizedReportAttachments;
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
   const { $unset: unset, ...setFields } = update;

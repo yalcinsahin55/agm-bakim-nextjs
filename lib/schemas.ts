@@ -1,4 +1,5 @@
-import { z, type ZodError } from "zod";
+import { z, ZodError } from "zod";
+import { isAllowedReportAttachmentUrl, isReportAttachmentMime, REPORT_ATTACHMENT_MAX_BYTES, REPORT_ATTACHMENT_MAX_COUNT } from "@/lib/reportAttachments";
 
 // 🔐 Giriş validasyonu. `email` alanı eski istemcilerle geriye dönük uyumludur.
 export const loginSchema = z.object({
@@ -97,6 +98,16 @@ export const recordSchema = z.object({
     )
     .max(5, "En fazla 5 video.")
     .optional(),
+
+  report_attachments: z.array(z.object({
+    id: z.string().min(8).max(100),
+    url: z.string().refine((value) => value.startsWith("offline:") || isAllowedReportAttachmentUrl(value), "Rapor eki yalnızca güvenilir Blob URL’si olmalıdır."),
+    filename: z.string().trim().min(1).max(180),
+    mime: z.string().refine(isReportAttachmentMime, "Rapor eki PDF, Excel veya Word formatında olmalıdır."),
+    size: z.number().int().positive().max(REPORT_ATTACHMENT_MAX_BYTES, "Rapor eki 20 MB’tan küçük olmalıdır."),
+    uploaded_at: z.string().datetime({ offset: true }),
+    uploaded_by_id: z.string().min(1).max(100).optional(),
+  })).max(REPORT_ATTACHMENT_MAX_COUNT, `En fazla ${REPORT_ATTACHMENT_MAX_COUNT} rapor eki.`).optional(),
 
   pressure_reading: z
     .number({ invalid_type_error: "Basınç bir sayı olmalıdır." })

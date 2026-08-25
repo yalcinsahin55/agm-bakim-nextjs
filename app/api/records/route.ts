@@ -14,6 +14,7 @@ import { EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, canTe
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
+import { normalizeReportAttachments } from "@/lib/reportAttachments";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import type { MaintenanceRecordDocument, MaintenanceTypeDocument } from "@/lib/dbTypes";
@@ -172,13 +173,20 @@ async function postRecord(req: NextRequest) {
 
     const {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
-      photos_b64, photos, videos, pressure_reading, backdated, record_date, period, extra_types,
+      photos_b64, photos, videos, report_attachments, pressure_reading, backdated, record_date, period, extra_types,
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
     } = parsed.data as RecordInput;
 
     if (legacyMediaTooLarge(photos_b64, videos)) {
       return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
+    }
+    if (report_attachments?.some((attachment) => attachment.url.startsWith("offline:"))) {
+      return NextResponse.json({ error: "Rapor eklerinden biri henüz senkronize edilmedi. İnternet bağlantısını kontrol edip tekrar deneyin." }, { status: 400 });
+    }
+    const normalizedReportAttachments = normalizeReportAttachments(report_attachments, user._id);
+    if (report_attachments && normalizedReportAttachments.length !== report_attachments.length) {
+      return NextResponse.json({ error: "Rapor eklerinden biri geçersiz veya güvenilir Blob URL’si değil." }, { status: 400 });
     }
 
     operationStep = "load_collections";
@@ -188,7 +196,7 @@ async function postRecord(req: NextRequest) {
 
     if (completion_confirmation === true) {
       const checklistComplete = Array.isArray(checklist) && checklist.length > 0 && checklist.every((entry) => entry.completed === true);
-      const hasEvidence = Boolean((technician_note || "").trim() || (photos_b64?.length || photos?.length || videos?.length));
+      const hasEvidence = Boolean((technician_note || "").trim() || (photos_b64?.length || photos?.length || videos?.length || normalizedReportAttachments.length));
       if (!checklistComplete || !hasEvidence) {
         return NextResponse.json({ error: "Bakım kaydı için kontrol listesi ve en az bir bakım kanıtı gereklidir." }, { status: 400 });
       }
@@ -324,6 +332,7 @@ async function postRecord(req: NextRequest) {
         photos_b64: isPrimary ? (photos_b64 || []) : [],
         photos: isPrimary ? (photos || []) : [],
         videos: isPrimary ? (videos || []) : [],
+        report_attachments: isPrimary ? normalizedReportAttachments : [],
         checklist: isPrimary ? normalizedChecklist : [],
         ...(isPrimary && completion_confirmation === true ? { completion_confirmed_at: new Date() } : {}),
         manager_confirmation_status: managerConfirmationStatus,
@@ -402,7 +411,7 @@ async function postRecord(req: NextRequest) {
       entity: "maintenance_record",
       entityId: groupId,
       summary: `${engine.name} için ${completedLabels.join(", ")} bakımı oluşturuldu${shouldConfirmOnCreate ? " ve yönetici tarafından teyit edildi" : "; yönetici teyidi bekleniyor"}`,
-      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), responsible_technician_duration: responsibleDurationMinutes, technician_contributions: technicianContributions, completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
+      after: { engine_id, type_key, type_label, hour_at_completion, completedLabels, technician_id: responsibleTechnicianId, technician_name: responsibleTechnicianName, technician_source: useExternalService ? "external_service" : "internal", external_service_name: externalServiceName || undefined, other_technician_ids: otherTechnicians.map((technician) => technician.id), responsible_technician_duration: responsibleDurationMinutes, technician_contributions: technicianContributions, report_attachment_count: normalizedReportAttachments.length, completion_confirmation: completion_confirmation === true, manager_confirmation_status: managerConfirmationStatus, manager_confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate, maintenance_start_at: maintenanceStartAt, maintenance_end_at: maintenanceEndAt, maintenance_duration_minutes: maintenanceDurationMinutes },
     });
     invalidateMaintenancePanelServerCache();
     operationStep = "refresh_notifications";

@@ -10,7 +10,7 @@ const OFFLINE_PREFIX = "offline:";
 
 export interface QueuedMedia {
   id: string;
-  kind: "photo" | "video";
+  kind: "photo" | "video" | "report";
   name: string;
   type: string;
   blob: Blob;
@@ -147,6 +147,16 @@ async function uploadPhoto(blob: Blob, name: string): Promise<string> {
   return data.url;
 }
 
+async function uploadReport(blob: Blob, name: string, mime: string): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", new File([blob], name, { type: mime }));
+  formData.append("folder", "report-attachments");
+  const response = await fetch("/api/blob/upload-server", { method: "POST", body: formData });
+  const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
+  if (!response.ok || !data.url) throw new Error(data.error || "Rapor eki yüklenemedi.");
+  return data.url;
+}
+
 function replacePhotoPlaceholder(photos: unknown, id: string, url: string): unknown[] {
   return Array.isArray(photos) ? photos.map((photo) => photo === `${OFFLINE_PREFIX}${id}` ? url : photo) : [];
 }
@@ -156,6 +166,14 @@ function replaceVideoPlaceholder(videos: unknown, id: string, url: string): unkn
     if (!video || typeof video !== "object") return video;
     const item = video as Record<string, unknown>;
     return item.url === `${OFFLINE_PREFIX}${id}` ? { ...item, url } : video;
+  }) : [];
+}
+
+function replaceReportPlaceholder(attachments: unknown, id: string, url: string): unknown[] {
+  return Array.isArray(attachments) ? attachments.map((attachment) => {
+    if (!attachment || typeof attachment !== "object") return attachment;
+    const item = attachment as Record<string, unknown>;
+    return item.url === `${OFFLINE_PREFIX}${id}` ? { ...item, url } : attachment;
   }) : [];
 }
 
@@ -182,11 +200,16 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
           if (!pending) continue;
           const url = await uploadPhoto(storedBlob, media.name);
           job.payload.photos = replacePhotoPlaceholder(job.payload.photos, media.id, url);
-        } else {
+        } else if (media.kind === "video") {
           const pending = Array.isArray(job.payload.videos) && job.payload.videos.some((video) => video && typeof video === "object" && (video as Record<string, unknown>).url === placeholder);
           if (!pending) continue;
           const url = await uploadVideoChunked(new File([storedBlob], media.name, { type: media.type || "video/mp4" }));
           job.payload.videos = replaceVideoPlaceholder(job.payload.videos, media.id, url);
+        } else {
+          const pending = Array.isArray(job.payload.report_attachments) && job.payload.report_attachments.some((attachment) => attachment && typeof attachment === "object" && (attachment as Record<string, unknown>).url === placeholder);
+          if (!pending) continue;
+          const url = await uploadReport(storedBlob, media.name, media.type);
+          job.payload.report_attachments = replaceReportPlaceholder(job.payload.report_attachments, media.id, url);
         }
       }
 

@@ -151,3 +151,34 @@ test("no protected UI route relies on middleware as its authorization boundary",
   assert.match(permissions, /canAccessRoute/);
   assert.match(permissions, /normalizeRole/);
 });
+
+test("maintenance report attachments stay bounded, authenticated, and offline-safe", async () => {
+  const helper = await source("lib/reportAttachments.ts");
+  const upload = await source("app/api/blob/upload-server/route.ts");
+  const schema = await source("lib/schemas.ts");
+  const create = await source("app/api/records/route.ts");
+  const update = await source("app/api/records/[id]/route.ts");
+  const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
+  const queue = await source("lib/offlineQueue.ts");
+  const complete = await source("app/tamamla/page.tsx");
+  const records = await source("app/kayitlar/page.tsx");
+  assert.match(helper, /REPORT_ATTACHMENT_MAX_BYTES = 20 \* 1024 \* 1024/);
+  assert.match(helper, /\.xlsx/);
+  assert.match(helper, /\.docx/);
+  assert.match(upload, /report-attachments/);
+  assert.match(upload, /resolveReportAttachmentMime/);
+  assert.match(upload, /REPORT_ATTACHMENT_MAX_BYTES/);
+  assert.match(schema, /report_attachments/);
+  assert.match(schema, /isAllowedReportAttachmentUrl/);
+  assert.match(create, /normalizedReportAttachments/);
+  assert.match(create, /report_attachments: isPrimary/);
+  assert.match(update, /update\.report_attachments = normalizedReportAttachments/);
+  assert.match(fileRoute, /record-attachment-read/);
+  assert.match(fileRoute, /Content-Disposition/);
+  assert.match(fileRoute, /Cache-Control.*private, no-store/);
+  assert.match(queue, /kind: "photo" \| "video" \| "report"/);
+  assert.match(queue, /job\.payload\.report_attachments/);
+  assert.match(complete, /<ReportAttachmentPicker/);
+  assert.match(records, /<ReportAttachmentPicker/);
+  assert.match(records, /\/api\/records\/\$\{selectedRecord\._id\}\/attachments\/\$\{encodeURIComponent\(attachment\.id\)\}/);
+});
