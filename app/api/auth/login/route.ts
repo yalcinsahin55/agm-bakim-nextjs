@@ -9,6 +9,7 @@ import { loginSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { withApiTiming } from "@/lib/performance";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,18 @@ async function postLogin(req: NextRequest) {
 
     if (user.active === false) {
       return NextResponse.json({ error: "Hesabınız pasif durumda. Yöneticinizle iletişime geçin." }, { status: 403 });
+    }
+
+    try {
+      await writeAuditLog(db, {
+        user,
+        action: "login",
+        entity: "user",
+        entityId: user._id,
+        summary: `${user.full_name} giriş yaptı`,
+      });
+    } catch (auditError) {
+      console.error("Giriş audit kaydı yazılamadı:", auditError instanceof Error ? auditError.name : "UnknownError");
     }
 
     const token = await createSessionToken(user._id);

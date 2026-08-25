@@ -85,6 +85,13 @@ test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async
   await assert.rejects(source("pnpm-workspace.yaml"));
 });
 
+test("successful login is audited without blocking session creation", async () => {
+  const login = await source("app/api/auth/login/route.ts");
+  assert.match(login, /action: "login"/);
+  assert.match(login, /entity: "user"/);
+  assert.match(login, /Giriş audit kaydı yazılamadı/);
+});
+
 test("engine hours and maintenance type changes are audited with before/after data", async () => {
   const engines = await source("app/api/engines/route.ts");
   const engineHours = await source("app/api/engines/hours/route.ts");
