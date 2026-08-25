@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ async function getIntervalSummary(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = await enforceApiRateLimit(req, "records-interval-summary-read", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
     await ensureAppIndexes(db);
 
     const engineId = new URL(req.url).searchParams.get("engine_id");

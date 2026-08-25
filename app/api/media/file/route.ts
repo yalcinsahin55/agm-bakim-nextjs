@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
 import { fetchStoredBlob } from "@/lib/blobStorage";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ async function getMedia(request: NextRequest): Promise<Response> {
   const db = await getDb();
   const user = await getCurrentUser(request, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  const rateLimited = await enforceApiRateLimit(request, "media-read", 240, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const url = request.nextUrl.searchParams.get("url") || "";
   const kind = request.nextUrl.searchParams.get("kind");

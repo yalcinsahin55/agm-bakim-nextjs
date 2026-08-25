@@ -67,6 +67,8 @@ async function getRecords(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const readRateLimited = await enforceApiRateLimit(req, "records-read", 240, 10 * 60 * 1000, user._id);
+    if (readRateLimited) return readRateLimited;
     await ensureAppIndexes(db);
 
     const { searchParams } = new URL(req.url);

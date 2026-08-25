@@ -2,6 +2,7 @@ import { oilAnalysesCollection, usersCollection } from "@/lib/dbCollections";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedPdfUrl, looksLikePdf, MAX_PDF_BYTES, readPdfResponse } from "@/lib/pdfSecurity";
 import { fetchStoredBlob } from "@/lib/blobStorage";
@@ -30,6 +31,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const db = await getDb();
     const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = await enforceApiRateLimit(req, "oil-analysis-file-read", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Geçersiz analiz kaydı." }, { status: 400 });

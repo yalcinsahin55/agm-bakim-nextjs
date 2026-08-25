@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     if (!hasPermission(user.role, "reports:read")) return NextResponse.json({ error: "Rapor görme yetkiniz yok." }, { status: 403 });
+    const rateLimited = await enforceApiRateLimit(req, "engine-report-read", 60, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { all, page, pageSize, skip } = parseParams(req);
     const searchParams = new URL(req.url).searchParams;

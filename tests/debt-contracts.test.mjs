@@ -21,6 +21,26 @@ test("protected APIs keep server-side authentication and role guards", async () 
   assert.match(await source("app/api/backups/export/route.ts"), /canManageUsers\(user\.role\)/);
 });
 
+test("sensitive read routes keep user-scoped rate limits", async () => {
+  const routes = await Promise.all([
+    source("app/api/audit-logs/route.ts"),
+    source("app/api/media/file/route.ts"),
+    source("app/api/oil-analyses/[id]/file/route.ts"),
+    source("app/api/records/route.ts"),
+    source("app/api/records/interval-summary/route.ts"),
+    source("app/api/reports/engine/[id]/route.ts"),
+    source("app/api/users/technicians/route.ts"),
+  ]);
+  for (const route of routes) assert.match(route, /enforceApiRateLimit\(/);
+  assert.match(routes[0], /audit-log-read/);
+  assert.match(routes[1], /media-read/);
+  assert.match(routes[2], /oil-analysis-file-read/);
+  assert.match(routes[3], /records-read/);
+  assert.match(routes[4], /records-interval-summary-read/);
+  assert.match(routes[5], /engine-report-read/);
+  assert.match(routes[6], /technician-list-read/);
+});
+
 test("legacy media and oil PDF fallback remain bounded", async () => {
   const media = await source("lib/mediaValidation.ts");
   const oil = await source("app/api/oil-analyses/route.ts");

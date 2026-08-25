@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { listActiveTechnicians } from "@/lib/technicians";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
     if (!canWriteMaintenance(user.role)) {
       return NextResponse.json({ error: "Teknisyen listesine erişim yetkiniz yok." }, { status: 403 });
     }
+    const rateLimited = await enforceApiRateLimit(req, "technician-list-read", 240, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
     return NextResponse.json(await listActiveTechnicians(db));
   } catch (error) {
     console.error("GET /api/users/technicians hatası:", error instanceof Error ? error.name : "UnknownError");

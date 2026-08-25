@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { AuditAction, AuditLogDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Bu kayıtları görme yetkiniz yok." }, { status: 403 });
+  const rateLimited = await enforceApiRateLimit(req, "audit-log-read", 120, 10 * 60 * 1000, user._id);
+  if (rateLimited) return rateLimited;
 
   const { searchParams } = new URL(req.url);
   const page = Math.max(Number.parseInt(searchParams.get("page") || "1", 10) || 1, 1);

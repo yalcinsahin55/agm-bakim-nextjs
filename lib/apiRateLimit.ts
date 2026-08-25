@@ -39,6 +39,7 @@ const FAIL_CLOSED_SCOPES = new Set([
   "pressure-reading-create",
   "pressure-reading-delete",
   "record-confirm",
+  "audit-log-read",
 ]);
 
 function getFailureMode(scope: string): RateLimitFailureMode {
