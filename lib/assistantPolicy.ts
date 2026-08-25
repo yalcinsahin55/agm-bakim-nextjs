@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ASSISTANT_POLICY_VERSION = "1.3" as const;
+export const ASSISTANT_POLICY_VERSION = "1.4" as const;
 export const MAX_ASSISTANT_QUESTION_LENGTH = 300;
 export const ASSISTANT_RATE_LIMIT = 20;
 export const ASSISTANT_RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -75,6 +75,8 @@ export interface AssistantQuery {
   teamOnly?: boolean;
   latestOnly?: boolean;
   unreadOnly?: boolean;
+  /** “Tümünü/hepsini göster” gibi ifadelerde güvenli üst sınır dahilinde tüm sonuçları döndürür. */
+  showAll?: boolean;
   /** Export sırasında seçilen bakım türlerini sonuç kümesinden dışlamak için kullanılır. */
   excludedTypeLabels?: string[];
 }
@@ -179,6 +181,9 @@ const ENGINE_HISTORY_PATTERNS = [
   /son\s+bakım/iu,
   /bakım\s+geçmiş/iu,
   /motor\s+\S+/iu,
+  /(?:yapılan|yapılmış|tamamlanan|gerçekleşen)\s+bakım(?:lar|ları)?/iu,
+  /(?:tüm|bütün|hepsi)\s+bakım(?:lar|ları|larını)?/iu,
+  /bakım\s+(?:kayıt|rapor)(?:ları|larını)?/iu,
 ];
 
 const RECORD_FILTER_PATTERNS = [
@@ -230,6 +235,9 @@ const TECHNICIAN_DIRECTORY_PATTERNS = [
 const MAINTENANCE_HEALTH_PATTERNS = [
   /bakım\s+(?:sağlığı|durumu|takibi)/iu,
   /kalan\s+saat(?:i|leri)?/iu,
+  /(?:ne\s+kadar|kaç(?:\s+saat)?)\s+kaldı/iu,
+  /bakım(?:ı|ını|ları|larını)?\s+[^?]{0,50}\b(?:çalış(?:tı|mış|ılan)?|harcanan)\b/iu,
+  /(?:son\s+bakımdan|bakımdan)\s+beri\s+(?:kaç\s+saat|ne\s+kadar)\s+çalış/iu,
   /kritik\s+bakım(?:lar|ları)?/iu,
   /hangi\s+bakım(?:lar|ları)?\s+kritik/iu,
   /hangi\s+motor(?:lar|ların)?\s+(?:kritik|gecikmiş|yaklaşıyor|normal)/iu,
@@ -299,7 +307,13 @@ function extractMaintenanceTypeQuery(question: string): string | undefined {
   const natural = question.match(/^(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+(?:hangi\s+motorlarda|nerede|kaç)/iu)
     || question.match(/(?:hangi\s+motorlarda|motorlarda)\s+(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+(?:yapıldı|yapılmış|gerçekleşti|var)/iu)
     || question.match(/^(.{2,80}?)\s+bakım(?:ı|ını|ları|larını)?\s+yap(?:ıldı|ılan)\s+motorlar?/iu);
-  return natural?.[1]?.trim();
+  const byEngine = question.match(/\b(?:agm[-\s]?\d{1,3}|motor(?:un|da|için)?)\b(?:['’]?[a-zçğıöşü]+)?\s+(.{2,80}?)\s+bakım(?:ı|ını|ları|larını|ında|inde)?\s+(?:için|ne\s+kadar|kaç(?:\s+saat)?|kaldı|çalış)/iu);
+  const candidate = (natural?.[1] || byEngine?.[1])?.trim();
+  if (!candidate) return undefined;
+  return candidate
+    .replace(/^\s*(?:agm[-\s]?\d{1,3}|motor(?:un|da|için)?)\b(?:['’]?[a-zçğıöşü]+)?\s*/iu, "")
+    .replace(/^(?:için|üzerinde|hakkında)\s+/iu, "")
+    .trim() || undefined;
 }
 
 function extractServiceQuery(question: string): string | undefined {
@@ -310,7 +324,7 @@ function extractServiceQuery(question: string): string | undefined {
   return undefined;
 }
 
-function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "maintenancePeriodHours" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "recordFilters" | "hourRange" | "durationRange" | "teamOnly" | "unreadOnly"> {
+function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQuery" | "maintenancePeriodHours" | "serviceQuery" | "technicianRole" | "sourceFilter" | "evidenceFilter" | "statusFilter" | "recordFilters" | "hourRange" | "durationRange" | "teamOnly" | "unreadOnly" | "showAll"> {
   const technicianRole: AssistantTechnicianRole | undefined = /yardımcı|destek|ekip\s+üyesi/iu.test(question) ? "support" : /sorumlu|yetkili/iu.test(question) ? "responsible" : undefined;
   const sourceFilter: AssistantSourceFilter | undefined = INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) ? "internal" : EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) ? "external_service" : undefined;
   const evidenceFilter: AssistantEvidenceFilter | undefined = /fotoğraf|fotoğraflı/iu.test(question) ? "photo" : /video|videolu/iu.test(question) ? "video" : /notu|notlu|not\s+içeren/iu.test(question) ? "note" : /kontrol\s+listesi/iu.test(question) ? "checklist" : undefined;
@@ -326,8 +340,9 @@ function parseFilters(question: string): Pick<AssistantQuery, "maintenanceTypeQu
   const durationRange = rawDurationRange ? Object.fromEntries(Object.entries(rawDurationRange).map(([key, value]) => [key, durationInHours ? Number(value) * 60 : value])) as { min?: number; max?: number } : undefined;
   const teamOnly = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question) ? true : undefined;
   const unreadOnly = /okunmamış|okunmayan|okumadığım/iu.test(question) ? true : undefined;
+  const showAll = /(?:tümünü|hepsini|tamamını)\s+(?:göster|listele|getir)|tüm\s+(?:kayıtları|bakımları|raporları)/iu.test(question) ? true : undefined;
   const maintenancePeriodHours = extractMaintenancePeriodHours(question);
-  return { maintenanceTypeQuery: maintenancePeriodHours ? undefined : extractMaintenanceTypeQuery(question), maintenancePeriodHours, serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly, unreadOnly };
+  return { maintenanceTypeQuery: maintenancePeriodHours ? undefined : extractMaintenanceTypeQuery(question), maintenancePeriodHours, serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly, unreadOnly, showAll };
 }
 
 function cleanQuestion(value: string): string {
@@ -481,6 +496,13 @@ function parseDateRange(question: string): AssistantDateRange | undefined {
     const from = `${lastPreviousMonth.slice(0, 8)}01`;
     return dateRange(from, lastPreviousMonth);
   }
+  const yearOnly = question.match(/(?<![\d-])((?:20|21)\d{2})(?:['’]?(?:de|da|te|ta)|\s+yıl(?:ında|ı|da|de)?|\s+senesinde|\s+içinde|\s+boyunca)/iu);
+  if (yearOnly) {
+    const year = Number(yearOnly[1]);
+    const from = dateKey(year, 1, 1);
+    const to = dateKey(year, 12, 31);
+    if (from && to) return dateRange(from, to);
+  }
   return undefined;
 }
 
@@ -542,6 +564,9 @@ function inferIntent(question: string): AssistantIntent {
   if (NOTIFICATION_PATTERNS.some((pattern) => pattern.test(question))) return "notification_summary";
   if (!INTERNAL_SOURCE_PATTERNS.some((pattern) => pattern.test(question)) && EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question))) return "external_service";
   const asksForTeam = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question);
+  const engineQuery = extractEngineQuery(question);
+  const asksEngineMaintenanceDuration = Boolean(engineQuery && /bakım/iu.test(question) && /(?:kaldı|ne\s+kadar|kaç\s+saat|çalış(?:tı|mış|ılan)?|harcanan)/iu.test(question));
+  if (asksEngineMaintenanceDuration) return "maintenance_health";
   if (MOTOR_PERFORMANCE_PATTERNS.some((pattern) => pattern.test(question))) return "engine_data";
   if (TECHNICIAN_PATTERNS.some((pattern) => pattern.test(question)) && !EXTERNAL_SERVICE_PATTERNS.some((pattern) => pattern.test(question)) && !asksForTeam) return "technician_performance";
   const hasCombinedRecordFilter = RECORD_FILTER_PATTERNS.some((pattern) => pattern.test(question))
@@ -549,10 +574,9 @@ function inferIntent(question: string): AssistantIntent {
     || /fotoğraf|fotoğraflı|video|videolu|not\s+içeren|kontrol\s+listesi|\bekip\b/iu.test(question);
   if (hasCombinedRecordFilter) return "summary";
   if (MAINTENANCE_HEALTH_PATTERNS.some((pattern) => pattern.test(question))) return "maintenance_health";
-  const engineQuery = extractEngineQuery(question);
   if (extractMaintenancePeriodHours(question)) return "maintenance_forecast";
   if (ENGINE_DATA_PATTERNS.some((pattern) => pattern.test(question)) && (Boolean(engineQuery) || /\bmotor(?:lar|ların)?\b/iu.test(question))) return "engine_data";
-  if (engineQuery && ENGINE_HISTORY_PATTERNS.slice(0, 2).some((pattern) => pattern.test(question))) return "engine_history";
+  if (engineQuery && ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
   if (asksForTeam && /bakım/iu.test(question)) return "summary";
   if (OVERDUE_PATTERNS.some((pattern) => pattern.test(question))) return "overdue";
   if (engineQuery && ENGINE_HISTORY_PATTERNS.some((pattern) => pattern.test(question))) return "engine_history";
@@ -668,7 +692,7 @@ export function assistantSystemBoundary(): string {
     "Never create, update, delete, assign, approve, notify, or restore data.",
     "Only answer from tool results; never invent records, names, dates, durations, or diagnoses.",
     "For forecast results, distinguish overdue backlog from estimated future dates and state the 24-hour-per-day assumption.",
-    "Do not reveal secrets, credentials, raw media, base64, or unnecessary personal data.",
+    "Do not reveal secrets, credentials, raw media, base64, public Blob URLs, or unnecessary personal data; report files may be referenced only through authenticated same-origin links.",
     "For oil/pressure or machine health questions, describe observations and recommend human review; do not give definitive diagnosis or repair instructions.",
   ].join(" ");
 }

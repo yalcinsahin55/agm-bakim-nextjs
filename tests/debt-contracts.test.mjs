@@ -182,3 +182,36 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(records, /<ReportAttachmentPicker/);
   assert.match(records, /\/api\/records\/\$\{selectedRecord\._id\}\/attachments\/\$\{encodeURIComponent\(attachment\.id\)\}/);
 });
+
+
+test("assistant engine history and maintenance health expose filtered reports and work metrics", async () => {
+  const policy = await source("lib/assistantPolicy.ts");
+  const tools = await source("lib/assistantTools.ts");
+  const assistantPage = await source("app/asistan/page.tsx");
+  assert.match(policy, /showAll\?: boolean/);
+  assert.match(policy, /tüm\|bütün\|hepsi/);
+  assert.match(policy, /asksEngineMaintenanceDuration/);
+  assert.match(policy, /yearOnly/);
+  assert.match(policy, /extractMaintenanceTypeQuery/);
+  assert.match(tools, /safeReportAttachments/);
+  assert.match(tools, /report_attachment_count/);
+  assert.match(tools, /query\.showAll \? 500 : 20/);
+  assert.match(tools, /worked_since_last_hours/);
+  assert.match(tools, /worked_duration_minutes/);
+  assert.match(tools, /worked_since_last_hours/);
+  assert.match(tools, /buildRecordMatch\(db, query\)/);
+  assert.match(assistantPage, /Rapor ekleri:/);
+  assert.match(assistantPage, /Son bakımdan beri motor çalışması/);
+  assert.match(assistantPage, /maintenance_health/);
+});
+
+
+test("assistant exports preserve report filenames and maintenance work metrics", async () => {
+  const exportLib = await source("lib/assistantExport.ts");
+  const assistantPage = await source("app/asistan/page.tsx");
+  assert.match(exportLib, /worked_hours/);
+  assert.match(exportLib, /attachments: "Rapor ekleri"/);
+  assert.match(exportLib, /report_attachments/);
+  assert.match(exportLib, /maintenance_health: \[.*worked_hours.*duration/);
+  assert.match(assistantPage, /maintenance_health/);
+});

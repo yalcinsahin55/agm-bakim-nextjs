@@ -22,6 +22,8 @@ export type ExportColumnId =
   | "measurements"
   | "period_hours"
   | "remaining"
+  | "worked_hours"
+  | "attachments"
   | "forecast_date"
   | "category"
   | "note";
@@ -64,6 +66,8 @@ export const EXPORT_COLUMN_LABELS: Record<ExportColumnId, string> = {
   measurements: "Ölçüm adedi",
   period_hours: "Periyot",
   remaining: "Kalan/gecikme",
+  worked_hours: "Son bakımdan beri motor çalışması",
+  attachments: "Rapor ekleri",
   forecast_date: "Tahmini tarih",
   category: "Plan kategorisi",
   note: "Not",
@@ -74,7 +78,7 @@ const ALL_COLUMNS = Object.keys(EXPORT_COLUMN_LABELS) as ExportColumnId[];
 const INTENT_COLUMNS: Record<string, ExportColumnId[]> = {
   summary: ["date", "engine", "type", "duration", "source", "count"],
   overdue: ["engine", "type", "hours", "period_hours", "remaining", "status"],
-  engine_history: ["date", "engine", "type", "hours", "technician", "start", "end", "duration"],
+  engine_history: ["date", "engine", "type", "hours", "technician", "start", "end", "duration", "attachments"],
   technician_performance: ["date", "engine", "type", "technician", "role", "duration", "count"],
   external_service: ["date", "engine", "type", "service", "technician", "duration", "source"],
   maintenance_forecast: ["engine", "type", "period_hours", "hours", "remaining", "forecast_date", "status", "category"],
@@ -85,7 +89,7 @@ const INTENT_COLUMNS: Record<string, ExportColumnId[]> = {
   equipment_info: ["engine", "note"],
   technician_directory: ["technician", "role", "status"],
   notification_summary: ["date", "engine", "type", "status", "note"],
-  maintenance_health: ["engine", "type", "hours", "period_hours", "remaining", "status"],
+  maintenance_health: ["engine", "type", "hours", "period_hours", "worked_hours", "duration", "remaining", "status"],
 };
 
 const INTENT_SHEETS: Record<string, string[]> = {
@@ -236,6 +240,12 @@ export function getExportColumnValue(row: Record<string, unknown>, column: Expor
     case "measurements": return value("measurements") ?? value("performance_observations");
     case "period_hours": return value("period_hours") ?? value("default_period_hours");
     case "remaining": return value("remaining_hours") ?? value("overdue_hours");
+    case "worked_hours": return value("worked_since_last_hours") ?? value("worked_hours");
+    case "attachments": {
+      const attachments = value("report_attachments");
+      if (Array.isArray(attachments)) return attachments.map((attachment) => attachment && typeof attachment === "object" ? String((attachment as Record<string, unknown>).filename || "") : "").filter(Boolean).join(", ");
+      return value("report_attachment_count") || "";
+    }
     case "forecast_date": return value("estimated_date_label") ?? value("estimated_date");
     case "category": return value("category") ?? value("status_label");
     case "note": return value("note") ?? value("technician_note");

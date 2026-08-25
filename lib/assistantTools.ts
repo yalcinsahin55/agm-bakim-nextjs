@@ -4,6 +4,7 @@ import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnic
 import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 import { enginesCollection, maintenanceTypesCollection, recordsCollection, pressureReadingsCollection, oilAnalysesCollection, equipmentInfoCollection, notificationsCollection } from "@/lib/dbCollections";
 import { buildMaintenanceForecastRows, dateKeyLabel, summarizeMaintenanceForecast, validForecastYear, validMaintenancePeriodHours } from "@/lib/maintenanceForecast";
+import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "@/lib/reportAttachments";
 
 export interface AssistantToolResponse {
   intent: AssistantIntent;
@@ -22,6 +23,8 @@ type TechnicianAggregateRow = { _id?: unknown; technician?: string; technician_t
 type TechnicianDetailTypeRow = { _id?: string; count?: number };
 type TechnicianDetailEngineRow = { _id?: { engine_id?: string; engine?: string }; count?: number };
 type ExternalServiceAggregateRow = { totals?: Array<{ count?: number; duration?: number }>; services?: Array<{ _id?: string; count?: number; duration?: number }>; engines?: Array<{ _id?: string; engine?: string; count?: number }> };
+type ReportAttachmentRow = { id?: unknown; url?: unknown; filename?: unknown; mime?: unknown; size?: unknown; uploaded_at?: unknown };
+type MaintenanceWorkRow = { total_duration_minutes: number; last_duration_minutes: number; completed_count: number; last_completed_at: string | null };
 
 function currentTurkeyDateKey(): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -176,6 +179,60 @@ function formatMinutes(value: number): string {
   if (hours) parts.push(`${hours} saat`);
   if (remaining || parts.length === 0) parts.push(`${remaining} dakika`);
   return parts.join(" ");
+}
+
+function safeReportAttachments(recordId: unknown, value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  const id = String(recordId || "");
+  if (!id) return [];
+  return value.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const attachment = candidate as ReportAttachmentRow;
+    if (!isReportAttachmentId(attachment.id) || !isAllowedReportAttachmentUrl(attachment.url)) return [];
+    const filename = typeof attachment.filename === "string" && attachment.filename.trim() ? attachment.filename : "rapor-eki";
+    if (!isReportAttachmentMime(attachment.mime)) return [];
+    const mime = attachment.mime;
+    const size = typeof attachment.size === "number" && Number.isFinite(attachment.size) && attachment.size > 0 ? Math.min(20 * 1024 * 1024, Math.round(attachment.size)) : null;
+    const uploadedAt = formatUnknownDate(attachment.uploaded_at);
+    const attachmentId = String(attachment.id);
+    const basePath = `/api/records/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`;
+    return [{
+      id: attachmentId,
+      filename,
+      mime,
+      size,
+      uploaded_at: uploadedAt,
+      href: `${basePath}?inline=1`,
+      download_href: `${basePath}?download=1`,
+    }];
+  });
+}
+
+function buildMaintenanceWorkIndex(records: Array<Record<string, unknown>>): Map<string, MaintenanceWorkRow> {
+  const eventRows = new Map<string, { pairKey: string; duration: number; completedAt: string | null }>();
+  records.forEach((record, recordIndex) => {
+    const engineId = String(record.engine_id || "");
+    const typeKey = String(record.type_key || record.type_label || "");
+    if (!engineId || !typeKey) return;
+    const pairKey = `${engineId}|${typeKey}`;
+    const eventKey = `${pairKey}|${String(record.group_id || record._id || record.maintenance_start_at || record.created_at || recordIndex)}`;
+    const duration = Math.max(0, Number(record.maintenance_duration_minutes || 0));
+    const completedAt = formatUnknownDate(record.maintenance_start_at || record.created_at);
+    const previous = eventRows.get(eventKey);
+    if (!previous || duration >= previous.duration) eventRows.set(eventKey, { pairKey, duration, completedAt });
+  });
+  const index = new Map<string, MaintenanceWorkRow>();
+  [...eventRows.values()].forEach((event) => {
+    const current = index.get(event.pairKey) || { total_duration_minutes: 0, last_duration_minutes: 0, completed_count: 0, last_completed_at: null };
+    current.total_duration_minutes += event.duration;
+    current.completed_count += 1;
+    if (!current.last_completed_at || (event.completedAt && event.completedAt > current.last_completed_at)) {
+      current.last_completed_at = event.completedAt;
+      current.last_duration_minutes = event.duration;
+    }
+    index.set(event.pairKey, current);
+  });
+  return index;
 }
 
 async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
@@ -387,34 +444,42 @@ async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery): Promi
       match,
       {
       projection: {
-        _id: 1, engine_id: 1, engine_name: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
+        _id: 1, group_id: 1, engine_id: 1, engine_name: 1, type_key: 1, type_label: 1, hour_at_completion: 1, technician_name: 1, technician_source: 1,
         external_service_name: 1, other_technicians: 1, maintenance_start_at: 1, maintenance_end_at: 1,
-        maintenance_duration_minutes: 1, created_at: 1,
+        maintenance_duration_minutes: 1, report_attachments: 1, created_at: 1,
         },
       },
-    ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(20).toArray(),
+    ).sort({ maintenance_start_at: -1, created_at: -1 }).limit(query.showAll ? 500 : 20).toArray(),
   ]);
-  const safeRecords = records.map((record) => ({
-    id: String(record._id),
-    engine_id: record.engine_id || null,
-    engine_name: record.engine_name || null,
-    type: record.type_label || "Bilinmeyen",
-    hour_at_completion: Number(record.hour_at_completion || 0),
-    technician: record.technician_name || "Bilinmeyen",
-    technician_source: record.technician_source || "internal",
-    external_service_name: record.external_service_name || null,
-    other_technicians: Array.isArray(record.other_technicians) ? record.other_technicians.map((item) => item.full_name).filter(Boolean).slice(0, 10) : [],
-    start_at: record.maintenance_start_at || null,
-    end_at: record.maintenance_end_at || null,
-    duration_minutes: Number(record.maintenance_duration_minutes || 0),
-    created_at: record.maintenance_start_at || record.created_at || null,
-  }));
+  const safeRecords = records.map((record) => {
+    const reportAttachments = safeReportAttachments(record._id, record.report_attachments);
+    return {
+      id: String(record._id),
+      group_id: record.group_id || null,
+      engine_id: record.engine_id || null,
+      engine_name: record.engine_name || null,
+      type_key: record.type_key || null,
+      type: record.type_label || "Bilinmeyen",
+      hour_at_completion: Number(record.hour_at_completion || 0),
+      technician: record.technician_name || "Bilinmeyen",
+      technician_source: record.technician_source || "internal",
+      external_service_name: record.external_service_name || null,
+      other_technicians: Array.isArray(record.other_technicians) ? record.other_technicians.map((item) => item.full_name).filter(Boolean).slice(0, 10) : [],
+      start_at: record.maintenance_start_at || null,
+      end_at: record.maintenance_end_at || null,
+      duration_minutes: Number(record.maintenance_duration_minutes || 0),
+      duration_text: formatMinutes(Number(record.maintenance_duration_minutes || 0)),
+      report_attachment_count: reportAttachments.length,
+      report_attachments: reportAttachments,
+      created_at: record.maintenance_start_at || record.created_at || null,
+    };
+  });
   return {
     intent: "engine_history",
     period: query.period,
     title: engine ? `${engine.name} bakım geçmişi` : "Motor bakım geçmişi",
-    summary: engine ? `${engine.name} için ${periodLabel(query)} döneminde ${totalRecords} bakım kaydı bulundu.` : `${periodLabel(query)} tüm motorlarda ${totalRecords} bakım kaydı bulundu.`,
-    data: { engine_id: engine ? String(engine._id) : null, engine: engine?.name || null, current_hours: engine ? Number(engine.hours || 0) : null, total_records: totalRecords, displayed_records: safeRecords.length, date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
+    summary: engine ? `${engine.name} için ${periodLabel(query)} döneminde ${totalRecords} bakım kaydı bulundu.${safeRecords.reduce((sum, record) => sum + Number(record.report_attachment_count || 0), 0) ? " Rapor ekleri sonuç satırlarında gösteriliyor." : ""}` : `${periodLabel(query)} tüm motorlarda ${totalRecords} bakım kaydı bulundu.`,
+    data: { engine_id: engine ? String(engine._id) : null, engine: engine?.name || null, current_hours: engine ? Number(engine.hours || 0) : null, total_records: totalRecords, displayed_records: safeRecords.length, has_more: totalRecords > safeRecords.length, show_all: query.showAll === true, report_attachment_count: safeRecords.reduce((sum, record) => sum + Number(record.report_attachment_count || 0), 0), date_range: query.dateRange || null, filters: { source: query.sourceFilter || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null }, records: safeRecords },
   };
 }
 
@@ -866,6 +931,11 @@ async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<Assi
     enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
   ]);
+  const workMatch = await buildRecordMatch(db, query);
+  const workRecords = await recordsCollection(db).find(workMatch, {
+    projection: { _id: 1, group_id: 1, engine_id: 1, type_key: 1, type_label: 1, maintenance_duration_minutes: 1, maintenance_start_at: 1, created_at: 1 },
+  }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(5000).toArray();
+  const workIndex = buildMaintenanceWorkIndex(workRecords as Array<Record<string, unknown>>);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
   const selectedType = await resolveMaintenanceType(db, query);
   const statusMap: Record<string, PanelItem["status"]> = { overdue: "gecikmis", critical: "kritik", upcoming: "yaklasiyor", normal: "normal" };
@@ -877,12 +947,17 @@ async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<Assi
     .filter((item) => !requestedStatus || item.status === requestedStatus)
     .sort((a, b) => a.remaining - b.remaining || a.engine_name.localeCompare(b.engine_name, "tr"));
   const counts = items.reduce<Record<string, number>>((result, item) => { result[item.status] = (result[item.status] || 0) + 1; return result; }, {});
+  const displayedItems = items.slice(0, query.showAll ? 500 : 200).map((item) => {
+    const work = workIndex.get(`${item.engine_id}|${item.type_key}`) || workIndex.get(`${item.engine_id}|${item.type_label}`) || { total_duration_minutes: 0, last_duration_minutes: 0, completed_count: 0, last_completed_at: null };
+    const workedSinceLastHours = Math.max(0, Number(item.engine_hours || 0) - Number(item.last_hour || 0));
+    return { engine_id: item.engine_id, engine: item.engine_name, type_key: item.type_key, type: item.type_label, engine_hours: item.engine_hours, last_hour: item.last_hour, period_hours: item.period, remaining_hours: item.remaining, worked_since_last_hours: workedSinceLastHours, worked_duration_minutes: work.total_duration_minutes, last_worked_duration_minutes: work.last_duration_minutes, completed_count: work.completed_count, last_completed_at: work.last_completed_at, status: item.status };
+  });
   return {
     intent: "maintenance_health",
     period: "all",
     title: selectedEngine ? `${selectedEngine.name} bakım sağlığı` : "Motor bakım sağlığı",
-    summary: `${items.length} motor-bakım durumu bulundu: ${counts.gecikmis || 0} gecikmiş, ${counts.kritik || 0} kritik, ${counts.yaklasiyor || 0} yaklaşan, ${counts.normal || 0} normal.`,
-    data: { counts, items: items.slice(0, 200).map((item) => ({ engine_id: item.engine_id, engine: item.engine_name, type_key: item.type_key, type: item.type_label, engine_hours: item.engine_hours, last_hour: item.last_hour, period_hours: item.period, remaining_hours: item.remaining, status: item.status })) },
+    summary: `${items.length} motor-bakım durumu bulundu: ${counts.gecikmis || 0} gecikmiş, ${counts.kritik || 0} kritik, ${counts.yaklasiyor || 0} yaklaşan, ${counts.normal || 0} normal. Çalışma süresi bulunan ${displayedItems.filter((item) => item.worked_duration_minutes > 0).length} bakım satırı gösteriliyor.`,
+    data: { counts, total_items: items.length, displayed_items: displayedItems.length, has_more: items.length > displayedItems.length, show_all: query.showAll === true, items: displayedItems },
   };
 }
 
