@@ -38,14 +38,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const engineId = searchParams.get("engine_id");
     const query = engineId ? { engine_id: engineId } : {};
-
-    const readings = await pressureReadingsCollection(db).find(query, {
+    const pageParam = searchParams.get("page");
+    const pageSizeParam = searchParams.get("page_size");
+    const paginated = pageParam !== null || pageSizeParam !== null;
+    const page = Math.min(Math.max(Number.parseInt(pageParam || "1", 10) || 1, 1), 10_000);
+    const pageSize = Math.min(Math.max(Number.parseInt(pageSizeParam || "250", 10) || 250, 1), 500);
+    const collection = pressureReadingsCollection(db);
+    const cursor = collection.find(query, {
       projection: {
         _id: 1, engine_id: 1, engine_name: 1, reading_date: 1, load_kw: 1, pressure_bar: 1,
         status: 1, new_type: 1, note: 1, uploaded_by: 1, uploaded_by_id: 1, created_at: 1,
       },
-    }).sort({ reading_date: 1, created_at: 1 }).toArray();
-    return NextResponse.json(readings);
+    }).sort({ reading_date: 1, created_at: 1, _id: 1 });
+
+    if (!paginated) return NextResponse.json(await cursor.toArray());
+    const [readings, total] = await Promise.all([
+      cursor.skip((page - 1) * pageSize).limit(pageSize).toArray(),
+      collection.countDocuments(query),
+    ]);
+    return NextResponse.json({ items: readings, total, page, page_size: pageSize, has_more: page * pageSize < total });
   } catch (error) {
     console.error("Karter basınç verileri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Karter basınç verileri yüklenirken bir hata oluştu." }, { status: 500 });

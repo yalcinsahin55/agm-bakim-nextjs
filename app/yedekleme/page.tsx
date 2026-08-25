@@ -41,14 +41,42 @@ export default function YedeklemePage() {
   const archiveTo = new Date(Date.UTC(Number(archiveMonth.slice(0, 4)), Number(archiveMonth.slice(5, 7)), 0)).toISOString().slice(0, 10);
   const archiveQuery = `?from=${archiveFrom}&to=${archiveTo}`;
 
+  async function readRestorePayload() {
+    if (!restoreFile) throw new Error("Önce bir JSON yedek dosyası seçin.");
+    const backup = JSON.parse(await restoreFile.text()) as { version?: unknown; collections?: unknown };
+    if (backup.version !== 1 || !backup.collections) throw new Error("Geçersiz veya desteklenmeyen yedek dosyası.");
+    return backup;
+  }
+
+  async function previewRestore() {
+    if (!restoreFile || restoreConfirm !== "RESTORE") return;
+    setRestoreBusy(true);
+    setRestoreMessage("");
+    try {
+      const backup = await readRestorePayload();
+      const response = await fetch("/api/backups/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collections: backup.collections, confirm: "RESTORE", dry_run: true }),
+      });
+      const data = await response.json() as { error?: string; summary?: Record<string, number>; skipped?: Record<string, number> };
+      if (!response.ok) throw new Error(data.error || "Dry-run başarısız.");
+      const summaryText = Object.entries(data.summary || {}).map(([name, count]) => `${name}: ${count}`).join(" · ");
+      const skippedCount = Object.values(data.skipped || {}).reduce((sum, count) => sum + count, 0);
+      setRestoreMessage(`Dry-run başarılı; hiçbir veri yazılmadı. ${summaryText}${skippedCount ? ` · Atlanan: ${skippedCount}` : ""}`);
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? error.message : "Dry-run başarısız.");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   async function restoreBackup() {
     if (!restoreFile || restoreConfirm !== "RESTORE") return;
     setRestoreBusy(true);
     setRestoreMessage("");
     try {
-      const text = await restoreFile.text();
-      const backup = JSON.parse(text);
-      if (backup?.version !== 1 || !backup?.collections) throw new Error("Geçersiz veya desteklenmeyen yedek dosyası.");
+      const backup = await readRestorePayload();
       const response = await fetch("/api/backups/restore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,7 +143,10 @@ export default function YedeklemePage() {
             <input type="file" accept="application/json,.json" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} className="hidden" />
           </label>
           <input value={restoreConfirm} onChange={(event) => setRestoreConfirm(event.target.value)} placeholder="Onay için RESTORE yazın" className="mt-2 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-red" autoComplete="off" />
-          <button onClick={restoreBackup} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="mt-2 w-full rounded-lg border border-red/40 py-2.5 text-[12px] font-extrabold text-red disabled:opacity-40">{restoreBusy ? "Geri yükleniyor..." : "Yedeği güvenli şekilde geri yükle"}</button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button onClick={previewRestore} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-teal/40 py-2.5 text-[11px] font-extrabold text-teal disabled:opacity-40">{restoreBusy ? "Kontrol ediliyor..." : "Dry-run kontrolü"}</button>
+            <button onClick={restoreBackup} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-red/40 py-2.5 text-[11px] font-extrabold text-red disabled:opacity-40">{restoreBusy ? "Geri yükleniyor..." : "Yedeği geri yükle"}</button>
+          </div>
           {restoreMessage && <div className="mt-2 rounded-lg bg-panel2 p-2 text-[11px] text-muted" role="status">{restoreMessage}</div>}
         </section>
         <section className="mt-4 rounded-card border border-border bg-panel p-4 text-[11px] leading-5 text-muted">

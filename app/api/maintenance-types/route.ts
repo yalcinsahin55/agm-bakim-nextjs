@@ -25,10 +25,14 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
+    const rateLimited = await enforceApiRateLimit(req, "maintenance-type-list", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
     const includeDeleted = req.nextUrl.searchParams.get("include_deleted") === "true";
     const canIncludeDeleted = includeDeleted && user.role === "yonetici";
     const typeFilter = canIncludeDeleted ? {} : { is_deleted: { $ne: true } };
-    const types = await maintenanceTypesCollection(db).find(typeFilter).toArray();
+    const types = await maintenanceTypesCollection(db).find(typeFilter, {
+      projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1, is_deleted: 1, deleted_at: 1 },
+    }).toArray();
     return NextResponse.json(types);
   } catch (error) {
     console.error("Bakım türleri getirilirken hata:", error instanceof Error ? error.name : "UnknownError");
@@ -78,7 +82,7 @@ export async function POST(req: NextRequest) {
         };
       });
     } else if (apply_to_all) {
-      const engines = await enginesCollection(db).find().toArray();
+      const engines = await enginesCollection(db).find({}, { projection: { _id: 1, hours: 1 } }).toArray();
       engines.forEach((e) => {
         if (isSafeMongoPathSegment(e._id)) engineStates[e._id] = { last_maintenance_hour: e.hours, period_hours: Number(default_period_hours) || 0, tracking_source: "manual" };
       });

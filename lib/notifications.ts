@@ -113,7 +113,7 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
     }
   }
 
-  return listAfterSync ? listUserNotifications(db, user._id) : null;
+  return listAfterSync ? listUserNotifications(db, user._id, 500) : null;
 }
 
 export async function syncMaintenanceNotifications(db: Db, user: User): Promise<Notification[]> {

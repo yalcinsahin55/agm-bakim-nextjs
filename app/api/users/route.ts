@@ -1,4 +1,5 @@
 import { usersCollection } from "@/lib/dbCollections";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -23,13 +24,15 @@ export async function GET(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "user-list", 60, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const users = await usersCol.find().toArray();
+    const users = await usersCol.find({}, {
+      projection: { _id: 1, stable_id: 1, full_name: 1, email: 1, phone: 1, phone_normalized: 1, role: 1, technician_type: 1, can_be_responsible: 1, can_be_support: 1, allowed_work_domains: 1, active: 1, approved: 1, created_at: 1 },
+    }).toArray();
     return NextResponse.json(users.map((u) => {
       const isTechnician = u.role === "teknisyen" || u.role === "planlamaci";
       const technician_type = isTechnician ? normalizeTechnicianType(u.technician_type) : undefined;
       const permissions = isTechnician ? normalizeTechnicianPermissions(u, technician_type ?? "mekanik") : undefined;
       return {
-        id: u._id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
+        id: u._id, stable_id: u.stable_id, full_name: u.full_name, email: u.email || "", phone: u.phone || u.phone_normalized || "", role: u.role,
         technician_type, ...(permissions || {}),
         active: u.active !== false, approved: u.approved !== false, created_at: u.created_at,
       };
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
-      _id: normalizedPhone, full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
+      _id: normalizedPhone, stable_id: randomUUID(), full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
       password_hash: passwordHash, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType, ...technicianPermissions } : {}), active: true, approved: false, created_at: new Date(),
     });
     await writeAuditLog(db, {

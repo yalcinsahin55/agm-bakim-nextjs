@@ -1,4 +1,5 @@
 import { enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -91,6 +92,7 @@ async function postEngine(req: NextRequest) {
     const now = new Date();
     const doc = {
       _id: normalizedName,
+      stable_id: randomUUID(),
       name: normalizedName,
       hours: parsedHours,
       load_kw: parsedLoadKw,

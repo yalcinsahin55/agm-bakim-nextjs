@@ -56,20 +56,29 @@ export async function sendPushToUser(db: Db, userId: string, payload: PushPayloa
   const collection = db.collection<PushSubscriptionRecord>("push_subscriptions");
   const subscriptions = await collection.find({ user_id: userId }).toArray();
   let sent = 0;
+  let nextIndex = 0;
+  const workerCount = Math.min(4, subscriptions.length);
 
-  for (const record of subscriptions) {
-    try {
-      await webpush.sendNotification(record.subscription, JSON.stringify(payload));
-      sent += 1;
-    } catch (error: unknown) {
-      const statusCode = getErrorStatusCode(error);
-      if (statusCode === 404 || statusCode === 410) {
-        await collection.deleteOne({ endpoint: record.endpoint });
-      } else {
-        console.error("Web Push gönderilemedi:", error instanceof Error ? error.name : "UnknownError");
+  const sendWorker = async () => {
+    while (nextIndex < subscriptions.length) {
+      const record = subscriptions[nextIndex];
+      nextIndex += 1;
+      if (!record) continue;
+      try {
+        await webpush.sendNotification(record.subscription, JSON.stringify(payload));
+        sent += 1;
+      } catch (error: unknown) {
+        const statusCode = getErrorStatusCode(error);
+        if (statusCode === 404 || statusCode === 410) {
+          await collection.deleteOne({ endpoint: record.endpoint });
+        } else {
+          console.error("Web Push gönderilemedi:", error instanceof Error ? error.name : "UnknownError");
+        }
       }
     }
-  }
+  };
+
+  if (workerCount > 0) await Promise.all(Array.from({ length: workerCount }, () => sendWorker()));
 
   return { sent, skipped: false };
 }

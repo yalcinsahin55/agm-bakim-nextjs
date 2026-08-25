@@ -27,6 +27,11 @@ type TechnicianAggregateRow = {
   support_duration_minutes?: number;
 };
 
+type AnalyticsCacheEntry = { expiresAt: number; value: Record<string, unknown> };
+const ANALYTICS_CACHE_TTL_MS = 10_000;
+const VALID_ENGINE_PERIODS = new Set(["all", "month", "3months", "year"]);
+const analyticsCache = new Map<string, AnalyticsCacheEntry>();
+
 async function getAnalyticsSummary(req: NextRequest) {
   const db = await getDb();
   const user = await getCurrentUser(req, usersCollection(db));
@@ -37,7 +42,13 @@ async function getAnalyticsSummary(req: NextRequest) {
   await ensureAppIndexes(db);
 
   const searchParams = new URL(req.url).searchParams;
-  const enginePeriod = searchParams.get("period") || "all";
+  const requestedPeriod = searchParams.get("period") || "all";
+  const enginePeriod = VALID_ENGINE_PERIODS.has(requestedPeriod) ? requestedPeriod : "all";
+  const cached = analyticsCache.get(enginePeriod);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.value, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "HIT" } });
+  }
+  if (cached) analyticsCache.delete(enginePeriod);
   const now = new Date();
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -224,7 +235,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     technicianTypeTotals.set(row.technician_type, current);
   });
   const byTechnicianType = [...technicianTypeTotals.values()].sort((a, b) => b.total_count - a.total_count || a.technician_type.localeCompare(b.technician_type, "tr"));
-  return NextResponse.json({
+  const payload: Record<string, unknown> = {
     monthly: monthly.map((row) => ({ month: row._id, count: row.count })),
     byEngine: byEngine.map((row) => ({ engine_id: row._id || null, engine: row.engine || "Bilinmeyen", count: row.count })),
     byType: byType.map((row) => ({ type: row._id || "Bilinmeyen", count: row.count })),
@@ -238,7 +249,9 @@ async function getAnalyticsSummary(req: NextRequest) {
     periodTechnicianDurationMinutes: periodRow.technician_duration_minutes || 0,
     periodMissingDuration: periodRow.missing_duration || 0,
     periodTechnicianTasks: periodRow.technician_tasks || 0,
-  });
+  };
+  analyticsCache.set(enginePeriod, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
+  return NextResponse.json(payload, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "MISS" } });
 }
 
 export async function GET(req: NextRequest) {

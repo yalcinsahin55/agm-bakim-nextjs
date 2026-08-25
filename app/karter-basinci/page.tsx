@@ -45,6 +45,14 @@ interface ImportResult {
   error?: string;
 }
 
+interface PressurePage {
+  items: PressureReading[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -113,6 +121,10 @@ export default function KarterBasinciPage() {
   const { user } = useCurrentUser();
   const [engines, setEngines] = useState<PressureEngine[]>([]);
   const [readings, setReadings] = useState<PressureReading[]>([]);
+  const [readingsTotal, setReadingsTotal] = useState(0);
+  const [readingPage, setReadingPage] = useState(1);
+  const [hasMoreReadings, setHasMoreReadings] = useState(false);
+  const [loadingMoreReadings, setLoadingMoreReadings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<PressureTab>("new");
 
@@ -129,24 +141,46 @@ export default function KarterBasinciPage() {
 
   async function load() {
     try {
-      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/pressure-readings", { cache: "no-store" })]);
+      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store" })]);
       if (engRes.status === 401 || readRes.status === 401) { router.push("/login"); return; }
       const engData = await engRes.json().catch(() => null) as unknown;
       const readData = await readRes.json().catch(() => null) as unknown;
-      if (!engRes.ok || !Array.isArray(engData) || !readRes.ok || !Array.isArray(readData)) {
+      const pageData = readData && typeof readData === "object" && !Array.isArray(readData) ? readData as Partial<PressurePage> : null;
+      const readingList = Array.isArray(readData) ? readData as PressureReading[] : Array.isArray(pageData?.items) ? pageData.items : null;
+      if (!engRes.ok || !Array.isArray(engData) || !readRes.ok || !readingList) {
         setLoadError((engData && typeof engData === "object" && "error" in engData ? String(engData.error) : null) || (readData && typeof readData === "object" && "error" in readData ? String(readData.error) : null) || "Karter basıncı verileri yüklenemedi.");
         return;
       }
       setLoadError("");
       const engineList = engData as PressureEngine[];
-      const readingList = readData as PressureReading[];
       setEngines(engineList);
       setReadings(readingList);
+      setReadingsTotal(typeof pageData?.total === "number" ? pageData.total : readingList.length);
+      setReadingPage(typeof pageData?.page === "number" ? pageData.page : 1);
+      setHasMoreReadings(pageData?.has_more === true);
       if (engineList.length && !historyEngine) setHistoryEngine(engineList[0]._id);
     } catch {
       setLoadError("Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMoreReadings() {
+    if (loadingMoreReadings || !hasMoreReadings) return;
+    setLoadingMoreReadings(true);
+    try {
+      const response = await fetch(`/api/pressure-readings?page=${readingPage + 1}&page_size=250`, { cache: "no-store" });
+      const data = await response.json().catch(() => null) as (Partial<PressurePage> & { error?: string }) | null;
+      const items = Array.isArray(data?.items) ? data.items : null;
+      if (!response.ok || !items) throw new Error(data?.error || "Daha fazla ölçüm yüklenemedi.");
+      setReadings((current) => [...current, ...items]);
+      setReadingPage(typeof data?.page === "number" ? data.page : readingPage + 1);
+      setHasMoreReadings(data?.has_more === true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Daha fazla ölçüm yüklenemedi.");
+    } finally {
+      setLoadingMoreReadings(false);
     }
   }
 
@@ -297,7 +331,7 @@ export default function KarterBasinciPage() {
       <div className="px-4 py-4">
         <section className="mb-3 rounded-card border border-teal/30 bg-teal/5 p-4">
           <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">📈</div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Basınç durumu</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yükü ve karter fark basıncını tek akışta takip et.</p></div></div>
-          <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Motor sayısı</div><div className="mt-1 font-mono text-lg font-bold text-teal">{engines.length}</div></div><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Toplam ölçüm</div><div className="mt-1 font-mono text-lg font-bold text-amber">{readings.length}</div></div></div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Motor sayısı</div><div className="mt-1 font-mono text-lg font-bold text-teal">{engines.length}</div></div><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Toplam ölçüm</div><div className="mt-1 font-mono text-lg font-bold text-amber">{readingsTotal}</div></div></div>
         </section>
         {/* Modern Tab Butonları */}
         <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-xl border border-border mb-4">
@@ -423,6 +457,11 @@ export default function KarterBasinciPage() {
                     )}
                   </div>
                 ))}
+                {hasMoreReadings && (
+                  <button type="button" onClick={loadMoreReadings} disabled={loadingMoreReadings} className="mt-3 w-full rounded-xl border border-teal/30 bg-teal/5 px-3 py-2.5 text-[11px] font-bold text-teal disabled:opacity-50">
+                    {loadingMoreReadings ? "Daha fazla ölçüm yükleniyor..." : `${readings.length.toLocaleString("tr-TR")} / ${readingsTotal.toLocaleString("tr-TR")} ölçüm · Daha fazla yükle`}
+                  </button>
+                )}
               </div>
             )}
           </div>

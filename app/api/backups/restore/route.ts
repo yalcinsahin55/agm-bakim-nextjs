@@ -1,5 +1,5 @@
-import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse, type NextRequest } from "next/server";
+import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
@@ -7,16 +7,20 @@ import { writeAuditLog } from "@/lib/audit";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_BACKUP_REQUEST_BYTES } from "@/lib/requestLimits";
 import { withApiTiming } from "@/lib/performance";
+import { usersCollection } from "@/lib/dbCollections";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_COLLECTIONS = ["engines", "maintenance_types", "maintenance_records", "oil_analyses"] as const;
-type RestorableDocument = Record<string, unknown> & { _id?: string };
+type RestorableDocument = Record<string, unknown> & { _id?: string | ObjectId };
 const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64", "__proto__", "prototype", "constructor"]);
+const RESTORE_BATCH_SIZE = 500;
 
 function clean(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(clean);
   if (!value || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length === 1 && typeof record.$oid === "string" && /^[a-f\\d]{24}$/i.test(record.$oid)) return new ObjectId(record.$oid);
   const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const [key, item] of Object.entries(value)) {
     if (BLOCKED_KEYS.has(key) || key.startsWith("$") || key.includes(".")) continue;
@@ -28,10 +32,7 @@ function clean(value: unknown): unknown {
 function getIdentity(document: Record<string, unknown>): string | null {
   const id = document._id;
   if (typeof id === "string" && id.length > 0 && id.length <= 200 && !/[.$\0]/.test(id)) return id;
-  if (id && typeof id === "object" && "$oid" in id && typeof (id as { $oid?: unknown }).$oid === "string") {
-    const oid = (id as { $oid: string }).$oid;
-    return /^[a-f\d]{24}$/i.test(oid) ? oid : null;
-  }
+  if (id instanceof ObjectId) return id.toHexString();
   return null;
 }
 
@@ -48,44 +49,71 @@ async function postBackupRestore(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    if (body?.confirm !== "RESTORE") return NextResponse.json({ error: "Geri yüklemeyi onaylamak için RESTORE yazılmalıdır." }, { status: 400 });
-    const collections = body?.collections;
+    const bodyText = await req.text();
+    if (Buffer.byteLength(bodyText, "utf8") > MAX_BACKUP_REQUEST_BYTES) {
+      return NextResponse.json({ error: "Yedek dosyası izin verilen boyutu aşıyor." }, { status: 413 });
+    }
+    const body = JSON.parse(bodyText) as { confirm?: unknown; dry_run?: unknown; collections?: unknown };
+    if (body.confirm !== "RESTORE") return NextResponse.json({ error: "Geri yüklemeyi onaylamak için RESTORE yazılmalıdır." }, { status: 400 });
+    const collections = body.collections;
     if (!collections || typeof collections !== "object" || Array.isArray(collections)) return NextResponse.json({ error: "Geçersiz yedek dosyası." }, { status: 400 });
+    const dryRun = body.dry_run === true;
 
     const summary: Record<string, number> = {};
+    const skipped: Record<string, number> = {};
     for (const name of ALLOWED_COLLECTIONS) {
-      const documents = Array.isArray(collections[name]) ? collections[name] : [];
+      const documents = Array.isArray((collections as Record<string, unknown>)[name]) ? (collections as Record<string, unknown[]>)[name] : [];
       if (documents.length > 50000) return NextResponse.json({ error: `${name} koleksiyonu çok büyük.` }, { status: 413 });
+      const operations: AnyBulkWriteOperation<RestorableDocument>[] = [];
       let count = 0;
+      let skippedCount = 0;
       for (const raw of documents) {
-        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+          skippedCount += 1;
+          continue;
+        }
         const document = clean(raw) as RestorableDocument;
         const identity = getIdentity(document);
         if (identity) {
+          const rawIdentity = document._id;
           delete document._id;
-          await db.collection<RestorableDocument>(name).updateOne(
-            { _id: identity },
-            { $set: document, $setOnInsert: { _id: identity } },
-            { upsert: true },
-          );
+          const mongoIdentity = rawIdentity instanceof ObjectId ? rawIdentity : identity;
+          operations.push({
+            updateOne: {
+              filter: { _id: mongoIdentity },
+              update: { $set: document, $setOnInsert: { _id: mongoIdentity } },
+              upsert: true,
+            },
+          });
         } else {
           delete document._id;
-          await db.collection<RestorableDocument>(name).insertOne(document);
+          operations.push({ insertOne: { document } });
         }
         count += 1;
       }
+
+      if (!dryRun) {
+        const collection = db.collection<RestorableDocument>(name);
+        for (let offset = 0; offset < operations.length; offset += RESTORE_BATCH_SIZE) {
+          await collection.bulkWrite(operations.slice(offset, offset + RESTORE_BATCH_SIZE), { ordered: true });
+        }
+      }
       summary[name] = count;
+      skipped[name] = skippedCount;
+    }
+
+    if (dryRun) {
+      return NextResponse.json({ ok: true, summary, skipped, mode: "dry-run", applied: false });
     }
 
     await writeAuditLog(db, {
       user,
       action: "update",
       entity: "database",
-      summary: "Sanitized uygulama yedeği geri yüklendi",
-      after: { summary, restoredAt: new Date().toISOString(), mode: "merge" },
+      summary: "Sanitized uygulama yedeği batch merge modunda geri yüklendi",
+      after: { summary, skipped, restoredAt: new Date().toISOString(), mode: "merge", batchSize: RESTORE_BATCH_SIZE },
     });
-    return NextResponse.json({ ok: true, summary, mode: "merge" });
+    return NextResponse.json({ ok: true, summary, skipped, mode: "merge" });
   } catch (error) {
     console.error("POST /api/backups/restore hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Yedek geri yüklenemedi. Dosya biçimini kontrol edin." }, { status: 400 });

@@ -24,6 +24,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 - [Vercel deployment](#vercel-deployment)
 - [Bildirimler ve otomatik yenileme](#bildirimler-ve-otomatik-yenileme)
 - [Yedekleme ve veri güvenliği](#yedekleme-ve-veri-güvenliği)
+- [Legacy medya migration’ı](#legacy-medya-migrationı)
 - [Geliştirme ve doğrulama komutları](#geliştirme-ve-doğrulama-komutları)
 - [Bakım Asistanı sesli giriş ve hızlı dışa aktarma](#bakım-asistanı-sesli-giriş-ve-hızlı-dışa-aktarma)
 - [Lisans](#lisans)
@@ -409,6 +410,55 @@ node scripts/migrate-technician-source.mjs \
 
 Script yalnızca `technician_source`, `technician_id`, `technician_name` ve `external_service_name` alanlarına dokunur; motor, bakım türü, tarih-saat, medya, not, kontrol listesi ve ekip teknisyeni alanlarını değiştirmez. `migration-output/` klasörü `.gitignore` içinde tutulduğu için rapor ve yedekler GitHub’a gönderilmez. Migration tamamlandıktan sonra Teknisyen Raporu’nu yenileyerek isim varyasyonlarının tek satırda birleştiğini, dış hizmet kayıtlarının ise teknisyen metriklerine dahil olmadığını kontrol edin.
 
+Yeni doğal anahtar geçişinin ilk aşaması olarak yeni kullanıcı, motor ve motor bilgi kartlarına immutable `stable_id` eklenir; mevcut telefon/motor adı tabanlı `_id` alanları değiştirilmez. Eksik eski stable ID’leri önce dry-run ile inceleyin:
+
+```bash
+npm run migrate:stable-keys -- --report=migration-output/stable-keys-preview.json
+```
+
+Eski `planlamaci` rolü için de aynı kontrollü yaklaşım kullanılır. Uygulama mevcut eski hesapları geriye dönük olarak teknisyen davranışıyla çalıştırmaya devam eder. Yetkili migration kararı alınırsa önce rapor alın, sonra ayrı yedek ve explicit onay token’ı ile apply edin:
+
+```bash
+npm run migrate:legacy-role -- --report=migration-output/legacy-role-preview.json
+```
+
+Her iki script de varsayılan olarak veri değiştirmez. Apply ve rollback yalnızca ilgili `--confirm` değeri, değişiklik üst sınırı ve migration backup dosyası ile çalışır.
+
+## Legacy medya migration’ı
+
+Eski bakım kayıtlarında kalan açık `data:*;base64,` fotoğraf ve doğrulanabilir base64 video içerikleri Vercel Blob URL’lerine taşınabilir. Normal Blob URL’leri, mevcut video referansları ve doğrulanamayan içerikler olduğu gibi korunur; migration fiziksel bakım kaydı silmez ve fotoğraf/video alanlarını yalnızca başarılı Blob yüklemesi ile veritabanı güncellemesi birlikte tamamlandığında değiştirir. Her kaydın eski `photos_b64`, `photos` ve `videos` değerleri, veritabanı güncellemesinden önce atomik backup dosyasına yazılır.
+
+Önce erişimi kısıtlı bir test/staging veritabanında ve Blob store’da dry-run raporu alın:
+
+```bash
+npm run migrate:legacy-media -- \
+  --report=migration-output/legacy-media-preview.json \
+  --max-changes=100
+```
+
+Dry-run hiçbir veritabanı veya Blob değişikliği yapmaz. Apply işlemi varsayılan olarak kapalıdır; çalıştırmak için ayrı bir backup yolu, explicit confirmation token’ı ve zorunlu `--max-changes` sınırı verilmelidir. Uygun bir kayıt sayısı sınırı aşarsa işlem başlamadan durur. Apply sırasında yeni Blob yüklenir, rollback kaydı DB update’inden önce yazılır ve DB güncellemesi başarısız olursa yüklenen Blob’lar temizlenmeye çalışılır:
+
+```bash
+npm run migrate:legacy-media -- \
+  --report=migration-output/legacy-media-apply.json \
+  --backup=migration-output/legacy-media-backup.json \
+  --max-changes=25 \
+  --apply \
+  --confirm=APPLY-LEGACY-MEDIA-MIGRATION
+```
+
+Hatalı bir eşleşmede yalnızca bu migration’ın backup dosyasındaki alanları geri yükleyin:
+
+```bash
+npm run migrate:legacy-media -- \
+  --rollback=migration-output/legacy-media-backup.json \
+  --max-changes=25 \
+  --apply \
+  --confirm=ROLLBACK-LEGACY-MEDIA-MIGRATION
+```
+
+Bu script bu refaktör paketi kapsamında **production üzerinde çalıştırılmamıştır**. Production migration kararı verilirse önce Atlas snapshot, ayrı Blob store/backup, staging dry-run ve küçük bir pilot parti ile doğrulama yapılmalıdır. `migration-output/` GitHub’a gönderilmemelidir.
+
 ## Birlikte tamamlanan eski bakımlarda süre tekilleştirme
 
 Aynı işlem sırasında birden fazla bakım türü tamamlandığında uygulama bu türleri ayrı bakım kaydı olarak saklamaya devam eder. Ancak aynı `group_id` altındaki kayıtlar Teknisyen Raporu, analitik özetler ve Bakım Asistanı teknisyen istatistiklerinde tek bir ekip çalışması olarak sayılır. Böylece kişi katkı süresi ve görev toplamı, aynı bakım türü sayısı kadar çoğalmaz; bakım türü bazlı kayıt sayıları ise ayrı kalır.
@@ -450,7 +500,13 @@ Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süre
 | `npm run dev` | Geliştirme sunucusunu başlatır. |
 | `npm run build` | Next.js production derlemesini oluşturur. |
 | `npm run start` | Production derlemesini çalıştırır. |
+| `npm run typecheck` | Repository’nin normal TypeScript tip kontrolünü yapar. |
+| `npm test` | Repo içindeki auth, medya, bulkWrite, upload, backup ve notification regression testlerini çalıştırır. |
+| `npx tsc --noEmit --strict --skipLibCheck` | Strict TypeScript tip kontrolünü yapar. |
 | `npx tsc --noEmit --pretty false` | TypeScript tip kontrolü yapar. |
+| `npm run migrate:stable-keys` | Kullanıcı, motor ve motor bilgi kartlarında eksik stable ID’leri varsayılan dry-run ile raporlar. |
+| `npm run migrate:legacy-role` | Eski `planlamaci` hesaplarının kontrollü dry-run raporunu üretir. |
+| `npm run migrate:legacy-media` | Legacy base64 fotoğraf/video içeriklerinin Blob’a taşınmasını varsayılan dry-run ile raporlar. Apply için explicit onay, backup ve `--max-changes` zorunludur. |
 | `git diff --check` | Boşluk ve patch kaynaklı diff sorunlarını kontrol eder. |
 | `npx tsx /home/ubuntu/agm-audit-regression.ts` | Güvenlik, soft-delete, TTL ve legacy medya sınırı için geçici regresyon kontrolü. |
 | `BASE_URL=https://staging.example node scripts/staging-load-smoke.mjs` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
@@ -468,10 +524,17 @@ Yayın öncesi asgari doğrulama:
 
 ```bash
 git diff --check
-npx tsc --noEmit --pretty false
+npm test
+npm run typecheck
+npx tsc --noEmit --strict --skipLibCheck
+npm audit --omit=dev --audit-level=high
 npm run build
 git status --short --branch
 ```
+
+Bildirimler sayfası açılırken GET endpointi yalnızca mevcut bildirimleri okur. Bakım durumlarının yeniden hesaplanması ve eski bildirimlerin temizlenmesi yalnızca oturum ve rate-limit korumalı `POST /api/notifications/refresh` endpointi üzerinden yapılır. Eski `GET /api/notifications?refresh=1` çağrıları mutation çalıştırmadan 405 döner.
+
+Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılmalıdır. Komut satırı veya API çağrısı gerekiyorsa gövdeye `confirm: "RESTORE"` ve `dry_run: true` gönderildiğinde hiçbir veri yazılmaz; yalnızca koleksiyon bazında uygulanacak ve atlanacak kayıt özeti döner. Gerçek merge işlemi batch `bulkWrite` ile yapılır ve yedekleme rate-limit’i ile korunur.
 
 Üretim doğrulamasında gerçek kayıt oluşturmadan login sayfasını, auth yönlendirmelerini, yeni rotaların açılışını ve Vercel deployment durumunu kontrol edin. Gerçek kullanıcı hesabıyla özellik testi yapılacaksa test verisinin üretim kayıtlarına karışmamasına dikkat edin.
 

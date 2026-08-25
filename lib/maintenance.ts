@@ -8,6 +8,7 @@ type TrackingState = {
   last_maintenance_hour?: number;
   period_hours?: number;
   tracking_source?: "manual" | "record";
+  tracking_revision?: number;
 };
 
 type EngineStatesRecord = Record<string, unknown>;
@@ -68,6 +69,9 @@ function normalizeTrackingState(state: unknown): TrackingState | null {
   if (candidate.tracking_source === "manual" || candidate.tracking_source === "record") {
     normalized.tracking_source = candidate.tracking_source;
   }
+  if (typeof candidate.tracking_revision === "number" && Number.isInteger(candidate.tracking_revision) && candidate.tracking_revision >= 0) {
+    normalized.tracking_revision = candidate.tracking_revision;
+  }
   return Object.keys(normalized).length > 0 ? normalized : null;
 }
 
@@ -92,6 +96,12 @@ export async function recomputeLastMaintenance(
   const typesCol = maintenanceTypesCollection(db);
   const recordFilter = { engine_id: engineId, type_key: typeKey };
   const statePath = `engine_states.${engineId}`;
+  const revisionFilter = (state: TrackingState | undefined) => {
+    const revision = typeof state?.tracking_revision === "number" ? state.tracking_revision : 0;
+    return revision > 0
+      ? { [statePath + ".tracking_revision"]: revision }
+      : { $or: [{ [statePath + ".tracking_revision"]: { $exists: false } }, { [statePath + ".tracking_revision"]: 0 }] };
+  };
 
   for (let attempt = 0; attempt < MAX_RECOMPUTE_ATTEMPTS; attempt += 1) {
     const latest = await recordsCol.findOne(
@@ -113,20 +123,22 @@ export async function recomputeLastMaintenance(
       const concurrentRecord = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
       if (concurrentRecord) continue;
       if (currentState?.tracking_source === "record") {
-        await typesCol.updateOne(
-          { _id: typeKey, [`${statePath}.tracking_source`]: "record" },
+        const removed = await typesCol.updateOne(
+          { _id: typeKey, [`${statePath}.tracking_source`]: "record", ...revisionFilter(currentState) },
           { $unset: { [statePath]: "" } },
         );
+        if (removed.matchedCount === 0) continue;
       } else {
         // Bir bakım kaydı, önceden elle tanımlanmış takibin son bakım saatini
         // geçici olarak değiştirdiyse ve sonra silindiyse eski planı geri yükle.
         // Snapshot yoksa eski veriyi varsayarak silmek yerine korumaya devam ederiz.
         const previousState = normalizeTrackingState(fallbackState);
         if (previousState) {
-          await typesCol.updateOne(
-            { _id: typeKey, ...(isObjectRecord(type?.engine_states) ? { [`${statePath}.tracking_source`]: { $ne: "record" } } : {}) },
-            { $set: buildEngineStateUpdate(type?.engine_states, engineId, previousState) },
+          const restored = await typesCol.updateOne(
+            { _id: typeKey, ...(isObjectRecord(type?.engine_states) ? { [`${statePath}.tracking_source`]: { $ne: "record" } } : {}), ...revisionFilter(currentState) },
+            { $set: buildEngineStateUpdate(type?.engine_states, engineId, { ...previousState, tracking_revision: (currentState?.tracking_revision || 0) + 1 }) },
           );
+          if (restored.matchedCount === 0) continue;
         }
       }
       const recordAfterUpdate = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
@@ -135,10 +147,11 @@ export async function recomputeLastMaintenance(
     }
 
     const maxHour = typeof latest.hour_at_completion === "number" ? latest.hour_at_completion : 0;
-    await typesCol.updateOne(
-      { _id: typeKey },
-      { $set: buildEngineStateUpdate(type?.engine_states, engineId, { last_maintenance_hour: maxHour }) },
+    const updated = await typesCol.updateOne(
+      { _id: typeKey, ...revisionFilter(currentState) },
+      { $set: buildEngineStateUpdate(type?.engine_states, engineId, { last_maintenance_hour: maxHour, tracking_revision: (currentState?.tracking_revision || 0) + 1 }) },
     );
+    if (updated.matchedCount === 0) continue;
 
     // Yeni bir kayıt update ile aynı anda geldiyse ilk snapshot artık güncel
     // olmayabilir. Son snapshot değişmişse bir kez daha hesapla.

@@ -29,6 +29,8 @@ export function ensureAppIndexes(db: Db): Promise<void> {
     const videoChunks = db.collection("video_chunks");
     const oilAnalyses = db.collection("oil_analyses");
     const pressureReadings = db.collection("pressure_readings");
+    const engines = db.collection("engines");
+    const equipmentInfo = db.collection("equipment_info");
 
     global._agmIndexPromise = Promise.all([
       createIndexSafely(records, { engine_id: 1, type_label: 1, created_at: -1 }),
@@ -54,6 +56,9 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(auditLogs, { entity: 1, created_at: -1 }),
       createIndexSafely(auditLogs, { entity: 1, entity_id: 1, created_at: -1 }),
       createIndexSafely(users, { phone_normalized: 1 }, { unique: true, sparse: true, name: "users_phone_normalized_unique" }),
+      createIndexSafely(users, { stable_id: 1 }, { unique: true, sparse: true, name: "users_stable_id_unique" }),
+      createIndexSafely(engines, { stable_id: 1 }, { unique: true, sparse: true, name: "engines_stable_id_unique" }),
+      createIndexSafely(equipmentInfo, { stable_id: 1 }, { unique: true, sparse: true, name: "equipment_info_stable_id_unique" }),
       createIndexSafely(users, { bootstrap_key: 1 }, { unique: true, sparse: true, name: "users_first_bootstrap_unique" }),
       createIndexSafely(users, { role: 1, active: 1, approved: 1 }, { name: "users_technician_lookup" }),
       createIndexSafely(pushSubscriptions, { endpoint: 1 }, { unique: true }),

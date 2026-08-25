@@ -1,4 +1,5 @@
 import { equipmentInfoCollection, usersCollection } from "@/lib/dbCollections";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -15,7 +16,11 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    const items = await equipmentInfoCollection(db).find().toArray();
+    const rateLimited = await enforceApiRateLimit(req, "equipment-info-list", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
+    const items = await equipmentInfoCollection(db).find({}, {
+      projection: { _id: 1, stable_id: 1, engine_name: 1, kaver_tipi: 1, hava_filtresi: 1, krankcase: 1, esanjor_tipi: 1, dungs: 1, radyator_tipi: 1, not: 1 },
+    }).toArray();
     return NextResponse.json(items);
   } catch (error) {
     console.error("equipment-info GET hatası:", error instanceof Error ? error.name : "UnknownError");
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     const doc = {
-      _id: name, engine_name: name,
+      _id: name, stable_id: randomUUID(), engine_name: name,
       kaver_tipi: kaver_tipi || null, hava_filtresi: hava_filtresi || null, krankcase: krankcase || null,
       esanjor_tipi: esanjor_tipi || null, dungs: dungs || null, radyator_tipi: radyator_tipi || null,
       not: noteField || null,

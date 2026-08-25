@@ -12,6 +12,7 @@ export interface TechnicianPermissions {
 
 export interface User {
   _id: string;
+  stable_id?: string;
   full_name: string;
   email?: string;
   phone?: string;
@@ -36,6 +37,7 @@ export interface EngineHistoryEntry {
 
 export interface Engine {
   _id: string;
+  stable_id?: string;
   name: string;
   hours: number;
   load_kw: number;
@@ -47,6 +49,7 @@ export interface EngineState {
   last_maintenance_hour: number;
   period_hours: number;
   tracking_source?: "manual" | "record";
+  tracking_revision?: number;
 }
 
 export interface MaintenanceType {
@@ -131,6 +134,7 @@ export interface PressureReading {
 
 export interface EquipmentInfo {
   _id?: string;
+  stable_id?: string;
   engine_name: string;
   kaver_tipi?: string;
   hava_filtresi?: string;

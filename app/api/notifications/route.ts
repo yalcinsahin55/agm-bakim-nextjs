@@ -1,9 +1,10 @@
-import { usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { listUserNotifications, syncMaintenanceNotifications } from "@/lib/notifications";
+import { listUserNotifications } from "@/lib/notifications";
+import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { notificationsCollection, usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
@@ -14,14 +15,20 @@ async function getNotifications(req: NextRequest) {
     const user = await getCurrentUser(req, usersCollection(db));
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
 
-    // Normal zil çağrısı yalnızca okur; bildirimler sayfası `refresh=1` ile
-    // güncel bakım durumlarını yeniden hesaplayıp silinmiş/kapsam dışı kayıtları temizler.
-    const shouldRefresh = req.nextUrl.searchParams.get("refresh") === "1";
-    const notifications = shouldRefresh
-      ? await syncMaintenanceNotifications(db, user)
-      : await listUserNotifications(db, user._id);
-    const unreadCount = notifications.filter((notification) => !notification.read_at).length;
-    return NextResponse.json({ notifications, unreadCount });
+    // GET yalnızca okuma yapar. Bildirim senkronizasyonu ve temizlik,
+    // `/api/notifications/refresh` altındaki korumalı POST route’undadır.
+    if (req.nextUrl.searchParams.get("refresh") === "1") {
+      return NextResponse.json({ error: "Bildirim yenileme için POST /api/notifications/refresh kullanın." }, { status: 405, headers: { Allow: "GET" } });
+    }
+    const rateLimited = await enforceApiRateLimit(req, "notifications-list", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
+    const requestedLimit = Number.parseInt(req.nextUrl.searchParams.get("limit") || "500", 10);
+    const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 500, 1), 500);
+    const [notifications, unreadCount] = await Promise.all([
+      listUserNotifications(db, user._id, limit),
+      notificationsCollection(db).countDocuments({ user_id: user._id, read_at: null }),
+    ]);
+    return NextResponse.json({ notifications, unreadCount, hasMore: notifications.length === limit });
   } catch (error) {
     console.error("Bildirimler yüklenirken hata:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Bildirimler yüklenirken bir hata oluştu." }, { status: 500 });

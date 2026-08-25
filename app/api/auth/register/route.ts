@@ -1,4 +1,5 @@
 import { usersCollection } from "@/lib/dbCollections";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
@@ -55,7 +56,7 @@ async function postRegister(req: NextRequest) {
     // İlk kurulum: ilk kullanıcı yönetici olur
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
-      _id: id, full_name: full_name.trim(), email: normalizedEmail,
+      _id: id, stable_id: randomUUID(), full_name: full_name.trim(), email: normalizedEmail,
       ...(normalizedPhone ? { phone: phone?.trim(), phone_normalized: normalizedPhone } : {}),
       password_hash: passwordHash, role: "yonetici", active: true, approved: true, bootstrap_key: "first-user", created_at: new Date(),
     });

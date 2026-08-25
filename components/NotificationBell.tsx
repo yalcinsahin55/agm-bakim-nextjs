@@ -11,8 +11,13 @@ export default function NotificationBell() {
     let alive = true;
     const load = async (refresh = false) => {
       try {
-        const endpoint = refresh ? "/api/notifications?refresh=1" : "/api/notifications";
-        const data = await cachedFetch<{ unreadCount?: number }>(endpoint, refresh ? 0 : 30_000);
+        const data = refresh
+          ? await (async () => {
+            const response = await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" });
+            if (!response.ok) throw new Error("Bildirim yenilenemedi");
+            return await response.json() as { unreadCount?: number };
+          })()
+          : await cachedFetch<{ unreadCount?: number }>("/api/notifications", 30_000);
         if (alive) setUnreadCount(Number(data.unreadCount || 0));
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
