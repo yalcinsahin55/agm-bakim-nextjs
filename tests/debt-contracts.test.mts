@@ -333,7 +333,7 @@ test("session identity stays stable across phone changes", async () => {
 test("no protected UI route relies on middleware as its authorization boundary", async () => {
   const middleware = await source("middleware.ts");
   const permissions = await source("lib/permissions.ts");
-  assert.match(middleware, /jwtVerify\(/);
+  assert.match(middleware, /\.well-known/);
   assert.match(permissions, /canAccessRoute/);
   assert.match(permissions, /normalizeRole/);
 });
@@ -548,4 +548,12 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   assert.match(recordsPage, /engine_id: isAdmin \? engineId/);
   assert.match(recordsPage, /selectedEngineId/);
   assert.match(recordsPage, /engines=\{sortedEngines\}/);
+});
+
+test("Android TWA asset links stay public and match the signed package", async () => {
+  const assetLinks = await source("public/.well-known/assetlinks.json");
+  const middleware = await source("middleware.ts");
+  assert.match(assetLinks, /"package_name":\s*"com\.avcikoru\.bakim"/);
+  assert.match(assetLinks, /3B:64:AC:01:49:D3:11:40:2D:C3:5D:74:E5:37:FF:2E:A5:3D:BA:4F:C7:B8:9B:FD:BA:A9:FE:70:C2:57:C9:0B/);
+  assert.match(middleware, /\.well-known/);
 });

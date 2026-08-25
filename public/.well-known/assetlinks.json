@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.avcikoru.bakim",
+      "sha256_cert_fingerprints": [
+        "3B:64:AC:01:49:D3:11:40:2D:C3:5D:74:E5:37:FF:2E:A5:3D:BA:4F:C7:B8:9B:FD:BA:A9:FE:70:C2:57:C9:0B"
+      ]
+    }
+  }
+]
