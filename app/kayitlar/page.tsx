@@ -228,6 +228,11 @@ function maintenanceDayKey(record: MaintenanceRecord): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function reportAttachmentUrl(recordId: string, attachmentId: string, download = false): string {
+  const base = `/api/records/${encodeURIComponent(recordId)}/attachments/${encodeURIComponent(attachmentId)}`;
+  return download ? `${base}?download=1` : base;
+}
+
 function maintenanceDayLabel(key: string): string {
   if (key === "unknown") return "Tarihi bilinmeyen kayıtlar";
   const [year, month, day] = key.split("-").map(Number);
@@ -705,6 +710,7 @@ export default function KayitlarPage() {
   const [selectedVideo, setSelectedVideo] = useState<{ src: string; filename: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [selectedReportAttachment, setSelectedReportAttachment] = useState<{ recordId: string; attachment: ReportAttachment } | null>(null);
   const [confirmationRecord, setConfirmationRecord] = useState<MaintenanceRecord | null>(null);
   const [confirmationEngineId, setConfirmationEngineId] = useState("");
   const [confirmationDurations, setConfirmationDurations] = useState<Record<string, string>>({});
@@ -1208,7 +1214,7 @@ export default function KayitlarPage() {
             {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
             {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
             {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}
-            {selectedRecord.report_attachments?.length ? <div className="mt-4 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3"><div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div><div className="flex flex-col gap-1.5">{selectedRecord.report_attachments.map((attachment) => <a key={attachment.id} href={`/api/records/${selectedRecord._id}/attachments/${encodeURIComponent(attachment.id)}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-[10.5px] text-text hover:border-purple-300"><span className="min-w-0 truncate font-bold">{attachment.filename}</span><span className="flex-shrink-0 text-[9px] text-faint">{attachment.mime === "application/pdf" ? "PDF" : attachment.mime.includes("spreadsheet") || attachment.mime.includes("excel") ? "Excel" : "Word"} · {formatReportAttachmentSize(attachment.size)} ↗</span></a>)}</div></div> : null}
+            {selectedRecord.report_attachments?.length ? <div className="mt-4 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3"><div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div><div className="flex flex-col gap-1.5">{selectedRecord.report_attachments.map((attachment) => { const label = <><span className="min-w-0 truncate font-bold">{attachment.filename}</span><span className="flex-shrink-0 text-[9px] text-faint">{attachment.mime === "application/pdf" ? "PDF · Uygulama içinde aç" : attachment.mime.includes("spreadsheet") || attachment.mime.includes("excel") ? "Excel · İndir" : "Word · İndir"} · {formatReportAttachmentSize(attachment.size)} {attachment.mime === "application/pdf" ? "›" : "↓"}</span></>; return attachment.mime === "application/pdf" ? <button key={attachment.id} type="button" onClick={() => setSelectedReportAttachment({ recordId: selectedRecord._id, attachment })} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} PDF önizlemesini aç`}>{label}</button> : <a key={attachment.id} href={reportAttachmentUrl(selectedRecord._id, attachment.id, true)} download={attachment.filename} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} dosyasını indir`}>{label}</a>; })}</div></div> : null}
             {((selectedRecord.photos || selectedRecord.photos_b64 || []).length > 0 || (selectedRecord.videos || []).length > 0) && (
               <div className="mt-4">
                 <div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">Medya</div>
@@ -1226,6 +1232,53 @@ export default function KayitlarPage() {
               </div>
             )}
             <button type="button" onClick={() => setSelectedRecord(null)} className="mt-4 w-full rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Kapat</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bakım raporu PDF önizleme modalı */}
+      {selectedReportAttachment && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/85 backdrop-blur-sm md:items-center md:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${selectedReportAttachment.attachment.filename} PDF önizlemesi`}
+          onClick={() => setSelectedReportAttachment(null)}
+        >
+          <div
+            className="flex h-[92dvh] w-full max-w-4xl flex-col rounded-t-2xl border border-border bg-panel p-3 shadow-2xl md:h-[88vh] md:rounded-2xl md:p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-2 flex min-h-10 items-center justify-between gap-2 border-b border-border pb-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-bold text-text">📄 {selectedReportAttachment.attachment.filename}</div>
+                <div className="mt-0.5 text-[10px] text-faint">PDF önizleme · bakım kaydı içinde</div>
+              </div>
+              <div className="flex flex-shrink-0 items-center gap-1.5">
+                <a
+                  href={reportAttachmentUrl(selectedReportAttachment.recordId, selectedReportAttachment.attachment.id, true)}
+                  className="rounded-lg border border-amber/40 px-2.5 py-1.5 text-[10px] font-bold text-amber"
+                  download={selectedReportAttachment.attachment.filename}
+                >
+                  İndir
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedReportAttachment(null)}
+                  className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white"
+                  aria-label="PDF önizlemesini kapat"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={reportAttachmentUrl(selectedReportAttachment.recordId, selectedReportAttachment.attachment.id)}
+              title={selectedReportAttachment.attachment.filename}
+              className="min-h-0 w-full flex-1 rounded-xl border border-border bg-white"
+              aria-label={`${selectedReportAttachment.attachment.filename} PDF önizlemesi`}
+              referrerPolicy="no-referrer"
+            />
           </div>
         </div>
       )}

@@ -373,6 +373,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(fileRoute, /record-attachment-read/);
   assert.match(fileRoute, /fetchStoredBlob/);
   assert.match(fileRoute, /Content-Disposition/);
+  assert.match(fileRoute, /const inline = !download && attachment\.mime === "application\/pdf"/);
   assert.match(fileRoute, /Cache-Control.*private, no-store/);
   assert.match(oilFileRoute, /fetchStoredBlob/);
   assert.match(pdfSecurity, /\.private\.blob\.vercel-storage\.com/);
@@ -382,6 +383,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(blobStorage, /BLOB_READ_WRITE_TOKEN/);
   assert.match(blobStorage, /access: "private"/);
   assert.match(nextConfig, /source: "\/api\/oil-analyses\/:id\/file"/);
+  assert.match(nextConfig, /source: "\/api\/records\/:id\/attachments\/:attachmentId"/);
   assert.match(nextConfig, /X-Frame-Options.*SAMEORIGIN/);
   assert.match(oilFileRoute, /"X-Frame-Options": "SAMEORIGIN"/);
   assert.match(mediaUpload, /uploadPresigned/);
@@ -425,7 +427,19 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.doesNotMatch(oilPage, /\/api\/blob\/upload-server/);
   assert.match(complete, /getMediaDisplayUrl/);
   assert.match(records, /getMediaDisplayUrl/);
-  assert.match(records, /\/api\/records\/\$\{selectedRecord\._id\}\/attachments\/\$\{encodeURIComponent\(attachment\.id\)\}/);
+  assert.match(records, /selectedReportAttachment/);
+  assert.match(records, /setSelectedReportAttachment\(\{ recordId: selectedRecord\._id, attachment \}\)/);
+  assert.match(records, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id\)/);
+  assert.match(records, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id, true\)/);
+  assert.match(records, /download=1/);
+  const attachmentUiStart = records.indexOf("Detaylı rapor ekleri");
+  const attachmentUiEnd = records.indexOf("Bakım raporu PDF önizleme modalı");
+  assert.ok(attachmentUiStart >= 0 && attachmentUiEnd > attachmentUiStart, "Bakım raporu eki UI bloğu bulunamadı");
+  const attachmentUi = records.slice(attachmentUiStart, attachmentUiEnd);
+  assert.doesNotMatch(attachmentUi, /target=["']_blank["']/);
+  assert.doesNotMatch(attachmentUi, /window\.open\(/);
+  assert.match(attachmentUi, /href=\{reportAttachmentUrl\(selectedRecord\._id, attachment\.id, true\)\}/);
+  assert.match(attachmentUi, /download=\{attachment\.filename\}/);
 });
 
 

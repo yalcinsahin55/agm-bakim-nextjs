@@ -68,9 +68,16 @@ const nextConfig = {
           { key: "Expires", value: "0" },
         ],
       },
-      // Yağ analiz PDF’si aynı-origin önizleme iframe’inde açılır; diğer tüm rotalarda DENY korunur.
+      // Yağ analiz ve bakım raporu PDF’leri aynı-origin önizleme iframe’inde açılır; diğer tüm rotalarda DENY korunur.
       {
         source: "/api/oil-analyses/:id/file",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: oilAnalysisContentSecurityPolicy },
+        ],
+      },
+      {
+        source: "/api/records/:id/attachments/:attachmentId",
         headers: [
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Content-Security-Policy", value: oilAnalysisContentSecurityPolicy },
