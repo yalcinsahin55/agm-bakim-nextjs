@@ -74,13 +74,20 @@ test("notification page is GET-first and the bell uses a lightweight unread coun
   const unreadCount = await source("app/api/notifications/unread-count/route.ts");
   const notificationsPage = await source("app/bildirimler/page.tsx");
   const notificationBell = await source("components/NotificationBell.tsx");
+  const unreadCache = await source("lib/notificationUnreadCache.ts");
   assert.match(notificationsGet, /Bildirim yenileme için POST/);
   assert.match(notificationsRefresh, /export async function POST/);
   assert.match(unreadCount, /notifications-unread-count/);
   assert.match(unreadCount, /countDocuments\(\{ user_id: user\._id, read_at: null \}\)/);
+  assert.match(unreadCount, /getCachedUnreadCount/);
+  assert.match(unreadCount, /searchParams\.get\("fresh"\)/);
+  assert.match(unreadCache, /CACHE_TTL_MS = 5_000/);
+  assert.match(unreadCache, /MAX_CACHE_ENTRIES = 512/);
   assert.match(notificationsPage, /fetch\("\/api\/notifications\?limit=500", \{ cache: "no-store" \}\)/);
   assert.match(notificationsPage, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
   assert.match(notificationBell, /UNREAD_COUNT_URL = "\/api\/notifications\/unread-count"/);
+  assert.match(notificationBell, /\?fresh=1/);
+  assert.match(notificationBell, /fresh \? 0 : 5_000/);
   assert.doesNotMatch(notificationBell, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
   assert.doesNotMatch(notificationBell, /fetch\("\/api\/notifications"/);
 });
@@ -172,6 +179,9 @@ test("repository exposes CI validation commands", async () => {
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /npm audit --omit=dev --audit-level=high/);
+  assert.match(workflow, /actions\/checkout@v7/);
+  assert.match(workflow, /actions\/setup-node@v5/);
+  assert.match(workflow, /node-version: 24/);
 });
 
 test("session identity stays stable across phone changes", async () => {

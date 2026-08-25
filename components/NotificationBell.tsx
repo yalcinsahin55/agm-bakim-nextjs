@@ -18,7 +18,8 @@ export default function NotificationBell() {
     const load = async (fresh = false) => {
       try {
         if (fresh) invalidateCachedFetch(UNREAD_COUNT_URL);
-        const data = await cachedFetch<UnreadCountResponse>(UNREAD_COUNT_URL, fresh ? 0 : 30_000);
+        const url = fresh ? `${UNREAD_COUNT_URL}?fresh=1` : UNREAD_COUNT_URL;
+        const data = await cachedFetch<UnreadCountResponse>(url, fresh ? 0 : 5_000);
         if (alive) setUnreadCount(Number(data.unreadCount || 0));
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
