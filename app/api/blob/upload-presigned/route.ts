@@ -19,8 +19,50 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const REPORT_UPLOAD_PREFIX = "report-attachments/";
+const PHOTO_UPLOAD_PREFIX = "photos/";
+const VIDEO_UPLOAD_PREFIX = "videos/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
+const PHOTO_UPLOAD_CLIENT_PAYLOAD = "maintenance-photo";
+const VIDEO_UPLOAD_CLIENT_PAYLOAD = "maintenance-video";
+const OIL_ANALYSIS_UPLOAD_CLIENT_PAYLOAD = "oil-analysis";
+const OIL_ANALYSIS_UPLOAD_PREFIX = "oil-analyses/";
 const REPORT_UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
+const PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+const OIL_ANALYSIS_MAX_BYTES = 10 * 1024 * 1024;
+
+const PHOTO_UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const VIDEO_UPLOAD_MIME_TYPES = ["video/*"] as const;
+const OIL_ANALYSIS_UPLOAD_MIME_TYPES = ["application/pdf"] as const;
+
+type UploadPolicy = {
+  prefix: string;
+  allowedContentTypes: readonly string[];
+  maximumSizeInBytes: number;
+};
+
+const UPLOAD_POLICIES: Record<string, UploadPolicy> = {
+  [REPORT_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: REPORT_UPLOAD_PREFIX,
+    allowedContentTypes: REPORT_ATTACHMENT_MIME_TYPES,
+    maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES,
+  },
+  [PHOTO_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: PHOTO_UPLOAD_PREFIX,
+    allowedContentTypes: PHOTO_UPLOAD_MIME_TYPES,
+    maximumSizeInBytes: PHOTO_MAX_BYTES,
+  },
+  [VIDEO_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: VIDEO_UPLOAD_PREFIX,
+    allowedContentTypes: VIDEO_UPLOAD_MIME_TYPES,
+    maximumSizeInBytes: VIDEO_MAX_BYTES,
+  },
+  [OIL_ANALYSIS_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: OIL_ANALYSIS_UPLOAD_PREFIX,
+    allowedContentTypes: OIL_ANALYSIS_UPLOAD_MIME_TYPES,
+    maximumSizeInBytes: OIL_ANALYSIS_MAX_BYTES,
+  },
+};
 
 interface GeneratePresignedUrlBody {
   type: "blob.generate-presigned-url";
@@ -38,6 +80,18 @@ function isSafeReportUploadPath(pathname: string): boolean {
   const filename = pathname.slice(REPORT_UPLOAD_PREFIX.length);
   if (!filename || filename.length > 250 || filename !== sanitizeReportAttachmentFilename(filename)) return false;
   return Boolean(getReportAttachmentExtension(filename));
+}
+
+function isSafeMediaUploadPath(pathname: string, prefix: string): boolean {
+  if (!pathname.startsWith(prefix) || pathname.includes("..")) return false;
+  const filename = pathname.slice(prefix.length);
+  return Boolean(filename)
+    && filename.length <= 250
+    && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(filename);
+}
+
+function isSafeOilAnalysisUploadPath(pathname: string): boolean {
+  return isSafeMediaUploadPath(pathname, OIL_ANALYSIS_UPLOAD_PREFIX) && pathname.toLowerCase().endsWith(".pdf");
 }
 
 function isGeneratePresignedUrlBody(value: unknown): value is GeneratePresignedUrlBody {
@@ -63,12 +117,19 @@ function toPresignedUrlPayload(presignedUrl: string): PresignedUrlPayload {
   return { delegationToken, signature, params };
 }
 
+function isAllowedUploadPath(pathname: string, clientPayload: string | null | undefined): boolean {
+  if (clientPayload === REPORT_UPLOAD_CLIENT_PAYLOAD) return isSafeReportUploadPath(pathname);
+  if (clientPayload === OIL_ANALYSIS_UPLOAD_CLIENT_PAYLOAD) return isSafeOilAnalysisUploadPath(pathname);
+  const policy = clientPayload ? UPLOAD_POLICIES[clientPayload] : undefined;
+  return policy ? isSafeMediaUploadPath(pathname, policy.prefix) : false;
+}
+
 async function postPresignedUpload(request: NextRequest): Promise<Response> {
   const db = await getDb();
   const user = await getCurrentUser(request, usersCollection(db));
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   if (!canWriteMaintenance(user.role)) {
-    return NextResponse.json({ error: "Bu hesap rapor eki yükleyemez." }, { status: 403 });
+    return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
   }
 
   const rateLimited = await enforceApiRateLimit(request, "blob-upload", 120, 10 * 60 * 1000, user._id);
@@ -81,15 +142,16 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
     }
 
     const { pathname, clientPayload, multipart } = body.payload;
-    if (clientPayload !== REPORT_UPLOAD_CLIENT_PAYLOAD || !isSafeReportUploadPath(pathname)) {
-      return NextResponse.json({ error: "Geçersiz rapor eki yolu veya upload amacı." }, { status: 400 });
+    const policy = clientPayload ? UPLOAD_POLICIES[clientPayload] : undefined;
+    if (!policy || !isAllowedUploadPath(pathname, clientPayload)) {
+      return NextResponse.json({ error: "Geçersiz dosya yolu veya upload amacı." }, { status: 400 });
     }
 
     const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
     const storeId = process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID;
     if (!token && !storeId) {
-      console.error("Presigned Blob rapor eki token hatası: BLOB_CREDENTIALS_UNAVAILABLE");
-      return NextResponse.json({ error: "Rapor eki depolama bağlantısı yapılandırılmamış.", code: "BLOB_CREDENTIALS_UNAVAILABLE" }, { status: 503 });
+      console.error("Presigned Blob upload credential hatası: BLOB_CREDENTIALS_UNAVAILABLE");
+      return NextResponse.json({ error: "Dosya depolama bağlantısı yapılandırılmamış.", code: "BLOB_CREDENTIALS_UNAVAILABLE" }, { status: 503 });
     }
 
     const signedToken = await issueSignedToken({
@@ -97,8 +159,8 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       ...(storeId ? { storeId } : {}),
       pathname,
       operations: ["put"],
-      allowedContentTypes: [...REPORT_ATTACHMENT_MIME_TYPES],
-      maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES,
+      allowedContentTypes: [...policy.allowedContentTypes],
+      maximumSizeInBytes: policy.maximumSizeInBytes,
       validUntil: Date.now() + REPORT_UPLOAD_TOKEN_TTL_MS,
     });
     const { presignedUrl } = await presignUrl(signedToken, {
@@ -106,8 +168,8 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       operation: "put",
       pathname,
       addRandomSuffix: true,
-      allowedContentTypes: [...REPORT_ATTACHMENT_MIME_TYPES],
-      maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES,
+      allowedContentTypes: [...policy.allowedContentTypes],
+      maximumSizeInBytes: policy.maximumSizeInBytes,
       validUntil: signedToken.validUntil,
       ...(multipart ? {} : {}),
     });
@@ -119,8 +181,8 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
   } catch (error) {
     const reason = error instanceof Error ? error.message : "UnknownError";
     const errorCode = /credential|token|sign/i.test(reason) ? "BLOB_PRESIGN_CREDENTIAL_ERROR" : "BLOB_PRESIGN_ERROR";
-    console.error("Presigned Blob rapor eki upload hatası:", errorCode, reason.slice(0, 240));
-    return NextResponse.json({ error: "Rapor eki depolama servisine bağlanılamadı. Lütfen tekrar deneyin.", code: errorCode }, { status: 502 });
+    console.error("Presigned Blob upload hatası:", errorCode, reason.slice(0, 240));
+    return NextResponse.json({ error: "Dosya depolama servisine bağlanılamadı. Lütfen tekrar deneyin.", code: errorCode }, { status: 502 });
   }
 }
 

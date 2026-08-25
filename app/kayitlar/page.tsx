@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
 import { queueRecord, type QueuedMedia } from "@/lib/offlineQueue";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -381,17 +382,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
           uploaded.push(`offline:${id}`);
           continue;
         }
-        const formData = new FormData();
-        formData.append("file", new File([compressed], photoName, { type: "image/jpeg" }));
-        formData.append("folder", "photos");
-        const response = await withTimeout(
-          fetch("/api/blob/upload-server", { method: "POST", body: formData }),
-          60_000,
-          "Fotoğraf yükleme zaman aşımına uğradı.",
+        const url = await uploadMaintenanceMedia(
+          new File([compressed], photoName, { type: "image/jpeg" }),
+          "photo",
         );
-        const result = await response.json() as { url?: string; error?: string };
-        if (!response.ok || !result.url) throw new Error(result.error || "Fotoğraf yüklenemedi.");
-        uploaded.push(result.url);
+        uploaded.push(url);
       } catch (error) {
         if (!navigator.onLine) {
           try {

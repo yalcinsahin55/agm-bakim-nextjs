@@ -71,6 +71,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
         "Cache-Control": "private, no-store, max-age=0",
         "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "SAMEORIGIN",
       },
     });
   } catch (error) {

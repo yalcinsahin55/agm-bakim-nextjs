@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
+import { uploadOilAnalysisPdf } from "@/lib/mediaUpload";
 
 interface Engine {
   _id: string;
@@ -85,16 +86,11 @@ export default function YagAnalizleriPage() {
     setSaving(true);
     const loadingToast = toast.loading("Rapor yükleniyor...");
     try {
-      const uploadData = new FormData();
-      uploadData.append("file", file);
-      uploadData.append("folder", "oil-analyses");
-      const uploadRes = await fetch("/api/blob/upload-server", { method: "POST", body: uploadData });
-      const uploadResult = await uploadRes.json() as { url?: string; error?: string };
-      if (!uploadRes.ok || !uploadResult.url) throw new Error(uploadResult.error || "PDF yüklenemedi.");
+      const uploadResult = await uploadOilAnalysisPdf(file);
 
       const res = await fetch("/api/oil-analyses", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ engine_id: engineId, analysis_date: date, result, note, pdf_url: uploadResult.url, pdf_filename: file.name }),
+        body: JSON.stringify({ engine_id: engineId, analysis_date: date, result, note, pdf_url: uploadResult.url, pdf_filename: uploadResult.filename }),
       });
       if (res.ok) {
         toast.dismiss(loadingToast);

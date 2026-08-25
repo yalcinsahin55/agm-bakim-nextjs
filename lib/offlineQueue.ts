@@ -2,6 +2,7 @@
 
 import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { uploadReportAttachment } from "@/lib/reportAttachmentUpload";
+import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 
 const DB_NAME = "agm-bakim-offline";
@@ -139,13 +140,7 @@ async function updateQueuedRecord(job: QueuedRecordJob): Promise<void> {
 }
 
 async function uploadPhoto(blob: Blob, name: string): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", new File([blob], name, { type: "image/jpeg" }));
-  formData.append("folder", "photos");
-  const response = await fetch("/api/blob/upload-server", { method: "POST", body: formData });
-  const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
-  if (!response.ok || !data.url) throw new Error(data.error || "Fotoğraf yüklenemedi.");
-  return data.url;
+  return uploadMaintenanceMedia(new File([blob], name, { type: "image/jpeg" }), "photo");
 }
 
 async function uploadReport(blob: Blob, name: string, mime: string): Promise<string> {
