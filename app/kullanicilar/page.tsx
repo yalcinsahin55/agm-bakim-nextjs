@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -55,7 +55,7 @@ export default function KullanicilarPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const res = await fetch("/api/users", { cache: "no-store" });
       if (res.status === 401) { router.push("/login"); return; }
@@ -74,9 +74,9 @@ export default function KullanicilarPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
 
-  useEffect(() => { load(); }, [router]);
+  useEffect(() => { void load(); }, [load]);
 
   async function addUser() {
     setSaving(true);

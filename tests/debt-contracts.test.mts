@@ -177,10 +177,15 @@ test("backup and upload large-payload paths use bounded processing", async () =>
   const backupExport = await source("app/api/backups/export/route.ts");
   const backupRestore = await source("app/api/backups/restore/route.ts");
   const uploadChunk = await source("app/api/upload-chunk/route.ts");
+  const assistant = await source("app/api/assistant/route.ts");
+  const requestLimits = await source("lib/requestLimits.ts");
   assert.match(backupExport, /new ReadableStream/);
   assert.match(backupExport, /backup-export/);
   assert.match(backupRestore, /dry-run/);
   assert.match(backupRestore, /bulkWrite/);
+  assert.match(assistant, /readRequestTextLimited/);
+  assert.match(backupRestore, /readRequestTextLimited/);
+  assert.match(requestLimits, /RequestBodyTooLargeError/);
   assert.match(uploadChunk, /Readable\.from/);
   assert.match(uploadChunk, /multipart: true/);
   assert.doesNotMatch(uploadChunk, /Buffer\.concat\(chunkBuffers/);

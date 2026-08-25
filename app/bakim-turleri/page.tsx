@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -23,7 +23,7 @@ export default function BakimTurleriPage() {
   const [selectedKey, setSelectedKey] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tümü");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const data = await getMaintenancePanel();
       setItems(data.items);
@@ -34,9 +34,9 @@ export default function BakimTurleriPage() {
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       else setLoading(false);
     }
-  }
+  }, [router]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const sortedTypes = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label, "tr")), [types]);
 

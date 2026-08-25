@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -56,7 +56,7 @@ export default function BakimTuruYonetimiPage() {
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
   const [restoringKey, setRestoringKey] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     const [res, allTypesRes] = await Promise.all([
       fetch("/api/maintenance-types/panel"),
       fetch("/api/maintenance-types?include_deleted=true"),
@@ -69,9 +69,9 @@ export default function BakimTuruYonetimiPage() {
     setArchivedTypes(Array.isArray(allTypes) ? allTypes.filter((type: MaintenanceType) => type.is_deleted === true) : []);
     setEngines(Array.isArray(data.engines) ? data.engines : []);
     setLoading(false);
-  }
+  }, [router]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const sortedTypes = useMemo(() => [...types].sort((a, b) => (a.label || "").localeCompare(b.label || "", "tr")), [types]);
   const sortedArchivedTypes = useMemo(() => [...archivedTypes].sort((a, b) => (a.label || "").localeCompare(b.label || "", "tr")), [archivedTypes]);

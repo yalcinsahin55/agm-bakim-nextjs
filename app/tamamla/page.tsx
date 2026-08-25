@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
@@ -180,7 +180,7 @@ export default function TamamlaPage() {
     offlinePreviewUrlsRef.current = {};
   }, []);
 
-  async function loadPanel() {
+  const loadPanel = useCallback(async () => {
     try {
       const data = await getMaintenancePanel();
       setItems(data.items);
@@ -196,10 +196,10 @@ export default function TamamlaPage() {
       setLoading(false);
       toast.error("Bakım paneli yüklenemedi.");
     }
-  }
+  }, [router]);
 
   useEffect(() => {
-    loadPanel();
+    void loadPanel();
     fetch("/api/users/technicians")
       .then(async (response) => { if (response.ok) setTechnicians(await response.json()); })
       .catch(() => {});
@@ -222,7 +222,7 @@ export default function TamamlaPage() {
       window.removeEventListener("offline", updateConnection);
       window.removeEventListener("offline-queue:changed", updateQueue);
     };
-  }, []);
+  }, [loadPanel]);
 
   const engineList = useMemo(
     () => [...engines].sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })),
@@ -447,12 +447,17 @@ export default function TamamlaPage() {
   }
 
   const currentUserId = user?._id || user?.id || "";
-  const selectedMaintenanceTypes = [chosenType, ...extraKeys.map((key) => types.find((item) => item.key === key))]
-    .filter((type): type is MaintenanceType => Boolean(type));
-  const isEligibleForRole = (technician: TechnicianOption, role: "responsible" | "support"): boolean => selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
-  const responsibleTechnicians = technicians.filter((technician) => isEligibleForRole(technician, "responsible"));
+  const selectedMaintenanceTypes = useMemo(() => [chosenType, ...extraKeys.map((key) => types.find((item) => item.key === key))]
+    .filter((type): type is MaintenanceType => Boolean(type)), [chosenType, extraKeys, types]);
+  const responsibleTechnicians = useMemo(
+    () => technicians.filter((technician) => selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, "responsible"))),
+    [selectedMaintenanceTypes, technicians],
+  );
   const effectiveResponsibleTechnicianId = responsibleTechnicianId || currentUserId;
-  const selectableTechnicians = technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && isEligibleForRole(technician, "support"));
+  const selectableTechnicians = useMemo(
+    () => technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, "support"))),
+    [effectiveResponsibleTechnicianId, selectedMaintenanceTypes, technicians],
+  );
 
   useEffect(() => {
     if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleTechnicianDuration === "") {
@@ -468,7 +473,7 @@ export default function TamamlaPage() {
     if (responsibleTechnicianId && !responsibleTechnicians.some((technician) => technician.id === responsibleTechnicianId)) {
       setResponsibleTechnicianId("");
     }
-  }, [typeKey, extraKeys.join("|"), technicians.length, responsibleTechnicianId]);
+  }, [responsibleTechnicianId, responsibleTechnicians, selectableTechnicians]);
 
   async function submit() {
     if (!chosenType) {

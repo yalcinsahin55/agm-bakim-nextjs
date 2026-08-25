@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
@@ -488,38 +488,7 @@ export default function AssistantPage() {
   ]);
 
   const canAsk = useMemo(() => Boolean(user) && !sending, [sending, user]);
-
-  useEffect(() => {
-    if (sending || !pendingAnswerIdRef.current) return;
-    const answerId = pendingAnswerIdRef.current;
-    const target = document.getElementById(answerId);
-    if (!target) return;
-    pendingAnswerIdRef.current = null;
-    const frame = window.requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
-    return () => window.cancelAnimationFrame(frame);
-  }, [messages, sending]);
-
-  useEffect(() => {
-    if (!initialQuestion || initialQuestion.length > 300) return;
-    if (shouldAutoSend) {
-      if (user && !loading && autoSentQuestionRef.current !== initialQuestion) {
-        autoSentQuestionRef.current = initialQuestion;
-        void ask(initialQuestion);
-      }
-      return;
-    }
-    setQuestion((current) => current || initialQuestion);
-  }, [initialQuestion, loading, shouldAutoSend, user]);
-
-  function updateForecastExcludedTypes(messageId: string, excludedTypes: string[]) {
-    setMessages((current) => current.map((message) => {
-      if (message.id !== messageId || !message.data || message.intent !== "maintenance_forecast") return message;
-      const nextData = { ...message.data, excluded_type_labels: [...new Set(excludedTypes)] };
-      return { ...message, data: nextData, exportQuery: buildExportQuery(message.intent, message.period, message.dateRange, nextData) };
-    }));
-  }
-
-  async function ask(value: string) {
+  const ask = useCallback(async (value: string) => {
     const nextQuestion = value.trim();
     if (!nextQuestion || !canAsk) return;
     const answerId = `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -541,7 +510,38 @@ export default function AssistantPage() {
     } finally {
       setSending(false);
     }
+  }, [canAsk]);
+
+  useEffect(() => {
+    if (sending || !pendingAnswerIdRef.current) return;
+    const answerId = pendingAnswerIdRef.current;
+    const target = document.getElementById(answerId);
+    if (!target) return;
+    pendingAnswerIdRef.current = null;
+    const frame = window.requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages, sending]);
+
+  useEffect(() => {
+    if (!initialQuestion || initialQuestion.length > 300) return;
+    if (shouldAutoSend) {
+      if (user && !loading && autoSentQuestionRef.current !== initialQuestion) {
+        autoSentQuestionRef.current = initialQuestion;
+        void ask(initialQuestion);
+      }
+      return;
+    }
+    setQuestion((current) => current || initialQuestion);
+  }, [ask, initialQuestion, loading, shouldAutoSend, user]);
+
+  function updateForecastExcludedTypes(messageId: string, excludedTypes: string[]) {
+    setMessages((current) => current.map((message) => {
+      if (message.id !== messageId || !message.data || message.intent !== "maintenance_forecast") return message;
+      const nextData = { ...message.data, excluded_type_labels: [...new Set(excludedTypes)] };
+      return { ...message, data: nextData, exportQuery: buildExportQuery(message.intent, message.period, message.dateRange, nextData) };
+    }));
   }
+
 
   function submit(event: FormEvent) {
     event.preventDefault();

@@ -8,6 +8,7 @@ import { checkDistributedRateLimit } from "@/lib/redisRateLimit";
 import { evaluateAssistantQuestion, ASSISTANT_POLICY_VERSION, ASSISTANT_RATE_LIMIT, ASSISTANT_RATE_WINDOW_MS } from "@/lib/assistantPolicy";
 import { runAssistantTool } from "@/lib/assistantTools";
 import { withApiTiming } from "@/lib/performance";
+import { MAX_ASSISTANT_REQUEST_BYTES, readRequestTextLimited, RequestBodyTooLargeError } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,20 @@ async function postAssistant(req: NextRequest) {
       });
     }
 
-    const contentLength = Number(req.headers.get("content-length") || 0);
-    if (contentLength > 10_000) return jsonError("İstek çok büyük.", 413);
-    const body = await req.json().catch(() => ({}));
+    let bodyText: string;
+    try {
+      bodyText = await readRequestTextLimited(req, MAX_ASSISTANT_REQUEST_BYTES);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError) return jsonError("İstek çok büyük.", 413);
+      throw error;
+    }
+    const body = (() => {
+      try {
+        return JSON.parse(bodyText) as { question?: unknown };
+      } catch {
+        return {};
+      }
+    })();
     const policy = evaluateAssistantQuestion(body?.question);
     if (!policy.ok) {
       const status = policy.code === "invalid_input" ? 400 : 200;

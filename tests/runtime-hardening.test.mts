@@ -18,6 +18,27 @@ import {
 import { addRows, worksheetToGrid, worksheetToObjects } from "../lib/excel.ts";
 import { looksLikePdf, readPdfResponse } from "../lib/pdfSecurity.ts";
 import { statusFor } from "../lib/status.ts";
+import { readRequestTextLimited, RequestBodyTooLargeError } from "../lib/requestLimits.ts";
+
+test("bounded request body reader rejects oversized chunked bodies", async () => {
+  const normalPayload = JSON.stringify({ question: "AGM 8 bakımları" });
+  const normal = new Request("http://localhost", { method: "POST", body: normalPayload });
+  assert.equal(await readRequestTextLimited(normal, 10_000), normalPayload);
+
+  const oversizedRequestInit = {
+    method: "POST",
+    duplex: "half",
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(6));
+        controller.enqueue(new Uint8Array(6));
+        controller.close();
+      },
+    }),
+  } as unknown as RequestInit;
+  const oversized = new Request("http://localhost", oversizedRequestInit);
+  await assert.rejects(() => readRequestTextLimited(oversized, 10), (error: unknown) => error instanceof RequestBodyTooLargeError);
+});
 
 test("maintenance duration handles overnight, multi-day, and invalid intervals", () => {
   assert.equal(calculateMaintenanceDurationMinutes("08:00", "17:00"), 540);

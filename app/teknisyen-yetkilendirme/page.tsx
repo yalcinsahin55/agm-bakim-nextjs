@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -47,7 +47,7 @@ export default function TechnicianAuthorizationPage() {
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const response = await fetch("/api/users", { cache: "no-store" });
       if (response.status === 401) { router.push("/login"); return; }
@@ -59,9 +59,9 @@ export default function TechnicianAuthorizationPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   async function updateUser(id: string, patch: Record<string, unknown>, success = "Yetki güncellendi.") {
     setSavingId(id);

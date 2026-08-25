@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -139,7 +139,7 @@ export default function KarterBasinciPage() {
   const [importing, setImporting] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store" })]);
       if (engRes.status === 401 || readRes.status === 401) { router.push("/login"); return; }
@@ -158,13 +158,13 @@ export default function KarterBasinciPage() {
       setReadingsTotal(typeof pageData?.total === "number" ? pageData.total : readingList.length);
       setReadingPage(typeof pageData?.page === "number" ? pageData.page : 1);
       setHasMoreReadings(pageData?.has_more === true);
-      if (engineList.length && !historyEngine) setHistoryEngine(engineList[0]._id);
+      if (engineList.length) setHistoryEngine((current) => current || engineList[0]._id);
     } catch {
       setLoadError("Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
 
   async function loadMoreReadings() {
     if (loadingMoreReadings || !hasMoreReadings) return;
@@ -184,7 +184,7 @@ export default function KarterBasinciPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 

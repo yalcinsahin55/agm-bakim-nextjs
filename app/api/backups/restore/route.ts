@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
-import { MAX_BACKUP_REQUEST_BYTES } from "@/lib/requestLimits";
+import { MAX_BACKUP_REQUEST_BYTES, readRequestTextLimited, RequestBodyTooLargeError } from "@/lib/requestLimits";
 import { withApiTiming } from "@/lib/performance";
 import { usersCollection } from "@/lib/dbCollections";
 
@@ -21,15 +21,15 @@ async function postBackupRestore(req: NextRequest) {
   if (!canManageUsers(user.role)) return NextResponse.json({ error: "Geri yükleme yetkiniz yok." }, { status: 403 });
   const rateLimited = await enforceApiRateLimit(req, "backup-restore", 2, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
-  const contentLength = Number(req.headers.get("content-length") || 0);
-  if (Number.isFinite(contentLength) && contentLength > MAX_BACKUP_REQUEST_BYTES) {
-    return NextResponse.json({ error: "Yedek dosyası izin verilen boyutu aşıyor." }, { status: 413 });
-  }
-
   try {
-    const bodyText = await req.text();
-    if (Buffer.byteLength(bodyText, "utf8") > MAX_BACKUP_REQUEST_BYTES) {
-      return NextResponse.json({ error: "Yedek dosyası izin verilen boyutu aşıyor." }, { status: 413 });
+    let bodyText: string;
+    try {
+      bodyText = await readRequestTextLimited(req, MAX_BACKUP_REQUEST_BYTES);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError) {
+        return NextResponse.json({ error: "Yedek dosyası izin verilen boyutu aşıyor." }, { status: 413 });
+      }
+      throw error;
     }
     const body = JSON.parse(bodyText) as { confirm?: unknown; dry_run?: unknown; collections?: unknown };
     if (body.confirm !== "RESTORE") return NextResponse.json({ error: "Geri yüklemeyi onaylamak için RESTORE yazılmalıdır." }, { status: 400 });
