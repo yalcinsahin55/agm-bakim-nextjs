@@ -275,10 +275,17 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(mediaUpload, /maintenance-video/);
   assert.match(mediaUpload, /multipart: kind === "video"/);
   assert.match(uploadPresigned, /maintenance-photo/);
+  assert.match(uploadPresigned, /maintenance-photo-offline/);
+  assert.match(uploadPresigned, /maintenance-report-offline/);
   assert.match(uploadPresigned, /maintenance-video/);
+  assert.match(uploadPresigned, /maintenance-video-offline/);
+  assert.match(uploadPresigned, /allowOverwrite: true/);
   assert.match(uploadPresigned, /video\/\*/);
   assert.match(uploadPresigned, /maximumSizeInBytes: VIDEO_MAX_BYTES/);
-  assert.match(chunkUpload, /uploadMaintenanceMedia\(file, "video"\)/);
+  assert.match(chunkUpload, /uploadMaintenanceMedia\(file, "video", options\)/);
+  assert.match(mediaUpload, /idempotencyKey/);
+  assert.match(uploadHelper, /idempotencyKey/);
+  assert.match(queue, /\$\{job\.id\}-\$\{media\.id\}/);
   assert.match(mediaUrls, /api\/media\/file\?kind=\$\{kind\}&url=/);
   assert.match(mediaUrls, /private\.blob\.vercel-storage\.com/);
   assert.match(mediaRoute, /fetchStoredBlob/);

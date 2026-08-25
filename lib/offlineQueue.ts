@@ -139,12 +139,19 @@ async function updateQueuedRecord(job: QueuedRecordJob): Promise<void> {
   database.close();
 }
 
-async function uploadPhoto(blob: Blob, name: string): Promise<string> {
-  return uploadMaintenanceMedia(new File([blob], name, { type: "image/jpeg" }), "photo");
+async function uploadPhoto(blob: Blob, name: string, idempotencyKey: string): Promise<string> {
+  return uploadMaintenanceMedia(
+    new File([blob], name, { type: "image/jpeg" }),
+    "photo",
+    { idempotencyKey },
+  );
 }
 
-async function uploadReport(blob: Blob, name: string, mime: string): Promise<string> {
-  const uploaded = await uploadReportAttachment(new File([blob], name, { type: mime }));
+async function uploadReport(blob: Blob, name: string, mime: string, idempotencyKey: string): Promise<string> {
+  const uploaded = await uploadReportAttachment(
+    new File([blob], name, { type: mime }),
+    { idempotencyKey },
+  );
   return uploaded.url;
 }
 
@@ -189,17 +196,20 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
         if (media.kind === "photo") {
           const pending = Array.isArray(job.payload.photos) && job.payload.photos.includes(placeholder);
           if (!pending) continue;
-          const url = await uploadPhoto(storedBlob, media.name);
+          const url = await uploadPhoto(storedBlob, media.name, `${job.id}-${media.id}`);
           job.payload.photos = replacePhotoPlaceholder(job.payload.photos, media.id, url);
         } else if (media.kind === "video") {
           const pending = Array.isArray(job.payload.videos) && job.payload.videos.some((video) => video && typeof video === "object" && (video as Record<string, unknown>).url === placeholder);
           if (!pending) continue;
-          const url = await uploadVideoChunked(new File([storedBlob], media.name, { type: media.type || "video/mp4" }));
+          const url = await uploadVideoChunked(
+            new File([storedBlob], media.name, { type: media.type || "video/mp4" }),
+            { idempotencyKey: `${job.id}-${media.id}` },
+          );
           job.payload.videos = replaceVideoPlaceholder(job.payload.videos, media.id, url);
         } else {
           const pending = Array.isArray(job.payload.report_attachments) && job.payload.report_attachments.some((attachment) => attachment && typeof attachment === "object" && (attachment as Record<string, unknown>).url === placeholder);
           if (!pending) continue;
-          const url = await uploadReport(storedBlob, media.name, media.type);
+          const url = await uploadReport(storedBlob, media.name, media.type, `${job.id}-${media.id}`);
           job.payload.report_attachments = replaceReportPlaceholder(job.payload.report_attachments, media.id, url);
         }
       }

@@ -13,6 +13,10 @@ const VIDEO_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type MaintenanceMediaKind = "photo" | "video";
 
+export interface MaintenanceMediaUploadOptions {
+  idempotencyKey?: string;
+}
+
 export interface UploadedOilAnalysis {
   url: string;
   filename: string;
@@ -29,6 +33,10 @@ function safeMediaFilename(filename: string, kind: MaintenanceMediaKind): string
     .replace(/^[-.]+/, "")
     .slice(0, 180);
   return safe || fallback;
+}
+
+function safeIdempotencyKey(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 96) || "retry";
 }
 
 function validateMediaFile(file: File, kind: MaintenanceMediaKind): void {
@@ -79,10 +87,17 @@ export async function uploadOilAnalysisPdf(file: File): Promise<UploadedOilAnaly
   }
 }
 
-export async function uploadMaintenanceMedia(file: File, kind: MaintenanceMediaKind): Promise<string> {
+export async function uploadMaintenanceMedia(
+  file: File,
+  kind: MaintenanceMediaKind,
+  options: MaintenanceMediaUploadOptions = {},
+): Promise<string> {
   validateMediaFile(file, kind);
   const folder = kind === "photo" ? "photos" : "videos";
-  const clientPayload = kind === "photo" ? PHOTO_CLIENT_PAYLOAD : VIDEO_CLIENT_PAYLOAD;
+  const deterministic = Boolean(options.idempotencyKey);
+  const clientPayload = kind === "photo"
+    ? deterministic ? "maintenance-photo-offline" : PHOTO_CLIENT_PAYLOAD
+    : deterministic ? "maintenance-video-offline" : VIDEO_CLIENT_PAYLOAD;
   const contentType = kind === "photo" ? file.type : file.type || "video/mp4";
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -91,8 +106,11 @@ export async function uploadMaintenanceMedia(file: File, kind: MaintenanceMediaK
   );
 
   try {
+    const pathname = deterministic
+      ? `${folder}/offline-${safeIdempotencyKey(options.idempotencyKey || "")}-${safeMediaFilename(file.name, kind)}`
+      : `${folder}/${Date.now()}-${safeMediaFilename(file.name, kind)}`;
     const blob = await uploadPresigned(
-      `${folder}/${Date.now()}-${safeMediaFilename(file.name, kind)}`,
+      pathname,
       file,
       {
         access: "public",

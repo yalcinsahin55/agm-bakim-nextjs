@@ -1,5 +1,8 @@
-import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
+import { uploadMaintenanceMedia, type MaintenanceMediaUploadOptions } from "@/lib/mediaUpload";
 
-export async function uploadVideoChunked(file: File): Promise<string> {
-  return uploadMaintenanceMedia(file, "video");
+export async function uploadVideoChunked(
+  file: File,
+  options: MaintenanceMediaUploadOptions = {},
+): Promise<string> {
+  return uploadMaintenanceMedia(file, "video", options);
 }

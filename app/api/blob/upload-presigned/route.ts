@@ -22,8 +22,11 @@ const REPORT_UPLOAD_PREFIX = "report-attachments/";
 const PHOTO_UPLOAD_PREFIX = "photos/";
 const VIDEO_UPLOAD_PREFIX = "videos/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
+const OFFLINE_REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report-offline";
 const PHOTO_UPLOAD_CLIENT_PAYLOAD = "maintenance-photo";
+const OFFLINE_PHOTO_UPLOAD_CLIENT_PAYLOAD = "maintenance-photo-offline";
 const VIDEO_UPLOAD_CLIENT_PAYLOAD = "maintenance-video";
+const OFFLINE_VIDEO_UPLOAD_CLIENT_PAYLOAD = "maintenance-video-offline";
 const OIL_ANALYSIS_UPLOAD_CLIENT_PAYLOAD = "oil-analysis";
 const OIL_ANALYSIS_UPLOAD_PREFIX = "oil-analyses/";
 const REPORT_UPLOAD_TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -47,12 +50,27 @@ const UPLOAD_POLICIES: Record<string, UploadPolicy> = {
     allowedContentTypes: REPORT_ATTACHMENT_MIME_TYPES,
     maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES,
   },
+  [OFFLINE_REPORT_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: REPORT_UPLOAD_PREFIX,
+    allowedContentTypes: REPORT_ATTACHMENT_MIME_TYPES,
+    maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES,
+  },
   [PHOTO_UPLOAD_CLIENT_PAYLOAD]: {
     prefix: PHOTO_UPLOAD_PREFIX,
     allowedContentTypes: PHOTO_UPLOAD_MIME_TYPES,
     maximumSizeInBytes: PHOTO_MAX_BYTES,
   },
+  [OFFLINE_PHOTO_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: PHOTO_UPLOAD_PREFIX,
+    allowedContentTypes: PHOTO_UPLOAD_MIME_TYPES,
+    maximumSizeInBytes: PHOTO_MAX_BYTES,
+  },
   [VIDEO_UPLOAD_CLIENT_PAYLOAD]: {
+    prefix: VIDEO_UPLOAD_PREFIX,
+    allowedContentTypes: VIDEO_UPLOAD_MIME_TYPES,
+    maximumSizeInBytes: VIDEO_MAX_BYTES,
+  },
+  [OFFLINE_VIDEO_UPLOAD_CLIENT_PAYLOAD]: {
     prefix: VIDEO_UPLOAD_PREFIX,
     allowedContentTypes: VIDEO_UPLOAD_MIME_TYPES,
     maximumSizeInBytes: VIDEO_MAX_BYTES,
@@ -118,7 +136,7 @@ function toPresignedUrlPayload(presignedUrl: string): PresignedUrlPayload {
 }
 
 function isAllowedUploadPath(pathname: string, clientPayload: string | null | undefined): boolean {
-  if (clientPayload === REPORT_UPLOAD_CLIENT_PAYLOAD) return isSafeReportUploadPath(pathname);
+  if (clientPayload === REPORT_UPLOAD_CLIENT_PAYLOAD || clientPayload === OFFLINE_REPORT_UPLOAD_CLIENT_PAYLOAD) return isSafeReportUploadPath(pathname);
   if (clientPayload === OIL_ANALYSIS_UPLOAD_CLIENT_PAYLOAD) return isSafeOilAnalysisUploadPath(pathname);
   const policy = clientPayload ? UPLOAD_POLICIES[clientPayload] : undefined;
   return policy ? isSafeMediaUploadPath(pathname, policy.prefix) : false;
@@ -163,11 +181,15 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       maximumSizeInBytes: policy.maximumSizeInBytes,
       validUntil: Date.now() + REPORT_UPLOAD_TOKEN_TTL_MS,
     });
+    const deterministicUpload = clientPayload === OFFLINE_REPORT_UPLOAD_CLIENT_PAYLOAD
+      || clientPayload === OFFLINE_PHOTO_UPLOAD_CLIENT_PAYLOAD
+      || clientPayload === OFFLINE_VIDEO_UPLOAD_CLIENT_PAYLOAD;
     const { presignedUrl } = await presignUrl(signedToken, {
       access: "public",
       operation: "put",
       pathname,
-      addRandomSuffix: true,
+      addRandomSuffix: !deterministicUpload,
+      ...(deterministicUpload ? { allowOverwrite: true } : {}),
       allowedContentTypes: [...policy.allowedContentTypes],
       maximumSizeInBytes: policy.maximumSizeInBytes,
       validUntil: signedToken.validUntil,
