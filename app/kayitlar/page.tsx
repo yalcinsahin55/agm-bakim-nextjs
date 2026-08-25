@@ -11,6 +11,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
+import PdfPreview from "@/components/PdfPreview";
 import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { ReportAttachment } from "@/lib/types";
@@ -1272,12 +1273,9 @@ export default function KayitlarPage() {
                 </button>
               </div>
             </div>
-            <iframe
+            <PdfPreview
               src={reportAttachmentUrl(selectedReportAttachment.recordId, selectedReportAttachment.attachment.id)}
-              title={selectedReportAttachment.attachment.filename}
-              className="min-h-0 w-full flex-1 rounded-xl border border-border bg-white"
-              aria-label={`${selectedReportAttachment.attachment.filename} PDF önizlemesi`}
-              referrerPolicy="no-referrer"
+              filename={selectedReportAttachment.attachment.filename}
             />
           </div>
         </div>

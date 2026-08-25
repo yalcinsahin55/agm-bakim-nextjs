@@ -8,6 +8,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { isAllowedReportAttachmentUrl } from "@/lib/reportAttachments";
 import { fetchStoredBlob } from "@/lib/blobStorage";
 import { withApiTiming } from "@/lib/performance";
+import { looksLikePdf, readPdfResponse } from "@/lib/pdfSecurity";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 
 export const runtime = "nodejs";
@@ -63,15 +64,27 @@ async function getAttachment(request: NextRequest, { params }: AttachmentRouteCo
 
   const download = request.nextUrl.searchParams.get("download") === "1";
   const inline = !download && attachment.mime === "application/pdf";
+  const responseHeaders = {
+    "Content-Type": canonicalMime(attachment.mime),
+    "Content-Disposition": contentDisposition(attachment.filename, inline),
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+  };
+
+  if (attachment.mime === "application/pdf") {
+    const bytes = await readPdfResponse(upstream);
+    if (!bytes || !looksLikePdf(bytes)) return NextResponse.json({ error: "Geçersiz veya bozuk PDF dosyası." }, { status: 422 });
+    const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    return new Response(body, {
+      status: 200,
+      headers: { ...responseHeaders, "Content-Length": String(bytes.byteLength) },
+    });
+  }
+
   return new Response(upstream.body, {
     status: 200,
-    headers: {
-      "Content-Type": canonicalMime(attachment.mime),
-      "Content-Disposition": contentDisposition(attachment.filename, inline),
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer",
-    },
+    headers: responseHeaders,
   });
 }
 
