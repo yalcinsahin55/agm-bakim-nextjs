@@ -174,6 +174,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const helper = await source("lib/reportAttachments.ts");
   const upload = await source("app/api/blob/upload-server/route.ts");
   const clientUpload = await source("app/api/blob/upload-client/route.ts");
+  const presignedUpload = await source("app/api/blob/upload-presigned/route.ts");
   const uploadHelper = await source("lib/reportAttachmentUpload.ts");
   const schema = await source("lib/schemas.ts");
   const create = await source("app/api/records/route.ts");
@@ -193,8 +194,16 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
   assert.match(clientUpload, /token: REPORT_UPLOAD_TOKEN/);
   assert.match(clientUpload, /maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES/);
-  assert.match(uploadHelper, /REPORT_UPLOAD_ENDPOINT = "\/api\/blob\/upload-client"/);
-  assert.match(uploadHelper, /handleUploadUrl: REPORT_UPLOAD_ENDPOINT/);
+  assert.match(presignedUpload, /issueSignedToken/);
+  assert.match(presignedUpload, /presignUrl/);
+  assert.match(presignedUpload, /BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
+  assert.match(presignedUpload, /BLOB_STORE_ID \|\| process\.env\.MEDIA_STORE_ID/);
+  assert.match(presignedUpload, /REPORT_ATTACHMENT_MAX_BYTES/);
+  assert.match(uploadHelper, /REPORT_UPLOAD_ENDPOINT = "\/api\/blob\/upload-presigned"/);
+  assert.match(uploadHelper, /uploadPresigned/);
+  assert.match(uploadHelper, /multipart: file\.size >= REPORT_UPLOAD_MULTIPART_THRESHOLD_BYTES/);
+  assert.match(uploadHelper, /REPORT_UPLOAD_TIMEOUT_MS/);
+  assert.match(uploadHelper, /abortSignal: abortController\.signal/);
   assert.match(upload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(schema, /report_attachments/);
   assert.match(schema, /isAllowedReportAttachmentUrl/);
