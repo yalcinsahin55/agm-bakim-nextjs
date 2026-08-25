@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { maintenanceDateCandidateMatch } from "@/lib/maintenanceDateQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +40,21 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
     const to = searchParams.get("to");
     const match: Record<string, unknown> = { engine_id: id };
     if (typeLabel) match.type_label = typeLabel;
+    const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(from || "") ? new Date(`${from}T00:00:00.000Z`) : undefined;
+    const toDate = /^\d{4}-\d{2}-\d{2}$/.test(to || "") ? new Date(`${to}T23:59:59.999Z`) : undefined;
+    const validFrom = fromDate && Number.isFinite(fromDate.getTime()) ? fromDate : undefined;
+    const validTo = toDate && Number.isFinite(toDate.getTime()) ? toDate : undefined;
+    const dateCandidate = maintenanceDateCandidateMatch(validFrom, validTo);
     const recordsCol = recordsCollection(db);
     const pipeline: Record<string, unknown>[] = [
-      { $set: { maintenance_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
       { $match: match },
+      ...(dateCandidate ? [{ $match: dateCandidate }] : []),
+      { $set: { maintenance_date: { $convert: { input: { $ifNull: ["$maintenance_start_at", "$created_at"] }, to: "date", onError: null, onNull: null } } } },
     ];
-    if (from || to) {
+    if (validFrom || validTo) {
       pipeline.push({ $match: { maintenance_date: {
-        ...(from ? { $gte: new Date(`${from}T00:00:00.000Z`) } : {}),
-        ...(to ? { $lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+        ...(validFrom ? { $gte: validFrom } : {}),
+        ...(validTo ? { $lte: validTo } : {}),
       } } });
     }
     pipeline.push({

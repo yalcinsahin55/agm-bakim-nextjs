@@ -1,4 +1,22 @@
 /** @type {import('next').NextConfig} */
+const commonContentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://*.blob.vercel-storage.com",
+  "media-src 'self' blob: https://*.blob.vercel-storage.com",
+  "connect-src 'self' https://*.blob.vercel-storage.com",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "frame-src 'self'",
+  "form-action 'self'",
+].join('; ');
+
+const oilAnalysisContentSecurityPolicy = `${commonContentSecurityPolicy}; frame-ancestors 'self'`;
+
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingIncludes: {
@@ -35,6 +53,10 @@ const nextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",
           },
+          {
+            key: "Content-Security-Policy",
+            value: commonContentSecurityPolicy,
+          },
         ],
       },
       // API endpoint'leri için cache'i devre dışı bırak
@@ -49,7 +71,10 @@ const nextConfig = {
       // Yağ analiz PDF’si aynı-origin önizleme iframe’inde açılır; diğer tüm rotalarda DENY korunur.
       {
         source: "/api/oil-analyses/:id/file",
-        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: oilAnalysisContentSecurityPolicy },
+        ],
       },
     ];
   },

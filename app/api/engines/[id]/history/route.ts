@@ -67,6 +67,8 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = await enforceApiRateLimit(req, "engine-history-read", 120, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const { limit, page, skip } = parsePageParams(req);
     const enginesCol = enginesCollection(db);

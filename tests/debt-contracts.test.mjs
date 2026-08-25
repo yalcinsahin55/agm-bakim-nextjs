@@ -127,12 +127,16 @@ test("large history and administrative list paths expose bounded reads", async (
   const summary = await source("app/api/backups/summary/route.ts");
   const maintenanceTypes = await source("app/api/maintenance-types/route.ts");
   const users = await source("app/api/users/route.ts");
+  const engines = await source("app/api/engines/route.ts");
+  const engineHistory = await source("app/api/engines/[id]/history/route.ts");
   assert.match(pressure, /page_size/);
   assert.match(pressure, /has_more/);
   assert.match(summary, /backup-summary/);
   assert.match(summary, /await ensureAppIndexes\(db\)/);
   assert.match(maintenanceTypes, /maintenance-type-list/);
   assert.match(users, /projection:/);
+  assert.match(engines, /history: \{ \$slice: -250 \}/);
+  assert.match(engineHistory, /engine-history-read/);
 });
 
 test("analytics cache and tracking updates are bounded against repeated work", async () => {
@@ -144,6 +148,28 @@ test("analytics cache and tracking updates are bounded against repeated work", a
   assert.match(maintenance, /tracking_revision/);
   assert.match(maintenance, /matchedCount === 0/);
   assert.match(push, /workerCount = Math\.min\(4/);
+});
+
+test("date candidate filtering preserves legacy date fallback", async () => {
+  const dateQuery = await source("lib/maintenanceDateQuery.ts");
+  const analytics = await source("app/api/analytics/summary/route.ts");
+  const engineReport = await source("app/api/reports/engine/[id]/route.ts");
+  assert.match(dateQuery, /maintenance_start_at: \{ \$type: "string" \}/);
+  assert.match(dateQuery, /maintenance_start_at: \{ \$type: "number" \}/);
+  assert.match(dateQuery, /created_at: range/);
+  assert.match(analytics, /dateRangeStages/);
+  assert.match(engineReport, /maintenanceDateCandidateMatch/);
+  assert.match(engineReport, /\$convert/);
+});
+
+test("security headers include CSP without breaking same-origin oil PDF framing", async () => {
+  const nextConfig = await source("next.config.js");
+  assert.match(nextConfig, /Content-Security-Policy/);
+  assert.match(nextConfig, /default-src 'self'/);
+  assert.match(nextConfig, /object-src 'none'/);
+  assert.match(nextConfig, /https:\/\/\*\.blob\.vercel-storage\.com/);
+  assert.match(nextConfig, /frame-ancestors 'self'/);
+  assert.match(nextConfig, /X-Frame-Options.*SAMEORIGIN/);
 });
 
 test("maintenance status snapshot is shared and invalidated across read paths", async () => {
@@ -350,6 +376,8 @@ test("assistant engine history and maintenance health expose filtered reports an
   assert.match(tools, /worked_duration_minutes/);
   assert.match(tools, /worked_since_last_hours/);
   assert.match(tools, /buildRecordMatch\(db, query\)/);
+  assert.match(tools, /mapWithConcurrency/);
+  assert.match(tools, /mapWithConcurrency\(resultRows\.slice\(0, 12\), 4/);
   assert.match(assistantPage, /Rapor ekleri:/);
   assert.match(assistantPage, /Son bakımdan beri motor çalışması/);
   assert.match(assistantPage, /maintenance_health/);

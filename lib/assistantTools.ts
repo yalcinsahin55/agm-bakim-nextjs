@@ -7,6 +7,21 @@ import { buildMaintenanceForecastRows, dateKeyLabel, summarizeMaintenanceForecas
 import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "@/lib/reportAttachments";
 import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(Math.trunc(concurrency), 1), items.length);
+  const runWorker = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index], index);
+    }
+  };
+  if (workerCount > 0) await Promise.all(Array.from({ length: workerCount }, runWorker));
+  return results;
+}
+
 export interface AssistantToolResponse {
   intent: AssistantIntent;
   period: AssistantPeriod;
@@ -607,7 +622,7 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
     activityByType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "tr")).map(([type, count]) => ({ type, count, engines: [...(typeEngineCounts.get(type)?.values() || [])].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")) }));
     activityByEngine = [...engineCounts.values()].sort((a, b) => b.count - a.count || a.engine.localeCompare(b.engine, "tr")).map((engine) => ({ ...engine, type_stats: [...(engineTypeCounts.get(engine.engine_id)?.entries() || [])].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count || a.type.localeCompare(b.type, "tr")) }));
   }
-  const technicianDetails = await Promise.all(resultRows.slice(0, 12).map(async (technician) => {
+  const technicianDetails = await mapWithConcurrency(resultRows.slice(0, 12), 4, async (technician) => {
     if (!technician.technician_id || technician.technician_id === "unknown") return { technician_id: technician.technician_id, by_type: [], by_engine: [] };
     const detailMatch = { $and: [match, { $or: [{ technician_id: technician.technician_id }, { "other_technicians.id": technician.technician_id }] }] };
     const [detail] = await records.aggregate<{ byType?: TechnicianDetailTypeRow[]; byEngine?: TechnicianDetailEngineRow[] }>([
@@ -630,7 +645,7 @@ async function getTechnicianPerformance(db: Db, query: AssistantQuery): Promise<
       by_type: (detail?.byType || []).map((item) => ({ type: item._id || "Bilinmeyen", count: Number(item.count || 0) })),
       by_engine: (detail?.byEngine || []).map((item) => ({ engine_id: item._id?.engine_id || null, engine: item._id?.engine || "Bilinmeyen", count: Number(item.count || 0) })),
     };
-  }));
+  });
   const totalTasks = resultRows.reduce((sum, item) => sum + item.responsible_count + item.support_count, 0);
   const totalResponsibleTasks = resultRows.reduce((sum, item) => sum + item.responsible_count, 0);
   const totalSupportTasks = resultRows.reduce((sum, item) => sum + item.support_count, 0);

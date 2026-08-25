@@ -32,7 +32,11 @@ async function getEngines(req: NextRequest) {
     const searchParams = new URL(req.url).searchParams;
     const includeHistory = searchParams.get("include_history") === "true";
     const includeMaintenanceCounts = searchParams.get("include_maintenance_counts") === "true";
-    const options = includeHistory ? undefined : { projection: { history: 0 } };
+    // Ana liste için history yalnızca legacy uyumluluk amacıyla tutulur; detay ekranı ayrı paginated endpointi kullanır.
+    // `$slice`, tüm gömülü history dizisini server belleğine almadan son 250 kaydı döndürür.
+    const options = includeHistory
+      ? { projection: { history: { $slice: -250 } } }
+      : { projection: { history: 0 } };
     const enginesCol = enginesCollection(db);
     const recordsCol = recordsCollection(db);
     const [engines, countRows] = await Promise.all([

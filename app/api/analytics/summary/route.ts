@@ -9,6 +9,7 @@ import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName, normalizeTechnicianType, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { withApiTiming } from "@/lib/performance";
+import { maintenanceDateCandidateMatch } from "@/lib/maintenanceDateQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,16 @@ async function getAnalyticsSummary(req: NextRequest) {
   const activeTechniciansPromise = listActiveTechnicians(db);
 
   const normalizeMaintenanceDateStage = { $set: { maintenance_date: { $convert: { input: { $ifNull: ["$maintenance_start_at", "$created_at"] }, to: "date", onError: null, onNull: null } } } };
-  const dateMatch = engineSince ? [normalizeMaintenanceDateStage, { $match: { maintenance_date: { $gte: engineSince } } }] : [];
+  const dateRangeStages = (from?: Date, to?: Date): Document[] => {
+    const candidate = maintenanceDateCandidateMatch(from, to);
+    return [
+      ...(candidate ? [{ $match: candidate }] : []),
+      normalizeMaintenanceDateStage,
+      ...(from || to ? [{ $match: { maintenance_date: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } }] : []),
+    ];
+  };
+  const dateMatch = engineSince ? dateRangeStages(engineSince) : [];
+  const monthlyDateMatch = dateRangeStages(since);
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
   const contributionStages = (role: "responsible" | "support") => [
@@ -108,8 +118,7 @@ async function getAnalyticsSummary(req: NextRequest) {
   ];
   const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
     aggregate<MonthlyAggregateRow>([
-      normalizeMaintenanceDateStage,
-      { $match: { maintenance_date: { $gte: since } } },
+      ...monthlyDateMatch,
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date", timezone: "Europe/Istanbul" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]).toArray(),
