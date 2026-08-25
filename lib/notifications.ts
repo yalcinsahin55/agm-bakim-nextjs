@@ -1,9 +1,10 @@
 import type { Db } from "mongodb";
 import type { Notification, User } from "./types";
-import { buildItems, STATUS_LABELS, type PanelItem } from "./status";
+import { STATUS_LABELS, type PanelItem } from "./status";
 import { sendPushToUser } from "./push";
 import { ensureAppIndexes } from "./dbIndexes";
-import { enginesCollection, maintenanceTypesCollection, notificationsCollection, usersCollection } from "@/lib/dbCollections";
+import { getOrBuildMaintenancePanelServerPayload } from "./maintenancePanelServer";
+import { notificationsCollection, usersCollection } from "@/lib/dbCollections";
 
 function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineName: string, typeLabel: string, remaining: number) {
   if (status === "gecikmis") {
@@ -31,11 +32,8 @@ function isActionableItem(item: PanelItem): item is ActionablePanelItem {
 }
 
 async function loadActionableItems(db: Db): Promise<ActionablePanelItem[]> {
-  const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } }).toArray(),
-    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
-  ]);
-  return buildItems(engines, types).filter(isActionableItem);
+  const payload = await getOrBuildMaintenancePanelServerPayload(db);
+  return payload.items.filter(isActionableItem);
 }
 
 export async function listUserNotifications(db: Db, userId: string, limit?: number): Promise<Notification[]> {

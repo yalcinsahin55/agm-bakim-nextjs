@@ -1,6 +1,5 @@
 import type { Db } from "mongodb";
-import { buildItems } from "@/lib/status";
-import type { Engine, MaintenanceType } from "@/lib/types";
+import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 
 function escapeRegex(value: string): string {
@@ -21,12 +20,9 @@ function dateParam(value: string | null, endOfDay = false): Date | undefined {
 
 async function healthStatusPairs(db: Db, status: string | null): Promise<Array<{ engine_id: string; type_key: string }>> {
   if (!status || !["overdue", "critical", "upcoming", "normal"].includes(status)) return [];
-  const [engines, types] = await Promise.all([
-    db.collection("engines").find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
-    db.collection("maintenance_types").find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray(),
-  ]);
+  const { items } = await getOrBuildMaintenancePanelServerPayload(db);
   const target = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
-  return buildItems(engines as unknown as Engine[], types as unknown as MaintenanceType[])
+  return items
     .filter((item) => item.status === target)
     .map((item) => ({ engine_id: item.engine_id, type_key: item.type_key }));
 }

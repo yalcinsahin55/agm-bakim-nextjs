@@ -26,6 +26,8 @@ async function getEngines(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    const rateLimited = await enforceApiRateLimit(req, "engine-list-read", 240, 10 * 60 * 1000, user._id);
+    if (rateLimited) return rateLimited;
 
     const searchParams = new URL(req.url).searchParams;
     const includeHistory = searchParams.get("include_history") === "true";

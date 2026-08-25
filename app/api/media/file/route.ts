@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { usersCollection } from "@/lib/dbCollections";
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
 import { fetchStoredBlob } from "@/lib/blobStorage";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { ensureAppIndexes } from "@/lib/dbIndexes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,20 @@ async function getMedia(request: NextRequest): Promise<Response> {
   const kind = request.nextUrl.searchParams.get("kind");
   if (!isMediaKind(kind) || !isTrustedMediaUrl(url)) {
     return NextResponse.json({ error: "Geçersiz medya URL’si." }, { status: 400 });
+  }
+  await ensureAppIndexes(db);
+
+  // Ham, tahmin edilmiş bir Blob URL’si tek başına erişim kanıtı değildir.
+  // URL’nin bu uygulamadaki bir bakım kaydına ait olduğunu doğrula; böylece
+  // giriş yapmış bir kullanıcı bağlı olmayan Blob nesnelerini proxy’leyemez.
+  const mediaReference = await recordsCollection(db).findOne(
+    kind === "image"
+      ? { photos: url }
+      : { $or: [{ videos: url }, { "videos.url": url }] },
+    { projection: { _id: 1 } },
+  );
+  if (!mediaReference) {
+    return NextResponse.json({ error: "Medya kaydı bulunamadı." }, { status: 404 });
   }
 
   const stored = await fetchStoredBlob(url);

@@ -30,6 +30,8 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
     source("app/api/records/interval-summary/route.ts"),
     source("app/api/reports/engine/[id]/route.ts"),
     source("app/api/users/technicians/route.ts"),
+    source("app/api/engines/route.ts"),
+    source("app/api/maintenance-types/panel/route.ts"),
   ]);
   for (const route of routes) assert.match(route, /enforceApiRateLimit\(/);
   assert.match(routes[0], /audit-log-read/);
@@ -39,6 +41,8 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
   assert.match(routes[4], /records-interval-summary-read/);
   assert.match(routes[5], /engine-report-read/);
   assert.match(routes[6], /technician-list-read/);
+  assert.match(routes[7], /engine-list-read/);
+  assert.match(routes[8], /maintenance-panel-read/);
 });
 
 test("legacy media and oil PDF fallback remain bounded", async () => {
@@ -140,6 +144,21 @@ test("analytics cache and tracking updates are bounded against repeated work", a
   assert.match(maintenance, /tracking_revision/);
   assert.match(maintenance, /matchedCount === 0/);
   assert.match(push, /workerCount = Math\.min\(4/);
+});
+
+test("maintenance status snapshot is shared and invalidated across read paths", async () => {
+  const panelCache = await source("lib/maintenancePanelServer.ts");
+  const panelRoute = await source("app/api/maintenance-types/panel/route.ts");
+  const notifications = await source("lib/notifications.ts");
+  const assistant = await source("lib/assistantTools.ts");
+  const reportFilters = await source("lib/reportFilterQuery.ts");
+  assert.match(panelCache, /PANEL_CACHE_TTL_MS = 10_000/);
+  assert.match(panelCache, /getOrBuildMaintenancePanelServerPayload/);
+  assert.match(panelCache, /invalidateMaintenancePanelServerCache\(\)/);
+  assert.match(panelRoute, /getOrBuildMaintenancePanelServerPayload/);
+  assert.match(notifications, /getOrBuildMaintenancePanelServerPayload/);
+  assert.match(assistant, /getOrBuildMaintenancePanelServerPayload/);
+  assert.match(reportFilters, /getOrBuildMaintenancePanelServerPayload/);
 });
 
 test("stable IDs are generated without replacing legacy natural keys", async () => {
@@ -289,7 +308,17 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(mediaUrls, /api\/media\/file\?kind=\$\{kind\}&url=/);
   assert.match(mediaUrls, /private\.blob\.vercel-storage\.com/);
   assert.match(mediaRoute, /fetchStoredBlob/);
+  const indexes = await source("lib/dbIndexes.ts");
+  assert.match(indexes, /records_photos_media_url/);
+  assert.match(indexes, /records_videos_legacy_media_url/);
+  assert.match(indexes, /records_videos_url_media_url/);
   assert.match(mediaRoute, /Giriş gerekli/);
+  assert.match(mediaRoute, /recordsCollection\(db\)\.findOne/);
+  assert.match(mediaRoute, /kind === "image"/);
+  assert.match(mediaRoute, /\{ photos: url \}/);
+  assert.match(mediaRoute, /\{ videos: url \}/);
+  assert.match(mediaRoute, /\{ "videos\.url": url \}/);
+  assert.match(mediaRoute, /Medya kaydı bulunamadı/);
   assert.match(mediaRoute, /Content-Disposition.*inline/);
   assert.match(queue, /kind: "photo" \| "video" \| "report"/);
   assert.match(queue, /job\.payload\.report_attachments/);

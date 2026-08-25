@@ -1,10 +1,11 @@
 import type { Db } from "mongodb";
-import { buildItems, type PanelItem } from "@/lib/status";
+import { type PanelItem } from "@/lib/status";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnicianName, normalizeTechnicianType, TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 import { enginesCollection, maintenanceTypesCollection, recordsCollection, pressureReadingsCollection, oilAnalysesCollection, equipmentInfoCollection, notificationsCollection } from "@/lib/dbCollections";
 import { buildMaintenanceForecastRows, dateKeyLabel, summarizeMaintenanceForecast, validForecastYear, validMaintenancePeriodHours } from "@/lib/maintenanceForecast";
 import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "@/lib/reportAttachments";
+import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 
 export interface AssistantToolResponse {
   intent: AssistantIntent;
@@ -123,12 +124,9 @@ async function resolveMaintenanceType(db: Db, query: AssistantQuery) {
 
 async function statusPairs(db: Db, status: AssistantStatusFilter | undefined): Promise<Array<{ engine_id: string; type_key: string }>> {
   if (!status) return [];
-  const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
-    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
-  ]);
+  const { items } = await getOrBuildMaintenancePanelServerPayload(db);
   const targetStatus = status === "overdue" ? "gecikmis" : status === "critical" ? "kritik" : status === "upcoming" ? "yaklasiyor" : "normal";
-  return buildItems(engines, types)
+  return items
     .filter((item) => item.status === targetStatus)
     .map((item) => ({ engine_id: item.engine_id, type_key: item.type_key }));
 }
@@ -334,11 +332,7 @@ async function getMaintenanceSummary(db: Db, query: AssistantQuery): Promise<Ass
 }
 
 async function getOverdueMaintenance(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
-  const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
-    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
-  ]);
-  const items = buildItems(engines, types);
+  const { items } = await getOrBuildMaintenancePanelServerPayload(db);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
   const selectedType = await resolveMaintenanceType(db, query);
   const matchingOverdue = items
@@ -927,10 +921,7 @@ async function getTechnicianDirectory(db: Db, query: AssistantQuery): Promise<As
 }
 
 async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
-  const [engines, types] = await Promise.all([
-    enginesCollection(db).find({}, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1 } }).toArray(),
-    maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } }).toArray(),
-  ]);
+  const { items: snapshotItems } = await getOrBuildMaintenancePanelServerPayload(db);
   const workMatch = await buildRecordMatch(db, query);
   const workRecords = await recordsCollection(db).find(workMatch, {
     projection: { _id: 1, group_id: 1, engine_id: 1, type_key: 1, type_label: 1, maintenance_duration_minutes: 1, maintenance_start_at: 1, created_at: 1 },
@@ -940,7 +931,7 @@ async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<Assi
   const selectedType = await resolveMaintenanceType(db, query);
   const statusMap: Record<string, PanelItem["status"]> = { overdue: "gecikmis", critical: "kritik", upcoming: "yaklasiyor", normal: "normal" };
   const requestedStatus = query.statusFilter ? statusMap[query.statusFilter] : undefined;
-  const items = buildItems(engines, types)
+  const items = snapshotItems
     .filter((item) => !query.engineQuery || (selectedEngine && item.engine_id === String(selectedEngine._id)))
     .filter((item) => !query.maintenanceTypeQuery || (selectedType && item.type_key === String(selectedType.key)))
     .filter((item) => !query.excludedTypeLabels?.some((excluded) => excluded.localeCompare(item.type_label, "tr", { sensitivity: "base" }) === 0))
