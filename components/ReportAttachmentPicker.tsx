@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import type { ReportAttachment } from "@/lib/types";
+import { uploadReportAttachment } from "@/lib/reportAttachmentUpload";
 import {
   REPORT_ATTACHMENT_ACCEPT,
   REPORT_ATTACHMENT_MAX_BYTES,
@@ -11,14 +12,6 @@ import {
   resolveReportAttachmentMime,
   sanitizeReportAttachmentFilename,
 } from "@/lib/reportAttachments";
-
-interface UploadResponse {
-  url?: string;
-  filename?: string;
-  mime?: ReportAttachment["mime"];
-  size?: number;
-  error?: string;
-}
 
 interface ReportAttachmentPickerProps {
   attachments: ReportAttachment[];
@@ -99,13 +92,8 @@ export default function ReportAttachmentPicker({
         }
 
         try {
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("folder", "report-attachments");
-          const response = await fetch("/api/blob/upload-server", { method: "POST", body: formData });
-          const data = await response.json().catch(() => ({})) as UploadResponse;
-          if (!response.ok || !data.url) throw new Error(data.error || "Rapor eki yüklenemedi.");
-          const attachment = createAttachment(file, data.mime || mime, data.url);
+          const uploaded = await uploadReportAttachment(file);
+          const attachment = createAttachment(file, uploaded.mime, uploaded.url);
           nextAttachments = [...nextAttachments, attachment];
           onChange(nextAttachments);
         } catch (error) {

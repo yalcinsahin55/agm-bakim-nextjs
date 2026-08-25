@@ -49,6 +49,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(records, { group_id: 1, manager_confirmation_status: 1 }, { name: "records_group_confirmation_status" }),
       createIndexSafely(records, { client_request_id: 1 }, { unique: true, sparse: true }),
       createIndexSafely(notifications, { user_id: 1, read_at: 1, created_at: -1 }),
+      createIndexSafely(notifications, { user_id: 1, sort_at: -1, created_at: -1, _id: -1 }, { name: "notifications_user_sort_at_desc" }),
       createIndexSafely(notifications, { dedupe_key: 1 }, { unique: true, sparse: true }),
       createIndexSafely(auditLogs, { created_at: -1 }),
       createIndexSafely(auditLogs, { user_id: 1, created_at: -1 }),

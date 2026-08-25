@@ -73,10 +73,12 @@ async function postUpload(request: NextRequest) {
       ? sanitizeReportAttachmentFilename(file.name).slice(0, REPORT_ATTACHMENT_MAX_FILENAME_LENGTH)
       : file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
     const token = process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
+    const storeId = process.env.BLOB_STORE_ID || undefined;
     const blob = await put(`${folder}/${Date.now()}-${safeName}`, file, {
       access: "public",
       addRandomSuffix: true,
       ...(token ? { token } : {}),
+      ...(storeId ? { storeId } : {}),
     });
     return NextResponse.json({
       url: blob.url,

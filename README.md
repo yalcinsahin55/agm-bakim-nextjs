@@ -319,11 +319,17 @@ npx web-push generate-vapid-keys
 
 Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı veritabanı veya Blob değerleri tanımlanması önerilir. `PDF_ALLOWED_HOSTS` ve `PUSH_ALLOWED_HOSTS` yalnızca gerçekten kullanılan, güvenilir HTTPS hostları için doldurulmalıdır; bu allowlist’ler SSRF riskini azaltmak amacıyla sunucu tarafında doğrulanır. Yerel build sırasında üretim veritabanına yazmamak için ayrı bir test veritabanı kullanın.
 
+## Rapor ekleri ve kayıt idempotency
+
+Bakım tamamlama ve bakım kaydı düzenleme ekranlarında PDF, XLS/XLSX, DOC/DOCX raporları Vercel Blob client upload akışıyla doğrudan public Blob store’a yüklenir. Böylece en fazla 20 MB olan rapor dosyaları Next.js serverless function request gövdesinden geçirilmez; server yalnızca kimliği doğrulanmış kullanıcı için kısa ömürlü ve MIME/boyut/path kısıtlı upload yetkisi üretir. Çevrimdışı rapor ekleri de bağlantı geldiğinde aynı helper üzerinden yüklenir ve kayıt payload’ına yalnız gerçek Blob URL’si yazılır.
+
+Yeni bakım kaydı birden fazla bakım türü içeriyorsa ana kayıt ile ek kayıtlar aynı `client_request_id` değerini paylaşmaz. Ana kayıt istemciden gelen id’yi, her ek kayıt ise deterministik tekil id’yi kullanır; bu sayede sparse unique index üzerinde `insert_extra_record` duplicate-key hatası oluşmaz ve çevrimdışı yeniden gönderimler idempotent kalır.
+
 ## Bildirimler ve otomatik yenileme
 
 Web Push isteğe bağlıdır. Kullanıcı, Bildirimler ekranından tarayıcı bildirim izni verdiğinde abonelik bilgisi sunucuya kaydedilir. Bakım durumu değiştiğinde veya gecikmiş/kritik/yaklaşan bakım oluştuğunda uygun bildirimler gönderilebilir.
 
-Bildirim listesi endpoint’i artık sayfa açılışında bakım durumlarını yeniden üretmez; `/api/notifications` yalnızca mevcut bildirimleri okur. Böylece her Dashboard veya modül açılışında gereksiz bakım türü, motor ve bildirim yazma sorguları çalışmaz. Yeni gecikmiş/kritik/yaklaşan bakım bildirimleri zamanlanmış cron akışında hazırlanır.
+Bildirim listesi endpoint’i artık sayfa açılışında bakım durumlarını yeniden üretmez; `/api/notifications` yalnızca mevcut bildirimleri okur. Zil sayacı daha hafif olan `/api/notifications/unread-count` GET endpoint’ini kullanır. Kullanıcı bildirimler ekranındaki **Bildirimleri yenile** düğmesine basmadıkça pahalı refresh POST akışı çalışmaz. Böylece her Dashboard veya modül açılışında gereksiz bakım türü, motor ve bildirim yazma sorguları çalışmaz. Yeni gecikmiş/kritik/yaklaşan bakım bildirimleri zamanlanmış cron akışında hazırlanır.
 
 `vercel.json` dosyası aşağıdaki cron endpoint’ini her gün UTC 06:00’da çalıştırır:
 

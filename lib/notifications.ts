@@ -43,10 +43,10 @@ export async function listUserNotifications(db: Db, userId: string, limit?: numb
   // Eski belgelerde bu alan bulunmayabileceği için created_at güvenli geri dönüş alanıdır.
   const pipeline = [
     { $match: { user_id: userId } },
-    { $set: { notification_sort_at: { $ifNull: ["$last_notified_at", "$created_at"] } } },
-    { $sort: { notification_sort_at: -1, created_at: -1, _id: -1 } },
+    { $set: { _notification_sort_at: { $ifNull: ["$sort_at", { $ifNull: ["$last_notified_at", "$created_at"] }] } } },
+    { $sort: { _notification_sort_at: -1, created_at: -1, _id: -1 } },
     ...(typeof limit === "number" ? [{ $limit: limit }] : []),
-    { $unset: "notification_sort_at" },
+    { $unset: "_notification_sort_at" },
   ];
   const notifications = await notificationsCollection(db).aggregate<Notification>(pipeline).toArray();
   return notifications.map((notification) => ({
@@ -73,7 +73,7 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
   const existingRows = activeKeys.length > 0
     ? await collection.find(
       { dedupe_key: { $in: activeKeys } },
-      { projection: { dedupe_key: 1, status: 1 } },
+      { projection: { dedupe_key: 1, status: 1, sort_at: 1, last_notified_at: 1, created_at: 1 } },
     ).toArray()
     : [];
   const existingByKey = new Map(existingRows.map((row) => [String(row.dedupe_key), row] as const));
@@ -82,6 +82,9 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
     const text = notificationText(item.status, item.engine_name, item.type_label, item.remaining);
     const previous = existingByKey.get(dedupeKey);
     const isNewNotification = !previous || previous.status !== item.status;
+    const previousSortAt = previous && typeof previous.sort_at !== "undefined"
+      ? previous.sort_at
+      : previous?.last_notified_at || previous?.created_at;
     return {
       dedupeKey,
       text,
@@ -99,9 +102,10 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
               message: text.message,
               href: "/dashboard",
               updated_at: now,
+              sort_at: isNewNotification ? now : (previousSortAt || now),
               ...(isNewNotification ? { last_notified_at: now } : {}),
             },
-            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, last_notified_at: now, read_at: null },
+            $setOnInsert: { dedupe_key: dedupeKey, created_at: now, last_notified_at: now, sort_at: now, read_at: null },
           },
           upsert: true,
         },

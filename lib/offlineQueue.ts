@@ -1,6 +1,7 @@
 "use client";
 
 import { uploadVideoChunked } from "@/lib/chunkUpload";
+import { uploadReportAttachment } from "@/lib/reportAttachmentUpload";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 
 const DB_NAME = "agm-bakim-offline";
@@ -148,13 +149,8 @@ async function uploadPhoto(blob: Blob, name: string): Promise<string> {
 }
 
 async function uploadReport(blob: Blob, name: string, mime: string): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", new File([blob], name, { type: mime }));
-  formData.append("folder", "report-attachments");
-  const response = await fetch("/api/blob/upload-server", { method: "POST", body: formData });
-  const data = await response.json().catch(() => ({})) as { url?: string; error?: string };
-  if (!response.ok || !data.url) throw new Error(data.error || "Rapor eki yüklenemedi.");
-  return data.url;
+  const uploaded = await uploadReportAttachment(new File([blob], name, { type: mime }));
+  return uploaded.url;
 }
 
 function replacePhotoPlaceholder(photos: unknown, id: string, url: string): unknown[] {

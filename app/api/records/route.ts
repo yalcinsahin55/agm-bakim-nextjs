@@ -2,6 +2,7 @@ import { enginesCollection, maintenanceTypesCollection, recordsCollection, users
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId, type Filter } from "mongodb";
+import { createHash } from "node:crypto";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
@@ -50,6 +51,14 @@ function parseDateOnly(value: string): Date | null {
   if (![year, month, day].every(Number.isInteger)) return null;
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? date : null;
+}
+
+function buildExtraClientRequestId(baseId: string | undefined, typeKey: string): string | undefined {
+  if (!baseId) return undefined;
+  const raw = `${baseId}:extra:${typeKey}`;
+  if (raw.length <= 100) return raw;
+  const digest = createHash("sha256").update(raw).digest("hex").slice(0, 48);
+  return `${baseId.slice(0, 24)}:extra:${digest}`;
 }
 
 async function getRecords(req: NextRequest) {
@@ -177,6 +186,9 @@ async function postRecord(req: NextRequest) {
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
     } = parsed.data as RecordInput;
+    const normalizedExtraTypes = extra_types?.length
+      ? [...new Map(extra_types.map((item) => [item.type_key, item])).values()]
+      : [];
 
     if (legacyMediaTooLarge(photos_b64, videos)) {
       return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
@@ -261,7 +273,7 @@ async function postRecord(req: NextRequest) {
       responsibleTechnicianOption = resolvedResponsible[0];
     }
     operationStep = "load_maintenance_types";
-    const requestedTypeKeys = [...new Set([type_key, ...(extra_types || []).map((item) => item.type_key)])];
+    const requestedTypeKeys = [...new Set([type_key, ...normalizedExtraTypes.map((item) => item.type_key)])];
     const maintenanceTypes = await typesCol.find({ _id: { $in: requestedTypeKeys }, is_deleted: { $ne: true } }, { projection: { _id: 1, label: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } }).toArray();
     const maintenanceTypeByKey = new Map<string, MaintenanceTypeDocument>(maintenanceTypes.map((item) => [String(item._id), item]));
     const missingType = requestedTypeKeys.find((key) => !maintenanceTypeByKey.has(key));
@@ -317,7 +329,7 @@ async function postRecord(req: NextRequest) {
         .filter((item): item is { label: string; completed: boolean } => item.label.length > 0)
       : [];
 
-    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown) {
+    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown, recordClientRequestId = client_request_id) {
       const rec: MaintenanceRecordDocument = {
         engine_id, engine_name: engineName, type_key: tKey, type_label: tLabel,
         hour_at_completion,
@@ -350,7 +362,7 @@ async function postRecord(req: NextRequest) {
         other_technician_ids: otherTechnicians.map((technician) => technician.id),
         other_technicians: otherTechnicians,
         technician_contributions: technicianContributions,
-        client_request_id: client_request_id || undefined,
+        client_request_id: recordClientRequestId || undefined,
         created_at: createdAt, backdated: !!backdated,
         group_id: groupId, grouped_with: isPrimary ? null : tLabel,
         ...(trackingAutoCreated ? { auto_created_tracking: true } : {}),
@@ -373,8 +385,8 @@ async function postRecord(req: NextRequest) {
     await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState);
 
     const completedLabels: string[] = [type_label];
-    if (Array.isArray(extra_types)) {
-      for (const ex of extra_types) {
+    if (normalizedExtraTypes.length > 0) {
+      for (const ex of normalizedExtraTypes) {
         const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1, engine_scope: 1 } });
         const extraPreviousTrackingState = snapshotTrackingState(extraType?.engine_states?.[engine_id]);
         const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
@@ -387,7 +399,7 @@ async function postRecord(req: NextRequest) {
           );
         }
         operationStep = "insert_extra_record";
-        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated, extraPreviousTrackingState);
+        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated, extraPreviousTrackingState, buildExtraClientRequestId(client_request_id, ex.type_key));
         completedLabels.push(ex.type_label);
       }
     }
@@ -418,7 +430,10 @@ async function postRecord(req: NextRequest) {
     await refreshUserMaintenanceNotificationsBestEffort(db, user);
     return NextResponse.json({ ok: true, completed: completedLabels, confirmed: shouldConfirmOnCreate, confirmation_required: !shouldConfirmOnCreate });
   } catch (error) {
-    console.error("POST /api/records hatası:", error instanceof Error ? error.name : "UnknownError", `step=${operationStep}`);
+    const errorCode = typeof error === "object" && error !== null && "code" in error && typeof (error as { code?: unknown }).code === "number"
+      ? ` code=${String((error as { code: number }).code)}`
+      : "";
+    console.error("POST /api/records hatası:", error instanceof Error ? error.name : "UnknownError", `step=${operationStep}${errorCode}`);
     return NextResponse.json({ error: "Bakım kaydı oluşturulurken bir hata oluştu." }, { status: 500 });
   }
 }

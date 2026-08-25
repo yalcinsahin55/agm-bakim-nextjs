@@ -48,16 +48,21 @@ test("records list does not reintroduce media payloads", async () => {
   assert.match(records, /include_media/);
 });
 
-test("notification refresh is POST-only and the page uses the mutation-safe route", async () => {
+test("notification page is GET-first and the bell uses a lightweight unread count", async () => {
   const notificationsGet = await source("app/api/notifications/route.ts");
   const notificationsRefresh = await source("app/api/notifications/refresh/route.ts");
+  const unreadCount = await source("app/api/notifications/unread-count/route.ts");
   const notificationsPage = await source("app/bildirimler/page.tsx");
   const notificationBell = await source("components/NotificationBell.tsx");
   assert.match(notificationsGet, /Bildirim yenileme için POST/);
   assert.match(notificationsRefresh, /export async function POST/);
+  assert.match(unreadCount, /notifications-unread-count/);
+  assert.match(unreadCount, /countDocuments\(\{ user_id: user\._id, read_at: null \}\)/);
+  assert.match(notificationsPage, /fetch\("\/api\/notifications\?limit=500", \{ cache: "no-store" \}\)/);
   assert.match(notificationsPage, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
-  assert.match(notificationBell, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
-  assert.doesNotMatch(notificationBell, /notifications\?refresh=1/);
+  assert.match(notificationBell, /UNREAD_COUNT_URL = "\/api\/notifications\/unread-count"/);
+  assert.doesNotMatch(notificationBell, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
+  assert.doesNotMatch(notificationBell, /fetch\("\/api\/notifications"/);
 });
 
 test("notifications are ordered by their latest notification event", async () => {
@@ -65,10 +70,12 @@ test("notifications are ordered by their latest notification event", async () =>
   const notificationsPage = await source("app/bildirimler/page.tsx");
   assert.match(notificationModule, /last_notified_at/);
   assert.match(notificationModule, /\$ifNull: \["\$last_notified_at", "\$created_at"\]/);
-  assert.match(notificationModule, /notification_sort_at: -1, created_at: -1, _id: -1/);
+  assert.match(notificationModule, /_notification_sort_at: -1, created_at: -1, _id: -1/);
+  assert.match(notificationModule, /sort_at: isNewNotification/);
   assert.match(notificationsPage, /function sortNewestFirst\(notifications: Notification\[\]\)/);
   assert.match(notificationsPage, /last_notified_at \?\? notification\.created_at/);
   assert.match(notificationsPage, /Geldi: \{formatNotificationDate\(notification\)\}/);
+  assert.match(await source("lib/dbIndexes.ts"), /notifications_user_sort_at_desc/);
 });
 
 test("backup and upload large-payload paths use bounded processing", async () => {
@@ -166,6 +173,8 @@ test("no protected UI route relies on middleware as its authorization boundary",
 test("maintenance report attachments stay bounded, authenticated, and offline-safe", async () => {
   const helper = await source("lib/reportAttachments.ts");
   const upload = await source("app/api/blob/upload-server/route.ts");
+  const clientUpload = await source("app/api/blob/upload-client/route.ts");
+  const uploadHelper = await source("lib/reportAttachmentUpload.ts");
   const schema = await source("lib/schemas.ts");
   const create = await source("app/api/records/route.ts");
   const update = await source("app/api/records/[id]/route.ts");
@@ -178,10 +187,19 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(helper, /\.docx/);
   assert.match(upload, /report-attachments/);
   assert.match(upload, /resolveReportAttachmentMime/);
+  assert.match(upload, /storeId/);
+  assert.match(clientUpload, /handleUpload/);
+  assert.match(clientUpload, /REPORT_UPLOAD_PREFIX/);
+  assert.match(clientUpload, /maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES/);
+  assert.match(uploadHelper, /REPORT_UPLOAD_ENDPOINT = "\/api\/blob\/upload-client"/);
+  assert.match(uploadHelper, /handleUploadUrl: REPORT_UPLOAD_ENDPOINT/);
   assert.match(upload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(schema, /report_attachments/);
   assert.match(schema, /isAllowedReportAttachmentUrl/);
   assert.match(create, /normalizedReportAttachments/);
+  assert.match(create, /buildExtraClientRequestId/);
+  assert.match(create, /client_request_id: recordClientRequestId \|\| undefined/);
+  assert.match(create, /buildExtraClientRequestId\(client_request_id, ex\.type_key\)/);
   assert.match(create, /report_attachments: isPrimary/);
   assert.match(update, /update\.report_attachments = normalizedReportAttachments/);
   assert.match(fileRoute, /record-attachment-read/);
@@ -189,6 +207,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(fileRoute, /Cache-Control.*private, no-store/);
   assert.match(queue, /kind: "photo" \| "video" \| "report"/);
   assert.match(queue, /job\.payload\.report_attachments/);
+  assert.match(queue, /uploadReportAttachment/);
   assert.match(complete, /<ReportAttachmentPicker/);
   assert.match(records, /<ReportAttachmentPicker/);
   assert.match(records, /\/api\/records\/\$\{selectedRecord\._id\}\/attachments\/\$\{encodeURIComponent\(attachment\.id\)\}/);

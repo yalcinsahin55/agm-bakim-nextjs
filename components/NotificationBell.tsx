@@ -1,32 +1,34 @@
-"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { cachedFetch } from "@/lib/apiCache";
+import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
+
+interface UnreadCountResponse {
+  unreadCount?: number;
+}
+
+const UNREAD_COUNT_URL = "/api/notifications/unread-count";
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    const load = async (refresh = false) => {
+
+    const load = async (fresh = false) => {
       try {
-        const data = refresh
-          ? await (async () => {
-            const response = await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" });
-            if (!response.ok) throw new Error("Bildirim yenilenemedi");
-            return await response.json() as { unreadCount?: number };
-          })()
-          : await cachedFetch<{ unreadCount?: number }>("/api/notifications", 30_000);
+        if (fresh) invalidateCachedFetch(UNREAD_COUNT_URL);
+        const data = await cachedFetch<UnreadCountResponse>(UNREAD_COUNT_URL, fresh ? 0 : 30_000);
         if (alive) setUnreadCount(Number(data.unreadCount || 0));
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
       }
     };
-    const handleChanged = () => { void load(false); };
+
+    const handleChanged = () => { void load(true); };
     const handleRefresh = () => { void load(true); };
     void load();
-    const timer = window.setInterval(() => { void load(false); }, 60_000);
+    const timer = window.setInterval(() => { void load(); }, 60_000);
     window.addEventListener("notifications:changed", handleChanged);
     window.addEventListener("notifications:refresh", handleRefresh);
     return () => {

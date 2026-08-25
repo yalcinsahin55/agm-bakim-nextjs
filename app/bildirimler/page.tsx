@@ -107,14 +107,19 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ gecikmis: true, kritik: true });
   const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refresh = false) => {
     setLoadError("");
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     try {
-      const response = await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" });
+      const response = refresh
+        ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" })
+        : await fetch("/api/notifications?limit=500", { cache: "no-store" });
       if (response.status === 401) {
         window.location.href = "/login";
         return;
@@ -126,6 +131,7 @@ export default function NotificationsPage() {
       setLoadError("Bildirimler yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -186,12 +192,18 @@ export default function NotificationsPage() {
               </button>
             ))}
           </div>
-          {unreadCount > 0 && (
-            <button onClick={markAllRead} disabled={busy} className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-border px-3 py-2.5 text-[11px] font-bold text-teal transition hover:bg-teal/10 disabled:opacity-50">
-              <span aria-hidden="true">✓</span>
-              {busy ? "İşaretleniyor..." : "Tümünü okundu işaretle"}
+          <div className="flex flex-col gap-2 border-t border-border px-3 py-2.5 sm:flex-row">
+            <button onClick={() => { void load(true); }} disabled={refreshing} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition hover:border-teal/40 hover:text-teal disabled:opacity-50">
+              <span aria-hidden="true">↻</span>
+              {refreshing ? "Yenileniyor..." : "Bildirimleri yenile"}
             </button>
-          )}
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} disabled={busy} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-teal/25 px-3 py-2 text-[11px] font-bold text-teal transition hover:bg-teal/10 disabled:opacity-50">
+                <span aria-hidden="true">✓</span>
+                {busy ? "İşaretleniyor..." : "Tümünü okundu işaretle"}
+              </button>
+            )}
+          </div>
         </section>
 
         <p className="mb-3 text-[11px] leading-relaxed text-muted">Öncelikli bakım uyarıları durumlarına göre gruplandırılmıştır. Ayrıntıları görmek için ilgili grubu açın.</p>
@@ -207,7 +219,7 @@ export default function NotificationsPage() {
           <div className="mt-4 rounded-card border border-red/30 bg-panel py-12 text-center">
             <div className="mb-3 text-3xl">⚠️</div>
             <p className="text-sm font-semibold text-text">{loadError}</p>
-            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
+            <button onClick={() => { void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
           </div>
         ) : notifications.length === 0 ? (
           <div className="mt-4 rounded-card border border-border bg-panel py-14 text-center">
