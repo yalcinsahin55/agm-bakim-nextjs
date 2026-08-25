@@ -75,6 +75,8 @@ test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async
   const ci = await source(".github/workflows/ci.yml");
   const eslintConfig = await source("eslint.config.ts");
   const serviceWorker = await source("lib/serviceWorker.ts");
+  const postcssConfig = await source("postcss.config.js");
+  const globalsCss = await source("app/globals.css");
   const gitignore = await source(".gitignore");
   assert.equal(tsconfig.compilerOptions.strict, true);
   assert.equal(tsconfig.compilerOptions.allowJs, false);
@@ -90,8 +92,13 @@ test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async
   assert.match(packageJson.scripts.prebuild, /build:service-worker/);
   assert.match(gitignore, /\/public\/sw\.js/);
   assert.match(serviceWorker, /CACHE_NAME/);
+  assert.match(postcssConfig, /module\.exports/);
+  assert.match(postcssConfig, /tailwindcss/);
+  assert.match(globalsCss, /@tailwind base/);
+  assert.match(globalsCss, /@tailwind components/);
+  assert.match(globalsCss, /@tailwind utilities/);
   await assert.rejects(source("next.config.js"));
-  await assert.rejects(source("postcss.config.js"));
+  await assert.rejects(source("postcss.config.ts"));
   await assert.rejects(source("tailwind.config.js"));
   await assert.rejects(source("eslint.config.mjs"));
   await assert.rejects(source("jsconfig.json"));

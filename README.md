@@ -502,14 +502,15 @@ Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süre
 
 ## TypeScript kaynak standardı
 
-Uygulamanın takip edilen uygulama, bileşen, kütüphane, test, yapılandırma ve operasyon scripti kaynakları artık `.ts`, `.tsx` veya `.mts` uzantısındadır. `tsconfig.json` içinde `strict: true` ve `allowJs: false` korunur; böylece yeni JavaScript uygulama kodu eklenmesi typecheck aşamasında engellenir. `next.config.ts`, `postcss.config.ts`, `tailwind.config.ts` ve `eslint.config.ts` typed config olarak yüklenir.
+Uygulamanın takip edilen uygulama, bileşen, kütüphane, test ve operasyon scripti kaynakları `.ts`, `.tsx` veya `.mts` uzantısındadır. `tsconfig.json` içinde `strict: true` ve `allowJs: false` korunur; böylece yeni JavaScript uygulama kodu eklenmesi typecheck aşamasında engellenir. `next.config.ts`, `tailwind.config.ts` ve `eslint.config.ts` typed config olarak yüklenir. Next.js 15.5’in PostCSS pipeline’ı TypeScript configini bu projede yüklemediği için `postcss.config.js` küçük bir CommonJS bridge’i olarak bilinçli biçimde korunur; bu dosya uygulama kodu değildir ve Tailwind derlemesinin çalışması için gereklidir.
 
 Service worker için tarayıcının beklediği sabit `/sw.js` URL’si korunur. Kaynak dosya `lib/serviceWorker.ts` içindedir; `predev` ve `prebuild` adımları bunu TypeScript compiler ile `public/sw.js` çıktısına dönüştürür. `public/sw.js` generated olduğu için Git tarafından izlenmez. Beş legacy MongoDB migration scripti de `.mts` olarak çalışır; heterojen eski kayıt şekilleri nedeniyle bu operasyonel dosyalarda `@ts-nocheck` sınırı bulunur, ancak uygulama runtime’ı ve test kaynakları strict typecheck kapsamındadır. Bu scriptlerde davranış değişikliği yapılmamış, yalnızca çalıştırma ve kaynak uzantısı standardı güncellenmiştir.
 
 | Kaynak grubu | Durum |
 |---|---|
 | `app/`, `components/`, `lib/` | TypeScript/TSX ve strict typecheck kapsamı |
-| Next/PostCSS/Tailwind/ESLint configleri | Typed TypeScript config |
+| Next/Tailwind/ESLint configleri | Typed TypeScript config |
+| PostCSS config | Next.js CSS pipelineı için zorunlu küçük CommonJS bridge: `postcss.config.js` |
 | `tests/` ve read-only smoke | `.mts`, native Node TypeScript çalıştırma |
 | Migration scriptleri | `.mts`, legacy veri şekilleri için açık `@ts-nocheck` sınırı |
 | Browser service worker | Kaynak `lib/serviceWorker.ts`, generated çıktı `public/sw.js` |
