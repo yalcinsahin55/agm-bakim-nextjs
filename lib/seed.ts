@@ -10,7 +10,6 @@ type SeedDataShape = { engines: Record<string, SeedEngine>; oil: Record<string, 
 type SeedHistoryEntry = { date: string; engine: string; load: number | null; pressure: number | null; status?: string | null; new_type?: boolean };
 
 declare global {
-  // eslint-disable-next-line no-var
   var _seeded: boolean | undefined;
 }
 

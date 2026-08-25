@@ -166,6 +166,30 @@ test("backup and upload large-payload paths use bounded processing", async () =>
   assert.doesNotMatch(uploadChunk, /Buffer\.concat\(chunkBuffers/);
 });
 
+test("read-only smoke tooling never sends mutation methods", async () => {
+  const packageJson = JSON.parse(await source("package.json"));
+  const smoke = await source("scripts/smoke-readonly.mjs");
+  const runbook = await source("docs/staging-validation.md");
+  assert.equal(packageJson.scripts["smoke:readonly"], "node scripts/smoke-readonly.mjs");
+  assert.match(smoke, /method: "GET"/);
+  assert.doesNotMatch(smoke, /method: "(POST|PUT|PATCH|DELETE)"/);
+  assert.match(runbook, /Read-only smoke/);
+  assert.match(runbook, /production’a yönelik otomatik smoke çalıştırılmamalıdır/);
+});
+
+test("backup export and restore share sanitized format helpers", async () => {
+  const backupFormat = await source("lib/backupFormat.ts");
+  const backupExport = await source("app/api/backups/export/route.ts");
+  const backupRestore = await source("app/api/backups/restore/route.ts");
+  assert.match(backupFormat, /EXPORT_BLOCKED_KEYS/);
+  assert.match(backupFormat, /RESTORE_BLOCKED_KEYS/);
+  assert.match(backupFormat, /function sanitizeBackupValue/);
+  assert.match(backupFormat, /function cleanRestoredValue/);
+  assert.match(backupExport, /sanitizeBackupValue/);
+  assert.match(backupRestore, /cleanRestoredValue/);
+  assert.match(backupRestore, /for \(const name of RESTORE_COLLECTIONS\)/);
+});
+
 test("large history and administrative list paths expose bounded reads", async () => {
   const pressure = await source("app/api/pressure-readings/route.ts");
   const summary = await source("app/api/backups/summary/route.ts");

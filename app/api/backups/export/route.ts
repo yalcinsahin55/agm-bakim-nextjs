@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Document } from "mongodb";
+import { BACKUP_COLLECTIONS, sanitizeBackupValue } from "@/lib/backupFormat";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
@@ -10,30 +11,6 @@ import { withApiTiming } from "@/lib/performance";
 import { usersCollection } from "@/lib/dbCollections";
 
 export const dynamic = "force-dynamic";
-
-type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-
-function sanitizeDocument(value: unknown): JsonValue {
-  if (value === null) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(sanitizeDocument);
-  if (!value || typeof value !== "object") return null;
-  if ("toHexString" in value && typeof (value as { toHexString?: unknown }).toHexString === "function") {
-    return { $oid: String((value as { toHexString: () => string }).toHexString()) };
-  }
-  const result: { [key: string]: JsonValue } = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (["password", "password_hash", "token", "VAPID_PRIVATE_KEY"].includes(key)) continue;
-    if (["pdf_b64", "photos_b64", "data_b64"].includes(key)) continue;
-    result[key] = sanitizeDocument(item);
-  }
-  return result;
-}
-
-const BACKUP_COLLECTIONS = ["users", "engines", "maintenance_types", "maintenance_records", "oil_analyses", "notifications", "audit_logs"] as const;
 
 async function getBackupExport(req: NextRequest) {
   const db = await getDb();
@@ -65,7 +42,7 @@ async function getBackupExport(req: NextRequest) {
           const cursor = db.collection<Document>(name).find({});
           for await (const document of cursor) {
             if (!firstDocument) enqueue(",");
-            enqueue(JSON.stringify(sanitizeDocument(document)));
+            enqueue(JSON.stringify(sanitizeBackupValue(document)));
             firstDocument = false;
           }
           enqueue("]");

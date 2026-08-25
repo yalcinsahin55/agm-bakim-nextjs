@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
+import { RESTORE_COLLECTIONS, cleanRestoredValue, getRestoreIdentity, type RestorableDocument } from "@/lib/backupFormat";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
@@ -11,30 +12,7 @@ import { usersCollection } from "@/lib/dbCollections";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_COLLECTIONS = ["engines", "maintenance_types", "maintenance_records", "oil_analyses"] as const;
-type RestorableDocument = Record<string, unknown> & { _id?: string | ObjectId };
-const BLOCKED_KEYS = new Set(["password", "password_hash", "token", "VAPID_PRIVATE_KEY", "pdf_b64", "photos_b64", "data_b64", "__proto__", "prototype", "constructor"]);
 const RESTORE_BATCH_SIZE = 500;
-
-function clean(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(clean);
-  if (!value || typeof value !== "object") return value;
-  const record = value as Record<string, unknown>;
-  if (Object.keys(record).length === 1 && typeof record.$oid === "string" && /^[a-f\\d]{24}$/i.test(record.$oid)) return new ObjectId(record.$oid);
-  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  for (const [key, item] of Object.entries(value)) {
-    if (BLOCKED_KEYS.has(key) || key.startsWith("$") || key.includes(".")) continue;
-    result[key] = clean(item);
-  }
-  return result;
-}
-
-function getIdentity(document: Record<string, unknown>): string | null {
-  const id = document._id;
-  if (typeof id === "string" && id.length > 0 && id.length <= 200 && !/[.$\0]/.test(id)) return id;
-  if (id instanceof ObjectId) return id.toHexString();
-  return null;
-}
 
 async function postBackupRestore(req: NextRequest) {
   const db = await getDb();
@@ -61,7 +39,7 @@ async function postBackupRestore(req: NextRequest) {
 
     const summary: Record<string, number> = {};
     const skipped: Record<string, number> = {};
-    for (const name of ALLOWED_COLLECTIONS) {
+    for (const name of RESTORE_COLLECTIONS) {
       const documents = Array.isArray((collections as Record<string, unknown>)[name]) ? (collections as Record<string, unknown[]>)[name] : [];
       if (documents.length > 50000) return NextResponse.json({ error: `${name} koleksiyonu çok büyük.` }, { status: 413 });
       const operations: AnyBulkWriteOperation<RestorableDocument>[] = [];
@@ -72,8 +50,8 @@ async function postBackupRestore(req: NextRequest) {
           skippedCount += 1;
           continue;
         }
-        const document = clean(raw) as RestorableDocument;
-        const identity = getIdentity(document);
+        const document = cleanRestoredValue(raw) as RestorableDocument;
+        const identity = getRestoreIdentity(document);
         if (identity) {
           const rawIdentity = document._id;
           delete document._id;

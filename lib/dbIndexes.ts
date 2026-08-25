@@ -3,7 +3,6 @@ import type { Db } from "mongodb";
 // Serverless sıcak instance içinde aynı indeks kurulumunu tekrar tekrar çalıştırma.
 // Her indeks ayrı yakalanır; mevcut veride bir çakışma olması tüm uygulamayı kilitlememelidir.
 declare global {
-  // eslint-disable-next-line no-var
   var _agmIndexPromise: Promise<void> | undefined;
 }
 
