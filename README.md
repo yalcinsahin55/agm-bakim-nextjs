@@ -363,12 +363,12 @@ Uygulama içindeki yedekleme/arsiv ekranı kullanılabilse de MongoDB Atlas tara
 
 ## Eski teknisyen kayıtlarını standardize etme
 
-Yeni kayıtlar teknisyenleri sabit kullanıcı ID’siyle saklar. Eski kayıtlarda yalnızca görünen ad veya farklı yazım biçimleri bulunuyorsa `scripts/migrate-technician-source.mjs` yardımcı aracı kullanılabilir. Araç varsayılan olarak **dry-run** çalışır; bu modda hiçbir kayıt değiştirilmez.
+Yeni kayıtlar teknisyenleri sabit kullanıcı ID’siyle saklar. Eski kayıtlarda yalnızca görünen ad veya farklı yazım biçimleri bulunuyorsa `scripts/migrate-technician-source.mts` yardımcı aracı kullanılabilir. Araç varsayılan olarak **dry-run** çalışır; bu modda hiçbir kayıt değiştirilmez.
 
 Önce üretim veritabanının ayrı ve erişimi kısıtlı bir yedeğini alın. Ardından proje kök dizininde yalnızca rapor üretin:
 
 ```bash
-node scripts/migrate-technician-source.mjs --report=migration-output/technician-preview.json
+node --experimental-strip-types scripts/migrate-technician-source.mts --report=migration-output/technician-preview.json
 ```
 
 Araç şu sınıflandırmayı yapar:
@@ -394,7 +394,7 @@ Dry-run raporunda `high_confidence_changes`, `internal_changes`, `external_servi
 Mapping ve sınırlı apply işlemi:
 
 ```bash
-node scripts/migrate-technician-source.mjs \
+node --experimental-strip-types scripts/migrate-technician-source.mts \
   --mapping=migration-output/mapping.json \
   --report=migration-output/apply-report.json \
   --backup=migration-output/technician-backup.json \
@@ -408,7 +408,7 @@ Apply modu yalnızca yüksek güvenli otomatik eşleşmeleri ve mapping dosyası
 Bir hata veya yanlış eşleşme fark edilirse, apply sırasında üretilen yedekle yalnızca migration’ın takip ettiği alanları geri yükleyin:
 
 ```bash
-node scripts/migrate-technician-source.mjs \
+node --experimental-strip-types scripts/migrate-technician-source.mts \
   --rollback=migration-output/technician-backup.json \
   --max-changes=1000 \
   --apply \
@@ -473,14 +473,14 @@ Aynı işlem sırasında birden fazla bakım türü tamamlandığında uygulama 
 Geçmişte birlikte tamamlanan eski kayıtlarda `group_id` bulunmuyorsa, önce ayrı ve erişimi kısıtlı MongoDB yedeği alın. Ardından varsayılan dry-run ile yalnızca güçlü eşleşmeleri önizleyin:
 
 ```bash
-node scripts/migrate-grouped-maintenance-records.mjs \
+node --experimental-strip-types scripts/migrate-grouped-maintenance-records.mts \
   --report=migration-output/grouped-maintenance-preview.json
 ```
 
 Araç; aynı motor, tarih-saat, motor çalışma saati, sorumlu/ekip izi ve ortak grouped/client işaretlerine sahip birden fazla bakım türünü aday grup olarak değerlendirir. Mevcut `group_id` taşıyan kayıtlara dokunmaz. Belirsiz veya zayıf eşleşmeler değiştirilmez. Apply modunda yalnızca eksik `group_id` alanı yazılır; teknisyen, süre, bakım türü, medya ve tarih alanları değişmez:
 
 ```bash
-node scripts/migrate-grouped-maintenance-records.mjs \
+node --experimental-strip-types scripts/migrate-grouped-maintenance-records.mts \
   --report=migration-output/grouped-maintenance-apply.json \
   --backup=migration-output/grouped-maintenance-backup.json \
   --max-changes=1000 \
@@ -491,7 +491,7 @@ node scripts/migrate-grouped-maintenance-records.mjs \
 Apply işlemi explicit onay, değişiklik üst sınırı ve atomik backup olmadan çalışmaz. Apply sırasında beklenmeyen hata olursa script uygulanan kayıtları otomatik geri almaya çalışır. Gerekirse yalnızca oluşturulan backup ile geri alabilirsiniz:
 
 ```bash
-node scripts/migrate-grouped-maintenance-records.mjs \
+node --experimental-strip-types scripts/migrate-grouped-maintenance-records.mts \
   --rollback=migration-output/grouped-maintenance-backup.json \
   --max-changes=1000 \
   --apply \
@@ -499,6 +499,20 @@ node scripts/migrate-grouped-maintenance-records.mjs \
 ```
 
 Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süresini yenileyin. Aynı grouped bakımın tür satırları ayrı görünebilir; bu beklenen davranıştır. Süre ve kişi görevi toplamları ise grup başına bir kez hesaplanır.
+
+## TypeScript kaynak standardı
+
+Uygulamanın takip edilen uygulama, bileşen, kütüphane, test, yapılandırma ve operasyon scripti kaynakları artık `.ts`, `.tsx` veya `.mts` uzantısındadır. `tsconfig.json` içinde `strict: true` ve `allowJs: false` korunur; böylece yeni JavaScript uygulama kodu eklenmesi typecheck aşamasında engellenir. `next.config.ts`, `postcss.config.ts`, `tailwind.config.ts` ve `eslint.config.ts` typed config olarak yüklenir.
+
+Service worker için tarayıcının beklediği sabit `/sw.js` URL’si korunur. Kaynak dosya `lib/serviceWorker.ts` içindedir; `predev` ve `prebuild` adımları bunu TypeScript compiler ile `public/sw.js` çıktısına dönüştürür. `public/sw.js` generated olduğu için Git tarafından izlenmez. Beş legacy MongoDB migration scripti de `.mts` olarak çalışır; heterojen eski kayıt şekilleri nedeniyle bu operasyonel dosyalarda `@ts-nocheck` sınırı bulunur, ancak uygulama runtime’ı ve test kaynakları strict typecheck kapsamındadır. Bu scriptlerde davranış değişikliği yapılmamış, yalnızca çalıştırma ve kaynak uzantısı standardı güncellenmiştir.
+
+| Kaynak grubu | Durum |
+|---|---|
+| `app/`, `components/`, `lib/` | TypeScript/TSX ve strict typecheck kapsamı |
+| Next/PostCSS/Tailwind/ESLint configleri | Typed TypeScript config |
+| `tests/` ve read-only smoke | `.mts`, native Node TypeScript çalıştırma |
+| Migration scriptleri | `.mts`, legacy veri şekilleri için açık `@ts-nocheck` sınırı |
+| Browser service worker | Kaynak `lib/serviceWorker.ts`, generated çıktı `public/sw.js` |
 
 ## Geliştirme ve doğrulama komutları
 
@@ -516,7 +530,7 @@ Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süre
 | `npm run migrate:legacy-media` | Legacy base64 fotoğraf/video içeriklerinin Blob’a taşınmasını varsayılan dry-run ile raporlar. Apply için explicit onay, backup ve `--max-changes` zorunludur. |
 | `git diff --check` | Boşluk ve patch kaynaklı diff sorunlarını kontrol eder. |
 | `npx tsx /home/ubuntu/agm-audit-regression.ts` | Güvenlik, soft-delete, TTL ve legacy medya sınırı için geçici regresyon kontrolü. |
-| `BASE_URL=https://staging.example node scripts/staging-load-smoke.mjs` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
+| `BASE_URL=https://staging.example node --experimental-strip-types scripts/staging-load-smoke.mts` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
 
 Staging smoke/load kontrolü yalnızca test ortamında çalıştırılmalıdır. Script POST, PATCH veya DELETE göndermez; production alan adını açık onay olmadan reddeder. Yetkili staging oturumu ile test etmek için cookie değeri yalnızca yerel shell değişkeni olarak verilebilir:
 
@@ -524,7 +538,7 @@ Staging smoke/load kontrolü yalnızca test ortamında çalıştırılmalıdır.
 BASE_URL=https://staging.example \
 AUTH_COOKIE='agm_session=staging-cookie' \
 CONCURRENCY=4 ROUNDS=3 \
-node scripts/staging-load-smoke.mjs
+node --experimental-strip-types scripts/staging-load-smoke.mts
 ```
 
 Yayın öncesi asgari doğrulama:

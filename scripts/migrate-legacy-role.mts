@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";

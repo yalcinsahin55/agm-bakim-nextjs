@@ -1,4 +1,5 @@
-/** @type {import('next').NextConfig} */
+import type { NextConfig } from "next";
+
 const commonContentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -17,7 +18,7 @@ const commonContentSecurityPolicy = [
 
 const oilAnalysisContentSecurityPolicy = `${commonContentSecurityPolicy}; frame-ancestors 'self'`;
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   reactStrictMode: true,
   outputFileTracingIncludes: {
     "/api/assistant/export": ["./public/fonts/**/*", "./public/yesil-global-logo.jpg"],
@@ -29,37 +30,15 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "X-Frame-Options",
-            value: "DENY", // Clickjacking koruması
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff", // MIME sniffing koruması
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            key: "X-XSS-Protection",
-            value: "1; mode=block",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(self), geolocation=()",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
-          },
-          {
-            key: "Content-Security-Policy",
-            value: commonContentSecurityPolicy,
-          },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Content-Security-Policy", value: commonContentSecurityPolicy },
         ],
       },
-      // API endpoint'leri için cache'i devre dışı bırak
       {
         source: "/api/(.*)",
         headers: [
@@ -68,7 +47,6 @@ const nextConfig = {
           { key: "Expires", value: "0" },
         ],
       },
-      // Yağ analiz ve bakım raporu PDF’leri aynı-origin önizleme iframe’inde açılır; diğer tüm rotalarda DENY korunur.
       {
         source: "/api/oil-analyses/:id/file",
         headers: [
@@ -87,4 +65,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

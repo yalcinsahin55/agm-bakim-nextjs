@@ -35,3 +35,6 @@ next-env.d.ts
 
 # migration reports and backups
 /migration-output/
+
+# generated service worker (source: lib/serviceWorker.ts)
+/public/sw.js

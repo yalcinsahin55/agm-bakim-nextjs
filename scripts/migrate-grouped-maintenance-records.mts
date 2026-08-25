@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -131,9 +132,9 @@ Bu araç, ayrı bakım türü satırları olarak saklanan fakat aynı işlemde t
 Varsayılan davranış dry-run'dır; hiçbir veritabanı kaydı değiştirilmez.
 
 Kullanım:
-  node scripts/migrate-grouped-maintenance-records.mjs --report=migration-output/grouped-preview.json
-  node scripts/migrate-grouped-maintenance-records.mjs --apply --confirm=${APPLY_CONFIRM}
-  node scripts/migrate-grouped-maintenance-records.mjs --rollback=migration-output/grouped-backup.json --apply --confirm=${ROLLBACK_CONFIRM}
+  node scripts/migrate-grouped-maintenance-records.mts --report=migration-output/grouped-preview.json
+  node scripts/migrate-grouped-maintenance-records.mts --apply --confirm=${APPLY_CONFIRM}
+  node scripts/migrate-grouped-maintenance-records.mts --rollback=migration-output/grouped-backup.json --apply --confirm=${ROLLBACK_CONFIRM}
 
 Seçenekler:
   --apply                 Eksik group_id alanlarını uygular. Tek başına yeterli değildir.

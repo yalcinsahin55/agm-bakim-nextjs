@@ -4,7 +4,7 @@ import test from "node:test";
 import path from "node:path";
 
 const root = process.cwd();
-const source = (relativePath) => readFile(path.join(root, relativePath), "utf8");
+const source = (relativePath: string): Promise<string> => readFile(path.join(root, relativePath), "utf8");
 
 test("protected APIs keep server-side authentication and role guards", async () => {
   const routePaths = [
@@ -73,14 +73,27 @@ test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async
   const tsconfig = JSON.parse(await source("tsconfig.json"));
   const packageJson = JSON.parse(await source("package.json"));
   const ci = await source(".github/workflows/ci.yml");
-  const eslintConfig = await source("eslint.config.mjs");
+  const eslintConfig = await source("eslint.config.ts");
+  const serviceWorker = await source("lib/serviceWorker.ts");
+  const gitignore = await source(".gitignore");
   assert.equal(tsconfig.compilerOptions.strict, true);
   assert.equal(tsconfig.compilerOptions.allowJs, false);
-  assert.equal(packageJson.scripts.lint, "eslint app components lib");
+  assert.equal(packageJson.scripts.lint, "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config app components lib");
+  assert.match(packageJson.devDependencies.jiti, /^\^2\./);
   assert.match(ci, /name: ESLint/);
   assert.match(ci, /run: npm run lint/);
   assert.match(eslintConfig, /FlatCompat/);
   assert.match(eslintConfig, /next\/core-web-vitals/);
+  assert.match(packageJson.scripts.lint, /--flag unstable_native_nodejs_ts_config/);
+  assert.match(packageJson.scripts["build:service-worker"], /lib\/serviceWorker\.ts/);
+  assert.match(packageJson.scripts.predev, /build:service-worker/);
+  assert.match(packageJson.scripts.prebuild, /build:service-worker/);
+  assert.match(gitignore, /\/public\/sw\.js/);
+  assert.match(serviceWorker, /CACHE_NAME/);
+  await assert.rejects(source("next.config.js"));
+  await assert.rejects(source("postcss.config.js"));
+  await assert.rejects(source("tailwind.config.js"));
+  await assert.rejects(source("eslint.config.mjs"));
   await assert.rejects(source("jsconfig.json"));
   await assert.rejects(source("pnpm-lock.yaml"));
   await assert.rejects(source("pnpm-workspace.yaml"));
@@ -168,9 +181,9 @@ test("backup and upload large-payload paths use bounded processing", async () =>
 
 test("read-only smoke tooling never sends mutation methods", async () => {
   const packageJson = JSON.parse(await source("package.json"));
-  const smoke = await source("scripts/smoke-readonly.mjs");
+  const smoke = await source("scripts/smoke-readonly.mts");
   const runbook = await source("docs/staging-validation.md");
-  assert.equal(packageJson.scripts["smoke:readonly"], "node scripts/smoke-readonly.mjs");
+  assert.equal(packageJson.scripts["smoke:readonly"], "node --experimental-strip-types scripts/smoke-readonly.mts");
   assert.match(smoke, /method: "GET"/);
   assert.doesNotMatch(smoke, /method: "(POST|PUT|PATCH|DELETE)"/);
   assert.match(runbook, /Read-only smoke/);
@@ -231,7 +244,7 @@ test("date candidate filtering preserves legacy date fallback", async () => {
 });
 
 test("security headers include CSP without breaking same-origin oil PDF framing", async () => {
-  const nextConfig = await source("next.config.js");
+  const nextConfig = await source("next.config.ts");
   assert.match(nextConfig, /Content-Security-Policy/);
   assert.match(nextConfig, /default-src 'self'/);
   assert.match(nextConfig, /object-src 'none'/);
@@ -261,9 +274,9 @@ test("stable IDs are generated without replacing legacy natural keys", async () 
   const engineCreate = await source("app/api/engines/route.ts");
   const equipmentCreate = await source("app/api/equipment-info/route.ts");
   const indexes = await source("lib/dbIndexes.ts");
-  const migration = await source("scripts/migrate-stable-keys.mjs");
-  const legacyRoleMigration = await source("scripts/migrate-legacy-role.mjs");
-  const legacyMediaMigration = await source("scripts/migrate-legacy-media.mjs");
+  const migration = await source("scripts/migrate-stable-keys.mts");
+  const legacyRoleMigration = await source("scripts/migrate-legacy-role.mts");
+  const legacyMediaMigration = await source("scripts/migrate-legacy-media.mts");
   assert.match(userCreate, /stable_id: randomUUID\(\)/);
   assert.match(bootstrap, /stable_id: randomUUID\(\)/);
   assert.match(engineCreate, /stable_id: randomUUID\(\)/);
@@ -288,8 +301,7 @@ test("repository exposes CI validation commands", async () => {
   const packageJson = JSON.parse(await source("package.json"));
   const workflow = await source(".github/workflows/ci.yml");
   assert.equal(packageJson.scripts.typecheck, "tsc --noEmit");
-  assert.match(packageJson.scripts.test, /node --test tests\/\*\.test\.mjs/);
-  assert.match(packageJson.scripts.test, /node --experimental-strip-types --test tests\/\*\.test\.mts/);
+  assert.equal(packageJson.scripts.test, "node --experimental-strip-types --test tests/*.test.mts");
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /npm audit --omit=dev --audit-level=high/);
@@ -327,7 +339,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
   const pdfSecurity = await source("lib/pdfSecurity.ts");
   const blobStorage = await source("lib/blobStorage.ts");
-  const nextConfig = await source("next.config.js");
+  const nextConfig = await source("next.config.ts");
   const mediaUpload = await source("lib/mediaUpload.ts");
   const uploadPresigned = await source("app/api/blob/upload-presigned/route.ts");
   const mediaUrls = await source("lib/mediaUrls.ts");

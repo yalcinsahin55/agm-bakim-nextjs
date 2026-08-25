@@ -4,12 +4,15 @@
  * GET-only staging smoke/load check.
  *
  * Usage:
- *   BASE_URL=https://your-staging-url.example node scripts/staging-load-smoke.mjs
- *   BASE_URL=https://your-staging-url.example AUTH_COOKIE='agm_session=...' CONCURRENCY=4 ROUNDS=3 node scripts/staging-load-smoke.mjs
+ *   BASE_URL=https://your-staging-url.example node scripts/staging-load-smoke.mts
+ *   BASE_URL=https://your-staging-url.example AUTH_COOKIE='agm_session=...' CONCURRENCY=4 ROUNDS=3 node scripts/staging-load-smoke.mts
  *
  * This script never sends POST/PATCH/DELETE requests and refuses the public
  * production host unless ALLOW_PRODUCTION_SMOKE=1 is explicitly set.
  */
+type SmokeTarget = { path: string; kind: "page" | "api" };
+type SmokeResult = SmokeTarget & { status: number; ms: number };
+type RoundResult = SmokeResult & { round: number };
 
 const baseUrl = process.env.BASE_URL;
 const concurrency = Math.max(1, Math.min(Number(process.env.CONCURRENCY || 3), 10));
@@ -17,7 +20,7 @@ const rounds = Math.max(1, Math.min(Number(process.env.ROUNDS || 2), 20));
 const authCookie = process.env.AUTH_COOKIE || "";
 
 if (!baseUrl) {
-  console.error("BASE_URL gerekli. Örnek: BASE_URL=https://staging.example node scripts/staging-load-smoke.mjs");
+  console.error("BASE_URL gerekli. Örnek: BASE_URL=https://staging.example node scripts/staging-load-smoke.mts");
   process.exit(2);
 }
 
@@ -31,7 +34,7 @@ if (base.hostname === "agm-bakim-nextjs.vercel.app" && process.env.ALLOW_PRODUCT
   process.exit(2);
 }
 
-const targets = [
+const targets: SmokeTarget[] = [
   { path: "/", kind: "page" },
   { path: "/dashboard", kind: "page" },
   { path: "/motorlar", kind: "page" },
@@ -47,12 +50,12 @@ const targets = [
   { path: "/api/notifications", kind: "api" },
 ];
 
-function expectedStatus(target, status, hasAuth) {
+function expectedStatus(target: SmokeTarget, status: number, hasAuth: boolean): boolean {
   if (target.kind === "api") return hasAuth ? status >= 200 && status < 500 : status === 401;
   return hasAuth ? status >= 200 && status < 400 : status === 307 || status === 302;
 }
 
-async function request(target) {
+async function request(target: SmokeTarget): Promise<SmokeResult> {
   const started = performance.now();
   const response = await fetch(new URL(target.path, base), {
     method: "GET",
@@ -67,7 +70,7 @@ async function request(target) {
 }
 
 const hasAuth = Boolean(authCookie);
-const allResults = [];
+const allResults: RoundResult[] = [];
 for (let round = 1; round <= rounds; round += 1) {
   for (let offset = 0; offset < targets.length; offset += concurrency) {
     const batch = targets.slice(offset, offset + concurrency);
@@ -77,7 +80,7 @@ for (let round = 1; round <= rounds; round += 1) {
 }
 
 const latencies = allResults.map((result) => result.ms).sort((a, b) => a - b);
-const percentile = (p) => latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * p))] || 0;
+const percentile = (p: number): number => latencies[Math.min(latencies.length - 1, Math.floor(latencies.length * p))] || 0;
 const failures = allResults.filter((result) => !expectedStatus(result, result.status, hasAuth));
 const grouped = new Map();
 for (const result of allResults) {

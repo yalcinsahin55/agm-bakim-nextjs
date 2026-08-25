@@ -4,16 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "predev": "npm run build:service-worker",
     "build": "next build",
+    "prebuild": "npm run build:service-worker",
+    "build:service-worker": "tsc --target ES2020 --module none --lib ES2020,DOM --skipLibCheck --noEmitOnError false --outFile public/sw.js lib/serviceWorker.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint app components lib",
-    "test": "node --test tests/*.test.mjs && node --experimental-strip-types --test tests/*.test.mts",
-    "smoke:readonly": "node scripts/smoke-readonly.mjs",
-    "migrate:stable-keys": "node scripts/migrate-stable-keys.mjs",
-    "migrate:legacy-role": "node scripts/migrate-legacy-role.mjs",
-    "migrate:legacy-media": "node scripts/migrate-legacy-media.mjs",
-    "migrate:technician-source": "node scripts/migrate-technician-source.mjs"
+    "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config app components lib",
+    "test": "node --experimental-strip-types --test tests/*.test.mts",
+    "smoke:readonly": "node --experimental-strip-types scripts/smoke-readonly.mts",
+    "migrate:stable-keys": "node --experimental-strip-types scripts/migrate-stable-keys.mts",
+    "migrate:legacy-role": "node --experimental-strip-types scripts/migrate-legacy-role.mts",
+    "migrate:legacy-media": "node --experimental-strip-types scripts/migrate-legacy-media.mts",
+    "migrate:technician-source": "node --experimental-strip-types scripts/migrate-technician-source.mts"
   },
   "dependencies": {
     "@upstash/redis": "1.38.2",
@@ -45,6 +48,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.21",
+    "jiti": "^2.7.0",
     "postcss": "8.5.26",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.5.4"

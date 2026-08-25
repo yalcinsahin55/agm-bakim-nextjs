@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -225,10 +226,10 @@ Güvenli teknisyen kaynağı migration aracı
 Varsayılan davranış dry-run'dır; hiçbir veritabanı kaydı değiştirilmez.
 
 Kullanım:
-  node scripts/migrate-technician-source.mjs
-  node scripts/migrate-technician-source.mjs --report=migration-output/preview.json
-  node scripts/migrate-technician-source.mjs --mapping=migration-output/mapping.json --apply --confirm=${CONFIRM_TOKEN}
-  node scripts/migrate-technician-source.mjs --rollback=migration-output/backup.json --apply --confirm=ROLLBACK-TECHNICIAN-SOURCE-MIGRATION
+  node scripts/migrate-technician-source.mts
+  node scripts/migrate-technician-source.mts --report=migration-output/preview.json
+  node scripts/migrate-technician-source.mts --mapping=migration-output/mapping.json --apply --confirm=${CONFIRM_TOKEN}
+  node scripts/migrate-technician-source.mts --rollback=migration-output/backup.json --apply --confirm=ROLLBACK-TECHNICIAN-SOURCE-MIGRATION
 
 Seçenekler:
   --apply                 Yüksek güvenli eşleşmeleri uygular. Tek başına yeterli değildir.

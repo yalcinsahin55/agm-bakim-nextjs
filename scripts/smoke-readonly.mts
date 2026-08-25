@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+type SmokeCheck = { name: string; path: string; expected: readonly number[] };
+type SmokeResult = SmokeCheck & { status: number | "ERR"; duration: number; ok: boolean; error?: string };
 
 const baseUrl = (process.env.SMOKE_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const cookie = process.env.SMOKE_COOKIE || "";
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS || 15_000);
 
-const checks = [
+const checks: SmokeCheck[] = [
   { name: "dashboard page", path: "/dashboard", expected: [200, 307, 308] },
   { name: "records page", path: "/kayitlar", expected: [200, 307, 308] },
   { name: "oil analyses page", path: "/yag-analizleri", expected: [200, 307, 308] },
@@ -14,11 +16,11 @@ const checks = [
   { name: "notifications API", path: "/api/notifications?limit=1", expected: [200, 401] },
 ];
 
-function formatDuration(ms) {
+function formatDuration(ms: number) {
   return `${ms.toFixed(0)} ms`;
 }
 
-async function checkEndpoint(check) {
+async function checkEndpoint(check: SmokeCheck): Promise<SmokeResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const started = performance.now();
@@ -40,7 +42,7 @@ async function checkEndpoint(check) {
   }
 }
 
-const results = [];
+const results: SmokeResult[] = [];
 for (const check of checks) results.push(await checkEndpoint(check));
 
 console.log(`Read-only smoke: ${baseUrl}`);
