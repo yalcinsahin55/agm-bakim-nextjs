@@ -215,3 +215,33 @@ test("assistant exports preserve report filenames and maintenance work metrics",
   assert.match(exportLib, /maintenance_health: \[.*worked_hours.*duration/);
   assert.match(assistantPage, /maintenance_health/);
 });
+
+
+test("engine reassignment stays manager-only and repairs grouped maintenance tracking", async () => {
+  const update = await source("app/api/records/[id]/route.ts");
+  const confirm = await source("app/api/records/[id]/confirm/route.ts");
+  const helper = await source("lib/reassignMaintenanceEngine.ts");
+  const schemas = await source("lib/schemas.ts");
+  const recordsPage = await source("app/kayitlar/page.tsx");
+  assert.match(schemas, /recordConfirmationSchema = z\.object\(\{[\s\S]*engine_id/);
+  assert.match(update, /engineChangeRequested/);
+  assert.match(update, /Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir/);
+  assert.match(update, /reassignMaintenanceRecordEngine/);
+  assert.match(update, /session\.withTransaction/);
+  assert.match(update, /effectiveEngineId/);
+  assert.match(confirm, /user\.role !== "yonetici"/);
+  assert.match(confirm, /recordConfirmationSchema/);
+  assert.match(confirm, /reassignMaintenanceRecordEngine/);
+  assert.match(confirm, /moved_record_ids/);
+  assert.match(helper, /group_id/);
+  assert.match(helper, /recomputeLastMaintenance\(db, sourceEngineId, typeKey/);
+  assert.match(helper, /recomputeLastMaintenance\(db, targetEngineId, typeKey/);
+  assert.match(helper, /tracking_state_before/);
+  assert.match(helper, /period_hours/);
+  assert.match(helper, /tracking_source: "record"/);
+  assert.match(recordsPage, /Bakımın bağlı olduğu motor/);
+  assert.match(recordsPage, /Bakım motoru/);
+  assert.match(recordsPage, /engine_id: isAdmin \? engineId/);
+  assert.match(recordsPage, /selectedEngineId/);
+  assert.match(recordsPage, /engines=\{sortedEngines\}/);
+});

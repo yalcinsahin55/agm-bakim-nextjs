@@ -2,7 +2,7 @@ import { enginesCollection, maintenanceTypesCollection, recordsCollection, users
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
-import { getDb } from "@/lib/mongodb";
+import { getDb, getMongoClient } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
@@ -14,6 +14,7 @@ import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionD
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { legacyMediaTooLarge, LEGACY_MEDIA_LIMIT_LABEL } from "@/lib/mediaValidation";
 import { normalizeReportAttachments } from "@/lib/reportAttachments";
+import { reassignMaintenanceRecordEngine, type ReassignMaintenanceEngineResult } from "@/lib/reassignMaintenanceEngine";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { recordSchema, formatZodError } from "@/lib/schemas";
@@ -86,7 +87,20 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { engine_id: requestedEngineId, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const engineChangeRequested = typeof requestedEngineId === "string" && requestedEngineId.trim() !== record.engine_id;
+  if (engineChangeRequested && user.role !== "yonetici") {
+    return NextResponse.json({ error: "Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir." }, { status: 403 });
+  }
+  let requestedEngineName = record.engine_name;
+  if (engineChangeRequested) {
+    if (!requestedEngineId || !isSafeMongoPathSegment(requestedEngineId.trim())) {
+      return NextResponse.json({ error: "Geçersiz yeni motor kimliği." }, { status: 400 });
+    }
+    const requestedEngine = await enginesCollection(db).findOne({ _id: requestedEngineId.trim() }, { projection: { _id: 1, name: 1 } });
+    if (!requestedEngine) return NextResponse.json({ error: "Yeni motor bulunamadı." }, { status: 404 });
+    requestedEngineName = String(requestedEngine.name || requestedEngineId.trim());
+  }
 
   if (legacyMediaTooLarge(photos_b64, videos)) {
     return NextResponse.json({ error: `Eski base64 medya toplamı ${LEGACY_MEDIA_LIMIT_LABEL} sınırını aşamaz. Fotoğraf/video yüklemelerini Blob üzerinden yapın.` }, { status: 413 });
@@ -271,6 +285,12 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Kişi çalışma süresi toplam bakım süresini aşamaz." }, { status: 400 });
   }
   update.technician_contributions = technicianContributions;
+  const effectiveEngineId = requestedEngineId?.trim() || record.engine_id;
+  const effectiveEngineName = engineChangeRequested ? requestedEngineName : record.engine_name;
+  if (engineChangeRequested) {
+    update.engine_id = effectiveEngineId;
+    update.engine_name = effectiveEngineName;
+  }
   if (typeof nextGroupId === "string") update.group_id = nextGroupId;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
   if (typeof note === "string") update.note = note;
@@ -308,102 +328,125 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
     $set: sharedSetFields,
     ...(Object.keys(sharedUnset).length > 0 ? { $unset: sharedUnset } : {}),
   };
-  await recordsCol.updateOne({ _id: record._id }, { $set: setFields, ...(unset ? { $unset: unset } : {}) });
-  if (groupFilter) await recordsCol.updateMany(groupFilter, sharedUpdate);
-  await writeAuditLog(db, {
-    user,
-    action: "update",
-    entity: "maintenance_record",
-    entityId: id,
-    summary: `${record.engine_name} · ${record.type_label} bakım kaydı güncellendi`,
-    before: record,
-    after: update,
-  });
+  let engineReassignment: ReassignMaintenanceEngineResult | null = null;
 
-  if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
-    const enginesCol = enginesCollection(db);
-    const engine = await enginesCol.findOne({ _id: record.engine_id });
-    if (engine && hour_at_completion > engine.hours) {
-      const stamp = new Date();
-      await enginesCol.updateOne(
-        { _id: record.engine_id },
-        {
-          $set: { hours: hour_at_completion, updated_at: stamp },
-          $push: { history: { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 } },
-        }
-      );
+  const runRecordMutation = async (session?: import("mongodb").ClientSession): Promise<void> => {
+    const options = session ? { session } : {};
+    if (engineChangeRequested) {
+      engineReassignment = await reassignMaintenanceRecordEngine(db, record, effectiveEngineId, session);
     }
-  }
 
-  // Bu kaydı düzenlerken birlikte tamamlanan ama daha önce hiç kaydedilmemiş başka bakımlar da ekleniyorsa,
-  // her biri için ayrı kayıt oluşturulur ve aynı gruba bağlanır. Kardeş kayıtlar ortak olay
-  // alanlarıyla güncellendiği için kişi bazlı çalışma süresi bakım türü başına çoğalmaz.
-  if (Array.isArray(extra_types) && extra_types.length > 0) {
-    const groupId = nextGroupId || record.group_id;
-    if (!groupId) return NextResponse.json({ error: "Bakım grubu oluşturulamadı." }, { status: 500 });
-    const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
-    const extraTechnicianContributions: MaintenanceTechnicianContribution[] = technicianContributions;
-    const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
-    const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
-    const typesCol = maintenanceTypesCollection(db);
+    await recordsCol.updateOne({ _id: record._id }, { $set: setFields, ...(unset ? { $unset: unset } : {}) }, options);
+    if (groupFilter) await recordsCol.updateMany(groupFilter, sharedUpdate, options);
+    await writeAuditLog(db, {
+      user,
+      action: "update",
+      entity: "maintenance_record",
+      entityId: id,
+      summary: `${record.engine_name} · ${record.type_label} bakım kaydı güncellendi${engineChangeRequested ? `; motor ${record.engine_name} → ${effectiveEngineName} taşındı` : ""}`,
+      before: record,
+      after: { ...update, ...(engineChangeRequested ? { engine_id: effectiveEngineId, engine_name: effectiveEngineName, moved_record_ids: engineReassignment?.movedRecordIds || [id] } : {}) },
+      session,
+    });
 
-    for (const ex of extra_types) {
-      const extraClientRequestId = `${clientRequestId || `record:${String(record._id)}`}:extra:${String(ex.type_key)}`;
-      const existingExtra = await recordsCol.findOne(
-        {
-          $or: [
-            { group_id: groupId, type_key: ex.type_key },
-            ...(extraClientRequestId ? [{ client_request_id: extraClientRequestId }] : []),
-          ],
-        },
-        { projection: { _id: 1 } },
-      );
-      if (existingExtra) continue;
-      if (typeof ex.period === "number" && isSafeMongoPathSegment(record.engine_id)) {
-        const extraTypeState = selectedTypeDocs.find((type) => String(type._id) === ex.type_key)?.engine_states;
-        await typesCol.updateOne(
-          { _id: ex.type_key },
-          { $set: buildEngineStateUpdate(extraTypeState, record.engine_id, { period_hours: ex.period }) },
-          { upsert: true }
+    if (typeof hour_at_completion === "number" && (engineChangeRequested || hour_at_completion !== record.hour_at_completion)) {
+      const enginesCol = enginesCollection(db);
+      const engine = await enginesCol.findOne({ _id: effectiveEngineId }, options);
+      if (engine && hour_at_completion > Number(engine.hours || 0)) {
+        const stamp = new Date();
+        const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
+        await enginesCol.updateOne(
+          { _id: effectiveEngineId },
+          Array.isArray(engine.history)
+            ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
+            : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
+          options,
         );
       }
-      const extraType = selectedTypeDocs.find((type) => String(type._id) === ex.type_key);
-      await recordsCol.insertOne({
-        engine_id: record.engine_id, engine_name: record.engine_name,
-        type_key: ex.type_key, type_label: extraType?.label || ex.type_label,
-        hour_at_completion: finalHour,
-        ...(nextStartAt && nextEndAt && nextDurationMinutes ? {
-          time_tracking_version: 2,
-          maintenance_start_at: nextStartAt,
-          maintenance_end_at: nextEndAt,
-          maintenance_duration_minutes: nextDurationMinutes,
-        } : {}),
-        note: "", technician_note: "", photos_b64: [], photos: [], videos: [],
-        manager_confirmation_status: extraManagerConfirmationStatus,
-        ...(extraManagerConfirmedAt ? {
-          manager_confirmed_at: extraManagerConfirmedAt,
-          manager_confirmed_by_id: user._id,
-          manager_confirmed_by_name: user.full_name,
-          manager_confirmed_by_role: user.role,
-        } : {}),
-        technician_id: nextResponsibleId, technician_name: nextResponsibleName,
-        ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
-        other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
-        other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
-        technician_contributions: extraTechnicianContributions,
-        ...(extraClientRequestId ? { client_request_id: extraClientRequestId } : {}),
-        technician_type: useExternalService ? undefined : nextResponsibleType,
-        created_at: record.created_at, backdated: !!record.backdated,
-        group_id: groupId, grouped_with: record.type_label,
-      });
     }
-  }
 
-  const affectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
-  if (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) {
-    await Promise.all(affectedTypeKeys.map((typeKey) => recomputeLastMaintenance(db, record.engine_id, typeKey)));
-  } else if (Array.isArray(extra_types) && extra_types.length > 0) {
-    await Promise.all(requestedExtraTypeKeys.map((typeKey) => recomputeLastMaintenance(db, record.engine_id, typeKey)));
+    // Bu kaydı düzenlerken birlikte tamamlanan ama daha önce hiç kaydedilmemiş başka bakımlar da ekleniyorsa,
+    // her biri aynı motor/grup olayına bağlanır; kişi katkı süresi bakım türü başına çoğalmaz.
+    if (Array.isArray(extra_types) && extra_types.length > 0) {
+      const groupId = nextGroupId || record.group_id;
+      if (!groupId) throw new Error("Bakım grubu oluşturulamadı.");
+      const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
+      const extraTechnicianContributions: MaintenanceTechnicianContribution[] = technicianContributions;
+      const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
+      const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
+      const typesCol = maintenanceTypesCollection(db);
+
+      for (const ex of extra_types) {
+        const extraClientRequestId = `${clientRequestId || `record:${String(record._id)}`}:extra:${String(ex.type_key)}`;
+        const existingExtra = await recordsCol.findOne(
+          {
+            $or: [
+              { group_id: groupId, type_key: ex.type_key },
+              ...(extraClientRequestId ? [{ client_request_id: extraClientRequestId }] : []),
+            ],
+          },
+          { projection: { _id: 1 }, ...options },
+        );
+        if (existingExtra) continue;
+        if (typeof ex.period === "number" && isSafeMongoPathSegment(effectiveEngineId)) {
+          const extraTypeState = selectedTypeDocs.find((type) => String(type._id) === ex.type_key)?.engine_states;
+          await typesCol.updateOne(
+            { _id: ex.type_key },
+            { $set: buildEngineStateUpdate(extraTypeState, effectiveEngineId, { period_hours: ex.period }) },
+            { upsert: true, ...options },
+          );
+        }
+        const extraType = selectedTypeDocs.find((type) => String(type._id) === ex.type_key);
+        await recordsCol.insertOne({
+          engine_id: effectiveEngineId, engine_name: effectiveEngineName,
+          type_key: ex.type_key, type_label: extraType?.label || ex.type_label,
+          hour_at_completion: finalHour,
+          ...(nextStartAt && nextEndAt && nextDurationMinutes ? {
+            time_tracking_version: 2,
+            maintenance_start_at: nextStartAt,
+            maintenance_end_at: nextEndAt,
+            maintenance_duration_minutes: nextDurationMinutes,
+          } : {}),
+          note: "", technician_note: "", photos_b64: [], photos: [], videos: [], report_attachments: [],
+          manager_confirmation_status: extraManagerConfirmationStatus,
+          ...(extraManagerConfirmedAt ? {
+            manager_confirmed_at: extraManagerConfirmedAt,
+            manager_confirmed_by_id: user._id,
+            manager_confirmed_by_name: user.full_name,
+            manager_confirmed_by_role: user.role,
+          } : {}),
+          technician_id: nextResponsibleId, technician_name: nextResponsibleName,
+          ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
+          other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
+          other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
+          technician_contributions: extraTechnicianContributions,
+          ...(extraClientRequestId ? { client_request_id: extraClientRequestId } : {}),
+          technician_type: useExternalService ? undefined : nextResponsibleType,
+          created_at: record.created_at, backdated: !!record.backdated,
+          group_id: groupId, grouped_with: record.type_label,
+        }, options);
+      }
+    }
+
+    const affectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
+    if (engineChangeRequested || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
+      await Promise.all(affectedTypeKeys.map((typeKey) => recomputeLastMaintenance(db, effectiveEngineId, typeKey, undefined, session)));
+    }
+  };
+
+  if (engineChangeRequested) {
+    const session = (await getMongoClient()).startSession();
+    try {
+      await session.withTransaction(async () => runRecordMutation(session));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Motor değişikliği uygulanamadı.";
+      const status = /bulunamadı|geçersiz|oluşturulamadı/iu.test(message) ? 400 : 500;
+      return NextResponse.json({ error: status === 500 ? "Motor değişikliği güvenli biçimde tamamlanamadı; kayıt değiştirilmedi." : message }, { status });
+    } finally {
+      await session.endSession();
+    }
+  } else {
+    await runRecordMutation();
   }
 
   invalidateMaintenancePanelServerCache();

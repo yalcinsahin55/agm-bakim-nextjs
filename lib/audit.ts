@@ -1,4 +1,5 @@
 import type { Db } from "mongodb";
+import type { ClientSession } from "mongodb";
 import type { User } from "@/lib/types";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { auditLogsCollection } from "@/lib/dbCollections";
@@ -13,6 +14,7 @@ export interface AuditInput {
   summary: string;
   before?: unknown;
   after?: unknown;
+  session?: ClientSession;
 }
 
 function compact(value: unknown): unknown {
@@ -40,5 +42,5 @@ export async function writeAuditLog(db: Db, input: AuditInput): Promise<void> {
     before: compact(input.before),
     after: compact(input.after),
     created_at: new Date(),
-  });
+  }, input.session ? { session: input.session } : undefined);
 }

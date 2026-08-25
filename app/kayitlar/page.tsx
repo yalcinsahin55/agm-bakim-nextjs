@@ -244,9 +244,11 @@ interface EditFormProps {
   onSaved: () => void;
   onPhotoClick: (src: string) => void;
   isAdmin: boolean;
+  engines: Engine[];
 }
 
-function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditFormProps) {
+function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }: EditFormProps) {
+  const [engineId, setEngineId] = useState(record.engine_id);
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
   const [maintenanceStartAt, setMaintenanceStartAt] = useState(toLocalDateTimeInput(record.maintenance_start_at));
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
@@ -277,7 +279,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
   const selectedTypeKeys = useMemo(() => new Set([...historicalTypeKeys, ...extraKeys]), [historicalTypeKeys, extraKeys]);
   const selectedMaintenanceTypes = maintenanceTypes.filter((type) => selectedTypeKeys.has(type.key));
   const availableExtraTypes = maintenanceTypes.filter((type) => !historicalTypeKeys.has(type.key));
-  const trackedExtraTypeKeys = useMemo(() => new Set(maintenanceTypes.filter((type) => type.engine_scope === "all" || Boolean(type.engine_states?.[record.engine_id])).map((type) => type.key)), [maintenanceTypes, record.engine_id]);
+  const trackedExtraTypeKeys = useMemo(() => new Set(maintenanceTypes.filter((type) => type.engine_scope === "all" || Boolean(type.engine_states?.[engineId])).map((type) => type.key)), [maintenanceTypes, engineId]);
   const canWorkOnSelectedTypes = (technician: TechnicianOption, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
   const responsibleTechnicians = technicians.filter((technician) => canWorkOnSelectedTypes(technician, "responsible"));
   const supportTechnicians = technicians.filter((technician) => technician.id !== responsibleTechnicianId && canWorkOnSelectedTypes(technician, "support"));
@@ -477,6 +479,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
     setBusy(true);
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
     const payload = {
+      engine_id: isAdmin ? engineId : undefined,
       hour_at_completion: Number(hours),
       time_tracking_version: TIME_TRACKING_VERSION,
       maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
@@ -530,6 +533,15 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin }: EditForm
 
   return (
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
+      {isAdmin && <div className="rounded-lg border border-purple-400/30 bg-purple-400/5 p-2.5">
+        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım motoru</label>
+        <p className="mt-0.5 text-[10px] text-faint">Yanlış motora kaydedilmişse doğru motoru seçin. Aynı olayda birlikte tamamlanan kardeş kayıtlar da birlikte taşınır.</p>
+        <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-300">
+          {!engines.some((engine) => engine._id === record.engine_id) && <option value={record.engine_id}>{record.engine_name} (mevcut)</option>}
+          {engines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
+        </select>
+        {engineId !== record.engine_id && <div className="mt-2 rounded-lg bg-purple-400/10 px-2 py-1.5 text-[10px] text-purple-100">Motor değişikliği: <b>{record.engine_name}</b> → <b>{engines.find((engine) => engine._id === engineId)?.name || "Yeni motor"}</b>. Eski motorun bakım takibi geri hesaplanacak.</div>}
+      </div>}
       {isAdmin && <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
         <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</label>
         <p className="mt-0.5 text-[10px] text-faint">Kayıtlı teknisyen veya dış servis/garanti bakım kaynağı seçilebilir.</p>
@@ -698,6 +710,7 @@ export default function KayitlarPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   const [confirmationRecord, setConfirmationRecord] = useState<MaintenanceRecord | null>(null);
+  const [confirmationEngineId, setConfirmationEngineId] = useState("");
   const [confirmationDurations, setConfirmationDurations] = useState<Record<string, string>>({});
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmationFilter, setConfirmationFilter] = useState<"all" | "pending">("all");
@@ -777,10 +790,11 @@ export default function KayitlarPage() {
     if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending") return;
     const rows = confirmationContributionRows(record);
     setConfirmationRecord(record);
+    setConfirmationEngineId(record.engine_id);
     setConfirmationDurations(Object.fromEntries(rows.map((row) => [row.id, minutesToHoursInput(row.duration_minutes)])));
   }
 
-  async function confirmRecord(record: MaintenanceRecord, durationInputs: Record<string, string>) {
+  async function confirmRecord(record: MaintenanceRecord, durationInputs: Record<string, string>, selectedEngineId: string) {
     if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending" || confirmingId === record._id) return;
     const rows = confirmationContributionRows(record);
     const isExternalService = record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID;
@@ -798,9 +812,12 @@ export default function KayitlarPage() {
       const res = await fetch(`/api/records/${record._id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ technician_contributions: technicianContributions }),
+        body: JSON.stringify({
+          ...(selectedEngineId && selectedEngineId !== record.engine_id ? { engine_id: selectedEngineId } : {}),
+          technician_contributions: technicianContributions,
+        }),
       });
-      const data = await res.json().catch(() => ({})) as { confirmed_at?: string; confirmed_by_name?: string; confirmed_ids?: string[]; technician_contributions?: NonNullable<MaintenanceRecord["technician_contributions"]>; error?: string };
+      const data = await res.json().catch(() => ({})) as { confirmed_at?: string; confirmed_by_name?: string; confirmed_ids?: string[]; engine_id?: string; engine_name?: string; moved_record_ids?: string[]; technician_contributions?: NonNullable<MaintenanceRecord["technician_contributions"]>; error?: string };
       if (!res.ok) {
         toast.error(data.error || "Bakım kaydı teyit edilemedi.");
         return;
@@ -813,11 +830,14 @@ export default function KayitlarPage() {
         manager_confirmed_by_id: user.id || user._id,
         manager_confirmed_by_name: data.confirmed_by_name || user.full_name,
         manager_confirmed_by_role: user.role,
+        ...(data.engine_id ? { engine_id: data.engine_id } : {}),
+        ...(data.engine_name ? { engine_name: data.engine_name } : {}),
         ...(data.technician_contributions ? { technician_contributions: data.technician_contributions } : {}),
       } : item;
       setRecords((current) => current.map(applyConfirmation));
       setSelectedRecord((current) => current ? applyConfirmation(current) : current);
       setConfirmationRecord(null);
+      setConfirmationEngineId("");
       setConfirmationDurations({});
       toast.success("Kişi bazlı çalışma süreleri kaydedildi ve bakım teyit edildi.");
       window.dispatchEvent(new Event("notifications:refresh"));
@@ -1084,6 +1104,7 @@ export default function KayitlarPage() {
                         load(page);
                       }}
                       isAdmin={user?.role === "yonetici"}
+                      engines={sortedEngines}
                     />
                   )}
                 </div>
@@ -1132,6 +1153,15 @@ export default function KayitlarPage() {
             <div className="rounded-xl border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber">
               <b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerler saat cinsindendir; örnek: <b>8,5</b> = 8 saat 30 dakika.
             </div>
+            <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
+              <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımın bağlı olduğu motor</label>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-faint">Teknisyen yanlış motora bakım yaptıysa doğru motoru seçin. Yönetici teyit ettiğinde aynı gruptaki tüm bakım türleri yeni motora taşınır ve eski motorun bakım takibi yeniden hesaplanır.</p>
+              <select value={confirmationEngineId} onChange={(event) => setConfirmationEngineId(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-300" aria-label="Bakım motoru">
+                {!sortedEngines.some((engine) => engine._id === confirmationRecord.engine_id) && <option value={confirmationRecord.engine_id}>{confirmationRecord.engine_name} (mevcut)</option>}
+                {sortedEngines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
+              </select>
+              {confirmationEngineId !== confirmationRecord.engine_id && <div className="mt-2 rounded-lg bg-purple-400/10 px-2 py-1.5 text-[10px] text-purple-100">Motor değişikliği seçildi: <b>{confirmationRecord.engine_name}</b> → <b>{sortedEngines.find((engine) => engine._id === confirmationEngineId)?.name || "Yeni motor"}</b>.</div>}
+            </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{confirmationRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
               <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Geçen bakım süresi</div><div className="mt-0.5 font-bold text-teal">{formatMaintenanceDuration(confirmationRecord.maintenance_duration_minutes)}</div></div>
@@ -1150,8 +1180,8 @@ export default function KayitlarPage() {
             )}
             {confirmationRecord.technician_source !== "external_service" && confirmationRecord.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && <div className="mt-3 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-[10.5px] text-teal">Toplam kişi katkısı: <b>{formatMaintenanceDuration(confirmationTotalMinutes)}</b> · Mesai ve farklı günlerdeki çalışma bu toplamda birlikte tutulur.</div>}
             <div className="mt-4 flex gap-2">
-              <button type="button" onClick={() => setConfirmationRecord(null)} className="flex-1 rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
-              <button type="button" onClick={() => void confirmRecord(confirmationRecord, confirmationDurations)} disabled={confirmingId === confirmationRecord._id} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-[#071a12] disabled:opacity-50">{confirmingId === confirmationRecord._id ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
+              <button type="button" onClick={() => { setConfirmationRecord(null); setConfirmationEngineId(""); }} className="flex-1 rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
+              <button type="button" onClick={() => void confirmRecord(confirmationRecord, confirmationDurations, confirmationEngineId)} disabled={confirmingId === confirmationRecord._id} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-[#071a12] disabled:opacity-50">{confirmingId === confirmationRecord._id ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
             </div>
           </div>
         </div>

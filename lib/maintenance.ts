@@ -1,5 +1,5 @@
 import { maintenanceTypesCollection, recordsCollection } from "@/lib/dbCollections";
-import type { Db } from "mongodb";
+import type { ClientSession, Db } from "mongodb";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 
 const MAX_RECOMPUTE_ATTEMPTS = 3;
@@ -90,6 +90,7 @@ export async function recomputeLastMaintenance(
   engineId: string,
   typeKey: string,
   fallbackState?: unknown,
+  session?: ClientSession,
 ): Promise<void> {
   if (!isSafeMongoPathSegment(engineId) || !isSafeMongoPathSegment(typeKey)) return;
   const recordsCol = recordsCollection(db);
@@ -109,23 +110,25 @@ export async function recomputeLastMaintenance(
       {
         projection: { _id: 1, hour_at_completion: 1 },
         sort: { hour_at_completion: -1, maintenance_start_at: -1, created_at: -1 },
+        ...(session ? { session } : {}),
       },
     );
     const type = await typesCol.findOne(
       { _id: typeKey },
-      { projection: { engine_states: 1 } },
+      { projection: { engine_states: 1 }, ...(session ? { session } : {}) },
     );
     const currentState = type?.engine_states?.[engineId];
 
     if (!latest) {
       // Yalnızca kayıt oluşturulurken otomatik açılmış takip silinir. Eski veya
       // yönetici tarafından bilinçli tanımlanmış takipler geriye dönük bozulmaz.
-      const concurrentRecord = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
+      const concurrentRecord = await recordsCol.findOne(recordFilter, { projection: { _id: 1 }, ...(session ? { session } : {}) });
       if (concurrentRecord) continue;
       if (currentState?.tracking_source === "record") {
         const removed = await typesCol.updateOne(
           { _id: typeKey, [`${statePath}.tracking_source`]: "record", ...revisionFilter(currentState) },
           { $unset: { [statePath]: "" } },
+          session ? { session } : undefined,
         );
         if (removed.matchedCount === 0) continue;
       } else {
@@ -137,11 +140,12 @@ export async function recomputeLastMaintenance(
           const restored = await typesCol.updateOne(
             { _id: typeKey, ...(isObjectRecord(type?.engine_states) ? { [`${statePath}.tracking_source`]: { $ne: "record" } } : {}), ...revisionFilter(currentState) },
             { $set: buildEngineStateUpdate(type?.engine_states, engineId, { ...previousState, tracking_revision: (currentState?.tracking_revision || 0) + 1 }) },
+            session ? { session } : undefined,
           );
           if (restored.matchedCount === 0) continue;
         }
       }
-      const recordAfterUpdate = await recordsCol.findOne(recordFilter, { projection: { _id: 1 } });
+      const recordAfterUpdate = await recordsCol.findOne(recordFilter, { projection: { _id: 1 }, ...(session ? { session } : {}) });
       if (recordAfterUpdate) continue;
       return;
     }
@@ -150,6 +154,7 @@ export async function recomputeLastMaintenance(
     const updated = await typesCol.updateOne(
       { _id: typeKey, ...revisionFilter(currentState) },
       { $set: buildEngineStateUpdate(type?.engine_states, engineId, { last_maintenance_hour: maxHour, tracking_revision: (currentState?.tracking_revision || 0) + 1 }) },
+      session ? { session } : undefined,
     );
     if (updated.matchedCount === 0) continue;
 
@@ -160,6 +165,7 @@ export async function recomputeLastMaintenance(
       {
         projection: { _id: 1 },
         sort: { hour_at_completion: -1, maintenance_start_at: -1, created_at: -1 },
+        ...(session ? { session } : {}),
       },
     );
     if (String(latestAfterUpdate?._id) === String(latest._id)) return;

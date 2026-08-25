@@ -52,7 +52,7 @@ Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur ve onaylar. Kullan
 
 | Rol | Yetki özeti |
 |---|---|
-| `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
+| `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, yanlış motora kaydedilen bakım kaydını doğru motora taşır, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
 | `teknisyen` | Yalnızca Bakım Tamamlama ve Bakım Kayıtları ekranlarını kullanır. Mobil ve masaüstü alt menüsünde yalnızca **Bakım Tamamla**, **Bakım Kayıtları** ve **Çıkış** bulunur. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
 | `goruntuleyici` | Dashboard, motorlar, bakım kayıtları, analiz ve takip, bilgi/rapor, bakım türleri ve tahmin modüllerini görüntüler; kayıt üzerinde değişiklik yapamaz. |
 | `planlamaci` | Eski hesaplarla geriye dönük uyumluluk için teknisyen davranışıyla değerlendirilir. Yeni kullanıcı arayüzünde ayrı bir planlamacı akışı bulunmaz. |
@@ -85,6 +85,7 @@ Dağıtık rate limit için production’da `UPSTASH_REDIS_REST_URL`, `UPSTASH_R
 8. Kaydı oluşturan kullanıcı yönetici değilse kayıt `manager_confirmation_status: pending` olarak açılır ve Bakım Kayıtları ekranında **Teyit bekliyor** görünür. Yönetici tarafından oluşturulan kayıtlar sunucu tarafında otomatik olarak teyitli açılır.
 9. Yönetici, Bakım Kayıtları ekranında kaydı ve kanıtlarını inceledikten sonra yalnızca kendisine gösterilen **Teyit et** düğmesini kullanır. Teyit API’de ayrıca korunur; istemciden gönderilen sahte teyit alanları kabul edilmez.
 10. Aynı işlemde seçilen ek bakım türleri `group_id` ile birlikte teyit edilir. Teyit işlemi audit log’a yazılır; sorumlu veya yardımcı teknisyen bu düğmeyi göremez ve API’den de kullanamaz.
+11. Yönetici teyit penceresinde yanlış motora kaydedilmiş bir kaydı doğru motora taşıyabilir. Grouped bakım olayındaki kardeş kayıtlar birlikte taşınır; motor adı veritabanından doğrulanır, eski motorun bakım takip state’i kalan kayıtlar üzerinden, yeni motorun state’i taşınan kayıtlar üzerinden yeniden hesaplanır. Motor değişikliği yalnızca yöneticiye açıktır ve kayıt güncellemesi, tracking düzeltmesi ile audit kaydı transaction içinde tamamlanır.
 
 Eski kayıtlar ve eski çevrimdışı payload’lar geriye dönük uyumluluk için korunur. Yeni kullanıcı arayüzü `time_tracking_version: 2` gönderdiği için yeni kayıtlar tam tarih+saat zorunluluğuna tabidir.
 

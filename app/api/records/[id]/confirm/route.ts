@@ -2,7 +2,7 @@ import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
-import { getDb } from "@/lib/mongodb";
+import { getDb, getMongoClient } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { formatZodError, recordConfirmationSchema } from "@/lib/schemas";
 import { writeAuditLog } from "@/lib/audit";
@@ -11,6 +11,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 import { withApiTiming } from "@/lib/performance";
+import { reassignMaintenanceRecordEngine, type ReassignMaintenanceEngineResult } from "@/lib/reassignMaintenanceEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -143,42 +144,105 @@ async function postConfirmation(req: NextRequest, { params }: { params: Promise<
   const confirmationScope = record.group_id
     ? { $or: [{ group_id: record.group_id }, { _id: recordId }] }
     : { _id: recordId };
-  const pendingRecords = await recordsCol.find(
-    { ...confirmationScope, manager_confirmation_status: "pending" },
-    { projection: { _id: 1, engine_name: 1, type_label: 1 } },
-  ).toArray();
-  if (pendingRecords.length === 0) {
-    const latest = await recordsCol.findOne({ _id: recordId }, { projection: { manager_confirmation_status: 1, manager_confirmed_at: 1, manager_confirmed_by_name: 1 } });
-    return NextResponse.json({ ok: true, alreadyConfirmed: latest?.manager_confirmation_status === "confirmed", confirmed_at: latest?.manager_confirmed_at, confirmed_by_name: latest?.manager_confirmed_by_name, confirmed_ids: [id] });
+  const requestedEngineId = parsed.data.engine_id;
+  type ConfirmationResult = {
+    alreadyConfirmed: boolean;
+    confirmed_at?: unknown;
+    confirmed_by_name?: string;
+    confirmed_ids: string[];
+    confirmed_count?: number;
+    technician_contributions?: StoredContribution[];
+    engine_reassignment?: ReassignMaintenanceEngineResult;
+  };
+
+  const runConfirmation = async (session?: import("mongodb").ClientSession): Promise<ConfirmationResult> => {
+    const options = session ? { session } : {};
+    let reassignment: ReassignMaintenanceEngineResult | null = null;
+    const pendingBeforeMove = await recordsCol.find(
+      { ...confirmationScope, manager_confirmation_status: "pending" },
+      { projection: { _id: 1 }, ...options },
+    ).toArray();
+    if (pendingBeforeMove.length === 0) {
+      const latest = await recordsCol.findOne(
+        { _id: recordId },
+        { projection: { manager_confirmation_status: 1, manager_confirmed_at: 1, manager_confirmed_by_name: 1 }, ...options },
+      );
+      return { alreadyConfirmed: latest?.manager_confirmation_status === "confirmed", confirmed_at: latest?.manager_confirmed_at, confirmed_by_name: latest?.manager_confirmed_by_name, confirmed_ids: [id] };
+    }
+
+    if (requestedEngineId && requestedEngineId.trim() !== record.engine_id) {
+      reassignment = await reassignMaintenanceRecordEngine(db, record, requestedEngineId, session);
+    }
+    const effectiveEngineId = reassignment?.toEngineId || record.engine_id;
+    const effectiveEngineName = reassignment?.toEngineName || record.engine_name;
+    const pendingRecords = await recordsCol.find(
+      { ...confirmationScope, manager_confirmation_status: "pending" },
+      { projection: { _id: 1, engine_name: 1, type_label: 1 }, ...options },
+    ).toArray();
+    if (pendingRecords.length === 0) {
+      const latest = await recordsCol.findOne(
+        { _id: recordId },
+        { projection: { manager_confirmation_status: 1, manager_confirmed_at: 1, manager_confirmed_by_name: 1 }, ...options },
+      );
+      return { alreadyConfirmed: latest?.manager_confirmation_status === "confirmed", confirmed_at: latest?.manager_confirmed_at, confirmed_by_name: latest?.manager_confirmed_by_name, confirmed_ids: [id] };
+    }
+
+    const confirmedAt = new Date();
+    const confirmation: Pick<MaintenanceRecordDocument, "manager_confirmation_status" | "manager_confirmed_at" | "manager_confirmed_by_id" | "manager_confirmed_by_name" | "manager_confirmed_by_role" | "technician_contributions"> = {
+      manager_confirmation_status: "confirmed",
+      manager_confirmed_at: confirmedAt,
+      manager_confirmed_by_id: user._id,
+      manager_confirmed_by_name: user.full_name,
+      manager_confirmed_by_role: user.role,
+      technician_contributions: normalizedContributions,
+    };
+    const result = await recordsCol.updateMany(
+      { ...confirmationScope, manager_confirmation_status: "pending" },
+      { $set: confirmation },
+      options,
+    );
+    const confirmedIds = pendingRecords.map((item) => String(item._id));
+    const confirmedCount = Number(result.modifiedCount || 0);
+
+    await writeAuditLog(db, {
+      user,
+      action: "update",
+      entity: "maintenance_record",
+      entityId: record.group_id || id,
+      summary: `${record.engine_name} · ${record.type_label}${reassignment?.changed ? `; motor ${record.engine_name} → ${effectiveEngineName}` : ""}${confirmedCount > 1 ? ` ve ${confirmedCount - 1} ilişkili bakım` : ""} yönetici tarafından kişi süreleriyle teyit edildi`,
+      before: { engine_id: record.engine_id, engine_name: record.engine_name, manager_confirmation_status: "pending", affected_record_count: pendingRecords.length, technician_contributions: record.technician_contributions || [] },
+      after: { ...confirmation, engine_id: effectiveEngineId, engine_name: effectiveEngineName, affected_record_count: confirmedCount, moved_record_ids: reassignment?.movedRecordIds || [] },
+      session,
+    });
+
+    return { alreadyConfirmed: false, confirmed_at: confirmedAt, confirmed_by_name: user.full_name, confirmed_ids: confirmedIds, confirmed_count: confirmedCount, technician_contributions: normalizedContributions, ...(reassignment ? { engine_reassignment: reassignment } : {}) };
+  };
+
+  let confirmationResult: ConfirmationResult | undefined;
+  if (requestedEngineId && requestedEngineId.trim() !== record.engine_id) {
+    const session = (await getMongoClient()).startSession();
+    try {
+      await session.withTransaction(async () => {
+        confirmationResult = await runConfirmation(session);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Motor değişikliği ve teyit işlemi tamamlanamadı.";
+      const status = /bulunamadı|geçersiz/iu.test(message) ? 400 : 500;
+      return NextResponse.json({ error: status === 500 ? "Motor değişikliği ve teyit güvenli biçimde tamamlanamadı; kayıt değiştirilmedi." : message }, { status });
+    } finally {
+      await session.endSession();
+    }
+  } else {
+    confirmationResult = await runConfirmation();
   }
 
-  const confirmedAt = new Date();
-  const confirmation: Pick<MaintenanceRecordDocument, "manager_confirmation_status" | "manager_confirmed_at" | "manager_confirmed_by_id" | "manager_confirmed_by_name" | "manager_confirmed_by_role" | "technician_contributions"> = {
-    manager_confirmation_status: "confirmed",
-    manager_confirmed_at: confirmedAt,
-    manager_confirmed_by_id: user._id,
-    manager_confirmed_by_name: user.full_name,
-    manager_confirmed_by_role: user.role,
-    technician_contributions: normalizedContributions,
-  };
-  const result = await recordsCol.updateMany(
-    { ...confirmationScope, manager_confirmation_status: "pending" },
-    { $set: confirmation },
-  );
-  const confirmedIds = pendingRecords.map((item) => String(item._id));
-  const confirmedCount = Number(result.modifiedCount || 0);
-
-  await writeAuditLog(db, {
-    user,
-    action: "update",
-    entity: "maintenance_record",
-    entityId: record.group_id || id,
-    summary: `${record.engine_name} · ${record.type_label}${confirmedCount > 1 ? ` ve ${confirmedCount - 1} ilişkili bakım` : ""} yönetici tarafından kişi süreleriyle teyit edildi`,
-    before: { manager_confirmation_status: "pending", affected_record_count: pendingRecords.length, technician_contributions: record.technician_contributions || [] },
-    after: { ...confirmation, affected_record_count: confirmedCount },
+  if (!confirmationResult) return NextResponse.json({ error: "Teyit sonucu alınamadı." }, { status: 500 });
+  return NextResponse.json({
+    ok: true,
+    ...confirmationResult,
+    ...(confirmationResult.engine_reassignment?.changed ? { engine_id: confirmationResult.engine_reassignment.toEngineId, engine_name: confirmationResult.engine_reassignment.toEngineName, moved_record_ids: confirmationResult.engine_reassignment.movedRecordIds } : {}),
   });
 
-  return NextResponse.json({ ok: true, alreadyConfirmed: false, confirmed_at: confirmedAt, confirmed_by_name: user.full_name, confirmed_ids: confirmedIds, confirmed_count: confirmedCount, technician_contributions: normalizedContributions });
 }
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {

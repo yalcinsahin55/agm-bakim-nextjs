@@ -141,6 +141,7 @@ export const recordSchema = z.object({
 
 // 👥 Yönetici teyidinde her ekip üyesinin gerçek katkı süresi ayrı doğrulanır.
 export const recordConfirmationSchema = z.object({
+  engine_id: z.string().min(1, "Motor kimliği geçersiz.").max(100).optional(),
   technician_contributions: z.array(z.object({
     id: z.string().min(1).max(100),
     duration_minutes: z.number({ required_error: "Kişi çalışma süresi gereklidir.", invalid_type_error: "Kişi çalışma süresi sayı olmalıdır." })
