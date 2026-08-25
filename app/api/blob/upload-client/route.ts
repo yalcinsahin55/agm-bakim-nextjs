@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 const REPORT_UPLOAD_PREFIX = "report-attachments/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
+const REPORT_UPLOAD_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
 
 function isSafeReportUploadPath(pathname: string): boolean {
   if (!pathname.startsWith(REPORT_UPLOAD_PREFIX) || pathname.includes("..")) return false;
@@ -50,6 +51,7 @@ async function postClientUpload(request: NextRequest): Promise<Response> {
     const result = await handleUpload({
       request,
       body,
+      ...(REPORT_UPLOAD_TOKEN ? { token: REPORT_UPLOAD_TOKEN } : {}),
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         if (clientPayload !== REPORT_UPLOAD_CLIENT_PAYLOAD || !isSafeReportUploadPath(pathname)) {
           throw new Error("Geçersiz rapor eki yolu veya upload amacı.");
@@ -64,8 +66,10 @@ async function postClientUpload(request: NextRequest): Promise<Response> {
     });
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Client Blob rapor eki upload token hatası:", error instanceof Error ? error.name : "UnknownError");
-    return NextResponse.json({ error: "Rapor eki depolama servisine bağlanılamadı. Lütfen tekrar deneyin." }, { status: 502 });
+    const reason = error instanceof Error ? error.message : "UnknownError";
+    const errorCode = /token/i.test(reason) ? "BLOB_TOKEN_UNAVAILABLE" : "BLOB_UPLOAD_TOKEN_ERROR";
+    console.error("Client Blob rapor eki upload token hatası:", errorCode, reason.slice(0, 240));
+    return NextResponse.json({ error: "Rapor eki depolama servisine bağlanılamadı. Lütfen tekrar deneyin.", code: errorCode }, { status: 502 });
   }
 }
 

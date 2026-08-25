@@ -190,6 +190,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(upload, /storeId/);
   assert.match(clientUpload, /handleUpload/);
   assert.match(clientUpload, /REPORT_UPLOAD_PREFIX/);
+  assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
+  assert.match(clientUpload, /token: REPORT_UPLOAD_TOKEN/);
   assert.match(clientUpload, /maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(uploadHelper, /REPORT_UPLOAD_ENDPOINT = "\/api\/blob\/upload-client"/);
   assert.match(uploadHelper, /handleUploadUrl: REPORT_UPLOAD_ENDPOINT/);
