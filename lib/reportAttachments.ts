@@ -20,7 +20,10 @@ const REPORT_ATTACHMENT_EXTENSION_MIMES: Record<string, ReportAttachmentMime> = 
   ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
-const DEFAULT_BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
+const DEFAULT_BLOB_HOST_SUFFIXES = [
+  ".public.blob.vercel-storage.com",
+  ".blob.vercel-storage.com",
+] as const;
 
 function configuredAllowedHosts(): string[] {
   return (process.env.REPORT_ATTACHMENT_ALLOWED_HOSTS || process.env.PDF_ALLOWED_HOSTS || "")
@@ -65,7 +68,8 @@ export function isAllowedReportAttachmentUrl(value: unknown): value is string {
     if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
     const hostname = url.hostname.toLowerCase();
     const explicitHosts = configuredAllowedHosts();
-    return hostname.endsWith(DEFAULT_BLOB_HOST_SUFFIX) || explicitHosts.includes(hostname);
+    const isVercelBlobHost = DEFAULT_BLOB_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+    return isVercelBlobHost || explicitHosts.includes(hostname);
   } catch {
     return false;
   }

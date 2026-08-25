@@ -186,6 +186,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(helper, /REPORT_ATTACHMENT_MAX_BYTES = 20 \* 1024 \* 1024/);
   assert.match(helper, /\.xlsx/);
   assert.match(helper, /\.docx/);
+  assert.match(helper, /DEFAULT_BLOB_HOST_SUFFIXES/);
+  assert.match(helper, /\.blob\.vercel-storage\.com/);
+  assert.match(helper, /\.public\.blob\.vercel-storage\.com/);
   assert.match(upload, /report-attachments/);
   assert.match(upload, /resolveReportAttachmentMime/);
   assert.match(upload, /storeId/);
