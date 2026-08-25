@@ -72,7 +72,7 @@ async function getMedia(request: NextRequest): Promise<Response> {
   }
 
   const contentType = stored.headers.get("content-type");
-  if (!mediaContentTypeMatches(kind, contentType)) {
+  if (!contentType || !mediaContentTypeMatches(kind, contentType)) {
     return NextResponse.json({ error: "Medya türü doğrulanamadı." }, { status: 415 });
   }
 

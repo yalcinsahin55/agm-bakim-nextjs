@@ -43,6 +43,7 @@ const actionLabels: Record<string, string> = {
 
 const entityLabels: Record<string, string> = {
   maintenance_record: "Bakım kaydı",
+  maintenance_type: "Bakım türü",
   engine: "Motor",
   oil_analysis: "Yağ analizi",
   pressure_reading: "Karter basıncı",

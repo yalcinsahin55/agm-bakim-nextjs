@@ -6,6 +6,9 @@ import ExcelJS from "exceljs";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { writeAuditLog } from "@/lib/audit";
+import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
+import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
@@ -73,6 +76,7 @@ async function postImportHours(req: NextRequest) {
   const existingEngines = await enginesCol.find({ _id: { $in: engineIds } }).toArray();
   const workingEngines = new Map(existingEngines.map((engine) => [String(engine._id), engine]));
   const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
+  const changes: Array<{ engine_id: string; engine: string; before: { hours: number; load_kw: number }; after: { hours: number; load_kw: number } }> = [];
   let updated = 0;
 
   for (const row of rows) {
@@ -92,15 +96,17 @@ async function postImportHours(req: NextRequest) {
       if (newLoad !== null && newLoad !== (existing.load_kw || 0)) { setFields.load_kw = newLoad; loadChanged = true; }
     }
     const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
+    const nextLoadKw = loadChanged && typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0);
     if (hoursChanged || loadChanged) {
       updateOp.$push = {
         history: {
           date: stamp.toISOString(),
           hours: hoursChanged ? hours : existing.hours,
-          load_kw: loadChanged && typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
+          load_kw: nextLoadKw,
         },
       };
     }
+    changes.push({ engine_id: name, engine: String(existing.name || name), before: { hours: Number(existing.hours || 0), load_kw: Number(existing.load_kw || 0) }, after: { hours: Number(hoursChanged ? hours : existing.hours || 0), load_kw: Number(nextLoadKw || 0) } });
     operations.push({ updateOne: { filter: { _id: name }, update: updateOp } });
     workingEngines.set(name, {
       ...existing,
@@ -117,6 +123,20 @@ async function postImportHours(req: NextRequest) {
   }
 
   if (operations.length > 0) await enginesCol.bulkWrite(operations, { ordered: true });
+
+  if (updated > 0) {
+    await writeAuditLog(db, {
+      user,
+      action: "update",
+      entity: "engine",
+      entityId: changes.length === 1 ? changes[0]?.engine_id : undefined,
+      summary: `${updated} motorun çalışma saati/yük bilgisi Excel ile güncellendi`,
+      before: { changes: changes.map((change) => ({ engine_id: change.engine_id, engine: change.engine, ...change.before })) },
+      after: { changes: changes.map((change) => ({ engine_id: change.engine_id, engine: change.engine, ...change.after })) },
+    });
+    invalidateMaintenancePanelServerCache();
+    await refreshUserMaintenanceNotificationsBestEffort(db, user);
+  }
 
   return NextResponse.json({ ok: true, updated });
 }

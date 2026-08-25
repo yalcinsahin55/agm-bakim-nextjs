@@ -9,6 +9,7 @@ import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelSer
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { buildEngineStateUpdate, canUpdateEngineStateNested, isObjectRecord, mergeEngineState } from "@/lib/maintenance";
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -32,17 +33,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   const type = await typesCol.findOne({ _id: key });
   if (!type) return NextResponse.json({ error: "Bakım türü bulunamadı." }, { status: 404 });
 
+  const beforeAudit = {
+    key: String(type.key || key),
+    label: type.label,
+    default_period_hours: Number(type.default_period_hours || 0),
+    engine_scope: type.engine_scope || null,
+    work_domains: type.work_domains || [],
+    allow_electromechanical_support: type.allow_electromechanical_support === true,
+    allow_electromechanical_responsible: type.allow_electromechanical_responsible === true,
+    is_deleted: type.is_deleted === true,
+    engine_states: type.engine_states || {},
+  };
+  let auditChanged = false;
   const update: Partial<MaintenanceTypeDocument> = {};
   const unset: Record<string, ""> = {};
   if (restore === true) {
     update.is_deleted = false;
     unset.deleted_at = "";
+    auditChanged = true;
   }
-  if (label) update.label = label.trim();
-  if (typeof default_period_hours === "number") update.default_period_hours = default_period_hours;
-  if (work_domains !== undefined) update.work_domains = normalizeWorkDomains(work_domains, "mekanik");
-  if (allow_electromechanical_support !== undefined) update.allow_electromechanical_support = allow_electromechanical_support === true;
-  if (allow_electromechanical_responsible !== undefined) update.allow_electromechanical_responsible = allow_electromechanical_responsible === true;
+  if (label) {
+    update.label = label.trim();
+    auditChanged = auditChanged || label.trim() !== type.label;
+  }
+  if (typeof default_period_hours === "number") {
+    update.default_period_hours = default_period_hours;
+    auditChanged = auditChanged || default_period_hours !== Number(type.default_period_hours || 0);
+  }
+  if (work_domains !== undefined) {
+    update.work_domains = normalizeWorkDomains(work_domains, "mekanik");
+    auditChanged = true;
+  }
+  if (allow_electromechanical_support !== undefined) {
+    update.allow_electromechanical_support = allow_electromechanical_support === true;
+    auditChanged = true;
+  }
+  if (allow_electromechanical_responsible !== undefined) {
+    update.allow_electromechanical_responsible = allow_electromechanical_responsible === true;
+    auditChanged = true;
+  }
   if (Object.keys(update).length || Object.keys(unset).length) {
     const updateOperation: { $set?: Partial<MaintenanceTypeDocument>; $unset?: Record<string, ""> } = {};
     if (Object.keys(update).length) updateOperation.$set = update;
@@ -55,6 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     if (patches.length === 0) return;
     const canBulkWriteNested = patches.every(({ engineId }) => canUpdateEngineStateNested(currentEngineStates, engineId));
     if (canBulkWriteNested) {
+      auditChanged = true;
       await typesCol.bulkWrite(patches.map(({ engineId, patch }) => ({
         updateOne: { filter: { _id: key }, update: { $set: buildEngineStateUpdate(currentEngineStates, engineId, patch) } },
       })));
@@ -65,6 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     }
     // Malformed legacy engine_states belgelerinde buildEngineStateUpdate tüm alanı
     // güvenli biçimde yeniden kurar; bu durumda sıralı fallback veri kaybını önler.
+    auditChanged = true;
     for (const { engineId, patch } of patches) {
       await typesCol.updateOne({ _id: key }, { $set: buildEngineStateUpdate(currentEngineStates, engineId, patch) });
       currentEngineStates = mergeEngineState(currentEngineStates, engineId, patch);
@@ -96,6 +127,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     ? [...new Set(remove_engine_ids.filter((id: unknown): id is string => isSafeMongoPathSegment(id)))]
     : [];
   if (removeEngineIds.length > 0) {
+    auditChanged = true;
     const nextEngineStates = (isObjectRecord(currentEngineStates) ? { ...currentEngineStates } : {}) as MaintenanceTypeDocument["engine_states"];
     removeEngineIds.forEach((engineId) => { delete nextEngineStates[engineId]; });
     // Bir motor elle kapsamdan çıkarıldığında "all" kapsamı artık geçerli değildir.
@@ -107,6 +139,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     await recordsCollection(db).updateMany({ type_key: key }, { $set: { type_label: label.trim() } });
   }
 
+  if (auditChanged) {
+    const updatedType = await typesCol.findOne({ _id: key });
+    const afterAudit = updatedType ? {
+      key: String(updatedType.key || key),
+      label: updatedType.label,
+      default_period_hours: Number(updatedType.default_period_hours || 0),
+      engine_scope: updatedType.engine_scope || null,
+      work_domains: updatedType.work_domains || [],
+      allow_electromechanical_support: updatedType.allow_electromechanical_support === true,
+      allow_electromechanical_responsible: updatedType.allow_electromechanical_responsible === true,
+      is_deleted: updatedType.is_deleted === true,
+      engine_states: updatedType.engine_states || {},
+    } : beforeAudit;
+    await writeAuditLog(db, {
+      user,
+      action: "update",
+      entity: "maintenance_type",
+      entityId: key,
+      summary: `${afterAudit.label} bakım türü güncellendi${restore === true ? " ve geri getirildi" : ""}`,
+      before: beforeAudit,
+      after: afterAudit,
+    });
+  }
   invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true });
 }
@@ -128,10 +183,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
 
   // Geçmiş bakım kayıtları hiçbir koşulda silinmez. Tür yalnızca gizlenir;
   // böylece yanlış silme durumunda tarihçe ve raporlar korunur.
+  const deletedAt = new Date();
   await maintenanceTypesCollection(db).updateOne(
     { _id: key },
-    { $set: { is_deleted: true, deleted_at: new Date() } },
+    { $set: { is_deleted: true, deleted_at: deletedAt } },
   );
+  await writeAuditLog(db, {
+    user,
+    action: "delete",
+    entity: "maintenance_type",
+    entityId: key,
+    summary: `${type.label} bakım türü silindi (geçmiş kayıtlar korundu)`,
+    before: { key, label: type.label, is_deleted: type.is_deleted === true, engine_scope: type.engine_scope || null },
+    after: { key, label: type.label, is_deleted: true, deleted_at: deletedAt, engine_scope: type.engine_scope || null },
+  });
   invalidateMaintenancePanelServerCache();
   return NextResponse.json({ ok: true, soft_deleted: true });
 }

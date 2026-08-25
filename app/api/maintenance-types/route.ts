@@ -8,6 +8,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,14 @@ export async function POST(req: NextRequest) {
       engine_states: engineStates,
     };
     await typesCol.insertOne(doc);
+    await writeAuditLog(db, {
+      user,
+      action: "create",
+      entity: "maintenance_type",
+      entityId: key,
+      summary: `${doc.label} bakım türü oluşturuldu`,
+      after: { key: doc.key, label: doc.label, default_period_hours: doc.default_period_hours, engine_scope: doc.engine_scope, work_domains: doc.work_domains },
+    });
     invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {

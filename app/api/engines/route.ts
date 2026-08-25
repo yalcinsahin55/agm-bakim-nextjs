@@ -10,6 +10,7 @@ import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { writeAuditLog } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,14 @@ async function postEngine(req: NextRequest) {
       history: [{ date: now.toISOString(), hours: parsedHours, load_kw: parsedLoadKw }],
     };
     await enginesCol.insertOne(doc);
+    await writeAuditLog(db, {
+      user,
+      action: "create",
+      entity: "engine",
+      entityId: normalizedName,
+      summary: `${normalizedName} motoru oluşturuldu`,
+      after: { engine_id: normalizedName, name: normalizedName, hours: parsedHours, load_kw: parsedLoadKw },
+    });
     invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);
   } catch (error) {

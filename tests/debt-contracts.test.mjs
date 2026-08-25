@@ -63,7 +63,43 @@ test("record date and bulk update safeguards stay in place", async () => {
   assert.match(records, /Geriye dönük bakım tarihi geçerli bir takvim tarihi olmalıdır/);
   assert.match(maintenanceTypes, /typesCol\.bulkWrite/);
   assert.match(engineHours, /enginesCol\.bulkWrite/);
+  assert.match(engineHours, /writeAuditLog/);
   assert.match(importHours, /enginesCol\.bulkWrite/);
+  assert.match(importHours, /writeAuditLog/);
+});
+
+test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async () => {
+  const tsconfig = JSON.parse(await source("tsconfig.json"));
+  const packageJson = JSON.parse(await source("package.json"));
+  const ci = await source(".github/workflows/ci.yml");
+  const eslintConfig = await source("eslint.config.mjs");
+  assert.equal(tsconfig.compilerOptions.strict, true);
+  assert.equal(tsconfig.compilerOptions.allowJs, false);
+  assert.equal(packageJson.scripts.lint, "eslint app components lib");
+  assert.match(ci, /name: ESLint/);
+  assert.match(ci, /run: npm run lint/);
+  assert.match(eslintConfig, /FlatCompat/);
+  assert.match(eslintConfig, /next\/core-web-vitals/);
+  await assert.rejects(source("jsconfig.json"));
+  await assert.rejects(source("pnpm-lock.yaml"));
+  await assert.rejects(source("pnpm-workspace.yaml"));
+});
+
+test("engine hours and maintenance type changes are audited with before/after data", async () => {
+  const engines = await source("app/api/engines/route.ts");
+  const engineHours = await source("app/api/engines/hours/route.ts");
+  const importHours = await source("app/api/import/hours/route.ts");
+  const maintenanceTypes = await source("app/api/maintenance-types/route.ts");
+  const maintenanceTypeChange = await source("app/api/maintenance-types/[key]/route.ts");
+  const auditPage = await source("app/audit-log/page.tsx");
+  for (const content of [engines, engineHours, importHours, maintenanceTypes, maintenanceTypeChange]) assert.match(content, /writeAuditLog/);
+  assert.match(engineHours, /before: \{ changes:/);
+  assert.match(engineHours, /after: \{ changes:/);
+  assert.match(importHours, /Excel ile güncellendi/);
+  assert.match(maintenanceTypeChange, /beforeAudit/);
+  assert.match(maintenanceTypeChange, /afterAudit/);
+  assert.match(maintenanceTypeChange, /bakım türü silindi/);
+  assert.match(auditPage, /maintenance_type: "Bakım türü"/);
 });
 
 test("records list does not reintroduce media payloads", async () => {
@@ -220,7 +256,8 @@ test("repository exposes CI validation commands", async () => {
   const packageJson = JSON.parse(await source("package.json"));
   const workflow = await source(".github/workflows/ci.yml");
   assert.equal(packageJson.scripts.typecheck, "tsc --noEmit");
-  assert.equal(packageJson.scripts.test, "node --test tests/*.test.mjs");
+  assert.match(packageJson.scripts.test, /node --test tests\/\*\.test\.mjs/);
+  assert.match(packageJson.scripts.test, /node --experimental-strip-types --test tests\/\*\.test\.mts/);
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /npm audit --omit=dev --audit-level=high/);

@@ -8,6 +8,7 @@ import { isAdmin } from "@/lib/permissions";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { writeAuditLog } from "@/lib/audit";
 import type { EngineDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export async function PATCH(req: NextRequest) {
     const existingEngines = await enginesCol.find({ _id: { $in: engineIds } }).toArray();
     const workingEngines = new Map(existingEngines.map((engine) => [String(engine._id), engine]));
     const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
+    const changes: Array<{ engine_id: string; engine: string; before: { hours: number; load_kw: number }; after: { hours: number; load_kw: number } }> = [];
     let changed = 0;
 
     for (const u of updates as EngineUpdate[]) {
@@ -75,11 +77,12 @@ export async function PATCH(req: NextRequest) {
       setFields.updated_at = stamp;
 
       const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
+      const nextHours = hoursChanged && typeof u.hours === "number" ? u.hours : existing.hours;
+      const nextLoadKw = loadChanged && typeof u.load_kw === "number" ? u.load_kw : (existing.load_kw || 0);
       if (hoursChanged || loadChanged) {
-        const nextHours = hoursChanged && typeof u.hours === "number" ? u.hours : existing.hours;
-        const nextLoadKw = loadChanged && typeof u.load_kw === "number" ? u.load_kw : (existing.load_kw || 0);
         updateOp.$push = { history: { date: stamp.toISOString(), hours: nextHours, load_kw: nextLoadKw } };
       }
+      changes.push({ engine_id: engineId, engine: String(existing.name || engineId), before: { hours: Number(existing.hours || 0), load_kw: Number(existing.load_kw || 0) }, after: { hours: Number(nextHours || 0), load_kw: Number(nextLoadKw || 0) } });
       operations.push({ updateOne: { filter: { _id: engineId }, update: updateOp } });
       workingEngines.set(engineId, {
         ...existing,
@@ -98,6 +101,15 @@ export async function PATCH(req: NextRequest) {
     if (operations.length > 0) await enginesCol.bulkWrite(operations, { ordered: true });
 
     if (changed > 0) {
+      await writeAuditLog(db, {
+        user,
+        action: "update",
+        entity: "engine",
+        entityId: changes.length === 1 ? changes[0]?.engine_id : undefined,
+        summary: `${changed} motorun çalışma saati/yük bilgisi güncellendi`,
+        before: { changes: changes.map((change) => ({ engine_id: change.engine_id, engine: change.engine, ...change.before })) },
+        after: { changes: changes.map((change) => ({ engine_id: change.engine_id, engine: change.engine, ...change.after })) },
+      });
       invalidateMaintenancePanelServerCache();
       await refreshUserMaintenanceNotificationsBestEffort(db, user);
     }
