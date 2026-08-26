@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config app components lib",
     "test": "node --experimental-strip-types --test tests/*.test.mts",
+    "test:e2e": "playwright test",
     "smoke:readonly": "node --experimental-strip-types scripts/smoke-readonly.mts",
     "migrate:stable-keys": "node --experimental-strip-types scripts/migrate-stable-keys.mts",
     "migrate:legacy-role": "node --experimental-strip-types scripts/migrate-legacy-role.mts",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
+    "@playwright/test": "1.62.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.5",
     "@types/pdfkit": "^0.17.6",
