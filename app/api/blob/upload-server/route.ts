@@ -86,8 +86,10 @@ async function postUpload(request: NextRequest) {
     const pathname = idempotencyKey
       ? `${folder}/offline-${idempotencyKey}-${safeName}`
       : `${folder}/${Date.now()}-${safeName}`;
-    const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
-    const storeId = process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined;
+    // Vercel Production’da Blob SDK, bağlı mağaza için OIDC yetkilendirmesini otomatik kullanır.
+    // Manuel token/storeId yalnızca local veya Vercel dışı ortamlarda geçirilir.
+    const token = process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
+    const storeId = process.env.VERCEL ? undefined : (process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined);
     const blob = await put(pathname, file, {
       access: "public",
       addRandomSuffix: !idempotencyKey,
