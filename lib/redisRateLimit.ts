@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { Redis } from "@upstash/redis";
-import { checkRateLimit, checkRateLimitBatch, type RateResult } from "@/lib/rate-limit";
+import { checkRateLimit, checkRateLimitBatch, type RateResult } from "./rate-limit.ts";
 
 export type RateLimitFailureMode = "local-fallback" | "fail-closed";
 
