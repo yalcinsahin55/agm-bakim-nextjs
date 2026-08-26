@@ -34,6 +34,8 @@ jobs:
       E2E_PASSWORD: e2e-admin-password-123
       E2E_VIEWER_IDENTIFIER: e2e-viewer@example.test
       E2E_VIEWER_PASSWORD: e2e-viewer-password-123
+      E2E_FIXTURE_ENGINE_ID: e2e-engine-1
+      E2E_FIXTURE_TYPE_KEY: e2e-type-1000h
     steps:
       - name: Checkout
         uses: actions/checkout@v7
