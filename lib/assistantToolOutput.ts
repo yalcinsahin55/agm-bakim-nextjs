@@ -1,4 +1,4 @@
-import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "@/lib/reportAttachments";
+import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "./reportAttachments.ts";
 
 type ReportAttachmentRow = { id?: unknown; url?: unknown; filename?: unknown; mime?: unknown; size?: unknown; uploaded_at?: unknown };
 

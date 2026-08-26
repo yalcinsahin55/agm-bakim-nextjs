@@ -219,3 +219,42 @@ test("Excel helpers convert rows and preserve bounded export shape", () => {
   tooWide.getCell(1, 101).value = "fazla";
   assert.throws(() => worksheetToGrid(tooWide), /izin verilen boyutu aşıyor/);
 });
+
+test("assistant output helpers preserve readable durations, UTC dates, and trusted attachment links", async () => {
+  const { formatMinutes, formatPerformanceNumber, formatUnknownDate, safeReportAttachments } = await import("../lib/assistantToolOutput.ts");
+  assert.equal(formatMinutes(1_500), "1 gün 1 saat");
+  assert.equal(formatMinutes(0), "0 dakika");
+  assert.equal(formatUnknownDate("2026-08-26T08:00:00.000Z"), "2026-08-26T08:00:00.000Z");
+  assert.equal(formatUnknownDate("not-a-date"), null);
+  assert.equal(formatPerformanceNumber(12.345), "12,35");
+  assert.equal(formatPerformanceNumber(null), "veri yok");
+
+  const attachments = safeReportAttachments("record-1", [
+    {
+      id: "attachment-1",
+      url: "https://fixture.public.blob.vercel-storage.com/reports/report.pdf",
+      filename: "bakim.pdf",
+      mime: "application/pdf",
+      size: 512,
+      uploaded_at: "2026-08-26T08:00:00.000Z",
+    },
+    {
+      id: "attachment-2",
+      url: "https://evil.example/report.pdf",
+      filename: "sahte.pdf",
+      mime: "application/pdf",
+      size: 512,
+      uploaded_at: "2026-08-26T08:00:00.000Z",
+    },
+  ]);
+
+  assert.deepEqual(attachments, [{
+    id: "attachment-1",
+    filename: "bakim.pdf",
+    mime: "application/pdf",
+    size: 512,
+    uploaded_at: "2026-08-26T08:00:00.000Z",
+    href: "/api/records/record-1/attachments/attachment-1?inline=1",
+    download_href: "/api/records/record-1/attachments/attachment-1?download=1",
+  }]);
+});
