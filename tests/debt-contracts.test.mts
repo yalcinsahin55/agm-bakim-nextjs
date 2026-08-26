@@ -554,6 +554,7 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   const helper = await source("lib/reassignMaintenanceEngine.ts");
   const schemas = await source("lib/schemas.ts");
   const recordsPage = await source("app/kayitlar/page.tsx");
+  const confirmationModal = await source("components/MaintenanceConfirmationModal.tsx");
   assert.match(schemas, /recordConfirmationSchema = z\.object\(\{[\s\S]*engine_id/);
   assert.match(update, /engineChangeRequested/);
   assert.match(update, /Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir/);
@@ -570,8 +571,8 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   assert.match(helper, /tracking_state_before/);
   assert.match(helper, /period_hours/);
   assert.match(helper, /tracking_source: "record"/);
-  assert.match(recordsPage, /Bakımın bağlı olduğu motor/);
-  assert.match(recordsPage, /Bakım motoru/);
+  assert.match(confirmationModal, /Bakımın bağlı olduğu motor/);
+  assert.match(confirmationModal, /Bakım motoru/);
   assert.match(recordsPage, /engine_id: isAdmin \? engineId/);
   assert.match(recordsPage, /selectedEngineId/);
   assert.match(recordsPage, /engines=\{sortedEngines\}/);
