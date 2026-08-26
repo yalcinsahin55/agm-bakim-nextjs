@@ -102,17 +102,21 @@ export default function Sidebar() {
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  <span className="relative flex-shrink-0 text-base">
-                    {item.icon}
+                  <span className="flex-shrink-0 text-base">{item.icon}</span>
+                  <span className="truncate">{item.label}</span>
+                  <span className="ml-auto flex items-center gap-2">
                     {item.href === "/dashboard" && gecikmis > 0 && (
-                      <span className="absolute -right-1.5 -top-1 flex h-3.5 min-w-[15px] items-center justify-center rounded-full bg-red px-1 text-[8px] font-bold text-white">
-                        {gecikmis}
+                      <span
+                        title={`${gecikmis} gecikmiş bakım`}
+                        aria-label={`${gecikmis} gecikmiş bakım`}
+                        className="whitespace-nowrap rounded-full border border-red/35 bg-red/15 px-1.5 py-0.5 text-[9px] font-bold text-red"
+                      >
+                        {gecikmis} gecikmiş
                       </span>
                     )}
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-amber" />}
+                    {isOtherMenu && !active && <span className="text-sm text-faint">→</span>}
                   </span>
-                  <span className="truncate">{item.label}</span>
-                  {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-amber" />}
-                  {isOtherMenu && !active && <span className="ml-auto text-sm text-faint">→</span>}
                 </Link>
               </div>
             );

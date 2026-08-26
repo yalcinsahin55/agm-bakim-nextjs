@@ -595,3 +595,11 @@ test("closed-window worker sync only targets bounded record jobs", async () => {
   assert.match(serviceWorker, /MAX_WORKER_SYNC_BODY_BYTES = 512 \* 1024/);
   assert.match(serviceWorker, /credentials: "same-origin"/);
 });
+
+test("sidebar labels delayed maintenance separately from the unread bell", async () => {
+  const sidebar = await source("components/Sidebar.tsx");
+  const bell = await source("components/NotificationBell.tsx");
+  assert.match(sidebar, /gecikmiş bakım/iu);
+  assert.match(sidebar, /aria-label=\{`\$\{gecikmis\} gecikmiş bakım`\}/u);
+  assert.match(bell, /\/api\/notifications\/unread-count/);
+});
