@@ -31,7 +31,12 @@ async function login(page: Page, identifier: string, password: string): Promise<
 }
 
 async function loginViaFixtureApi(page: Page, identifier: string, password: string): Promise<void> {
+  // Local E2E fallback keeps an in-memory IP quota for the whole server process.
+  // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
+  // without changing the production limiter or trusting this header in production.
+  const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
   const response = await page.context().request.post("/api/auth/login", {
+    headers: { "x-forwarded-for": fixtureIp },
     data: { identifier, password },
   });
   const loginBody = await response.text();
