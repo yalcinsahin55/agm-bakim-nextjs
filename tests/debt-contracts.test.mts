@@ -502,6 +502,7 @@ test("assistant engine history and maintenance health expose filtered reports an
   const policy = await source("lib/assistantPolicy.ts");
   const tools = await source("lib/assistantTools.ts");
   const assistantPage = await source("app/asistan/page.tsx");
+  const assistantDetails = await source("components/AssistantResultDetails.tsx");
   assert.match(policy, /showAll\?: boolean/);
   assert.match(policy, /tüm\|bütün\|hepsi/);
   assert.match(policy, /asksEngineMaintenanceDuration/);
@@ -516,20 +517,22 @@ test("assistant engine history and maintenance health expose filtered reports an
   assert.match(tools, /buildRecordMatch\(db, query\)/);
   assert.match(tools, /mapWithConcurrency/);
   assert.match(tools, /mapWithConcurrency\(resultRows\.slice\(0, 12\), 4/);
-  assert.match(assistantPage, /Rapor ekleri:/);
-  assert.match(assistantPage, /Son bakımdan beri motor çalışması/);
-  assert.match(assistantPage, /maintenance_health/);
+  assert.match(assistantPage, /AssistantResultDetails/);
+  assert.match(assistantDetails, /Rapor ekleri:/);
+  assert.match(assistantDetails, /Son bakımdan beri motor çalışması/);
+  assert.match(assistantDetails, /maintenance_health/);
 });
 
 
 test("assistant exports preserve report filenames and maintenance work metrics", async () => {
   const exportLib = await source("lib/assistantExport.ts");
   const assistantPage = await source("app/asistan/page.tsx");
+  const assistantDetails = await source("components/AssistantResultDetails.tsx");
   assert.match(exportLib, /worked_hours/);
   assert.match(exportLib, /attachments: "Rapor ekleri"/);
   assert.match(exportLib, /report_attachments/);
   assert.match(exportLib, /maintenance_health: \[.*worked_hours.*duration/);
-  assert.match(assistantPage, /maintenance_health/);
+  assert.match(assistantDetails, /maintenance_health/);
 });
 
 
