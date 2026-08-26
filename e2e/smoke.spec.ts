@@ -15,7 +15,7 @@ function requireFixture(): { engineId: string; typeKey: string } {
 }
 
 async function login(page: Page, identifier: string, password: string): Promise<void> {
-  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.goto("/login", { waitUntil: "networkidle" });
   await page.getByPlaceholder("05xx xxx xx xx").fill(identifier);
   await page.locator('input[type="password"]').fill(password);
   const [loginResponse] = await Promise.all([
