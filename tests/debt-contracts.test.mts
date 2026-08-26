@@ -603,3 +603,10 @@ test("sidebar labels delayed maintenance separately from the unread bell", async
   assert.match(sidebar, /aria-label=\{`\$\{gecikmis\} gecikmiş bakım`\}/u);
   assert.match(bell, /\/api\/notifications\/unread-count/);
 });
+
+test("notifications page refreshes maintenance snapshot on first load", async () => {
+  const notificationsPage = await source("app/bildirimler/page.tsx");
+  assert.match(notificationsPage, /useEffect\(\(\) => \{ load\(true\)/u);
+  assert.match(notificationsPage, /\/api\/notifications\/refresh/u);
+  assert.match(notificationsPage, /method: "POST"/u);
+});

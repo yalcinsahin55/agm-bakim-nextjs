@@ -135,7 +135,7 @@ export default function NotificationsPage() {
     }
   }, []);
 
-  useEffect(() => { load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
+  useEffect(() => { load(true).catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
 
   async function markRead(id: string) {
     try {
