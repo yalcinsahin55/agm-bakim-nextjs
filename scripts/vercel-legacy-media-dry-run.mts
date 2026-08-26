@@ -20,7 +20,7 @@ type BackupSummary = { errors?: Array<{ error?: unknown }> };
 
 const DRY_RUN_BRANCH = "migration-dry-run";
 const PILOT_BRANCH = "migration-pilot";
-const VERIFY_BRANCH = "migration-remainder-a-verify";
+const VERIFY_BRANCH = "migration-remainder-b-verify";
 const REPORT_PATH = "/tmp/agm-legacy-media-migration.json";
 const BACKUP_PATH = "/tmp/agm-legacy-media-pilot-backup.json";
 
