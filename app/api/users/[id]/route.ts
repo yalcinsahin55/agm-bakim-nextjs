@@ -14,7 +14,7 @@ import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/reques
 
 export const dynamic = "force-dynamic";
 
-type UserUpdateFields = Partial<Pick<UserDocument, "role" | "active" | "approved" | "phone" | "phone_normalized" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">>;
+type UserUpdateFields = Partial<Pick<UserDocument, "role" | "active" | "approved" | "phone" | "phone_normalized" | "session_version" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">>;
 
 async function getAuthorizedAdmin(req: NextRequest) {
   const db = await getDb();
@@ -102,6 +102,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const before = await usersCol.findOne({ _id: id }, { projection: { password_hash: 0 } });
   if (!before) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+  const currentSessionVersion = typeof before.session_version === "number" && Number.isInteger(before.session_version) && before.session_version >= 0 ? before.session_version : 0;
+  update.session_version = currentSessionVersion + 1;
   const result = await usersCol.updateOne({ _id: id }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
   if (result.matchedCount === 0) return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
   await writeAuditLog(db, {

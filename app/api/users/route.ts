@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(password);
     await usersCol.insertOne({
       _id: normalizedPhone, stable_id: randomUUID(), full_name: full_name.trim(), phone: phone.trim(), phone_normalized: normalizedPhone, email: "",
-      password_hash: passwordHash, role, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType, ...technicianPermissions } : {}), active: true, approved: false, created_at: new Date(),
+      password_hash: passwordHash, role, session_version: 0, ...(normalizedTechnicianType ? { technician_type: normalizedTechnicianType, ...technicianPermissions } : {}), active: true, approved: false, created_at: new Date(),
     });
     await writeAuditLog(db, {
       user, action: "create", entity: "user", entityId: normalizedPhone,

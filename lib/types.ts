@@ -21,6 +21,7 @@ export interface User {
   role: Role;
   active: boolean;
   approved?: boolean;
+  session_version?: number;
   bootstrap_key?: string;
   technician_type?: TechnicianType;
   can_be_responsible?: boolean;

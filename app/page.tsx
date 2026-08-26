@@ -1,7 +1,7 @@
 import { usersCollection } from "@/lib/dbCollections";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { getCurrentUser, SESSION_COOKIE } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { defaultRouteForRole } from "@/lib/permissions";
 
@@ -9,17 +9,12 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const userId = token ? await verifySessionToken(token) : null;
-  if (!userId) redirect("/login");
+  if (!cookieStore.get(SESSION_COOKIE)?.value) redirect("/login");
 
   const db = await getDb();
   const usersCol = usersCollection(db);
-  const user = await usersCol.findOne(
-    { _id: userId },
-    { projection: { role: 1, active: 1, approved: 1 } },
-  );
+  const user = await getCurrentUser({ cookies: cookieStore }, usersCol);
 
-  if (!user || user.active === false || user.approved === false) redirect("/login");
-  redirect(defaultRouteForRole(typeof user.role === "string" ? user.role : undefined));
+  if (!user) redirect("/login");
+  redirect(defaultRouteForRole(user.role));
 }
