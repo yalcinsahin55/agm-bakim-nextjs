@@ -366,6 +366,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const queue = await source("lib/offlineQueue.ts");
   const complete = await source("app/tamamla/page.tsx");
   const records = await source("app/kayitlar/page.tsx");
+  const recordMediaModals = await source("components/RecordMediaModals.tsx");
   const pdfPreview = await source("components/PdfPreview.tsx");
   const qrPage = await source("app/qr-etiketleri/page.tsx");
   const oilPage = await source("app/yag-analizleri/page.tsx");
@@ -469,7 +470,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.doesNotMatch(complete, /getMediaDisplayUrl/);
   assert.match(records, /getMediaDisplayUrl/);
   assert.match(records, /selectedReportAttachment/);
-  assert.match(records, /<PdfPreview/);
+  assert.match(records, /<RecordMediaModals/);
+  assert.match(recordMediaModals, /<PdfPreview/);
   assert.match(pdfPreview, /pdfjs-dist\/legacy\/build\/pdf\.mjs/);
   assert.match(pdfPreview, /pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs/);
   assert.match(pdfPreview, /GlobalWorkerOptions\.workerSrc/);
@@ -484,17 +486,12 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(qrPage, /type_key=\$\{encodeURIComponent\(item\.id\)\}/);
   assert.match(qrPage, /window\.print\(\)/);
   assert.match(records, /setSelectedReportAttachment\(\{ recordId: selectedRecord\._id, attachment \}\)/);
-  assert.match(records, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id\)/);
-  assert.match(records, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id, true\)/);
-  assert.match(records, /download=1/);
-  const attachmentUiStart = records.indexOf("Detaylı rapor ekleri");
-  const attachmentUiEnd = records.indexOf("Bakım raporu PDF önizleme modalı");
-  assert.ok(attachmentUiStart >= 0 && attachmentUiEnd > attachmentUiStart, "Bakım raporu eki UI bloğu bulunamadı");
-  const attachmentUi = records.slice(attachmentUiStart, attachmentUiEnd);
-  assert.doesNotMatch(attachmentUi, /target=["']_blank["']/);
-  assert.doesNotMatch(attachmentUi, /window\.open\(/);
-  assert.match(attachmentUi, /href=\{reportAttachmentUrl\(selectedRecord\._id, attachment\.id, true\)\}/);
-  assert.match(attachmentUi, /download=\{attachment\.filename\}/);
+  assert.match(recordMediaModals, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id\)/);
+  assert.match(recordMediaModals, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id, true\)/);
+  assert.match(recordMediaModals, /download=\{selectedReportAttachment\.attachment\.filename\}/);
+  assert.doesNotMatch(records, /target=["']_blank["']/);
+  assert.doesNotMatch(records, /window\.open\(/);
+  assert.doesNotMatch(records, /<iframe[\s\S]*selectedReportAttachment/);
 });
 
 
