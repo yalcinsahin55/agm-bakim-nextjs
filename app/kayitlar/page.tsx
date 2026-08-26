@@ -346,9 +346,13 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
             uploaded.push(`offline:${id}`);
             continue;
           }
-          const url = await uploadMaintenanceMedia(
-            new File([compressed], photoName, { type: "image/jpeg" }),
-            "photo",
+          const url = await withTimeout(
+            uploadMaintenanceMedia(
+              new File([compressed], photoName, { type: "image/jpeg" }),
+              "photo",
+            ),
+            150_000,
+            "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.",
           );
           uploaded.push(url);
         } catch (error) {

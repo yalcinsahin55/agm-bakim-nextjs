@@ -6,7 +6,13 @@ import { syncOfflineQueue } from "@/lib/offlineQueue";
 export default function PwaRegister() {
   useEffect(() => {
     let disposed = false;
+    let handleControllerChange: (() => void) | undefined;
     if ("serviceWorker" in navigator) {
+      handleControllerChange = () => {
+        if (!disposed) window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+
       const registerAndUpdate = async () => {
         try {
           const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
@@ -34,6 +40,9 @@ export default function PwaRegister() {
       window.removeEventListener("online", sync);
       window.removeEventListener("offline-queue:sync", sync);
       navigator.serviceWorker?.removeEventListener("message", handleWorkerMessage);
+      if (handleControllerChange) {
+        navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      }
     };
   }, []);
 

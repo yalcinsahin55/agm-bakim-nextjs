@@ -54,6 +54,7 @@ test("maintenance media handlers always clear loading state after processing", (
   assert.match(completionSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
   assert.match(completionSource, /try \{[\s\S]*setPhotos\(\(prev\) => \[\.\.\.prev, \.\.\.uploaded\]\);[\s\S]*setPhotoBusy\(false\);[\s\S]*e\.target\.value = "";[\s\S]*\} finally/);
   assert.match(completionSource, /disabled=\{submitting \|\| photoBusy \|\| videoBusy/);
+  assert.match(completionSource, /uploadMaintenanceMedia\([\s\S]*150_000/);
   assert.match(editSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
   assert.match(editSource, /const \[mediaBusy, setMediaBusy\] = useState\(false\)/);
   assert.match(editSource, /setMediaBusy\(true\);[\s\S]*setMediaBusy\(false\);/);
