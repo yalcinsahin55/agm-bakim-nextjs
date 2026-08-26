@@ -9,10 +9,11 @@ function readProjectFile(relativePath: string): string {
 
 test("new maintenance form renders unsaved media without persisted-record proxy", () => {
   const source = readProjectFile("app/tamamla/page.tsx");
+  const preview = readProjectFile("components/MaintenanceEvidencePreview.tsx");
 
   assert.doesNotMatch(source, /import \{ getMediaDisplayUrl \} from "@\/lib\/mediaUrls"/);
-  assert.match(source, /return photo\.startsWith\("http:\/\/"\) \|\| photo\.startsWith\("https:\/\/"\)\s*\? photo/);
-  assert.match(source, /video\.url \|\| undefined/);
+  assert.match(preview, /return photo\.startsWith\("http:\/\/"\) \|\| photo\.startsWith\("https:\/\/"\)\s*\? photo/);
+  assert.match(preview, /video\.url \|\| undefined/);
 });
 
 test("edit form distinguishes transient uploads from persisted record media", () => {
