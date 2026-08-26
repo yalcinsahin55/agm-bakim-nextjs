@@ -12,6 +12,7 @@ import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maint
 import { buildMaintenanceRecordQuery } from "@/lib/reportFilterQuery";
 import { buildForecastExportContext, forecastExportTitle, type ForecastExportContext } from "@/lib/forecastExport";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { loadDefaultExportLogo } from "@/lib/exportBranding";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -43,12 +44,24 @@ async function createForecastPdf(user: { full_name?: string | null }, context: F
   const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
   const title = forecastExportTitle(context);
   const excluded = context.excludedTypeLabels.length ? context.excludedTypeLabels.join(", ") : "Yok";
+  const logo = loadDefaultExportLogo();
 
   function pageHeading() {
-    doc.font(fontBold).fontSize(14).fillColor("#111827").text("Avcıkoru Santrali Bakım Merkezi", left, 30, { width: tableWidth });
-    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(title, left, 50, { width: tableWidth });
-    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleDateString("tr-TR")} · Satır: ${context.rows.length}${context.targetYear ? ` · Hedef yıl: ${context.targetYear}` : ""}${context.periodHours ? ` · Periyot: ${context.periodHours.toLocaleString("tr-TR")} saat` : ""}`, left, 67, { width: tableWidth });
-    doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Tamamlanmamış: ${context.summary.overdue_count} · Aktif plan: ${context.summary.scheduled_count} · Hariç tutulan bakım türleri: ${excluded}`, left, 79, { width: tableWidth });
+    let headingLeft = left;
+    let headingWidth = tableWidth;
+    if (logo) {
+      try {
+        doc.image(logo.buffer, left, 28, { fit: [104, 24], valign: "center" });
+        headingLeft += 116;
+        headingWidth -= 116;
+      } catch {
+        // Keep the text header when the configured logo cannot be decoded.
+      }
+    }
+    doc.font(fontBold).fontSize(14).fillColor("#111827").text("Avcıkoru Santrali Bakım Merkezi", headingLeft, 30, { width: headingWidth });
+    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(title, headingLeft, 50, { width: headingWidth });
+    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleDateString("tr-TR")} · Satır: ${context.rows.length}${context.targetYear ? ` · Hedef yıl: ${context.targetYear}` : ""}${context.periodHours ? ` · Periyot: ${context.periodHours.toLocaleString("tr-TR")} saat` : ""}`, headingLeft, 67, { width: headingWidth });
+    doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Tamamlanmamış: ${context.summary.overdue_count} · Aktif plan: ${context.summary.scheduled_count} · Hariç tutulan bakım türleri: ${excluded}`, headingLeft, 79, { width: headingWidth });
     doc.moveTo(left, 94).lineTo(left + tableWidth, 94).strokeColor("#9ca3af").lineWidth(0.7).stroke();
     doc.y = 106;
   }
@@ -149,15 +162,27 @@ async function createPdf(req: NextRequest) {
   ]);
 
   const { regular: fontRegular, bold: fontBold } = getPdfFontPaths();
+  const logo = loadDefaultExportLogo();
   const doc = new PDFDocument({ size: "A4", margins: { top: 36, bottom: 36, left: 36, right: 36 }, font: fontRegular, autoFirstPage: true });
   const title = selectedEngine ? `${selectedEngine.name} Bakım Geçmişi` : "Tüm Motorların Bakım Geçmişi";
   const left = doc.page.margins.left;
   const tableWidth = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
 
   function pageHeading() {
-    doc.font(fontBold).fontSize(15).fillColor("#111827").text("Avcıkoru Santrali Bakım Merkezi", left, 30, { width: tableWidth });
-    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(title, left, 51, { width: tableWidth });
-    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleDateString("tr-TR")} · Filtrelenen kayıt: ${total}${total > MAX_ROWS ? ` · İlk ${MAX_ROWS} kayıt gösteriliyor` : ""}`, left, 68, { width: tableWidth });
+    let headingLeft = left;
+    let headingWidth = tableWidth;
+    if (logo) {
+      try {
+        doc.image(logo.buffer, left, 28, { fit: [104, 24], valign: "center" });
+        headingLeft += 116;
+        headingWidth -= 116;
+      } catch {
+        // Keep the text header when the configured logo cannot be decoded.
+      }
+    }
+    doc.font(fontBold).fontSize(15).fillColor("#111827").text("Avcıkoru Santrali Bakım Merkezi", headingLeft, 30, { width: headingWidth });
+    doc.font(fontRegular).fontSize(10).fillColor("#4b5563").text(title, headingLeft, 51, { width: headingWidth });
+    doc.font(fontRegular).fontSize(8).fillColor("#6b7280").text(`Rapor tarihi: ${new Date().toLocaleDateString("tr-TR")} · Filtrelenen kayıt: ${total}${total > MAX_ROWS ? ` · İlk ${MAX_ROWS} kayıt gösteriliyor` : ""}`, headingLeft, 68, { width: headingWidth });
     doc.moveTo(left, 86).lineTo(left + tableWidth, 86).strokeColor("#9ca3af").lineWidth(0.7).stroke();
     doc.y = 98;
   }

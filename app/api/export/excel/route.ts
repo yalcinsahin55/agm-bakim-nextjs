@@ -13,6 +13,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { addRows } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
 import { buildForecastExportContext, forecastExportTitle, type ForecastExportContext } from "@/lib/forecastExport";
+import { loadDefaultExportLogo } from "@/lib/exportBranding";
 
 export const dynamic = "force-dynamic";
 
@@ -33,17 +34,21 @@ async function createForecastExcel(context: ForecastExportContext): Promise<Resp
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "AGM Bakım Merkezi";
   workbook.created = new Date();
+  const defaultLogo = loadDefaultExportLogo();
+  const logoId = defaultLogo ? workbook.addImage({ base64: defaultLogo.buffer.toString("base64"), extension: defaultLogo.extension }) : null;
   const usedSheetNames = new Set<string>();
   const addDataSheet = (name: string, rows: Record<string, unknown>[]) => {
     const worksheet = workbook.addWorksheet(uniqueSheetName(name, usedSheetNames));
     addRows(worksheet, escapeSpreadsheetRows(rows));
     worksheet.views = [{ state: "frozen", ySplit: 1 }];
     worksheet.autoFilter = { from: "A1", to: `${String.fromCharCode(64 + Math.min(26, Object.keys(rows[0] || {}).length))}${Math.max(1, rows.length + 1)}` };
+    return worksheet;
   };
 
   const summary = context.summary;
-  addDataSheet("Rapor Özeti", [
+  const summarySheet = addDataSheet("Rapor Özeti", [
     { "ALAN": "Rapor", "DEĞER": forecastExportTitle(context) },
+    { "ALAN": "Marka", "DEĞER": "Yeşil Global Enerji · AGM Bakım Merkezi" },
     { "ALAN": "Rapor tarihi", "DEĞER": new Date().toLocaleDateString("tr-TR") },
     { "ALAN": "Hesaplama tarihi", "DEĞER": summary.current_date },
     { "ALAN": "Hedef yıl", "DEĞER": context.targetYear || "Belirtilmedi" },
@@ -56,6 +61,7 @@ async function createForecastExcel(context: ForecastExportContext): Promise<Resp
     { "ALAN": "Hariç tutulan bakım türleri", "DEĞER": context.excludedTypeLabels.length ? context.excludedTypeLabels.join(", ") : "Yok" },
     { "ALAN": "Hesaplama varsayımı", "DEĞER": "Motor günde 24 saat çalışır; kalan saat / 24 = yaklaşık gün" },
   ]);
+  if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 180, height: 27 } });
 
   addDataSheet("Tahmini Bakım Planı", context.rows.map((row) => ({
     "MOTOR": row.engine,
@@ -119,11 +125,25 @@ async function getExcelExport(req: NextRequest) {
   const items = buildItems(engines, types).filter((item) => !typeFilter || item.type_label === typeFilter);
 
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = "AGM Bakım Merkezi";
+  workbook.created = new Date();
+  const defaultLogo = loadDefaultExportLogo();
+  const logoId = defaultLogo ? workbook.addImage({ base64: defaultLogo.buffer.toString("base64"), extension: defaultLogo.extension }) : null;
   const usedSheetNames = new Set<string>();
   const addDataSheet = (name: string, rows: Record<string, unknown>[]) => {
     const worksheet = workbook.addWorksheet(uniqueSheetName(name, usedSheetNames));
     addRows(worksheet, escapeSpreadsheetRows(rows));
+    return worksheet;
   };
+
+  const summarySheet = addDataSheet("Rapor Özeti", [
+    { "ALAN": "Rapor", "DEĞER": "AGM Motor Bakım Raporu" },
+    { "ALAN": "Marka", "DEĞER": "Yeşil Global Enerji · AGM Bakım Merkezi" },
+    { "ALAN": "Rapor tarihi", "DEĞER": new Date().toLocaleDateString("tr-TR") },
+    { "ALAN": "Motor filtresi", "DEĞER": engineFilter || "Tümü" },
+    { "ALAN": "Bakım türü filtresi", "DEĞER": typeFilter || "Tümü" },
+  ]);
+  if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 180, height: 27 } });
 
   const engineRows = engines.map((e) => ({
     "MOTOR": e.name, "MOTOR ÇALIŞMA SAATİ": e.hours, "YÜK (kW)": e.load_kw || 0,

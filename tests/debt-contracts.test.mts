@@ -533,6 +533,21 @@ test("assistant exports preserve report filenames and maintenance work metrics",
 });
 
 
+test("all generated PDF and Excel reports use the shared Yeşil Global logo", async () => {
+  const branding = await source("lib/exportBranding.ts");
+  const assistantExport = await source("app/api/assistant/export/route.ts");
+  const pdfExport = await source("app/api/export/pdf/route.ts");
+  const excelExport = await source("app/api/export/excel/route.ts");
+  assert.match(branding, /yesil-global-logo\.png/);
+  assert.match(branding, /yesil-global-logo\.jpg/);
+  assert.match(assistantExport, /loadDefaultExportLogo/);
+  assert.doesNotMatch(assistantExport, /yesil-global-logo\.jpg/);
+  assert.match(pdfExport, /loadDefaultExportLogo/);
+  assert.match(pdfExport, /doc\.image\(logo\.buffer/);
+  assert.match(excelExport, /loadDefaultExportLogo/);
+  assert.match(excelExport, /workbook\.addImage/);
+  assert.match(excelExport, /Yeşil Global Enerji · AGM Bakım Merkezi/);
+});
 test("engine reassignment stays manager-only and repairs grouped maintenance tracking", async () => {
   const update = await source("app/api/records/[id]/route.ts");
   const confirm = await source("app/api/records/[id]/confirm/route.ts");

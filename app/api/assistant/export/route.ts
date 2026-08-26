@@ -1,7 +1,5 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
 import { getPdfFontPaths } from "@/lib/pdfFonts";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -18,6 +16,7 @@ import { addRows } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
 import { exportColumnLabel, exportSheetLabel, getExportColumnValue, getAvailableColumns, normalizeExportOptions, type AssistantExportOptions, type ExportColumnId } from "@/lib/assistantExport";
 import { readResponseBytes } from "@/lib/pdfSecurity";
+import { loadDefaultExportLogo } from "@/lib/exportBranding";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -183,11 +182,6 @@ function reportTitle(result: AssistantToolResponse): string {
   return result.title || "Bakım Asistanı Raporu";
 }
 
-function loadDefaultExportLogo(): { buffer: Buffer; extension: "jpeg" } | null {
-  const logoPath = path.join(process.cwd(), "public", "yesil-global-logo.jpg");
-  return existsSync(logoPath) ? { buffer: readFileSync(logoPath), extension: "jpeg" } : null;
-}
-
 async function fetchExportLogo(url: string | null): Promise<{ buffer: Buffer; extension: "png" | "jpeg" } | null> {
   if (!url) return null;
   let parsed: URL;
@@ -304,10 +298,10 @@ async function createExcel(result: AssistantToolResponse, question: string, opti
     { Alan: "Açıklama", Değer: result.summary },
     { Alan: "Şablon", Değer: options.preset },
     { Alan: "Sıralama", Değer: options.sort },
-    { Alan: "Marka", Değer: options.includeLogo ? "AGM Bakım Merkezi" : "Dahil edilmedi" },
+    { Alan: "Marka", Değer: options.includeLogo ? "Yeşil Global Enerji · AGM Bakım Merkezi" : "Dahil edilmedi" },
     { Alan: "Üretim tarihi", Değer: new Date().toLocaleString("tr-TR") },
   ]);
-  if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 140, height: 60 } });
+  if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 180, height: 27 } });
   const scalar = scalarRows(result);
   if (scalar.length > 0) addDataSheet("Cevap Alanları", scalar);
   const sheets = arraySheets(result, options);
@@ -336,12 +330,12 @@ async function createPdf(result: AssistantToolResponse, question: string, option
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   const heading = () => {
-    const titleOffset = options.includeLogo ? 34 : 0;
+    const titleOffset = options.includeLogo ? 116 : 0;
     if (options.includeLogo) {
       let renderedCustomLogo = false;
       if (logo) {
         try {
-          doc.image(logo.buffer, doc.page.margins.left, 34, { fit: [24, 24], align: "center", valign: "center" });
+          doc.image(logo.buffer, doc.page.margins.left, 34, { fit: [104, 24], valign: "center" });
           renderedCustomLogo = true;
         } catch {
           renderedCustomLogo = false;
