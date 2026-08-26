@@ -634,3 +634,13 @@ test("notifications page retries transient initial load failures", async () => {
   assert.match(notificationsPage, /setTimeout\(resolve, 500\)/u);
   assert.match(notificationsPage, /data = await request\(false\)/u);
 });
+
+test("notification detail targets the selected dashboard motor health card", async () => {
+  const notifications = await source("lib/notifications.ts");
+  const dashboard = await source("app/dashboard/page.tsx");
+  assert.match(notifications, /maintenanceDashboardHref/u);
+  assert.match(notifications, /new URLSearchParams\(\{ engine: engineId, maintenance: typeKey \}\)/u);
+  assert.match(dashboard, /new URLSearchParams\(window\.location\.search\)/u);
+  assert.match(dashboard, /scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/u);
+  assert.match(dashboard, /id=\{healthCardId\(engine\._id\)\}/u);
+});

@@ -25,6 +25,11 @@ function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineNa
   };
 }
 
+function maintenanceDashboardHref(engineId: string, typeKey: string): string {
+  const params = new URLSearchParams({ engine: engineId, maintenance: typeKey });
+  return `/dashboard?${params.toString()}`;
+}
+
 type ActionablePanelItem = PanelItem & { status: Exclude<PanelItem["status"], "normal"> };
 
 function isActionableItem(item: PanelItem): item is ActionablePanelItem {
@@ -84,7 +89,7 @@ export async function listUserNotificationsWithCurrentStatuses(db: Db, userId: s
         status: item.status,
         title: text.title,
         message: text.message,
-        href: stored.href || "/dashboard",
+        href: maintenanceDashboardHref(item.engine_id, item.type_key),
       };
     }
     return {
@@ -93,7 +98,7 @@ export async function listUserNotificationsWithCurrentStatuses(db: Db, userId: s
       status: item.status,
       title: text.title,
       message: text.message,
-      href: "/dashboard",
+      href: maintenanceDashboardHref(item.engine_id, item.type_key),
       dedupe_key: dedupeKey,
       read_at: now,
       created_at: now,
@@ -153,7 +158,7 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
               status: item.status,
               title: text.title,
               message: text.message,
-              href: "/dashboard",
+              href: maintenanceDashboardHref(item.engine_id, item.type_key),
               updated_at: now,
               sort_at: isNewNotification ? now : (previousSortAt || now),
               ...(isNewNotification ? { last_notified_at: now } : {}),

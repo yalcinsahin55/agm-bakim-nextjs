@@ -36,6 +36,10 @@ function engineStatus(items: PanelItem[]): StatusKey {
   return ENGINE_STATUS_PRIORITY.find((status) => items.some((item) => item.status === status)) || "normal";
 }
 
+function healthCardId(engineId: string): string {
+  return `motor-health-${engineId.replace(/[^a-zA-Z0-9_-]/gu, "-")}`;
+}
+
 function greetingPresentation(hour: number) {
   if (hour < 6 || hour >= 20) {
     return {
@@ -205,6 +209,19 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    const requestedEngine = new URLSearchParams(window.location.search).get("engine")?.trim();
+    if (requestedEngine) setSelectedHealthEngineId(requestedEngine);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !selectedHealthEngineId) return;
+    const target = document.getElementById(healthCardId(selectedHealthEngineId));
+    if (!target) return;
+    const timer = window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    return () => window.clearTimeout(timer);
+  }, [loading, selectedHealthEngineId]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -311,7 +328,7 @@ export default function DashboardPage() {
             const statusView = ENGINE_STATUS_VIEW[status];
             const selected = selectedHealthEngineId === engine._id;
             const engineItems = items.filter((item) => item.engine_id === engine._id);
-            return <div key={engine._id} className="flex flex-col gap-2">
+            return <div id={healthCardId(engine._id)} key={engine._id} className="flex scroll-mt-24 flex-col gap-2">
               <button type="button" onClick={() => setSelectedHealthEngineId(selected ? "" : engine._id)} aria-expanded={selected} className={`rounded-xl border bg-panel p-3 text-left transition hover:border-amber/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber shadow-lg shadow-amber/10" : "border-border"}`}>
                 <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-bold text-text"><span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusView.dot}`} aria-hidden="true" />{engine.name}</span><span className={`font-mono text-lg font-extrabold ${statusView.text}`}>%{score}</span></div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel2"><div className={`h-full rounded-full bg-gradient-to-r ${statusView.bar}`} style={{ width: `${score}%` }} /></div>
