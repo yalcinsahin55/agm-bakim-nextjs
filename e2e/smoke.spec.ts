@@ -15,12 +15,15 @@ function requireFixture(): { engineId: string; typeKey: string } {
 }
 
 async function login(page: Page, identifier: string, password: string): Promise<void> {
-  await page.goto("/login", { waitUntil: "networkidle" });
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  const submitButton = page.getByRole("button", { name: "Giriş Yap" });
+  await expect(submitButton).toBeEnabled();
   await page.getByPlaceholder("05xx xxx xx xx").fill(identifier);
   await page.locator('input[type="password"]').fill(password);
+  await page.waitForTimeout(100);
   const [loginResponse] = await Promise.all([
     page.waitForResponse((response) => response.url().includes("/api/auth/login") && response.request().method() === "POST", { timeout: 15_000 }),
-    page.getByRole("button", { name: "Giriş Yap" }).click(),
+    submitButton.click(),
   ]);
   const loginBody = await loginResponse.text();
   expect(loginResponse.ok(), `Login failed with ${loginResponse.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
