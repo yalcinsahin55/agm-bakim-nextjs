@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { listUserNotifications } from "@/lib/notifications";
+import { listUserNotificationsWithCurrentStatuses } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { notificationsCollection, usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
@@ -25,7 +25,7 @@ async function getNotifications(req: NextRequest) {
     const requestedLimit = Number.parseInt(req.nextUrl.searchParams.get("limit") || "500", 10);
     const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 500, 1), 500);
     const [notifications, unreadCount] = await Promise.all([
-      listUserNotifications(db, user._id, limit),
+      listUserNotificationsWithCurrentStatuses(db, user._id, limit),
       notificationsCollection(db).countDocuments({ user_id: user._id, read_at: null }),
     ]);
     return NextResponse.json({ notifications, unreadCount, hasMore: notifications.length === limit });

@@ -1,9 +1,8 @@
 import "@/app/globals.css";
 import { Toaster } from "sonner";
 import type { ReactNode } from "react";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 import PwaRegister from "@/components/PwaRegister";
-import RoleGuard from "@/components/RoleGuard";
 
 export const metadata = {
   title: "Avcıkoru Santrali Motor Bakım Merkezi",
@@ -28,17 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Avcıkoru Bakım" />
       </head>
       <body className="antialiased">
-        {/* PC için yan menü - sadece md+ ekranlarda görünür */}
-        <Sidebar />
-        
-        {/* Ana içerik - PC'de sidebar'ın sağına kaydırılır */}
-        <div className="min-h-screen md:ml-64">
-          <div className="max-w-5xl mx-auto md:border-x md:border-border">
-            <RoleGuard>{children}</RoleGuard>
-          </div>
-        </div>
-        
-        
+        <AppShell>{children}</AppShell>
         <PwaRegister />
         <Toaster position="top-center" theme="dark" richColors closeButton />
       </body>

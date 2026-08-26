@@ -604,9 +604,26 @@ test("sidebar labels delayed maintenance separately from the unread bell", async
   assert.match(bell, /\/api\/notifications\/unread-count/);
 });
 
-test("notifications page refreshes maintenance snapshot on first load", async () => {
+test("notification listing uses current panel statuses without requiring refresh mutation", async () => {
+  const notificationsRoute = await source("app/api/notifications/route.ts");
+  const notifications = await source("lib/notifications.ts");
   const notificationsPage = await source("app/bildirimler/page.tsx");
-  assert.match(notificationsPage, /useEffect\(\(\) => \{ load\(true\)/u);
-  assert.match(notificationsPage, /\/api\/notifications\/refresh/u);
-  assert.match(notificationsPage, /method: "POST"/u);
+  assert.match(notificationsRoute, /listUserNotificationsWithCurrentStatuses/u);
+  assert.match(notifications, /loadActionableItems/u);
+  assert.match(notifications, /currentMaintenanceNotifications/u);
+  assert.match(notifications, /read_at: now/u);
+  assert.match(notificationsPage, /useEffect\(\(\) => \{ load\(\)/u);
+});
+
+test("public login route excludes protected navigation chrome", async () => {
+  const appShell = await source("components/AppShell.tsx");
+  assert.match(appShell, /isPublicRoute/u);
+  assert.match(appShell, /\{!isPublicRoute && <Sidebar \/>\}/u);
+  assert.match(appShell, /<RoleGuard>\{children\}<\/RoleGuard>/u);
+});
+
+test("notification refresh falls back to read-only listing on refresh failure", async () => {
+  const notificationsPage = await source("app/bildirimler/page.tsx");
+  assert.match(notificationsPage, /if \(!response\.ok && refresh\)/u);
+  assert.match(notificationsPage, /\/api\/notifications\?limit=500/u);
 });

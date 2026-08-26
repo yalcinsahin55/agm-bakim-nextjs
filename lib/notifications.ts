@@ -53,6 +53,61 @@ export async function listUserNotifications(db: Db, userId: string, limit?: numb
   }));
 }
 
+function notificationTimestamp(value: Date | string | undefined): number {
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/**
+ * Bildirim ekranı için mevcut panel snapshot’ını, kalıcı bildirim belgeleriyle
+ * read-only birleştirir. Böylece cron/refresh gecikse bile statü değişimi ekranda
+ * eski kritik/yaklaşan değeriyle kalmaz; kalıcı yazma yalnızca refresh akışında yapılır.
+ */
+export async function listUserNotificationsWithCurrentStatuses(db: Db, userId: string, limit = 500): Promise<Notification[]> {
+  const [storedNotifications, actionableItems] = await Promise.all([
+    listUserNotifications(db, userId),
+    loadActionableItems(db),
+  ]);
+  const storedByKey = new Map(
+    storedNotifications
+      .filter((notification) => notification.type === "maintenance" && typeof notification.dedupe_key === "string")
+      .map((notification) => [notification.dedupe_key as string, notification] as const),
+  );
+  const now = new Date();
+  const currentMaintenanceNotifications: Notification[] = actionableItems.map((item) => {
+    const dedupeKey = `maintenance:${userId}:${item.engine_id}:${item.type_key}`;
+    const text = notificationText(item.status, item.engine_name, item.type_label, item.remaining);
+    const stored = storedByKey.get(dedupeKey);
+    if (stored) {
+      return {
+        ...stored,
+        status: item.status,
+        title: text.title,
+        message: text.message,
+        href: stored.href || "/dashboard",
+      };
+    }
+    return {
+      user_id: userId,
+      type: "maintenance",
+      status: item.status,
+      title: text.title,
+      message: text.message,
+      href: "/dashboard",
+      dedupe_key: dedupeKey,
+      read_at: now,
+      created_at: now,
+      updated_at: now,
+      last_notified_at: now,
+      sort_at: now,
+    };
+  });
+  const systemNotifications = storedNotifications.filter((notification) => notification.type === "system");
+  return [...currentMaintenanceNotifications, ...systemNotifications]
+    .sort((a, b) => notificationTimestamp(b.sort_at || b.last_notified_at || b.created_at) - notificationTimestamp(a.sort_at || a.last_notified_at || a.created_at))
+    .slice(0, Math.max(1, Math.min(limit, 500)));
+}
+
 async function syncUserNotifications(db: Db, user: User, actionable: ActionablePanelItem[], listAfterSync = true): Promise<Notification[] | null> {
   const collection = notificationsCollection(db);
   const now = new Date();

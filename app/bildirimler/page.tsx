@@ -117,9 +117,16 @@ export default function NotificationsPage() {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const response = refresh
+      let response = refresh
         ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" })
         : await fetch("/api/notifications?limit=500", { cache: "no-store" });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      if (!response.ok && refresh) {
+        response = await fetch("/api/notifications?limit=500", { cache: "no-store" });
+      }
       if (response.status === 401) {
         window.location.href = "/login";
         return;
@@ -135,7 +142,7 @@ export default function NotificationsPage() {
     }
   }, []);
 
-  useEffect(() => { load(true).catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
+  useEffect(() => { load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
 
   async function markRead(id: string) {
     try {
