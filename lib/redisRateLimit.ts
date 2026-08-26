@@ -126,6 +126,10 @@ function getEnvironmentName(): string {
 }
 
 function shouldFailClosed(failureMode: RateLimitFailureMode): boolean {
+  const localE2EOverride = process.env.E2E_ALLOW_LOCAL_RATE_LIMIT === "1"
+    && process.env.E2E_SEED === "1"
+    && process.env.MONGO_DB_NAME === "agm_bakim_e2e";
+  if (localE2EOverride) return false;
   return failureMode === "fail-closed" && (process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL_ENV));
 }
 
