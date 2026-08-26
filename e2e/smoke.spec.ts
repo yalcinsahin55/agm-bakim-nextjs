@@ -4,9 +4,10 @@ async function login(page: Page, identifier: string, password: string): Promise<
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByPlaceholder("05xx xxx xx xx").fill(identifier);
   await page.locator('input[type="password"]').fill(password);
-  const loginResponsePromise = page.waitForResponse((response) => response.url().endsWith("/api/auth/login") && response.request().method() === "POST");
-  await page.getByRole("button", { name: "Giriş Yap" }).click();
-  const loginResponse = await loginResponsePromise;
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes("/api/auth/login") && response.request().method() === "POST", { timeout: 15_000 }),
+    page.getByRole("button", { name: "Giriş Yap" }).click(),
+  ]);
   const loginBody = await loginResponse.text();
   expect(loginResponse.ok(), `Login failed with ${loginResponse.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
