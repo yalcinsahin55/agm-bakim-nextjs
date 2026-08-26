@@ -17,6 +17,7 @@ function requireFixture(): { engineId: string; typeKey: string } {
 async function login(page: Page, identifier: string, password: string): Promise<void> {
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   const submitButton = page.getByRole("button", { name: "Giriş Yap" });
+  await expect(page.locator('form[data-login-hydrated="true"]')).toBeVisible();
   await expect(submitButton).toBeEnabled();
   await page.getByPlaceholder("05xx xxx xx xx").fill(identifier);
   await page.locator('input[type="password"]').fill(password);

@@ -16,11 +16,13 @@ export default function LoginPage() {
   const [form, setForm] = useState<LoginForm>({ identifier: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [redirectPath, setRedirectPath] = useState("/dashboard");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const redirectTo = params.get("redirect");
     if (redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")) setRedirectPath(redirectTo);
+    setHydrated(true);
   }, []);
 
   function handleField(field: keyof LoginForm) {
@@ -80,7 +82,7 @@ export default function LoginPage() {
           <div className="font-bold text-teal">Telefon ile güvenli giriş</div>
           <div className="mt-0.5 leading-relaxed">Telefon numaranızı ve yöneticinizin oluşturduğu şifrenizi kullanın.</div>
         </div>
-        <form onSubmit={submit} className="flex flex-col gap-3">
+        <form onSubmit={submit} data-login-hydrated={hydrated ? "true" : "false"} className="flex flex-col gap-3">
           <label className="text-left text-[10px] font-bold uppercase tracking-wide text-muted">Telefon numarası veya e-posta</label>
           <input
             required
