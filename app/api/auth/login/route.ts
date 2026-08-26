@@ -68,7 +68,7 @@ async function postLogin(req: NextRequest) {
       console.error("Giriş audit kaydı yazılamadı:", auditError instanceof Error ? auditError.name : "UnknownError");
     }
 
-    const token = await createSessionToken(user._id);
+    const token = await createSessionToken(user._id, user.session_version);
     const isTechnician = user.role === "teknisyen" || user.role === "planlamaci";
     const technician_type = isTechnician ? normalizeTechnicianType(user.technician_type) : undefined;
     const technicianPermissions = isTechnician ? normalizeTechnicianPermissions(user, technician_type ?? "mekanik") : undefined;

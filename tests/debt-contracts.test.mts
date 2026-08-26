@@ -330,9 +330,16 @@ test("repository exposes CI validation commands", async () => {
 test("session identity stays stable across phone changes", async () => {
   const login = await source("app/api/auth/login/route.ts");
   const auth = await source("lib/auth.ts");
+  const userUpdate = await source("app/api/users/[id]/route.ts");
+  const root = await source("app/page.tsx");
   assert.match(login, /phone_normalized/);
-  assert.match(login, /createSessionToken\(user\._id\)/);
-  assert.match(auth, /findOne\(\{ _id: userId \}\)/);
+  assert.match(login, /createSessionToken\(user\._id, user\.session_version\)/);
+  assert.match(auth, /findOne\(\{ _id: session.userId \}\)/);
+  assert.match(auth, /verifySessionTokenDetails/);
+  assert.match(auth, /session_version/);
+  assert.match(auth, /currentVersion/);
+  assert.match(userUpdate, /update.session_version/);
+  assert.match(root, /getCurrentUser/);
 });
 
 test("no protected UI route relies on middleware as its authorization boundary", async () => {
