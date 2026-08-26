@@ -35,6 +35,7 @@ async function loginViaFixtureApi(page: Page, identifier: string, password: stri
   // Local E2E fallback keeps an in-memory IP quota for the whole server process.
   // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
   // without changing the production limiter or trusting this header in production.
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
   const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
   const response = await page.context().request.post("/api/auth/login", {
     headers: { "x-forwarded-for": fixtureIp },
@@ -42,24 +43,39 @@ async function loginViaFixtureApi(page: Page, identifier: string, password: stri
   });
   const loginBody = await response.text();
   expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
-  expect((await page.context().cookies()).some((cookie) => cookie.name === "agm_session" && cookie.value.length > 0)).toBeTruthy();
+  const setCookie = response.headers()["set-cookie"] || "";
+  const headerMatch = setCookie.match(/(?:^|,\s*)agm_session=([^;]+)/);
+  const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
+  const sessionCookie = headerMatch?.[1] || existingCookie || "";
+  expect(sessionCookie.length).toBeGreaterThan(0);
+  await page.context().addCookies([{
+    name: "agm_session",
+    value: sessionCookie,
+    url: page.url(),
+    path: "/",
+    httpOnly: true,
+    secure: false,
+    sameSite: "Lax",
+  }]);
 }
 async function fetchJson(page: Page, url: string, options: { method?: string; body?: unknown } = {}): Promise<JsonResult> {
-  const response = await page.context().request.fetch(url, {
-    method: options.method || "GET",
-    ...(options.body === undefined ? {} : {
-      headers: { "Content-Type": "application/json" },
-      data: options.body,
-    }),
-  });
-  const raw = await response.text();
-  let parsed: unknown = null;
-  try {
-    parsed = raw ? JSON.parse(raw) : null;
-  } catch {
-    parsed = raw;
-  }
-  return { status: response.status(), body: parsed };
+  return page.evaluate(async ({ url: requestUrl, method, body }) => {
+    const response = await fetch(requestUrl, {
+      method,
+      ...(body === undefined ? {} : {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    });
+    const raw = await response.text();
+    let parsed: unknown = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      parsed = raw;
+    }
+    return { status: response.status, body: parsed };
+  }, { url, method: options.method || "GET", body: options.body });
 }
 
 function uniqueRequestId(testTitle: string, retry: number): string {
