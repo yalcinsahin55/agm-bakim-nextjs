@@ -21,6 +21,7 @@ import { engineSortKey } from "@/lib/status";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, formatDateTimeLocal, formatMaintenanceDuration, getMaintenanceRecordDate, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { compressImage } from "@/lib/imageCompression";
 
 interface Engine {
   _id: string;
@@ -85,58 +86,6 @@ interface MaintenanceRecord {
   group_id?: string | null;
   group_types?: Array<{ type_key: string; type_label: string }>;
   report_attachments?: ReportAttachment[];
-}
-
-function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        const release = () => {
-          img.onload = null;
-          img.onerror = null;
-          img.removeAttribute("src");
-          canvas.width = 1;
-          canvas.height = 1;
-        };
-        if (!ctx) {
-          release();
-          reject(new Error("Fotoğraf işlenemedi."));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          release();
-          if (!blob) {
-            reject(new Error("Fotoğraf sıkıştırılamadı."));
-            return;
-          }
-          resolve(blob);
-        }, "image/jpeg", quality);
-      };
-      img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-      if (typeof e.target?.result !== "string") {
-        reject(new Error("Fotoğraf okunamadı."));
-        return;
-      }
-      img.src = e.target.result;
-    };
-    reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-    reader.readAsDataURL(file);
-  });
 }
 
 function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
@@ -283,6 +232,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const [busy, setBusy] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const previewUrlsRef = useRef<Record<string, string>>({});
   const historicalTypeKeys = useMemo(() => new Set([record.type_key, ...(record.extra_types || []).map((extra) => extra.type_key), ...groupTypes.map((type) => type.type_key)]), [record.type_key, record.extra_types, groupTypes]);
   const selectedTypeKeys = useMemo(() => new Set([...historicalTypeKeys, ...extraKeys]), [historicalTypeKeys, extraKeys]);
@@ -378,67 +328,67 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
 
   async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
+    if (!files.length || mediaBusy) {
+      e.target.value = "";
+      return;
+    }
+    setMediaBusy(true);
     const uploaded: string[] = [];
-    for (const f of files) {
-      try {
-        const compressed = await compressImage(f);
-        const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-        if (!navigator.onLine) {
-          const id = makeOfflineId();
-          setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-          createOfflinePreview(id, compressed);
-          uploaded.push(`offline:${id}`);
-          continue;
-        }
-        const url = await uploadMaintenanceMedia(
-          new File([compressed], photoName, { type: "image/jpeg" }),
-          "photo",
-        );
-        uploaded.push(url);
-      } catch (error) {
-        if (!navigator.onLine) {
-          try {
-            const compressed = await compressImage(f);
+    try {
+      for (const f of files) {
+        try {
+          const compressed = await compressImage(f);
+          const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+          if (!navigator.onLine) {
             const id = makeOfflineId();
-            const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
             setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
             createOfflinePreview(id, compressed);
             uploaded.push(`offline:${id}`);
             continue;
-          } catch {
-            // Genel hata aşağıda gösterilir.
           }
+          const url = await uploadMaintenanceMedia(
+            new File([compressed], photoName, { type: "image/jpeg" }),
+            "photo",
+          );
+          uploaded.push(url);
+        } catch (error) {
+          if (!navigator.onLine) {
+            try {
+              const compressed = await compressImage(f);
+              const id = makeOfflineId();
+              const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+              setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+              createOfflinePreview(id, compressed);
+              uploaded.push(`offline:${id}`);
+              continue;
+            } catch {
+              // Genel hata aşağıda gösterilir.
+            }
+          }
+          const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+          toast.error(`${f.name} yüklenemedi: ${message}`);
         }
-        const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-        toast.error(`${f.name} yüklenemedi: ${message}`);
       }
+    } finally {
+      setPhotos((p) => [...p, ...uploaded]);
+      setMediaBusy(false);
+      e.target.value = "";
     }
-    setPhotos((p) => [...p, ...uploaded]);
-    e.target.value = "";
   }
 
   async function addVideos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
-    for (const f of files) {
-      if (f.size > 100 * 1024 * 1024) {
-        toast.error(`'${f.name}' çok büyük (en fazla 100MB).`);
-        continue;
-      }
-      if (!navigator.onLine) {
-        const id = makeOfflineId();
-        setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-        createOfflinePreview(id, f);
-        setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
-        continue;
-      }
-      try {
-        const url = await withTimeout(
-          uploadVideoChunked(f),
-          600_000,
-          "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
-        );
-        setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
-      } catch (err: unknown) {
+    if (!files.length || mediaBusy) {
+      e.target.value = "";
+      return;
+    }
+    setMediaBusy(true);
+    try {
+      for (const f of files) {
+        if (f.size > 100 * 1024 * 1024) {
+          toast.error(`'${f.name}' çok büyük (en fazla 100MB).`);
+          continue;
+        }
         if (!navigator.onLine) {
           const id = makeOfflineId();
           setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
@@ -446,11 +396,29 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
           setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
           continue;
         }
-        const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
-        toast.error(`${f.name} yüklenemedi: ${message}`);
+        try {
+          const url = await withTimeout(
+            uploadVideoChunked(f.type ? f : new File([f], f.name, { type: "video/mp4", lastModified: f.lastModified })),
+            600_000,
+            "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
+          );
+          setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
+        } catch (err: unknown) {
+          if (!navigator.onLine) {
+            const id = makeOfflineId();
+            setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
+            createOfflinePreview(id, f);
+            setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
+            continue;
+          }
+          const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
+          toast.error(`${f.name} yüklenemedi: ${message}`);
+        }
       }
+    } finally {
+      setMediaBusy(false);
+      e.target.value = "";
     }
-    e.target.value = "";
   }
 
   async function save() {
@@ -625,7 +593,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
           {offlineMedia.length} medya/rapor eki bağlantı gelince yüklenecek; kaydettiğinde güncelleme kuyruğa alınır.
         </div>
       )}
-      <ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={busy} />
+      <ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={busy || mediaBusy} />
       {photos.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           {photos.map((p, idx) => (
@@ -649,8 +617,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
         </div>
       )}
       <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-        📷 Fotoğraf ekle
-        <input type="file" accept="image/*" multiple onChange={addPhotos} className="hidden" />
+        {mediaBusy ? "Fotoğraf işleniyor..." : "📷 Fotoğraf ekle"}
+        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || mediaBusy} onChange={addPhotos} className="hidden" />
       </label>
 
       {videos.length > 0 && (
@@ -666,8 +634,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
         </div>
       )}
       <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-        🎬 Video ekle (max 100MB)
-        <input type="file" accept="video/*" multiple onChange={addVideos} className="hidden" />
+        {mediaBusy ? "Video yükleniyor..." : "🎬 Video ekle (max 100MB)"}
+        <input type="file" accept="video/*" multiple disabled={busy || mediaBusy} onChange={addVideos} className="hidden" />
       </label>
 
       <div className="flex gap-2 mt-1">
@@ -676,7 +644,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
         </button>
         <button
           onClick={save}
-          disabled={busy || reportAttachmentBusy}
+          disabled={busy || mediaBusy || reportAttachmentBusy}
           className="flex-1 py-2.5 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition"
         >
           {busy ? (

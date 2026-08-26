@@ -46,3 +46,19 @@ test("Vercel keeps the notification refresh cron after optional MongoDB probing 
     { path: "/api/cron/refresh", schedule: "0 6 * * *" },
   ]);
 });
+test("maintenance media handlers always clear loading state after processing", () => {
+  const completionSource = readProjectFile("app/tamamla/page.tsx");
+  const editSource = readProjectFile("app/kayitlar/page.tsx");
+  const compressionSource = readProjectFile("lib/imageCompression.ts");
+
+  assert.match(completionSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
+  assert.match(completionSource, /try \{[\s\S]*setPhotos\(\(prev\) => \[\.\.\.prev, \.\.\.uploaded\]\);[\s\S]*setPhotoBusy\(false\);[\s\S]*e\.target\.value = "";[\s\S]*\} finally/);
+  assert.match(completionSource, /disabled=\{submitting \|\| photoBusy \|\| videoBusy/);
+  assert.match(editSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
+  assert.match(editSource, /const \[mediaBusy, setMediaBusy\] = useState\(false\)/);
+  assert.match(editSource, /setMediaBusy\(true\);[\s\S]*setMediaBusy\(false\);/);
+  assert.match(editSource, /disabled=\{busy \|\| mediaBusy \|\| reportAttachmentBusy\}/);
+  assert.match(compressionSource, /IMAGE_PROCESSING_TIMEOUT_MS = 30_000/);
+  assert.match(compressionSource, /reader\.onabort/);
+  assert.match(compressionSource, /canvas\.toBlob/);
+});

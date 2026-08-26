@@ -21,6 +21,7 @@ import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { compressImage } from "@/lib/imageCompression";
 
 const CHECKLIST_TEMPLATES = {
   yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
@@ -38,55 +39,6 @@ function checklistForType(typeKey: string, label?: string): string[] {
   if (normalized.includes("alternat")) return CHECKLIST_TEMPLATES.alternator;
   return CHECKLIST_TEMPLATES.default;
 }
-
-function compressImage(file: File, maxDim = 720, quality = 0.65): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-          reader.onload = (e) => {
-
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-        else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        const release = () => {
-          img.onload = null;
-          img.onerror = null;
-          img.removeAttribute("src");
-          canvas.width = 1;
-          canvas.height = 1;
-        };
-        if (!ctx) {
-          release();
-          reject(new Error("Fotoğraf işlenemedi."));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          release();
-          if (!blob) {
-            reject(new Error("Fotoğraf sıkıştırılamadı."));
-            return;
-          }
-          resolve(blob);
-        }, "image/jpeg", quality);
-      };
-      img.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-              if (typeof e.target?.result !== "string") {
-          reject(new Error("Fotoğraf okunamadı."));
-          return;
-        }
-        img.src = e.target.result;
-
-    };
-    reader.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-    reader.readAsDataURL(file);
-  });
-}
-
 
 function getPhotoSrc(photo: string, previews: Record<string, string> = {}): string {
   if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
@@ -295,46 +247,52 @@ export default function TamamlaPage() {
 
   async function handlePhotos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+    if (!files.length || photoBusy) {
+      e.target.value = "";
+      return;
+    }
     setPhotoBusy(true);
     const uploaded: string[] = [];
-    for (const f of files) {
-      try {
-        const compressed = await compressImage(f);
-        const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-        if (!navigator.onLine) {
-          const id = makeOfflineId();
-          setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-          createOfflinePreview(id, compressed);
-          uploaded.push(`offline:${id}`);
-          continue;
-        }
-        const url = await uploadMaintenanceMedia(
-          new File([compressed], photoName, { type: "image/jpeg" }),
-          "photo",
-        );
-        uploaded.push(url);
-      } catch (error) {
-        if (!navigator.onLine) {
-          try {
-            const compressed = await compressImage(f);
+    try {
+      for (const f of files) {
+        try {
+          const compressed = await compressImage(f);
+          const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+          if (!navigator.onLine) {
             const id = makeOfflineId();
-            const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
             setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
             createOfflinePreview(id, compressed);
             uploaded.push(`offline:${id}`);
             continue;
-          } catch {
-            // Aşağıdaki genel hata kullanıcıya gösterilir.
           }
+          const url = await uploadMaintenanceMedia(
+            new File([compressed], photoName, { type: "image/jpeg" }),
+            "photo",
+          );
+          uploaded.push(url);
+        } catch (error) {
+          if (!navigator.onLine) {
+            try {
+              const compressed = await compressImage(f);
+              const id = makeOfflineId();
+              const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
+              setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
+              createOfflinePreview(id, compressed);
+              uploaded.push(`offline:${id}`);
+              continue;
+            } catch {
+              // Aşağıdaki genel hata kullanıcıya gösterilir.
+            }
+          }
+          const message = error instanceof Error ? error.message : "Bilinmeyen hata";
+          toast.error(`${f.name} yüklenemedi: ${message}`);
         }
-        const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-        toast.error(`${f.name} yüklenemedi: ${message}`);
       }
+    } finally {
+      setPhotos((prev) => [...prev, ...uploaded]);
+      setPhotoBusy(false);
+      e.target.value = "";
     }
-    setPhotos((prev) => [...prev, ...uploaded]);
-    setPhotoBusy(false);
-    e.target.value = "";
   }
 
   function removePhoto(idx: number) {
@@ -350,10 +308,14 @@ export default function TamamlaPage() {
   // Videolar küçük parçalara bölünerek uygulama API’sine gönderilir ve Blob’a yazılır.
   async function handleVideos(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+    if (!files.length || videoBusy) {
+      e.target.value = "";
+      return;
+    }
 
     if (videos.length + files.length > 5) {
       toast.warning("Toplamda en fazla 5 video ekleyebilirsiniz.");
+      e.target.value = "";
       return;
     }
 
@@ -373,7 +335,7 @@ export default function TamamlaPage() {
         }
         try {
           const url = await withTimeout(
-            uploadVideoChunked(f),
+            uploadVideoChunked(f.type ? f : new File([f], f.name, { type: "video/mp4", lastModified: f.lastModified })),
             600_000,
             "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
           );
@@ -730,10 +692,10 @@ export default function TamamlaPage() {
           <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="checklist-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">05 · Kontrol listesi</div><h2 id="checklist-heading" className="mt-1 text-base font-extrabold text-text">Bakım doğrulaması</h2><p className="mt-1 text-[10px] text-faint">Kaydetmeden önce tüm maddeleri işaretleyin.</p></div><div className="grid gap-1.5">{checklistItems.map((item) => <label key={item} className="flex items-center gap-2.5 rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(event) => setChecklist((current) => ({ ...current, [item]: event.target.checked }))} />{item}</label>)}</div><div className={`mt-3 rounded-lg px-3 py-2.5 text-[10.5px] ${checklistComplete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{checklistComplete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div></section>
 
-            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="evidence-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">06 · Kanıt ve notlar</div><h2 id="evidence-heading" className="mt-1 text-base font-extrabold text-text">Bakım kanıtları</h2><p className="mt-1 text-[10px] text-faint">En az bir not, fotoğraf/video veya PDF/Excel/Word rapor eki eklenmesi zorunludur.</p></div><label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımcı notu<textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{photoBusy ? "Fotoğraflar işleniyor..." : "Fotoğraf ekle"}<span className="mt-1 block text-[9px] text-faint">Birden fazla seçebilirsiniz</span></span><input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" /></label><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{videoBusy ? "Videolar yükleniyor..." : "Video ekle"}<span className="mt-1 block text-[9px] text-faint">En fazla 5 adet · 100MB</span></span><input type="file" accept="video/*" multiple onChange={handleVideos} className="hidden" /></label></div><ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={submitting} />{photos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Fotoğraflar</div><div className="flex flex-wrap gap-2">{photos.map((photo, index) => <div key={`${photo}-${index}`} className="relative"><button type="button" onClick={() => setSelectedPhoto(getPhotoSrc(photo, offlinePreviews))} className="block" aria-label="Fotoğrafı büyüt"><NextImage src={getPhotoSrc(photo, offlinePreviews)} width={64} height={64} unoptimized className="h-16 w-16 rounded-lg border border-border object-cover" alt="" /></button><button type="button" onClick={() => removePhoto(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-text">✕</button></div>)}</div></div>}{videos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Videolar</div><div className="flex flex-wrap gap-2">{videos.map((video, index) => <div key={`${video.url}-${index}`} className="relative"><video src={video.url?.startsWith("offline:") ? offlinePreviews[video.url.slice("offline:".length)] : video.url ? getMediaDisplayUrl(video.url, "video") : undefined} className="h-16 w-20 rounded-lg border border-border bg-black object-cover" controls={false} /><button type="button" onClick={() => removeVideo(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-red">✕</button></div>)}</div></div>}{!evidenceReady && <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtı ekleyin.</div>}</section>
+            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="evidence-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">06 · Kanıt ve notlar</div><h2 id="evidence-heading" className="mt-1 text-base font-extrabold text-text">Bakım kanıtları</h2><p className="mt-1 text-[10px] text-faint">En az bir not, fotoğraf/video veya PDF/Excel/Word rapor eki eklenmesi zorunludur.</p></div><label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımcı notu<textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" /></label><div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{photoBusy ? "Fotoğraflar işleniyor..." : "Fotoğraf ekle"}<span className="mt-1 block text-[9px] text-faint">Birden fazla seçebilirsiniz</span></span><input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={submitting || photoBusy || videoBusy} onChange={handlePhotos} className="hidden" /></label><label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60"><span>{videoBusy ? "Videolar yükleniyor..." : "Video ekle"}<span className="mt-1 block text-[9px] text-faint">En fazla 5 adet · 100MB</span></span><input type="file" accept="video/*" multiple disabled={submitting || photoBusy || videoBusy} onChange={handleVideos} className="hidden" /></label></div><ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={submitting} />{photos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Fotoğraflar</div><div className="flex flex-wrap gap-2">{photos.map((photo, index) => <div key={`${photo}-${index}`} className="relative"><button type="button" onClick={() => setSelectedPhoto(getPhotoSrc(photo, offlinePreviews))} className="block" aria-label="Fotoğrafı büyüt"><NextImage src={getPhotoSrc(photo, offlinePreviews)} width={64} height={64} unoptimized className="h-16 w-16 rounded-lg border border-border object-cover" alt="" /></button><button type="button" onClick={() => removePhoto(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-text">✕</button></div>)}</div></div>}{videos.length > 0 && <div className="mt-3"><div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-faint">Videolar</div><div className="flex flex-wrap gap-2">{videos.map((video, index) => <div key={`${video.url}-${index}`} className="relative"><video src={video.url?.startsWith("offline:") ? offlinePreviews[video.url.slice("offline:".length)] : video.url ? getMediaDisplayUrl(video.url, "video") : undefined} className="h-16 w-20 rounded-lg border border-border bg-black object-cover" controls={false} /><button type="button" onClick={() => removeVideo(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-red">✕</button></div>)}</div></div>}{!evidenceReady && <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtı ekleyin.</div>}</section>
           </div>
 
-          <div className="flex flex-col-reverse items-stretch justify-between gap-3 rounded-2xl border border-border bg-panel p-3 sm:flex-row sm:items-center"><div className="text-[10px] text-faint">Kaydetmeden önce zaman, kontrol listesi ve kanıt alanlarını doğrulayın.</div><div className="flex gap-2 sm:min-w-[320px] sm:justify-end"><button type="button" onClick={() => router.back()} className="flex-1 rounded-lg border border-border bg-panel2 px-4 py-3 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text sm:flex-none">İptal</button><button type="submit" disabled={submitting || videoBusy || reportAttachmentBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady} className="flex-1 rounded-lg bg-amber px-5 py-3 text-[12px] font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[220px]">{submitting ? "Kaydediliyor..." : "BAKIMI TAMAMLA"}</button></div></div>
+          <div className="flex flex-col-reverse items-stretch justify-between gap-3 rounded-2xl border border-border bg-panel p-3 sm:flex-row sm:items-center"><div className="text-[10px] text-faint">Kaydetmeden önce zaman, kontrol listesi ve kanıt alanlarını doğrulayın.</div><div className="flex gap-2 sm:min-w-[320px] sm:justify-end"><button type="button" onClick={() => router.back()} className="flex-1 rounded-lg border border-border bg-panel2 px-4 py-3 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text sm:flex-none">İptal</button><button type="submit" disabled={submitting || photoBusy || videoBusy || reportAttachmentBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady} className="flex-1 rounded-lg bg-amber px-5 py-3 text-[12px] font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[220px]">{submitting ? "Kaydediliyor..." : "BAKIMI TAMAMLA"}</button></div></div>
         </form>
       </main>
 
