@@ -48,13 +48,13 @@ async function loginViaFixtureApi(page: Page, identifier: string, password: stri
   const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
   const sessionCookie = headerMatch?.[1] || existingCookie || "";
   expect(sessionCookie.length).toBeGreaterThan(0);
+  const loginOrigin = new URL(page.url()).origin;
   await page.context().addCookies([{
     name: "agm_session",
     value: sessionCookie,
-    url: page.url(),
-    path: "/",
+    url: `${loginOrigin}/`,
     httpOnly: true,
-    secure: false,
+    secure: loginOrigin.startsWith("https://"),
     sameSite: "Lax",
   }]);
 }
