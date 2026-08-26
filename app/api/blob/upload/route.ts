@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canWriteMaintenance } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const rateLimited = await enforceApiRateLimit(request, "blob-upload-legacy", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const body = (await request.json()) as HandleUploadBody;
+  const bodyResult = await parseJsonBodyLimited(request, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Upload yetkilendirme isteği çok büyük." : "Geçersiz Blob upload isteği." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const body = bodyResult.value as HandleUploadBody;
+  if (!body || typeof body !== "object" || !("type" in body)) {
+    return NextResponse.json({ error: "Geçersiz Blob upload isteği." }, { status: 400 });
+  }
   if (body.type === "blob.generate-client-token" && !isAllowedPathname(body.payload?.pathname)) {
     return NextResponse.json({ error: "Geçersiz dosya yolu." }, { status: 400 });
   }

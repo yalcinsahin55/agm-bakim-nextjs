@@ -217,7 +217,6 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
   const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
   const [transientPhotoUrls, setTransientPhotoUrls] = useState<Set<string>>(() => new Set());
-  const [transientVideoUrls, setTransientVideoUrls] = useState<Set<string>>(() => new Set());
   const [reportAttachments, setReportAttachments] = useState<ReportAttachment[]>(record.report_attachments || []);
   const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
@@ -322,14 +321,6 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
       revokeOfflinePreview(id);
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
     }
-    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
-      setTransientVideoUrls((current) => {
-        if (!current.has(url)) return current;
-        const next = new Set(current);
-        next.delete(url);
-        return next;
-      });
-    }
     setVideos((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
 
@@ -431,7 +422,6 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
             600_000,
             "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
           );
-          setTransientVideoUrls((current) => new Set(current).add(url));
           setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
         } catch (err: unknown) {
           if (!navigator.onLine) {

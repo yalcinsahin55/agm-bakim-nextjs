@@ -6,6 +6,7 @@ const PHOTO_TIMEOUT_MS = 2 * 60 * 1000;
 const VIDEO_TIMEOUT_MS = 10 * 60 * 1000;
 
 export type MaintenanceMediaKind = "photo" | "video";
+export type ServerUploadFolder = "photos" | "oil-analyses" | "report-attachments";
 
 export interface MaintenanceMediaUploadOptions {
   idempotencyKey?: string;
@@ -16,23 +17,23 @@ export interface UploadedOilAnalysis {
   filename: string;
 }
 
+export interface ServerFileUploadResult {
+  url: string;
+  filename?: string;
+  mime?: string;
+  size?: number;
+}
+
 interface ServerUploadResponse {
   url?: unknown;
   filename?: unknown;
+  mime?: unknown;
+  size?: unknown;
   error?: unknown;
 }
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
-}
-
-function safeMediaFilename(filename: string, kind: MaintenanceMediaKind): string {
-  const fallback = kind === "photo" ? "photo.jpg" : "video.mp4";
-  const safe = filename
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^[-.]+/, "")
-    .slice(0, 180);
-  return safe || fallback;
 }
 
 function safeIdempotencyKey(value: string): string {
@@ -56,12 +57,18 @@ function validateMediaFile(file: File, kind: MaintenanceMediaKind): void {
   }
 }
 
-async function uploadThroughServer(
+function timeoutMessage(folder: ServerUploadFolder): string {
+  if (folder === "photos") return "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.";
+  if (folder === "report-attachments") return "Rapor eki yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.";
+  return "PDF yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.";
+}
+
+export async function uploadFileThroughServer(
   file: File,
-  folder: "photos" | "oil-analyses",
+  folder: ServerUploadFolder,
   timeoutMs: number,
   options: MaintenanceMediaUploadOptions = {},
-): Promise<{ url: string; filename?: string }> {
+): Promise<ServerFileUploadResult> {
   const formData = new FormData();
   formData.append("file", file, file.name);
   formData.append("folder", folder);
@@ -85,13 +92,11 @@ async function uploadThroughServer(
     return {
       url: data.url,
       ...(typeof data.filename === "string" ? { filename: data.filename } : {}),
+      ...(typeof data.mime === "string" ? { mime: data.mime } : {}),
+      ...(typeof data.size === "number" ? { size: data.size } : {}),
     };
   } catch (error) {
-    if (controller.signal.aborted || isAbortError(error)) {
-      throw new Error(folder === "photos"
-        ? "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin."
-        : "PDF yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.");
-    }
+    if (controller.signal.aborted || isAbortError(error)) throw new Error(timeoutMessage(folder));
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
@@ -101,7 +106,7 @@ async function uploadThroughServer(
 export async function uploadOilAnalysisPdf(file: File): Promise<UploadedOilAnalysis> {
   if (file.type !== "application/pdf") throw new Error("Sadece PDF dosyası yükleyebilirsiniz.");
   if (file.size <= 0 || file.size > OIL_ANALYSIS_MAX_BYTES) throw new Error("PDF dosyası 10 MB’tan küçük olmalıdır.");
-  const result = await uploadThroughServer(file, "oil-analyses", PHOTO_TIMEOUT_MS);
+  const result = await uploadFileThroughServer(file, "oil-analyses", PHOTO_TIMEOUT_MS);
   return { url: result.url, filename: result.filename || file.name };
 }
 
@@ -112,7 +117,7 @@ export async function uploadMaintenanceMedia(
 ): Promise<string> {
   validateMediaFile(file, kind);
   if (kind === "photo") {
-    const result = await uploadThroughServer(file, "photos", PHOTO_TIMEOUT_MS, options);
+    const result = await uploadFileThroughServer(file, "photos", PHOTO_TIMEOUT_MS, options);
     return result.url;
   }
   throw new Error("Video upload için uploadVideoChunked kullanılmalıdır.");

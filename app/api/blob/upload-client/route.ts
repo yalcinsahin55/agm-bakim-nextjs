@@ -13,13 +13,16 @@ import {
   getReportAttachmentExtension,
   sanitizeReportAttachmentFilename,
 } from "@/lib/reportAttachments";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const REPORT_UPLOAD_PREFIX = "report-attachments/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
-const REPORT_UPLOAD_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
+const REPORT_UPLOAD_TOKEN = process.env.VERCEL
+  ? undefined
+  : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
 
 function isSafeReportUploadPath(pathname: string): boolean {
   if (!pathname.startsWith(REPORT_UPLOAD_PREFIX) || pathname.includes("..")) return false;
@@ -40,7 +43,14 @@ async function postClientUpload(request: NextRequest): Promise<Response> {
   if (rateLimited) return rateLimited;
 
   try {
-    const body = await request.json().catch(() => null) as HandleUploadBody | null;
+    const bodyResult = await parseJsonBodyLimited(request, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Upload yetkilendirme isteği çok büyük." : "Geçersiz Blob upload isteği." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value as HandleUploadBody | null;
     if (!body || typeof body !== "object" || !("type" in body)) {
       return NextResponse.json({ error: "Geçersiz Blob upload isteği." }, { status: 400 });
     }

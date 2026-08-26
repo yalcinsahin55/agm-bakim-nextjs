@@ -165,14 +165,18 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       return NextResponse.json({ error: "Geçersiz Blob presigned upload isteği." }, { status: 400 });
     }
 
-    const { pathname, clientPayload, multipart } = body.payload;
+    const { pathname, clientPayload } = body.payload;
     const policy = clientPayload ? UPLOAD_POLICIES[clientPayload] : undefined;
     if (!policy || !isAllowedUploadPath(pathname, clientPayload)) {
       return NextResponse.json({ error: "Geçersiz dosya yolu veya upload amacı." }, { status: 400 });
     }
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
-    const storeId = process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID;
+    const token = process.env.VERCEL
+      ? undefined
+      : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
+    const storeId = process.env.VERCEL
+      ? undefined
+      : process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID;
     if (!token && !storeId) {
       console.error("Presigned Blob upload credential hatası: BLOB_CREDENTIALS_UNAVAILABLE");
       return NextResponse.json({ error: "Dosya depolama bağlantısı yapılandırılmamış.", code: "BLOB_CREDENTIALS_UNAVAILABLE" }, { status: 503 });
@@ -199,7 +203,6 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       allowedContentTypes: [...policy.allowedContentTypes],
       maximumSizeInBytes: policy.maximumSizeInBytes,
       validUntil: signedToken.validUntil,
-      ...(multipart ? {} : {}),
     });
 
     return NextResponse.json({

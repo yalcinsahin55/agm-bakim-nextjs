@@ -25,13 +25,15 @@ export function isAllowedPdfUrl(value: unknown): value is string {
   }
 }
 
-export async function readPdfResponse(response: Response): Promise<Uint8Array | null> {
+export async function readResponseBytes(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new RangeError("Response byte limit must be a positive safe integer.");
+
   const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_PDF_BYTES) return null;
+  if (Number.isFinite(contentLength) && contentLength >= 0 && contentLength > maxBytes) return null;
 
   if (!response.body) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    return bytes.length <= MAX_PDF_BYTES ? bytes : null;
+    return bytes.length <= maxBytes ? bytes : null;
   }
 
   const reader = response.body.getReader();
@@ -43,7 +45,7 @@ export async function readPdfResponse(response: Response): Promise<Uint8Array | 
       if (done) break;
       if (!value) continue;
       total += value.byteLength;
-      if (total > MAX_PDF_BYTES) {
+      if (total > maxBytes) {
         await reader.cancel();
         return null;
       }
@@ -57,9 +59,13 @@ export async function readPdfResponse(response: Response): Promise<Uint8Array | 
   let offset = 0;
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
-    offset += chunk.byteLength;
+    offset += chunk.length;
   }
   return bytes;
+}
+
+export async function readPdfResponse(response: Response): Promise<Uint8Array | null> {
+  return readResponseBytes(response, MAX_PDF_BYTES);
 }
 
 export function looksLikePdf(bytes: Uint8Array): boolean {

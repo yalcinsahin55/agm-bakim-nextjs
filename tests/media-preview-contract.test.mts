@@ -22,10 +22,8 @@ test("edit form distinguishes transient uploads from persisted record media", ()
   assert.match(source, /return transientUrls\?\.has\(photo\) \? photo : getMediaDisplayUrl\(photo, "image"\)/);
   assert.match(source, /function getVideoSrc\(v: VideoItem \| string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
   assert.match(source, /const \[transientPhotoUrls, setTransientPhotoUrls\] = useState<Set<string>>/);
-  assert.match(source, /const \[transientVideoUrls, setTransientVideoUrls\] = useState<Set<string>>/);
   assert.match(source, /getPhotoSrc\(p, offlinePreviews, transientPhotoUrls\)/);
   assert.match(source, /setTransientPhotoUrls\(\(current\) =>/);
-  assert.match(source, /setTransientVideoUrls\(\(current\) => new Set\(current\)\.add\(url\)\)/);
 });
 
 test("media proxy only serves URLs already attached to a maintenance record", () => {

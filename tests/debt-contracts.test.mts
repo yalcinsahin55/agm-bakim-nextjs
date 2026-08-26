@@ -355,6 +355,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
   const pdfSecurity = await source("lib/pdfSecurity.ts");
+  const assistantExport = await source("app/api/assistant/export/route.ts");
   const blobStorage = await source("lib/blobStorage.ts");
   const nextConfig = await source("next.config.ts");
   const mediaUpload = await source("lib/mediaUpload.ts");
@@ -383,7 +384,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(upload, /allowOverwrite/);
   assert.match(clientUpload, /handleUpload/);
   assert.match(clientUpload, /REPORT_UPLOAD_PREFIX/);
-  assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
+  assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.VERCEL/);
+  assert.match(clientUpload, /BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
   assert.match(clientUpload, /token: REPORT_UPLOAD_TOKEN/);
   assert.match(clientUpload, /maximumSizeInBytes: REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(presignedUpload, /issueSignedToken/);
@@ -391,11 +393,12 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(presignedUpload, /BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
   assert.match(presignedUpload, /BLOB_STORE_ID \|\| process\.env\.MEDIA_STORE_ID/);
   assert.match(presignedUpload, /REPORT_ATTACHMENT_MAX_BYTES/);
-  assert.match(uploadHelper, /REPORT_UPLOAD_ENDPOINT = "\/api\/blob\/upload-presigned"/);
-  assert.match(uploadHelper, /uploadPresigned/);
-  assert.match(uploadHelper, /multipart: file\.size >= REPORT_UPLOAD_MULTIPART_THRESHOLD_BYTES/);
+  assert.match(uploadHelper, /uploadFileThroughServer/);
+  assert.match(uploadHelper, /"report-attachments"/);
+  assert.doesNotMatch(uploadHelper, /uploadPresigned/);
   assert.match(uploadHelper, /REPORT_UPLOAD_TIMEOUT_MS/);
-  assert.match(uploadHelper, /abortSignal: abortController\.signal/);
+  assert.match(mediaUpload, /report-attachments/);
+  assert.match(mediaUpload, /idempotencyKey/);
   assert.match(upload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(schema, /report_attachments/);
   assert.match(schema, /isAllowedReportAttachmentUrl/);
@@ -416,6 +419,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(oilFileRoute, /fetchStoredBlob/);
   assert.match(pdfSecurity, /\.private\.blob\.vercel-storage\.com/);
   assert.match(pdfSecurity, /\.blob\.vercel-storage\.com/);
+  assert.match(pdfSecurity, /readResponseBytes/);
+  assert.match(assistantExport, /readResponseBytes/);
   assert.match(blobStorage, /from "@vercel\/blob"/);
   assert.match(blobStorage, /MEDIA_READ_WRITE_TOKEN/);
   assert.match(blobStorage, /BLOB_READ_WRITE_TOKEN/);
