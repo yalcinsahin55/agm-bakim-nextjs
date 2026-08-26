@@ -645,7 +645,7 @@ export default function TamamlaPage() {
         {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
           <div className="mb-3 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
             <div className="font-bold">{!isOnline ? "Çevrimdışı çalışma açık." : "Senkronizasyon bekleyen kayıt var."}</div>
-            <div className="mt-0.5 text-[10px] text-muted">{!isOnline ? "Kayıt ve seçtiğiniz medya/rapor ekleri cihazda tutulur; bağlantı gelince gönderilir." : `${pendingOfflineCount} kayıt bağlantı üzerinden gönderilmeyi bekliyor.`}</div>
+            <div className="mt-0.5 text-[10px] text-muted">{!isOnline ? "Kayıt ve seçtiğiniz medya/rapor ekleri cihazda tutulur; bağlantı gelince arka planda veya uygulama yeniden açıldığında gönderilir." : `${pendingOfflineCount} kayıt gönderilmeyi bekliyor. Medya veya rapor eki olan işler için bağlantı geldikten sonra uygulamayı açık tutun.`}</div>
             {isOnline && pendingOfflineCount > 0 && <button type="button" onClick={() => { window.dispatchEvent(new Event("offline-queue:sync")); }} className="mt-2 rounded-lg border border-amber/40 px-2.5 py-1.5 text-[10px] font-bold text-amber">Şimdi senkronize et</button>}
           </div>
         )}

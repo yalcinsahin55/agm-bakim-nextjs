@@ -557,3 +557,41 @@ test("Android TWA asset links stay public and match the signed package", async (
   assert.match(assetLinks, /3B:64:AC:01:49:D3:11:40:2D:C3:5D:74:E5:37:FF:2E:A5:3D:BA:4F:C7:B8:9B:FD:BA:A9:FE:70:C2:57:C9:0B/);
   assert.match(middleware, /\.well-known/);
 });
+
+test("service worker keeps push handling and closed-window metadata sync bounded", async () => {
+  const serviceWorker = await source("lib/serviceWorker.ts");
+  assert.match(serviceWorker, /addEventListener\("push"/);
+  assert.match(serviceWorker, /addEventListener\("sync"/);
+  assert.match(serviceWorker, /syncOfflineQueueInWorker/);
+  assert.match(serviceWorker, /isMetadataOnlyOfflineJob/);
+  assert.match(serviceWorker, /value\.media\.length === 0/);
+  assert.match(serviceWorker, /client_request_id/);
+});
+
+test("push subscription endpoints keep request bodies bounded and typed", async () => {
+  const pushRoute = await source("app/api/push/subscribe/route.ts");
+  const limits = await source("lib/requestLimits.ts");
+  assert.match(pushRoute, /readRequestTextLimited/);
+  assert.match(pushRoute, /MAX_PUSH_SUBSCRIPTION_REQUEST_BYTES/);
+  assert.match(pushRoute, /RequestBodyTooLargeError/);
+  assert.doesNotMatch(pushRoute, /await req\.json\(\)/);
+  assert.match(limits, /MAX_PUSH_SUBSCRIPTION_REQUEST_BYTES = 32 \* 1024/);
+});
+
+test("service worker updates bypass stale script caches", async () => {
+  const serviceWorker = await source("lib/serviceWorker.ts");
+  const pwaRegister = await source("components/PwaRegister.tsx");
+  const pushToggle = await source("components/PushNotificationToggle.tsx");
+  assert.match(serviceWorker, /agm-bakim-shell-v2/);
+  assert.match(serviceWorker, /caches\.delete/);
+  assert.match(pwaRegister, /updateViaCache: "none"/);
+  assert.match(pushToggle, /updateViaCache: "none"/);
+});
+
+test("closed-window worker sync only targets bounded record jobs", async () => {
+  const serviceWorker = await source("lib/serviceWorker.ts");
+  assert.match(serviceWorker, /isAllowedOfflineEndpoint/);
+  assert.match(serviceWorker, /\/\^\\\/api\\\/records\\\//);
+  assert.match(serviceWorker, /MAX_WORKER_SYNC_BODY_BYTES = 512 \* 1024/);
+  assert.match(serviceWorker, /credentials: "same-origin"/);
+});

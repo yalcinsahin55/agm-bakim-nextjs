@@ -2,6 +2,7 @@
 export const MAX_IMPORT_BASE64_CHARS = 20 * 1024 * 1024;
 export const MAX_BACKUP_REQUEST_BYTES = 60 * 1024 * 1024;
 export const MAX_ASSISTANT_REQUEST_BYTES = 10_000;
+export const MAX_PUSH_SUBSCRIPTION_REQUEST_BYTES = 32 * 1024;
 
 export class RequestBodyTooLargeError extends Error {
   constructor() {

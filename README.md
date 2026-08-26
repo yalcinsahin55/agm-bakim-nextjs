@@ -348,6 +348,14 @@ Cron endpoint’i `CRON_SECRET` ile korunur. Cron zamanları UTC’dir; Türkiye
 
 Bakım paneli, aynı istemci içinde 15 saniyelik istek birleştirme/cache katmanına ve sıcak sunucu instance’ında 10 saniyelik kısa cache’e sahiptir. Motor veya bakım türü değiştiğinde kısa süreli stale veri ihtimali azaltılmıştır; kayıt oluşturma, düzenleme, silme ve çevrimdışı senkronizasyon sonrasında istemci cache’i açıkça temizlenir.
 
+## Push bildirimleri ve çevrimdışı senkronizasyon
+
+Bildirimler sayfasındaki push ayarı Web Push aboneliğini cihaz bazında `push_subscriptions` koleksiyonuna kaydeder. Production ortamında `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY` ve `VAPID_PRIVATE_KEY` değişkenleri tanımlı olmalıdır; private key repository’ye veya kullanıcıya açık dosyalara yazılmamalıdır. Eski veya geçersiz push endpoint’leri gönderim sırasında temizlenir.
+
+Bakım durumu yeni bir gecikmiş, kritik veya yaklaşan uyarıya dönüştüğünde ilgili kullanıcı için push gönderilir. Tüm aktif kullanıcıların bakım durumunu toplu yenileyen `/api/cron/refresh` görevi mevcut Vercel planının zamanlama sınırları içinde günlük çalışır; kullanıcıya ait bakım kaydı değişiklikleri ise best-effort bildirim yenilemesiyle daha erken tetiklenebilir.
+
+Çevrimdışı bakım kayıtları IndexedDB kuyruğunda idempotent `client_request_id` ile saklanır. Android/Chrome Background Sync çalıştığında medya veya rapor eki olmayan kayıtlar uygulama tamamen kapalıyken de yalnızca izinli `/api/records` endpoint’lerine ve sınırlı gövde boyutuyla gönderilebilir. Fotoğraf, video veya PDF/Excel/Word eki içeren işler Blob yükleme adımı nedeniyle uygulama yeniden açıldığında client akışıyla tamamlanır; bu işler bağlantı geri geldikten sonra uygulamanın en az bir kez açılmasını gerektirir. Service worker cache sürümü değişikliklerde artırılır ve eski cache’ler activate aşamasında temizlenir.
+
 ## Yedekleme ve veri güvenliği
 
 Uygulama içindeki yedekleme/arsiv ekranı kullanılabilse de MongoDB Atlas tarafındaki yedekleme imkânları ayrıca değerlendirilmelidir. Yedek dosyalarını GitHub’a veya herkese açık Blob alanına koymayın.
@@ -567,6 +575,7 @@ Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılm
 - [Vercel Blob Documentation](https://vercel.com/docs/vercel-blob)
 - [Vercel Cron Jobs](https://vercel.com/docs/cron-jobs)
 - [Web Push Protocol](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)
+- [Background Synchronization API](https://developer.mozilla.org/en-US/docs/Web/API/Background_Synchronization_API)
 
 ## Lisans
 

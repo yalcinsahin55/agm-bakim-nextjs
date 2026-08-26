@@ -6,7 +6,7 @@ import { syncOfflineQueue } from "@/lib/offlineQueue";
 export default function PwaRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((error) => {
+      navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch((error) => {
         console.warn("Service Worker kaydedilemedi:", error instanceof Error ? error.name : "UnknownError");
       });
     }

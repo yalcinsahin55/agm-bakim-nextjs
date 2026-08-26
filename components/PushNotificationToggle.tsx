@@ -48,7 +48,7 @@ export default function PushNotificationToggle() {
         setMessage("Web Push sunucu ortamında henüz yapılandırılmamış.");
         return;
       }
-      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
       const existing = await registration.pushManager.getSubscription();
       if (existing && enabled) {
         await fetch("/api/push/subscribe", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: existing.endpoint }) });
