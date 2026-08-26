@@ -98,11 +98,13 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: stri
   });
 }
 
-function getPhotoSrc(photo: string, previews: Record<string, string> = {}): string {
+function getPhotoSrc(photo: string, previews: Record<string, string> = {}, transientUrls?: ReadonlySet<string>): string {
   if (photo.startsWith("offline:")) return previews[photo.slice("offline:".length)] || "";
-  return photo.startsWith("http://") || photo.startsWith("https://")
-    ? getMediaDisplayUrl(photo, "image")
-    : photo.startsWith("data:") ? photo : `data:image/jpeg;base64,${photo}`;
+  if (photo.startsWith("http://") || photo.startsWith("https://")) {
+    // Yeni yüklenen URL henüz kayda yazılmadı; proxy bunu doğal olarak bulamaz.
+    return transientUrls?.has(photo) ? photo : getMediaDisplayUrl(photo, "image");
+  }
+  return photo.startsWith("data:") ? photo : `data:image/jpeg;base64,${photo}`;
 }
 
 function makeOfflineId(): string {
@@ -111,10 +113,10 @@ function makeOfflineId(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function getVideoSrc(v: VideoItem | string, previews: Record<string, string> = {}): string {
+function getVideoSrc(v: VideoItem | string, previews: Record<string, string> = {}, transientUrls?: ReadonlySet<string>): string {
   const url = typeof v === "string" ? v : v?.url;
   if (url?.startsWith("offline:")) return previews[url.slice("offline:".length)] || "";
-  if (url) return getMediaDisplayUrl(url, "video");
+  if (url) return transientUrls?.has(url) ? url : getMediaDisplayUrl(url, "video");
   if (typeof v !== "string" && v?.data_b64) return `data:${v.mime || "video/mp4"};base64,${v.data_b64}`;
   return "";
 }
@@ -214,6 +216,8 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
   const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
   const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
+  const [transientPhotoUrls, setTransientPhotoUrls] = useState<Set<string>>(() => new Set());
+  const [transientVideoUrls, setTransientVideoUrls] = useState<Set<string>>(() => new Set());
   const [reportAttachments, setReportAttachments] = useState<ReportAttachment[]>(record.report_attachments || []);
   const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
@@ -291,6 +295,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
       revokeOfflinePreview(id);
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
     }
+    if (photo && (photo.startsWith("http://") || photo.startsWith("https://"))) {
+      setTransientPhotoUrls((current) => {
+        if (!current.has(photo)) return current;
+        const next = new Set(current);
+        next.delete(photo);
+        return next;
+      });
+    }
     setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
 
@@ -309,6 +321,14 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
     if (id) {
       revokeOfflinePreview(id);
       setOfflineMedia((current) => current.filter((media) => media.id !== id));
+    }
+    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+      setTransientVideoUrls((current) => {
+        if (!current.has(url)) return current;
+        const next = new Set(current);
+        next.delete(url);
+        return next;
+      });
     }
     setVideos((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
@@ -374,6 +394,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
         }
       }
     } finally {
+      setTransientPhotoUrls((current) => {
+        const next = new Set(current);
+        uploaded.filter((url) => url.startsWith("http://") || url.startsWith("https://")).forEach((url) => next.add(url));
+        return next;
+      });
       setPhotos((p) => [...p, ...uploaded]);
       setMediaBusy(false);
       e.target.value = "";
@@ -406,6 +431,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
             600_000,
             "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
           );
+          setTransientVideoUrls((current) => new Set(current).add(url));
           setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
         } catch (err: unknown) {
           if (!navigator.onLine) {
@@ -604,11 +630,11 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
             <div key={idx} className="relative">
               <button
                 type="button"
-                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p, offlinePreviews))}
+                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p, offlinePreviews, transientPhotoUrls))}
                 className="block hover:scale-105 transition-transform"
                 aria-label="Fotoğrafı büyüt"
               >
-                <NextImage src={getPhotoSrc(p, offlinePreviews)} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+                <NextImage src={getPhotoSrc(p, offlinePreviews, transientPhotoUrls)} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
               </button>
               <button
                 onClick={() => removePhoto(idx)}

@@ -461,7 +461,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.doesNotMatch(complete, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(records, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(oilPage, /\/api\/blob\/upload-server/);
-  assert.match(complete, /getMediaDisplayUrl/);
+  assert.doesNotMatch(complete, /getMediaDisplayUrl/);
   assert.match(records, /getMediaDisplayUrl/);
   assert.match(records, /selectedReportAttachment/);
   assert.match(records, /<PdfPreview/);
