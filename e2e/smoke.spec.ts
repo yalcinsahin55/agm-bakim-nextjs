@@ -43,28 +43,23 @@ async function loginViaFixtureApi(page: Page, identifier: string, password: stri
   const loginBody = await response.text();
   expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
   expect((await page.context().cookies()).some((cookie) => cookie.name === "agm_session" && cookie.value.length > 0)).toBeTruthy();
-  await page.goto("/login", { waitUntil: "domcontentloaded" });
-  await expect(page.getByPlaceholder("05xx xxx xx xx")).toBeVisible();
 }
-
 async function fetchJson(page: Page, url: string, options: { method?: string; body?: unknown } = {}): Promise<JsonResult> {
-  return page.evaluate(async ({ url: requestUrl, method, body }) => {
-    const response = await fetch(requestUrl, {
-      method,
-      ...(body === undefined ? {} : {
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    });
-    const raw = await response.text();
-    let parsed: unknown = null;
-    try {
-      parsed = raw ? JSON.parse(raw) : null;
-    } catch {
-      parsed = raw;
-    }
-    return { status: response.status, body: parsed };
-  }, { url, method: options.method || "GET", body: options.body });
+  const response = await page.context().request.fetch(url, {
+    method: options.method || "GET",
+    ...(options.body === undefined ? {} : {
+      headers: { "Content-Type": "application/json" },
+      data: options.body,
+    }),
+  });
+  const raw = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = raw;
+  }
+  return { status: response.status(), body: parsed };
 }
 
 function uniqueRequestId(testTitle: string, retry: number): string {
