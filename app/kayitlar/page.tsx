@@ -15,6 +15,7 @@ import Lightbox from "@/components/Lightbox";
 import RecordMediaModals from "@/components/RecordMediaModals";
 import MaintenanceRecordDetailsModal from "@/components/MaintenanceRecordDetailsModal";
 import MaintenanceConfirmationModal from "@/components/MaintenanceConfirmationModal";
+import MaintenanceRecordCard from "@/components/MaintenanceRecordCard";
 import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { ReportAttachment } from "@/lib/types";
@@ -968,127 +969,31 @@ export default function KayitlarPage() {
                 </div>
                 <div className="flex flex-col gap-2">
             {group.records.map((r) => {
-              const photos = r.photos || r.photos_b64 || [];
-              const videos = r.videos || [];
-              const showMedia = !r.group_id || photos.length > 0 || videos.length > 0;
               // user._id veya user.id kontrolü (MongoDB standartlarına göre _id kullanılır)
               const canEdit = user && (user.role === "yonetici" || user.id === r.technician_id || user._id === r.technician_id);
               return (
-                <div key={r._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
-                  {!photos.length && !videos.length && (
-                    <button
-                      type="button"
-                      onClick={() => loadRecordMedia(r)}
-                      disabled={mediaLoadingId === r._id}
-                      className="mb-2 rounded-lg border border-border px-2.5 py-1.5 text-[10.5px] font-bold text-muted hover:border-teal/40 hover:text-teal disabled:opacity-50"
-                    >
-                      {mediaLoadingId === r._id ? "Medya yükleniyor..." : "📎 Medyayı görüntüle"}
-                    </button>
-                  )}
-                  {showMedia && photos.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap mb-2">
-                      {photos.map((p, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedPhoto(getPhotoSrc(p))}
-                          className="hover:scale-105 transition-transform"
-                          aria-label="Fotoğrafı büyüt"
-                        >
-                          <NextImage src={getPhotoSrc(p)} width={56} height={56} unoptimized className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {showMedia && videos.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap mb-2">
-                      {videos.map((v, idx) => {
-                        const videoSrc = getVideoSrc(v);
-                        if (!videoSrc) return null;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setSelectedVideo({ src: videoSrc, filename: v.filename || "Video" })}
-                            className="relative w-20 h-20 rounded-lg overflow-hidden border border-border bg-panel2 hover:scale-105 transition-transform"
-                            aria-label={`${v.filename || "Video"} videosunu oynat`}
-                          >
-                            <video muted preload="metadata" className="w-full h-full object-cover pointer-events-none">
-                              <source src={videoSrc} />
-            </video>
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white text-xl">▶</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-[13px] font-bold text-text">{r.engine_name}</div>
-                      <div className="mt-0.5 truncate text-[11px] font-semibold text-teal">{r.type_label}</div>
-                    </div>
-                    {r.manager_confirmation_status === "confirmed" ? <span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green">✓ Teyitli</span> : r.manager_confirmation_status === "pending" ? <span className="flex-shrink-0 rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="flex-shrink-0 rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
-                  </div>
-                  <div className="text-[11px] text-faint mt-0.5">
-                    {getMaintenanceRecordDate(r.maintenance_start_at, r.created_at)?.toLocaleDateString("tr-TR") || "—"} · {r.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel(r)}
-                  </div>
-                  {(r.maintenance_start_at || r.maintenance_end_at || r.maintenance_duration_minutes != null) && <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] text-teal"><span>Başlangıç: {r.maintenance_start_at ? new Date(r.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {r.maintenance_end_at ? new Date(r.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>Süre: {formatMaintenanceDuration(r.maintenance_duration_minutes)}</span></div>}
-                  {r.pressure_reading != null && <div className="text-[11.5px] text-muted mt-1">📈 Fark Basıncı: {r.pressure_reading} bar</div>}
-                  {r.technician_note && <div className="text-[11.5px] text-muted mt-1">🗒️ {r.technician_note}</div>}
-                  {r.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {r.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
-                  {r.report_attachments?.length ? <div className="mt-1 text-[11px] text-purple-200">📄 {r.report_attachments.length} detaylı rapor eki</div> : null}
-
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <button
-                      onClick={() => void openDetails(r)}
-                      className="text-[11px] font-bold text-amber border border-amber/40 rounded-lg px-2.5 py-1.5 hover:bg-amber/10 transition"
-                    >
-                      🔎 Detay
-                    </button>
-                    {user?.role === "yonetici" && r.manager_confirmation_status === "pending" && <button
-                      type="button"
-                      onClick={() => openConfirmation(r)}
-                      disabled={confirmingId === r._id}
-                      className="text-[11px] font-bold text-[#071a12] bg-green rounded-lg px-2.5 py-1.5 hover:brightness-110 transition disabled:opacity-50"
-                    >
-                      {confirmingId === r._id ? "Teyit ediliyor..." : "✓ Teyit et"}
-                    </button>}
-                    {canEdit && (
-                      <>
-                        <button
-                          onClick={() => editingId === r._id ? setEditingId(null) : void openEdit(r)}
-                          className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"
-                        >
-                          ✏️ Düzenle
-                        </button>
-                        {confirmDeleteId === r._id ? (
-                          <>
-                            <button
-                              onClick={() => doDelete(r._id)}
-                              className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition"
-                            >
-                              Evet, Sil
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition"
-                            >
-                              Vazgeç
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteId(r._id)}
-                            className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition"
-                          >
-                            🗑️ Sil
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {editingId === r._id && (
+                <MaintenanceRecordCard
+                  key={r._id}
+                  record={r}
+                  technicianLabel={technicianLabel(r)}
+                  canEdit={Boolean(canEdit)}
+                  isManager={user?.role === "yonetici"}
+                  isMediaLoading={mediaLoadingId === r._id}
+                  isConfirming={confirmingId === r._id}
+                  isEditing={editingId === r._id}
+                  deletePending={confirmDeleteId === r._id}
+                  getPhotoSrc={(photo) => getPhotoSrc(photo)}
+                  getVideoSrc={(video) => getVideoSrc(video)}
+                  onLoadMedia={() => void loadRecordMedia(r)}
+                  onPhotoClick={(src) => setSelectedPhoto(src)}
+                  onVideoClick={(src, filename) => setSelectedVideo({ src, filename })}
+                  onOpenDetails={() => void openDetails(r)}
+                  onOpenConfirmation={() => openConfirmation(r)}
+                  onToggleEdit={() => editingId === r._id ? setEditingId(null) : void openEdit(r)}
+                  onDeleteRequest={() => setConfirmDeleteId(r._id)}
+                  onDeleteConfirm={() => void doDelete(r._id)}
+                  onDeleteCancel={() => setConfirmDeleteId(null)}
+                  editForm={editingId === r._id ? (
                     <EditForm
                       record={r}
                       onPhotoClick={(src: string) => setSelectedPhoto(src)}
@@ -1100,8 +1005,8 @@ export default function KayitlarPage() {
                       isAdmin={user?.role === "yonetici"}
                       engines={sortedEngines}
                     />
-                  )}
-                </div>
+                  ) : null}
+                />
               );
             })}
                 </div>
