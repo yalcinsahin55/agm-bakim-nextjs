@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 const imageContentTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxPhotoSize = 4 * 1024 * 1024;
+const maxVideoSize = 100 * 1024 * 1024;
 const maxPdfSize = 10 * 1024 * 1024;
 
 function isReportAttachmentFolder(value: FormDataEntryValue | null): boolean {
@@ -36,13 +37,24 @@ async function postUpload(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file");
     const folderValue = formData.get("folder");
-    const folder = folderValue === "oil-analyses" ? "oil-analyses" : folderValue === "report-attachments" ? "report-attachments" : "photos";
+    const folder = folderValue === "oil-analyses"
+      ? "oil-analyses"
+      : folderValue === "report-attachments"
+        ? "report-attachments"
+        : folderValue === "videos"
+          ? "videos"
+          : folderValue === "photos"
+            ? "photos"
+            : null;
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
     }
     if (!canWriteMaintenance(user.role)) {
       return NextResponse.json({ error: "Bu hesap dosya yükleyemez." }, { status: 403 });
+    }
+    if (!folder) {
+      return NextResponse.json({ error: "Geçersiz dosya klasörü." }, { status: 400 });
     }
 
     const resolvedReportMime = isReportAttachmentFolder(folderValue)
@@ -53,29 +65,33 @@ async function postUpload(request: NextRequest) {
       if (file.size <= 0 || file.size > REPORT_ATTACHMENT_MAX_BYTES) {
         return NextResponse.json({ error: "Rapor eki 20 MB’tan küçük olmalıdır." }, { status: 413 });
       }
-    } else {
-      if (!imageContentTypes.has(file.type) && file.type !== "application/pdf") {
-        return NextResponse.json({ error: "Desteklenmeyen dosya türü." }, { status: 415 });
-      }
-      if ((folder === "oil-analyses" && file.type !== "application/pdf") || (folder === "photos" && file.type === "application/pdf")) {
-        return NextResponse.json({ error: folder === "oil-analyses" ? "Yağ analizi klasörüne yalnızca PDF yüklenebilir." : "Fotoğraf klasörüne yalnızca görsel yüklenebilir." }, { status: 415 });
-      }
-      if (file.type === "application/pdf" && file.size > maxPdfSize) {
-        return NextResponse.json({ error: "PDF dosyası 10 MB’tan küçük olmalıdır." }, { status: 413 });
-      }
-      if (file.type !== "application/pdf" && file.size > maxPhotoSize) {
-        return NextResponse.json({ error: "Fotoğraf 4 MB’tan küçük olmalıdır." }, { status: 413 });
-      }
+    } else if (folder === "oil-analyses") {
+      if (file.type !== "application/pdf") return NextResponse.json({ error: "Yağ analizi klasörüne yalnızca PDF yüklenebilir." }, { status: 415 });
+      if (file.size <= 0 || file.size > maxPdfSize) return NextResponse.json({ error: "PDF dosyası 10 MB’tan küçük olmalıdır." }, { status: 413 });
+    } else if (folder === "photos") {
+      if (!imageContentTypes.has(file.type)) return NextResponse.json({ error: "Fotoğraf klasörüne yalnızca JPEG, PNG veya WebP görsel yüklenebilir." }, { status: 415 });
+      if (file.size <= 0 || file.size > maxPhotoSize) return NextResponse.json({ error: "Fotoğraf 4 MB’tan küçük olmalıdır." }, { status: 413 });
+    } else if (folder === "videos") {
+      if (!file.type.startsWith("video/")) return NextResponse.json({ error: "Video klasörüne yalnızca video dosyaları yüklenebilir." }, { status: 415 });
+      if (file.size <= 0 || file.size > maxVideoSize) return NextResponse.json({ error: "Video 100 MB’tan küçük olmalıdır." }, { status: 413 });
     }
 
     const safeName = isReportAttachmentFolder(folderValue)
       ? sanitizeReportAttachmentFilename(file.name).slice(0, REPORT_ATTACHMENT_MAX_FILENAME_LENGTH)
       : file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const rawIdempotencyKey = formData.get("idempotency_key");
+    const idempotencyKey = typeof rawIdempotencyKey === "string"
+      ? rawIdempotencyKey.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 96)
+      : "";
+    const pathname = idempotencyKey
+      ? `${folder}/offline-${idempotencyKey}-${safeName}`
+      : `${folder}/${Date.now()}-${safeName}`;
     const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
     const storeId = process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined;
-    const blob = await put(`${folder}/${Date.now()}-${safeName}`, file, {
+    const blob = await put(pathname, file, {
       access: "public",
-      addRandomSuffix: true,
+      addRandomSuffix: !idempotencyKey,
+      ...(idempotencyKey ? { allowOverwrite: true } : {}),
       ...(token ? { token } : {}),
       ...(storeId ? { storeId } : {}),
     });

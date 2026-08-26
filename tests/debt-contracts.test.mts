@@ -377,6 +377,10 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(upload, /report-attachments/);
   assert.match(upload, /resolveReportAttachmentMime/);
   assert.match(upload, /storeId/);
+  assert.match(upload, /videos/);
+  assert.match(upload, /maxVideoSize/);
+  assert.match(upload, /idempotency_key/);
+  assert.match(upload, /allowOverwrite/);
   assert.match(clientUpload, /handleUpload/);
   assert.match(clientUpload, /REPORT_UPLOAD_PREFIX/);
   assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.BLOB_READ_WRITE_TOKEN \|\| process\.env\.MEDIA_READ_WRITE_TOKEN/);
@@ -420,10 +424,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(nextConfig, /source: "\/api\/records\/:id\/attachments\/:attachmentId"/);
   assert.match(nextConfig, /X-Frame-Options.*SAMEORIGIN/);
   assert.match(oilFileRoute, /"X-Frame-Options": "SAMEORIGIN"/);
-  assert.match(mediaUpload, /uploadPresigned/);
-  assert.match(mediaUpload, /maintenance-photo/);
-  assert.match(mediaUpload, /maintenance-video/);
-  assert.match(mediaUpload, /multipart: kind === "video"/);
+  assert.match(mediaUpload, /SERVER_UPLOAD_ENDPOINT/);
+  assert.match(mediaUpload, /folder === "photos"/);
   assert.match(uploadPresigned, /maintenance-photo/);
   assert.match(uploadPresigned, /maintenance-photo-offline/);
   assert.match(uploadPresigned, /maintenance-report-offline/);
@@ -432,7 +434,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(uploadPresigned, /allowOverwrite: true/);
   assert.match(uploadPresigned, /video\/\*/);
   assert.match(uploadPresigned, /maximumSizeInBytes: VIDEO_MAX_BYTES/);
-  assert.match(chunkUpload, /uploadMaintenanceMedia\(file, "video", options\)/);
+  assert.match(chunkUpload, /UPLOAD_ENDPOINT/);
   assert.match(mediaUpload, /idempotencyKey/);
   assert.match(uploadHelper, /idempotencyKey/);
   assert.match(queue, /\$\{job\.id\}-\$\{media\.id\}/);
