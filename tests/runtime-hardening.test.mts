@@ -19,7 +19,69 @@ import { addRows, worksheetToGrid, worksheetToObjects } from "../lib/excel.ts";
 import { looksLikePdf, readPdfResponse } from "../lib/pdfSecurity.ts";
 import { statusFor } from "../lib/status.ts";
 import { parseJsonBodyLimited, readRequestTextLimited, RequestBodyTooLargeError } from "../lib/requestLimits.ts";
+import { checkDistributedRateLimit } from "../lib/redisRateLimit.ts";
 
+test("E2E local rate-limit fallback requires the complete isolated fixture contract", async () => {
+  const keys = [
+    "NODE_ENV",
+    "VERCEL_ENV",
+    "MONGO_DB_NAME",
+    "E2E_SEED",
+    "E2E_ALLOW_LOCAL_RATE_LIMIT",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "KV_REST_API_URL",
+    "KV_REST_API_TOKEN",
+  ] as const;
+  const env = process.env as Record<string, string | undefined>;
+  const previous = new Map<string, string | undefined>(keys.map((key) => [key, env[key]]));
+
+  try {
+    env.NODE_ENV = "production";
+    env.VERCEL_ENV = "preview";
+    env.MONGO_DB_NAME = "agm_bakim_e2e";
+    env.E2E_SEED = "1";
+    env.E2E_ALLOW_LOCAL_RATE_LIMIT = "1";
+    delete env.UPSTASH_REDIS_REST_URL;
+    delete env.UPSTASH_REDIS_REST_TOKEN;
+    delete env.KV_REST_API_URL;
+    delete env.KV_REST_API_TOKEN;
+
+    const isolated = await checkDistributedRateLimit({
+      scope: "test-isolated-e2e",
+      identifier: "isolated-fixture",
+      limit: 2,
+      windowMs: 60_000,
+    }, "fail-closed");
+    assert.equal(isolated.degraded, true);
+    assert.equal(isolated.infrastructureFailure, false);
+
+    for (const [key, value] of [
+      ["E2E_ALLOW_LOCAL_RATE_LIMIT", "0"],
+      ["E2E_SEED", "0"],
+      ["MONGO_DB_NAME", "agm_bakim"],
+    ] as const) {
+      env.E2E_ALLOW_LOCAL_RATE_LIMIT = "1";
+      env.E2E_SEED = "1";
+      env.MONGO_DB_NAME = "agm_bakim_e2e";
+      env[key] = value;
+      const productionLike = await checkDistributedRateLimit({
+        scope: `test-fail-closed-${key.toLowerCase()}`,
+        identifier: "production-like-fixture",
+        limit: 2,
+        windowMs: 60_000,
+      }, "fail-closed");
+      assert.equal(productionLike.degraded, false, key);
+      assert.equal(productionLike.infrastructureFailure, true, key);
+    }
+  } finally {
+    for (const key of keys) {
+      const value = previous.get(key);
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+  }
+});
 test("bounded request body reader rejects oversized chunked bodies", async () => {
   const normalPayload = JSON.stringify({ question: "AGM 8 bakımları" });
   const normal = new Request("http://localhost", { method: "POST", body: normalPayload });
