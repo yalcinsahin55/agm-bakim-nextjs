@@ -71,10 +71,17 @@ test.describe("AGM Bakım configured authentication", () => {
     );
 
     await login(page, process.env.E2E_VIEWER_IDENTIFIER!, process.env.E2E_VIEWER_PASSWORD!);
-    const response = await page.request.post("/api/records", { data: {} });
+    const result = await page.evaluate(async () => {
+      const response = await fetch("/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      return { status: response.status, body: await response.json().catch(() => null) };
+    });
 
-    expect(response.status()).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({
       error: expect.stringMatching(/görüntüleyici|viewer/i),
     });
   });
