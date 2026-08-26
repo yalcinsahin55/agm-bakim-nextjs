@@ -125,6 +125,11 @@ workerScope.addEventListener("activate", (rawEvent) => {
   );
 });
 
+workerScope.addEventListener("message", (rawEvent) => {
+  const event = rawEvent as unknown as MessageEvent<{ type?: unknown }>;
+  if (event.data?.type === "AGM_SKIP_WAITING") void workerScope.skipWaiting();
+});
+
 workerScope.addEventListener("fetch", (rawEvent) => {
   const event = rawEvent as unknown as FetchEvent;
   const request = event.request;

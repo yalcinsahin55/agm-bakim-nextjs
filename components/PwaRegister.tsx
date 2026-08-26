@@ -16,7 +16,17 @@ export default function PwaRegister() {
       const registerAndUpdate = async () => {
         try {
           const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
-          if (!disposed) await registration.update();
+          const requestActivation = () => registration.waiting?.postMessage({ type: "AGM_SKIP_WAITING" });
+          registration.addEventListener("updatefound", () => {
+            const worker = registration.installing;
+            worker?.addEventListener("statechange", () => {
+              if (worker.state === "installed") requestActivation();
+            });
+          });
+          if (!disposed) {
+            await registration.update();
+            requestActivation();
+          }
         } catch (error) {
           console.warn("Service Worker güncellenemedi:", error instanceof Error ? error.name : "UnknownError");
         }
