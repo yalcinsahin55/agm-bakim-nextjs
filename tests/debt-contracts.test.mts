@@ -624,6 +624,13 @@ test("public login route excludes protected navigation chrome", async () => {
 
 test("notification refresh falls back to read-only listing on refresh failure", async () => {
   const notificationsPage = await source("app/bildirimler/page.tsx");
-  assert.match(notificationsPage, /if \(!response\.ok && refresh\)/u);
+  assert.match(notificationsPage, /if \(!response\.ok && shouldRefresh\)/u);
   assert.match(notificationsPage, /\/api\/notifications\?limit=500/u);
+});
+
+test("notifications page retries transient initial load failures", async () => {
+  const notificationsPage = await source("app/bildirimler/page.tsx");
+  assert.match(notificationsPage, /Serverless cold start/u);
+  assert.match(notificationsPage, /setTimeout\(resolve, 500\)/u);
+  assert.match(notificationsPage, /data = await request\(false\)/u);
 });

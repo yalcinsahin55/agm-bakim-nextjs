@@ -116,23 +116,37 @@ export default function NotificationsPage() {
     setLoadError("");
     if (refresh) setRefreshing(true);
     else setLoading(true);
-    try {
-      let response = refresh
+
+    const request = async (shouldRefresh: boolean): Promise<{ notifications?: Notification[] } | null> => {
+      let response = shouldRefresh
         ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" })
         : await fetch("/api/notifications?limit=500", { cache: "no-store" });
       if (response.status === 401) {
         window.location.href = "/login";
-        return;
+        return null;
       }
-      if (!response.ok && refresh) {
+      if (!response.ok && shouldRefresh) {
         response = await fetch("/api/notifications?limit=500", { cache: "no-store" });
       }
       if (response.status === 401) {
         window.location.href = "/login";
-        return;
+        return null;
       }
       if (!response.ok) throw new Error("Bildirimler yüklenemedi");
-      const data = await response.json();
+      return (await response.json()) as { notifications?: Notification[] };
+    };
+
+    try {
+      let data: { notifications?: Notification[] } | null;
+      try {
+        data = await request(refresh);
+      } catch {
+        // Serverless cold start veya kısa süreli ağ hatasında kullanıcıyı gereksiz
+        // yere hata ekranına düşürmeden aynı read-only listeyi bir kez yeniden dene.
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        data = await request(false);
+      }
+      if (!data) return;
       setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
     } catch {
       setLoadError("Bildirimler yüklenemedi. Lütfen tekrar deneyin.");
