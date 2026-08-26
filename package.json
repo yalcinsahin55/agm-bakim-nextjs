@@ -6,7 +6,7 @@
     "dev": "next dev",
     "predev": "npm run build:service-worker",
     "build": "next build",
-    "prebuild": "npm run build:service-worker && npm run migrate:legacy-oil-pdfs:vercel-dry-run && npm run migrate:legacy-oil-pdfs:vercel-pilot && npm run migrate:legacy-oil-pdfs:vercel-verify && npm run migrate:legacy-oil-pdfs:vercel-batch-a && npm run migrate:legacy-oil-pdfs:vercel-batch-a-verify && npm run migrate:legacy-oil-pdfs:vercel-batch-b",
+    "prebuild": "npm run build:service-worker && npm run migrate:legacy-oil-pdfs:vercel-dry-run && npm run migrate:legacy-oil-pdfs:vercel-pilot && npm run migrate:legacy-oil-pdfs:vercel-verify && npm run migrate:legacy-oil-pdfs:vercel-batch-a && npm run migrate:legacy-oil-pdfs:vercel-batch-a-verify && npm run migrate:legacy-oil-pdfs:vercel-batch-b && npm run migrate:legacy-oil-pdfs:vercel-batch-b-verify",
     "build:service-worker": "tsc --target ES2020 --module none --lib ES2020,DOM --skipLibCheck --noEmitOnError false --outFile public/sw.js lib/serviceWorker.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -23,6 +23,7 @@
     "migrate:legacy-oil-pdfs:vercel-batch-a": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-batch-a.mts",
     "migrate:legacy-oil-pdfs:vercel-batch-a-verify": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-batch-a-verify.mts",
     "migrate:legacy-oil-pdfs:vercel-batch-b": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-batch-b.mts",
+    "migrate:legacy-oil-pdfs:vercel-batch-b-verify": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-batch-b-verify.mts",
     "migrate:technician-source": "node --experimental-strip-types scripts/migrate-technician-source.mts"
   },
   "dependencies": {
