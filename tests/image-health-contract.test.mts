@@ -10,7 +10,7 @@ function readProjectFile(relativePath: string): string {
 test("all previously warned image call sites use Next Image", () => {
   const files = [
     "app/kayitlar/page.tsx",
-    "app/tamamla/page.tsx",
+    "components/MaintenanceEvidencePreview.tsx",
     "app/motorlar/page.tsx",
     "app/qr-etiketleri/page.tsx",
     "components/Lightbox.tsx",
