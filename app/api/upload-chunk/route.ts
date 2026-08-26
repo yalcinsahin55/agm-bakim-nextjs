@@ -10,6 +10,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { usersCollection, videoChunksCollection } from "@/lib/dbCollections";
+import { MAX_UPLOAD_CHUNK_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,14 @@ async function postUploadChunk(req: NextRequest) {
   if (rateLimited) return rateLimited;
   await ensureAppIndexes(db);
 
-  const rawBody: unknown = await req.json();
+  const bodyResult = await parseJsonBodyLimited(req, MAX_UPLOAD_CHUNK_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Video parçası isteği izin verilen boyutu aşıyor." : "Geçersiz video isteği." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const rawBody: unknown = bodyResult.value;
   if (!isObjectRecord(rawBody)) return NextResponse.json({ error: "Geçersiz video isteği." }, { status: 400 });
   const body = rawBody;
   const col = videoChunksCollection(db);

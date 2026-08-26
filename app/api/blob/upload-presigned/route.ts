@@ -8,6 +8,7 @@ import { canWriteMaintenance } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import {
   REPORT_ATTACHMENT_MAX_BYTES,
   REPORT_ATTACHMENT_MIME_TYPES,
@@ -91,8 +92,6 @@ interface GeneratePresignedUrlBody {
   };
 }
 
-type UploadPresignedBody = GeneratePresignedUrlBody;
-
 function isSafeReportUploadPath(pathname: string): boolean {
   if (!pathname.startsWith(REPORT_UPLOAD_PREFIX) || pathname.includes("..")) return false;
   const filename = pathname.slice(REPORT_UPLOAD_PREFIX.length);
@@ -154,7 +153,14 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
   if (rateLimited) return rateLimited;
 
   try {
-    const body: unknown = await request.json();
+    const bodyResult = await parseJsonBodyLimited(request, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Blob upload isteği izin verilen boyutu aşıyor." : "Geçersiz Blob presigned upload isteği." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body: unknown = bodyResult.value;
     if (!isGeneratePresignedUrlBody(body)) {
       return NextResponse.json({ error: "Geçersiz Blob presigned upload isteği." }, { status: 400 });
     }

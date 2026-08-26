@@ -11,6 +11,7 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,14 @@ export async function POST(req: NextRequest) {
     if (rateLimited) return rateLimited;
     await ensureAppIndexes(db);
 
-    const parsed = adminUserSchema.safeParse(await req.json().catch(() => ({})));
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Kullanıcı isteği izin verilen boyutu aşıyor." : "Geçersiz kullanıcı verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const parsed = adminUserSchema.safeParse(bodyResult.value);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }

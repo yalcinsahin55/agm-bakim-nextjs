@@ -9,6 +9,7 @@ import { registerSchema, formatZodError } from "@/lib/schemas";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
+import { MAX_AUTH_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,14 @@ async function postRegister(req: NextRequest) {
   if (rateLimited) return rateLimited;
 
   try {
-    const body = await req.json().catch(() => ({}));
-
-    const parsed = registerSchema.safeParse(body);
+    const bodyResult = await parseJsonBodyLimited(req, MAX_AUTH_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Kayıt isteği izin verilen boyutu aşıyor." : "Geçersiz kayıt verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const parsed = registerSchema.safeParse(bodyResult.value);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }

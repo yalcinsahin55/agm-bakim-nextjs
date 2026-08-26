@@ -10,6 +10,7 @@ import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notificatio
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { writeAuditLog } from "@/lib/audit";
 import type { EngineDocument } from "@/lib/dbTypes";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,16 @@ export async function PATCH(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "engine-hours-update", 120, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const { updates } = await req.json();
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Motor güncelleme isteği izin verilen boyutu aşıyor." : "Geçersiz veri formatı." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const updates = typeof bodyResult.value === "object" && bodyResult.value !== null && !Array.isArray(bodyResult.value)
+      ? (bodyResult.value as { updates?: unknown }).updates
+      : undefined;
     if (!Array.isArray(updates)) {
       return NextResponse.json({ error: "Geçersiz veri formatı." }, { status: 400 });
     }

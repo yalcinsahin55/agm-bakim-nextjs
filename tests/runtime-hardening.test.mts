@@ -18,7 +18,7 @@ import {
 import { addRows, worksheetToGrid, worksheetToObjects } from "../lib/excel.ts";
 import { looksLikePdf, readPdfResponse } from "../lib/pdfSecurity.ts";
 import { statusFor } from "../lib/status.ts";
-import { readRequestTextLimited, RequestBodyTooLargeError } from "../lib/requestLimits.ts";
+import { parseJsonBodyLimited, readRequestTextLimited, RequestBodyTooLargeError } from "../lib/requestLimits.ts";
 
 test("bounded request body reader rejects oversized chunked bodies", async () => {
   const normalPayload = JSON.stringify({ question: "AGM 8 bakımları" });
@@ -38,6 +38,15 @@ test("bounded request body reader rejects oversized chunked bodies", async () =>
   } as unknown as RequestInit;
   const oversized = new Request("http://localhost", oversizedRequestInit);
   await assert.rejects(() => readRequestTextLimited(oversized, 10), (error: unknown) => error instanceof RequestBodyTooLargeError);
+});
+
+test("bounded JSON parser distinguishes valid, invalid, and oversized bodies", async () => {
+  const valid = await parseJsonBodyLimited(new Request("http://localhost", { method: "POST", body: JSON.stringify({ ok: true }) }), 1_000);
+  assert.deepEqual(valid, { ok: true, value: { ok: true } });
+  const invalid = await parseJsonBodyLimited(new Request("http://localhost", { method: "POST", body: "not-json" }), 1_000);
+  assert.deepEqual(invalid, { ok: false, tooLarge: false });
+  const oversized = await parseJsonBodyLimited(new Request("http://localhost", { method: "POST", body: "12345678901" }), 10);
+  assert.deepEqual(oversized, { ok: false, tooLarge: true });
 });
 
 test("maintenance duration handles overnight, multi-day, and invalid intervals", () => {

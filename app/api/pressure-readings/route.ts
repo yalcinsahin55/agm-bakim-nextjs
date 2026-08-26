@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,17 @@ export async function POST(req: NextRequest) {
     if (rateLimited) return rateLimited;
     await ensureAppIndexes(db);
 
-    const body = await req.json() as PressureRequestBody;
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Basınç ölçümü isteği izin verilen boyutu aşıyor." : "Geçersiz basınç ölçümü verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    if (!isObjectRecord(bodyResult.value)) {
+      return NextResponse.json({ error: "Geçersiz basınç ölçümü verisi." }, { status: 400 });
+    }
+    const body = bodyResult.value as PressureRequestBody;
     const { reading_date } = body;
     const rawEntries = body.entries;
     if (!Array.isArray(rawEntries) || rawEntries.length === 0 || rawEntries.length > 100) {

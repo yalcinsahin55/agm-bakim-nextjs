@@ -19,6 +19,7 @@ import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelSer
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { recordSchema, formatZodError } from "@/lib/schemas";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
+import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { withApiTiming } from "@/lib/performance";
 import type { MaintenanceTechnicianContribution, User } from "@/lib/types";
 
@@ -80,8 +81,14 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
   if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı düzenleme yetkiniz yok." }, { status: 403 });
 
-  const body = await req.json().catch(() => null);
-  const parsedBody = recordSchema.partial().safeParse(body);
+  const bodyResult = await parseJsonBodyLimited(req, MAX_RECORD_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Bakım kaydı isteği izin verilen boyutu aşıyor." : "Geçersiz bakım kaydı verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const parsedBody = recordSchema.partial().safeParse(bodyResult.value);
   if (!parsedBody.success) {
     return NextResponse.json({ error: formatZodError(parsedBody.error) }, { status: 400 });
   }

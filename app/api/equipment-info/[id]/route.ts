@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await col.findOne({ _id: id });
   if (!existing) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
 
-  const body = await req.json().catch(() => ({}));
+  const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Motor bilgi kartı isteği izin verilen boyutu aşıyor." : "Geçersiz motor bilgi kartı verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
   const update: Partial<Record<EquipmentInfoField, string | null>> = {};
-  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const input = bodyResult.value && typeof bodyResult.value === "object" && !Array.isArray(bodyResult.value)
+    ? bodyResult.value as Record<string, unknown>
+    : {};
   for (const field of FIELDS) {
     if (field in input) {
       const value = input[field];

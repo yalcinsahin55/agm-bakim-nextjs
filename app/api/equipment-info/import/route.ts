@@ -6,7 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
-import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
+import { MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToGrid } from "@/lib/excel";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,14 @@ export async function POST(req: NextRequest) {
   const rateLimited = await enforceApiRateLimit(req, "import-equipment-info", 12, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { file_b64 } = await req.json();
+  const bodyResult = await parseJsonBodyLimited(req, MAX_IMPORT_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Excel import isteği izin verilen boyutu aşıyor." : "Geçersiz Excel import verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const { file_b64 } = bodyResult.value as { file_b64?: unknown };
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
   if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
     return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });

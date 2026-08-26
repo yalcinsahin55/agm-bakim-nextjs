@@ -19,6 +19,7 @@ import { normalizeReportAttachments } from "@/lib/reportAttachments";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import type { MaintenanceRecordDocument, MaintenanceTypeDocument } from "@/lib/dbTypes";
+import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import type { TechnicianOption } from "@/lib/technicians";
 
@@ -174,7 +175,14 @@ async function postRecord(req: NextRequest) {
     if (rateLimited) return rateLimited;
 
     operationStep = "parse_request";
-    const body = await req.json().catch(() => ({}));
+    const bodyResult = await parseJsonBodyLimited(req, MAX_RECORD_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Bakım kaydı isteği izin verilen boyutu aşıyor." : "Geçersiz bakım kaydı verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value;
 
     // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
     const parsed = recordSchema.safeParse(body);

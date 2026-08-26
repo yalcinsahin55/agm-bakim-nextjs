@@ -75,24 +75,6 @@ const INTENT_ARRAY_KEYS: Record<string, string[]> = {
   performance_daily: ["performance_daily"],
 };
 
-const INTENT_ARRAY_LABELS: Record<string, string> = {
-  by_engine: "Motor Dağılımı",
-  by_type: "Bakım Türü Dağılımı",
-  items: "Sonuçlar",
-  records: "Bakım Geçmişi",
-  activities: "Çalışılan Bakımlar",
-  technicians: "Teknisyenler",
-  services: "Dış Servisler",
-  engines: "Motorlar",
-  types: "Bakım Türleri",
-  readings: "Karter Basıncı Ölçümleri",
-  analyses: "Yağ Analizleri",
-  infos: "Motor Bilgi Kartları",
-  notifications: "Bildirimler",
-  performance_daily: "Günlük Motor Performansı",
-  daily_records: "Gün Gün Yapılan Bakımlar",
-};
-
 function isEmptyExportValue(value: unknown): boolean {
   return value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
 }

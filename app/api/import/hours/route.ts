@@ -10,7 +10,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
-import { MAX_IMPORT_BASE64_CHARS } from "@/lib/requestLimits";
+import { MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { loadExcelWorkbook, worksheetToObjects } from "@/lib/excel";
 import { withApiTiming } from "@/lib/performance";
 import type { EngineDocument } from "@/lib/dbTypes";
@@ -34,7 +34,18 @@ async function postImportHours(req: NextRequest) {
   const rateLimited = await enforceApiRateLimit(req, "import-hours", 12, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { file_b64, import_date } = await req.json();
+  const bodyResult = await parseJsonBodyLimited(req, MAX_IMPORT_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Excel import isteği izin verilen boyutu aşıyor." : "Geçersiz Excel import verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const { file_b64, import_date: rawImportDate } = bodyResult.value as { file_b64?: unknown; import_date?: unknown };
+  if (rawImportDate !== undefined && typeof rawImportDate !== "string") {
+    return NextResponse.json({ error: "Geçersiz içe aktarma tarihi." }, { status: 400 });
+  }
+  const import_date = rawImportDate;
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
   if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
     return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });

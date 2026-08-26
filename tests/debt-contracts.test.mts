@@ -645,3 +645,22 @@ test("notification detail targets the selected dashboard motor health card", asy
   assert.match(dashboard, /scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/u);
   assert.match(dashboard, /id=\{healthCardId\(engine\._id\)\}/u);
 });
+
+test("large JSON mutation routes enforce transport body limits", async () => {
+  const limits = await source("lib/requestLimits.ts");
+  const routePaths = [
+    "app/api/auth/login/route.ts",
+    "app/api/auth/register/route.ts",
+    "app/api/records/route.ts",
+    "app/api/records/[id]/route.ts",
+    "app/api/equipment-info/import/route.ts",
+    "app/api/import/hours/route.ts",
+    "app/api/pressure-readings/import/route.ts",
+    "app/api/oil-analyses/route.ts",
+    "app/api/upload-chunk/route.ts",
+  ];
+  assert.match(limits, /parseJsonBodyLimited/u);
+  assert.match(limits, /MAX_RECORD_REQUEST_BYTES = 16 \* 1024 \* 1024/u);
+  assert.match(limits, /MAX_UPLOAD_CHUNK_REQUEST_BYTES = 4 \* 1024 \* 1024/u);
+  for (const routePath of routePaths) assert.match(await source(routePath), /parseJsonBodyLimited/u);
+});

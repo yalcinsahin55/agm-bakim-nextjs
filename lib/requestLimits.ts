@@ -3,11 +3,36 @@ export const MAX_IMPORT_BASE64_CHARS = 20 * 1024 * 1024;
 export const MAX_BACKUP_REQUEST_BYTES = 60 * 1024 * 1024;
 export const MAX_ASSISTANT_REQUEST_BYTES = 10_000;
 export const MAX_PUSH_SUBSCRIPTION_REQUEST_BYTES = 32 * 1024;
+export const MAX_AUTH_REQUEST_BYTES = 32 * 1024;
+export const MAX_SMALL_JSON_REQUEST_BYTES = 256 * 1024;
+export const MAX_RECORD_REQUEST_BYTES = 16 * 1024 * 1024;
+export const MAX_IMPORT_REQUEST_BYTES = MAX_IMPORT_BASE64_CHARS + 512 * 1024;
+export const MAX_UPLOAD_CHUNK_REQUEST_BYTES = 4 * 1024 * 1024;
+export const MAX_OIL_ANALYSIS_REQUEST_BYTES = 16 * 1024 * 1024;
 
 export class RequestBodyTooLargeError extends Error {
   constructor() {
     super("Request body exceeds the configured limit.");
     this.name = "RequestBodyTooLargeError";
+  }
+}
+
+export type LimitedJsonResult =
+  | { ok: true; value: unknown }
+  | { ok: false; tooLarge: boolean };
+
+export async function parseJsonBodyLimited(request: Request, maxBytes: number): Promise<LimitedJsonResult> {
+  try {
+    const text = await readRequestTextLimited(request, maxBytes);
+    if (!text.trim()) return { ok: true, value: {} };
+    try {
+      return { ok: true, value: JSON.parse(text) as unknown };
+    } catch {
+      return { ok: false, tooLarge: false };
+    }
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return { ok: false, tooLarge: true };
+    throw error;
   }
 }
 

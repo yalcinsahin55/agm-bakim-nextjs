@@ -10,14 +10,20 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/technicians";
 import { withApiTiming } from "@/lib/performance";
 import { writeAuditLog } from "@/lib/audit";
+import { MAX_AUTH_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
 async function postLogin(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-
-    const parsed = loginSchema.safeParse(body);
+    const bodyResult = await parseJsonBodyLimited(req, MAX_AUTH_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Giriş isteği izin verilen boyutu aşıyor." : "Geçersiz giriş verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const parsed = loginSchema.safeParse(bodyResult.value);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }

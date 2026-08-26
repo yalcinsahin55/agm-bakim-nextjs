@@ -12,7 +12,6 @@ import {
   REPORT_ATTACHMENT_MAX_FILENAME_LENGTH,
   resolveReportAttachmentMime,
   sanitizeReportAttachmentFilename,
-  isReportAttachmentMime,
 } from "@/lib/reportAttachments";
 
 export const runtime = "nodejs";

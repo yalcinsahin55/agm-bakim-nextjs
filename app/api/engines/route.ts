@@ -11,6 +11,7 @@ import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelSer
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { writeAuditLog } from "@/lib/audit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,17 @@ async function postEngine(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "engine-create", 30, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const { name, hours, load_kw } = await req.json();
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Motor isteği izin verilen boyutu aşıyor." : "Geçersiz motor verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value;
+    const { name, hours, load_kw } = typeof body === "object" && body !== null && !Array.isArray(body)
+      ? body as { name?: unknown; hours?: unknown; load_kw?: unknown }
+      : {};
     const normalizedName = typeof name === "string" ? name.trim() : "";
     if (!normalizedName) {
       return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });

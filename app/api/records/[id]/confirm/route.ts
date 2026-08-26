@@ -11,6 +11,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 import { withApiTiming } from "@/lib/performance";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { reassignMaintenanceRecordEngine, type ReassignMaintenanceEngineResult } from "@/lib/reassignMaintenanceEngine";
 
 export const dynamic = "force-dynamic";
@@ -100,8 +101,14 @@ async function postConfirmation(req: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Bu kayıt yeni yönetici teyit akışına dahil değil." }, { status: 409 });
   }
 
-  const parsedBody = await req.json().catch(() => ({}));
-  const parsed = recordConfirmationSchema.safeParse(parsedBody);
+  const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Bakım teyit isteği izin verilen boyutu aşıyor." : "Geçersiz bakım teyit verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const parsed = recordConfirmationSchema.safeParse(bodyResult.value);
   if (!parsed.success) {
     return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }

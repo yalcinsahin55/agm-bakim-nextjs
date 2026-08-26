@@ -10,6 +10,7 @@ import { normalizeTechnicianPermissions, normalizeTechnicianType } from "@/lib/t
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { withApiTiming } from "@/lib/performance";
 import type { UserDocument } from "@/lib/dbTypes";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -33,20 +34,40 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const rateLimited = await enforceApiRateLimit(req, "user-update", 60, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } = await req.json();
-  if (user._id === id && (active === false || approved === false)) {
+  const patchBodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!patchBodyResult.ok) {
+    return NextResponse.json(
+      { error: patchBodyResult.tooLarge ? "Kullanıcı güncelleme isteği izin verilen boyutu aşıyor." : "Geçersiz kullanıcı verisi." },
+      { status: patchBodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const patchBody = patchBodyResult.value;
+  const { role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } =
+    typeof patchBody === "object" && patchBody !== null && !Array.isArray(patchBody)
+      ? patchBody as Record<string, unknown>
+      : {};
+  const roleValue = typeof role === "string" ? role : undefined;
+  const activeValue = typeof active === "boolean" ? active : undefined;
+  const approvedValue = typeof approved === "boolean" ? approved : undefined;
+  const technicianTypeValue = typeof technician_type === "string" ? technician_type : undefined;
+  const canBeResponsibleValue = typeof can_be_responsible === "boolean" ? can_be_responsible : undefined;
+  const canBeSupportValue = typeof can_be_support === "boolean" ? can_be_support : undefined;
+  const allowedWorkDomainsValue = Array.isArray(allowed_work_domains)
+    ? allowed_work_domains.filter((domain): domain is "mechanical" | "electrical" | "commissioning" => domain === "mechanical" || domain === "electrical" || domain === "commissioning")
+    : undefined;
+  if (user._id === id && (activeValue === false || approvedValue === false)) {
     return NextResponse.json({ error: "Kendi yönetici erişiminizi pasifleştiremez veya onayını kaldıramazsınız." }, { status: 400 });
   }
   const update: UserUpdateFields = {};
   const unset: Record<string, ""> = {};
-  if (role !== undefined) {
-    const normalizedRole = normalizeRole(role);
+  if (roleValue !== undefined) {
+    const normalizedRole = normalizeRole(roleValue);
     if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });
     update.role = normalizedRole;
     if (normalizedRole === "teknisyen") {
-      const normalizedType = normalizeTechnicianType(technician_type);
+      const normalizedType = normalizeTechnicianType(technicianTypeValue);
       update.technician_type = normalizedType;
-      Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible, can_be_support, allowed_work_domains }, normalizedType));
+      Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible: canBeResponsibleValue, can_be_support: canBeSupportValue, allowed_work_domains: allowedWorkDomainsValue }, normalizedType));
     } else {
       unset.technician_type = "";
       unset.can_be_responsible = "";
@@ -54,19 +75,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       unset.allowed_work_domains = "";
     }
   }
-  if (role === undefined && (technician_type !== undefined || can_be_responsible !== undefined || can_be_support !== undefined || allowed_work_domains !== undefined)) {
+  if (roleValue === undefined && (technicianTypeValue !== undefined || canBeResponsibleValue !== undefined || canBeSupportValue !== undefined || allowedWorkDomainsValue !== undefined)) {
     const target = await usersCol.findOne({ _id: id }, { projection: { role: 1, technician_type: 1, can_be_responsible: 1, can_be_support: 1, allowed_work_domains: 1 } });
     if (!target || normalizeRole(target.role) !== "teknisyen") {
       return NextResponse.json({ error: "Teknisyen yetkileri yalnızca teknisyen hesaplarına atanabilir." }, { status: 400 });
     }
     const previousType = normalizeTechnicianType(target.technician_type);
-    const normalizedType = normalizeTechnicianType(technician_type ?? target.technician_type);
-    const typeChanged = technician_type !== undefined && normalizedType !== previousType;
+    const normalizedType = normalizeTechnicianType(technicianTypeValue ?? target.technician_type);
+    const typeChanged = technicianTypeValue !== undefined && normalizedType !== previousType;
     update.technician_type = normalizedType;
-    Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible: can_be_responsible ?? (typeChanged ? undefined : target.can_be_responsible), can_be_support: can_be_support ?? (typeChanged ? undefined : target.can_be_support), allowed_work_domains: allowed_work_domains ?? (typeChanged ? undefined : target.allowed_work_domains) }, normalizedType));
+    Object.assign(update, normalizeTechnicianPermissions({ can_be_responsible: canBeResponsibleValue ?? (typeChanged ? undefined : target.can_be_responsible), can_be_support: canBeSupportValue ?? (typeChanged ? undefined : target.can_be_support), allowed_work_domains: allowedWorkDomainsValue ?? (typeChanged ? undefined : target.allowed_work_domains) }, normalizedType));
   }
-  if (typeof active === "boolean") update.active = active;
-  if (typeof approved === "boolean") update.approved = approved;
+  if (activeValue !== undefined) update.active = activeValue;
+  if (approvedValue !== undefined) update.approved = approvedValue;
   if (phone !== undefined) {
     if (typeof phone !== "string" || !isValidPhone(phone)) {
       return NextResponse.json({ error: "Geçerli bir Türkiye telefon numarası girin." }, { status: 400 });
@@ -98,9 +119,16 @@ async function deleteUser(req: NextRequest, { params }: { params: Promise<{ id: 
   if (rateLimited) return rateLimited;
   if (user._id === id) return NextResponse.json({ error: "Kendi hesabınızı silemezsiniz." }, { status: 400 });
 
-  const body: unknown = await req.json().catch(() => ({}));
-  const confirmation = body && typeof body === "object" && !Array.isArray(body)
-    ? (body as { confirm?: unknown }).confirm
+  const deleteBodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!deleteBodyResult.ok) {
+    return NextResponse.json(
+      { error: deleteBodyResult.tooLarge ? "Kullanıcı silme isteği izin verilen boyutu aşıyor." : "Geçersiz silme onayı verisi." },
+      { status: deleteBodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const deleteBody = deleteBodyResult.value;
+  const confirmation = deleteBody && typeof deleteBody === "object" && !Array.isArray(deleteBody)
+    ? (deleteBody as { confirm?: unknown }).confirm
     : undefined;
   if (confirmation !== "DELETE") {
     return NextResponse.json({ error: "Kalıcı silme için DELETE onayı gereklidir." }, { status: 400 });

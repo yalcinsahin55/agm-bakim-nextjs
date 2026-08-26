@@ -5,14 +5,6 @@ const PRIVATE_BLOB_HOST_SUFFIX = ".private.blob.vercel-storage.com";
 const GENERIC_BLOB_HOST_SUFFIX = ".blob.vercel-storage.com";
 const BLOB_READ_TIMEOUT_MS = 20_000;
 
-function isPublicBlobUrl(value: string): boolean {
-  try {
-    return new URL(value).hostname.toLowerCase().endsWith(PUBLIC_BLOB_HOST_SUFFIX);
-  } catch {
-    return false;
-  }
-}
-
 function isPrivateBlobUrl(value: string): boolean {
   try {
     const hostname = new URL(value).hostname.toLowerCase();

@@ -9,6 +9,7 @@ import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { EngineDocument } from "@/lib/dbTypes";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +142,16 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
     const rateLimited = await enforceApiRateLimit(req, "engine-history-update", 120, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const body = await req.json();
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Motor geçmişi isteği izin verilen boyutu aşıyor." : "Geçersiz motor geçmişi verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value && typeof bodyResult.value === "object" && !Array.isArray(bodyResult.value)
+      ? bodyResult.value as Record<string, unknown>
+      : {};
     const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne({ _id: id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
@@ -154,7 +164,7 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
       if (!body.history.every(isValidHistoryEntry)) {
         return NextResponse.json({ error: "Her kayıt için geçerli bir tarih ve saat gerekli." }, { status: 400 });
       }
-      nextHistory = body.history;
+      nextHistory = body.history as HistoryEntry[];
     } else if (Number.isInteger(body.entry_index)) {
       const index = Number(body.entry_index);
       if (index < 0 || index >= currentHistory.length) {
@@ -164,10 +174,11 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
       if (body.delete === true) {
         nextHistory = currentHistory.filter((_, currentIndex) => currentIndex !== index);
       } else {
-        if (!isValidHistoryEntry(body.entry)) {
+        const nextEntry = body.entry;
+        if (!isValidHistoryEntry(nextEntry)) {
           return NextResponse.json({ error: "Geçerli bir tarih ve saat gerekli." }, { status: 400 });
         }
-        nextHistory = currentHistory.map((entry, currentIndex) => currentIndex === index ? body.entry : entry);
+        nextHistory = currentHistory.map((entry, currentIndex) => currentIndex === index ? nextEntry : entry);
       }
     } else {
       return NextResponse.json({ error: "Geçersiz veri." }, { status: 400 });

@@ -10,6 +10,7 @@ import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { buildEngineStateUpdate, canUpdateEngineStateNested, isObjectRecord, mergeEngineState } from "@/lib/maintenance";
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 import { writeAuditLog } from "@/lib/audit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
   const rateLimited = await enforceApiRateLimit(req, "maintenance-type-change", 60, 60 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
 
-  const { label, default_period_hours, apply_period_to_all, engine_states, remove_engine_ids, work_domains, allow_electromechanical_support, allow_electromechanical_responsible, restore } = await req.json();
+  const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+  if (!bodyResult.ok) {
+    return NextResponse.json(
+      { error: bodyResult.tooLarge ? "Bakım türü isteği izin verilen boyutu aşıyor." : "Geçersiz bakım türü verisi." },
+      { status: bodyResult.tooLarge ? 413 : 400 },
+    );
+  }
+  const rawBody = bodyResult.value;
+  const input = typeof rawBody === "object" && rawBody !== null && !Array.isArray(rawBody)
+    ? rawBody as Record<string, unknown>
+    : {};
+  const label = typeof input.label === "string" ? input.label.trim() : "";
+  const default_period_hours = typeof input.default_period_hours === "number" ? input.default_period_hours : undefined;
+  const apply_period_to_all = input.apply_period_to_all === true;
+  const engine_states = input.engine_states;
+  const remove_engine_ids = input.remove_engine_ids;
+  const work_domains = input.work_domains;
+  const allow_electromechanical_support = input.allow_electromechanical_support;
+  const allow_electromechanical_responsible = input.allow_electromechanical_responsible;
+  const restore = input.restore === true;
 
   const typesCol = maintenanceTypesCollection(db);
   const type = await typesCol.findOne({ _id: key });
@@ -53,8 +73,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     auditChanged = true;
   }
   if (label) {
-    update.label = label.trim();
-    auditChanged = auditChanged || label.trim() !== type.label;
+    update.label = label;
+    auditChanged = auditChanged || label !== type.label;
   }
   if (typeof default_period_hours === "number") {
     update.default_period_hours = default_period_hours;

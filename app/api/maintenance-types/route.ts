@@ -9,6 +9,7 @@ import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelSer
 import type { MaintenanceTypeDocument } from "@/lib/dbTypes";
 import { isSafeMongoPathSegment } from "@/lib/mongoSecurity";
 import { writeAuditLog } from "@/lib/audit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -53,9 +54,26 @@ export async function POST(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "maintenance-type-create", 30, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const { label, default_period_hours, apply_to_all, engine_states, work_domains, allow_electromechanical_support, allow_electromechanical_responsible } = await req.json();
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Bakım türü isteği izin verilen boyutu aşıyor." : "Geçersiz bakım türü verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value;
+    const input = typeof body === "object" && body !== null && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : {};
+    const label = typeof input.label === "string" ? input.label.trim() : "";
+    const default_period_hours = input.default_period_hours;
+    const apply_to_all = input.apply_to_all === true;
+    const engine_states = input.engine_states;
+    const work_domains = input.work_domains;
+    const allow_electromechanical_support = input.allow_electromechanical_support;
+    const allow_electromechanical_responsible = input.allow_electromechanical_responsible;
     const normalizedWorkDomains = normalizeWorkDomains(work_domains, "mekanik");
-    if (!label || !label.trim()) {
+    if (!label) {
       return NextResponse.json({ error: "Bakım türü adı gerekli." }, { status: 400 });
     }
 
@@ -92,7 +110,7 @@ export async function POST(req: NextRequest) {
     const doc: MaintenanceTypeDocument = {
       _id: key,
       key,
-      label: label.trim(),
+      label,
       default_period_hours: Number(default_period_hours) || 0,
       engine_scope: apply_to_all ? "all" : "explicit",
       work_domains: normalizedWorkDomains,

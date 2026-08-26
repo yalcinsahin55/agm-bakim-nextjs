@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { isAllowedPdfUrl } from "@/lib/pdfSecurity";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_OIL_ANALYSIS_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import type { OilAnalysisDocument } from "@/lib/dbTypes";
 
 export const dynamic = "force-dynamic";
@@ -42,14 +43,32 @@ export async function POST(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "oil-analysis-create", 30, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const { engine_id, analysis_date, result, note, pdf_url, pdf_b64, pdf_filename } = await req.json();
+    const bodyResult = await parseJsonBodyLimited(req, MAX_OIL_ANALYSIS_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Yağ analizi isteği izin verilen boyutu aşıyor." : "Geçersiz yağ analizi verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value;
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "Geçersiz yağ analizi verisi." }, { status: 400 });
+    }
+    const rawBody = body as Record<string, unknown>;
+    const engine_id = typeof rawBody.engine_id === "string" ? rawBody.engine_id.trim() : "";
+    const analysis_date = typeof rawBody.analysis_date === "string" ? rawBody.analysis_date : "";
+    const result = typeof rawBody.result === "string" ? rawBody.result : "";
+    const note = typeof rawBody.note === "string" ? rawBody.note : "";
+    const pdf_url = typeof rawBody.pdf_url === "string" ? rawBody.pdf_url.trim() : "";
+    const pdf_b64 = typeof rawBody.pdf_b64 === "string" ? rawBody.pdf_b64 : "";
+    const pdf_filename = typeof rawBody.pdf_filename === "string" ? rawBody.pdf_filename.trim() : "";
     if (!engine_id || (!pdf_url && !pdf_b64)) {
       return NextResponse.json({ error: "Motor ve PDF dosyası gerekli." }, { status: 400 });
     }
     if (pdf_url && !isAllowedPdfUrl(pdf_url)) {
       return NextResponse.json({ error: "PDF bağlantısı izin verilen güvenli depolama alanından olmalıdır." }, { status: 400 });
     }
-    if (pdf_b64 && (typeof pdf_b64 !== "string" || pdf_b64.length > 10 * 1024 * 1024 * 1.4)) {
+    if (pdf_b64 && pdf_b64.length > 10 * 1024 * 1024 * 1.4) {
       return NextResponse.json({ error: "Dosya 10MB sınırını aşıyor." }, { status: 400 });
     }
     if (pdf_b64 && !pdf_b64.startsWith("data:application/pdf;base64,")) {

@@ -6,6 +6,7 @@ import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
+import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -40,14 +41,25 @@ export async function POST(req: NextRequest) {
     const rateLimited = await enforceApiRateLimit(req, "equipment-info-create", 60, 10 * 60 * 1000, user._id);
     if (rateLimited) return rateLimited;
 
-    const body = await req.json();
-    const { engine_name, kaver_tipi, hava_filtresi, krankcase, esanjor_tipi, dungs, radyator_tipi, not: noteField } = body;
-    if (!engine_name || !engine_name.trim()) {
+    const bodyResult = await parseJsonBodyLimited(req, MAX_SMALL_JSON_REQUEST_BYTES);
+    if (!bodyResult.ok) {
+      return NextResponse.json(
+        { error: bodyResult.tooLarge ? "Motor bilgi kartı isteği izin verilen boyutu aşıyor." : "Geçersiz motor bilgi kartı verisi." },
+        { status: bodyResult.tooLarge ? 413 : 400 },
+      );
+    }
+    const body = bodyResult.value;
+    const { engine_name, kaver_tipi, hava_filtresi, krankcase, esanjor_tipi, dungs, radyator_tipi, not: noteField } =
+      typeof body === "object" && body !== null && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const name = typeof engine_name === "string" ? engine_name.trim() : "";
+    if (!name) {
       return NextResponse.json({ error: "Motor adı gerekli." }, { status: 400 });
     }
+    const optionalText = (value: unknown): string | null => typeof value === "string" ? value.trim() || null : null;
 
     const col = equipmentInfoCollection(db);
-    const name = engine_name.trim();
     const existing = await col.findOne({ _id: name });
     if (existing) {
       return NextResponse.json({ error: "Bu motor için zaten bir bilgi kartı var. Listeden düzenleyebilirsiniz." }, { status: 409 });
@@ -55,9 +67,9 @@ export async function POST(req: NextRequest) {
 
     const doc = {
       _id: name, stable_id: randomUUID(), engine_name: name,
-      kaver_tipi: kaver_tipi || null, hava_filtresi: hava_filtresi || null, krankcase: krankcase || null,
-      esanjor_tipi: esanjor_tipi || null, dungs: dungs || null, radyator_tipi: radyator_tipi || null,
-      not: noteField || null,
+      kaver_tipi: optionalText(kaver_tipi), hava_filtresi: optionalText(hava_filtresi), krankcase: optionalText(krankcase),
+      esanjor_tipi: optionalText(esanjor_tipi), dungs: optionalText(dungs), radyator_tipi: optionalText(radyator_tipi),
+      not: optionalText(noteField),
     };
     await col.insertOne(doc);
     return NextResponse.json({ ok: true });
