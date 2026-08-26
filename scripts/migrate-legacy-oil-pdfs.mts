@@ -69,6 +69,13 @@ function positiveInt(values: Map<string, string>, key: string, fallback: number)
   if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`--${key} pozitif bir tam sayı olmalıdır.`);
   return parsed;
 }
+function nonNegativeInt(values: Map<string, string>, key: string, fallback: number): number {
+  const raw = values.get(key);
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`--${key} negatif olmayan bir tam sayı olmalıdır.`);
+  return parsed;
+}
 function parseArgs(args: readonly string[]): { values: Map<string, string>; flags: Set<string> } {
   const values = new Map<string, string>();
   const flags = new Set<string>();
@@ -112,7 +119,7 @@ function candidateQuery(): JsonRecord {
 async function findCandidates(db: Db): Promise<OilAnalysisDocument[]> {
   return await db.collection<OilAnalysisDocument>("oil_analyses").find(candidateQuery(), {
     projection: { _id: 1, engine_id: 1, engine_name: 1, analysis_date: 1, pdf_url: 1, pdf_b64: 1, pdf_filename: 1 },
-  }).limit(MAX_RECORDS + 1).toArray();
+  }).sort({ _id: 1 }).limit(MAX_RECORDS + 1).toArray();
 }
 async function scan(db: Db): Promise<{ report: OilReport; records: OilAnalysisDocument[] }> {
   const records = await findCandidates(db);
@@ -177,7 +184,7 @@ function buildRollbackState(record: OilAnalysisDocument, originalPdf: string): B
   else unset.pdf_url = "";
   return { set, unset };
 }
-async function migrateRecord(record: OilAnalysisDocument, db: Db, runId: string, persistBeforeCommit: (change: BackupChange) => Promise<void>): Promise<BackupChange | null> {
+async function migrateRecord(record: OilAnalysisDocument, db: Db, persistBeforeCommit: (change: BackupChange) => Promise<void>): Promise<BackupChange | null> {
   const inspected = inspectRecord(record);
   if (!inspected.eligible || !inspected.buffer || typeof record.pdf_b64 !== "string") return null;
   const uploadedUrls: string[] = [];
@@ -256,8 +263,10 @@ async function main(): Promise<void> {
   const uri = process.env.MONGO_URI;
   if (!uri) throw new Error("MONGO_URI gerekli.");
   const maxChanges = positiveInt(values, "max-changes", DEFAULT_MAX_CHANGES);
+  const batchOffset = nonNegativeInt(values, "offset", 0);
   if (maxChanges > MAX_RECORDS) throw new Error(`--max-changes en fazla ${MAX_RECORDS} olabilir.`);
   if (isApply && !rollbackPath && !values.has("max-changes")) throw new Error("Apply için zorunlu güvenlik sınırı: --max-changes=<n>. ");
+  if (isApply && !rollbackPath && !values.has("run-id")) throw new Error("Apply için zorunlu benzersiz sınır: --run-id=<id>. ");
   const client = new MongoClient(uri, { maxPoolSize: 4, serverSelectionTimeoutMS: 10_000 });
   await client.connect();
   try {
@@ -275,10 +284,12 @@ async function main(): Promise<void> {
       console.log(JSON.stringify({ mode: "dry-run", migration: "legacy-oil-pdfs", report: reportPath, scanned: report.scanned, eligible: report.eligible, invalid: report.invalid, skipped: report.skipped, total_bytes: report.total_bytes, limited: report.limited, max_changes: maxChanges }, null, 2));
       return;
     }
-    const applicable = records.filter((record) => inspectRecord(record).eligible);
-    if (applicable.length > maxChanges) throw new Error(`Apply durduruldu: ${applicable.length} uygun kayıt bulundu, --max-changes=${maxChanges}.`);
+    const eligibleCandidates = records.filter((record) => inspectRecord(record).eligible);
     if (report.limited) throw new Error("Apply durduruldu: tarama limiti aşıldı; kapsamı bölerek yeniden dry-run yapın.");
-    const runId = readArg(values, "run-id", `legacy-oil-pdfs-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`);
+    if (batchOffset > eligibleCandidates.length) throw new Error(`Apply durduruldu: --offset=${batchOffset}, uygun kayıt sayısı=${eligibleCandidates.length}.`);
+    const applicable = eligibleCandidates.slice(batchOffset, batchOffset + maxChanges);
+    if (applicable.length === 0) throw new Error("Apply durduruldu: seçilen batch içinde uygun kayıt bulunamadı.");
+    const runId = readArg(values, "run-id");
     const backupPath = resolve(readArg(values, "backup", "/tmp/legacy-oil-pdfs-backup.json"));
     await claimRun(db, runId);
     const backup: OilBackup = { version: 1, migration: "legacy-oil-pdfs", run_id: runId, generated_at: new Date().toISOString(), changes: [], errors: [] };
@@ -295,7 +306,7 @@ async function main(): Promise<void> {
     persistBackup();
     for (const record of applicable) {
       try {
-        const migrated = await migrateRecord(record, db, runId, persistBeforeCommit);
+        const migrated = await migrateRecord(record, db, persistBeforeCommit);
         if (migrated) {
           const saved = backup.changes.find((change) => change.id === migrated.id);
           if (saved) saved.state = migrated.state;

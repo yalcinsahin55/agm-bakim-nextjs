@@ -6,7 +6,7 @@
     "dev": "next dev",
     "predev": "npm run build:service-worker",
     "build": "next build",
-    "prebuild": "npm run build:service-worker && npm run migrate:legacy-oil-pdfs:vercel-dry-run",
+    "prebuild": "npm run build:service-worker && npm run migrate:legacy-oil-pdfs:vercel-dry-run && npm run migrate:legacy-oil-pdfs:vercel-pilot",
     "build:service-worker": "tsc --target ES2020 --module none --lib ES2020,DOM --skipLibCheck --noEmitOnError false --outFile public/sw.js lib/serviceWorker.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -18,6 +18,7 @@
     "migrate:legacy-media": "node --experimental-strip-types scripts/migrate-legacy-media.mts",
     "migrate:legacy-oil-pdfs": "node --experimental-strip-types scripts/migrate-legacy-oil-pdfs.mts",
     "migrate:legacy-oil-pdfs:vercel-dry-run": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-dry-run.mts",
+    "migrate:legacy-oil-pdfs:vercel-pilot": "node --experimental-strip-types scripts/vercel-legacy-oil-pdf-pilot.mts",
     "migrate:technician-source": "node --experimental-strip-types scripts/migrate-technician-source.mts"
   },
   "dependencies": {
