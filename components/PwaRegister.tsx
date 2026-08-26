@@ -5,10 +5,17 @@ import { syncOfflineQueue } from "@/lib/offlineQueue";
 
 export default function PwaRegister() {
   useEffect(() => {
+    let disposed = false;
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch((error) => {
-        console.warn("Service Worker kaydedilemedi:", error instanceof Error ? error.name : "UnknownError");
-      });
+      const registerAndUpdate = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+          if (!disposed) await registration.update();
+        } catch (error) {
+          console.warn("Service Worker güncellenemedi:", error instanceof Error ? error.name : "UnknownError");
+        }
+      };
+      void registerAndUpdate();
     }
 
     const sync = () => {
@@ -23,6 +30,7 @@ export default function PwaRegister() {
     sync();
 
     return () => {
+      disposed = true;
       window.removeEventListener("online", sync);
       window.removeEventListener("offline-queue:sync", sync);
       navigator.serviceWorker?.removeEventListener("message", handleWorkerMessage);

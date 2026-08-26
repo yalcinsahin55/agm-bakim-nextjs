@@ -94,7 +94,7 @@ workerScope.addEventListener("push", (rawEvent) => {
   );
 });
 
-const CACHE_NAME = "agm-bakim-shell-v2";
+const CACHE_NAME = "agm-bakim-shell-v3";
 const SHELL_ASSETS = ["/login", "/manifest.json", "/icon.svg"];
 const OFFLINE_DB_NAME = "agm-bakim-offline";
 const OFFLINE_DB_VERSION = 1;
@@ -104,7 +104,9 @@ const MAX_WORKER_SYNC_BODY_BYTES = 512 * 1024;
 workerScope.addEventListener("install", (rawEvent) => {
   const event = rawEvent as unknown as ExtendableEvent;
   event.waitUntil(
-    workerScope.caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)),
+    workerScope.caches.open(CACHE_NAME).then((cache) => cache.addAll(
+      SHELL_ASSETS.map((asset) => new Request(asset, { cache: "reload" })),
+    )),
   );
   void workerScope.skipWaiting();
 });
@@ -129,11 +131,15 @@ workerScope.addEventListener("fetch", (rawEvent) => {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== workerScope.location.origin || url.pathname.startsWith("/api/")) return;
 
+  const isDocumentRequest = request.destination === "document" || request.headers.get("accept")?.includes("text/html") === true;
+  const networkRequest = isDocumentRequest ? new Request(request, { cache: "no-store" }) : request;
   event.respondWith(
-    fetch(request)
+    fetch(networkRequest)
       .then((response) => {
-        const copy = response.clone();
-        void workerScope.caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          void workerScope.caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
       .catch(() => workerScope.caches.match(request).then((cached) => cached ?? workerScope.caches.match("/login").then((login) => login ?? new Response("Offline", { status: 503 })))),
