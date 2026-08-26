@@ -150,6 +150,7 @@ function buildRollbackState(record: MigrationRecord): RollbackState {
   return { set, unset };
 }
 function blobToken(): string | undefined { return process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN || undefined; }
+function blobStoreId(): string | undefined { return process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined; }
 function candidateQuery(): Filter<MigrationRecord> {
   return {
     $or: [
@@ -222,7 +223,7 @@ async function migrateRecord(record: MigrationRecord, db: Db, onBeforeCommit: (c
       const parsed = parsePhoto(value);
       if (!parsed) throw new Error(`Geçersiz veya desteklenmeyen fotoğraf formatı: ${String(record._id)}`);
       const extension = PHOTO_MIMES.get(parsed.mime) || "bin";
-      const blob = await put(legacyBlobPath(record._id, "photo", index, parsed.buffer, extension), parsed.buffer, { access: "public", contentType: parsed.mime, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}) });
+      const blob = await put(legacyBlobPath(record._id, "photo", index, parsed.buffer, extension), parsed.buffer, { access: "public", contentType: parsed.mime, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}), ...(blobStoreId() ? { storeId: blobStoreId() } : {}) });
       photoUrls.push(blob.url);
       uploadedUrls.push(blob.url);
     }
@@ -234,7 +235,7 @@ async function migrateRecord(record: MigrationRecord, db: Db, onBeforeCommit: (c
       const parsed = parseVideo(value);
       if (!parsed) { videoRefs.push(value); continue; }
       const videoExtension = parsed.filename.split(".").pop()?.replace(/[^A-Za-z0-9]/g, "") || "mp4";
-      const blob = await put(legacyBlobPath(record._id, "video", index, parsed.buffer, videoExtension), parsed.buffer, { access: "public", contentType: parsed.mime, multipart: true, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}) });
+      const blob = await put(legacyBlobPath(record._id, "video", index, parsed.buffer, videoExtension), parsed.buffer, { access: "public", contentType: parsed.mime, multipart: true, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}), ...(blobStoreId() ? { storeId: blobStoreId() } : {}) });
       const reference: BlobVideoReference = { url: blob.url, filename: parsed.filename, mime: parsed.mime };
       videoRefs.push(reference);
       uploadedUrls.push(blob.url);

@@ -16,6 +16,8 @@ type DryRunReport = {
   errors?: unknown;
 };
 
+type BackupSummary = { errors?: Array<{ error?: unknown }> };
+
 const DRY_RUN_BRANCH = "migration-dry-run";
 const PILOT_BRANCH = "migration-pilot";
 const REPORT_PATH = "/tmp/agm-legacy-media-migration.json";
@@ -60,8 +62,10 @@ function main(): void {
   }
 
   let report: DryRunReport;
+  let backup: BackupSummary = {};
   try {
     report = JSON.parse(readFileSync(REPORT_PATH, "utf8")) as DryRunReport;
+    if (mode === "apply" && existsSync(BACKUP_PATH)) backup = JSON.parse(readFileSync(BACKUP_PATH, "utf8")) as BackupSummary;
   } catch {
     console.error(JSON.stringify({ migration: "legacy-media", mode, ok: false, reason: "report unreadable" }));
     process.exitCode = 1;
@@ -82,6 +86,7 @@ function main(): void {
     applied: numeric(report.applied),
     pending: numeric(report.pending),
     errors: numeric(report.errors),
+    error_messages: mode === "apply" ? (backup.errors || []).slice(0, 5).map((item) => String(item.error || "unknown").replace(/mongodb(?:\+srv)?:\/\/\S+/gi, "[redacted-mongo-uri]").replace(/https?:\/\/\S+/gi, "[redacted-url]").replace(/\b[A-Za-z0-9+/]{100,}={0,2}\b/g, "[redacted-base64]").slice(0, 240)) : undefined,
   }));
 }
 
