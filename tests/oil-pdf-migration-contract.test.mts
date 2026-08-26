@@ -10,6 +10,7 @@ test("oil PDF migration keeps dry-run, confirmation, backup, and rollback safegu
   const migration = await source("scripts/migrate-legacy-oil-pdfs.mts");
   const wrapper = await source("scripts/vercel-legacy-oil-pdf-dry-run.mts");
   const pilot = await source("scripts/vercel-legacy-oil-pdf-pilot.mts");
+  const batchA = await source("scripts/vercel-legacy-oil-pdf-batch-a.mts");
   assert.match(migration, /const APPLY_CONFIRM = "APPLY-LEGACY-OIL-PDFS"/);
   assert.match(migration, /const ROLLBACK_CONFIRM = "ROLLBACK-LEGACY-OIL-PDFS"/);
   assert.match(migration, /if \(isApply && readArg\(values, "confirm"\) !== expectedConfirm\)/);
@@ -28,6 +29,10 @@ test("oil PDF migration keeps dry-run, confirmation, backup, and rollback safegu
   assert.match(pilot, /--max-changes=3/);
   assert.match(pilot, /--run-id=/);
   assert.match(pilot, /mode: "apply"/);
+  assert.match(batchA, /migration-oil-pdf-batch-a/);
+  assert.match(batchA, /--max-changes=6/);
+  assert.match(batchA, /--offset=0/);
+  assert.match(batchA, /mode: "apply"/);
 });
 
 test("oil PDF migration preserves existing PDF URL records and validates PDF bytes", async () => {
