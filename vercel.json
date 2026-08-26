@@ -4,10 +4,6 @@
     {
       "path": "/api/cron/refresh",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/health/mongodb",
-      "schedule": "0 7 * * *"
     }
   ]
 }

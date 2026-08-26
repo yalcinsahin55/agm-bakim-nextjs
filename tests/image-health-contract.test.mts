@@ -38,12 +38,11 @@ test("MongoDB health endpoint is secret-protected and performs a bounded ping", 
   assert.doesNotMatch(source, /stack/);
 });
 
-test("Vercel keeps notification refresh and adds a daily MongoDB health probe", () => {
+test("Vercel keeps the notification refresh cron after optional MongoDB probing is disabled", () => {
   const config = JSON.parse(readProjectFile("vercel.json")) as {
     crons?: Array<{ path?: string; schedule?: string }>;
   };
   assert.deepEqual(config.crons, [
     { path: "/api/cron/refresh", schedule: "0 6 * * *" },
-    { path: "/api/health/mongodb", schedule: "0 7 * * *" },
   ]);
 });
