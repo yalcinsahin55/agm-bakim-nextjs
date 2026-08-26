@@ -305,6 +305,10 @@ test("stable IDs are generated without replacing legacy natural keys", async () 
   assert.match(legacyMediaMigration, /ROLLBACK-LEGACY-MEDIA-MIGRATION/);
   assert.match(legacyMediaMigration, /MAX_RECORD_MEDIA_BYTES/);
   assert.match(legacyMediaMigration, /max-changes/);
+  assert.match(legacyMediaMigration, /run-id/);
+  assert.match(legacyMediaMigration, /rollback-run-id/);
+  assert.match(legacyMediaMigration, /legacy_media_migration_runs/);
+  assert.match(legacyMediaMigration, /legacy_media_migration_backup_items/);
   assert.match(legacyMediaMigration, /state: "pending"/);
   assert.match(legacyMediaMigration, /candidateQuery/);
   assert.match(legacyMediaMigration, /createHash\("sha256"\)/);

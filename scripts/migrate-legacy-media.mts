@@ -19,6 +19,7 @@ type UnsetRecord = Record<string, "" | 1 | true>;
 type RollbackState = { set: JsonRecord; unset: UnsetRecord };
 type PendingChange = { id: SerializedId; uploadedUrls: string[]; before: RollbackState; state: "pending" | "committed" };
 type MediaBackup = { version: 1; generated_at: string; changes: PendingChange[]; errors: Array<{ id: SerializedId; error: string }> };
+type DurableBackupItem = { _id: string; run_id: string; generated_at: string; change: PendingChange };
 type MediaReport = { version: 2; mode: "dry-run" | "apply"; generated_at: string; scanned: number; limited: boolean; eligible: number; invalid: number; skipped: number; total_bytes: number; samples: Array<JsonRecord>; max_changes?: number };
 
 type BlobVideoReference = { url: string; filename: string; mime: string };
@@ -265,13 +266,10 @@ function isMediaBackup(value: unknown): value is MediaBackup {
   const candidate = value as JsonRecord;
   return candidate.version === 1 && typeof candidate.generated_at === "string" && Array.isArray(candidate.changes) && candidate.changes.every(isPendingChange) && Array.isArray(candidate.errors);
 }
-async function rollback(db: Db, rollbackPath: string): Promise<{ restored: number; requested: number; deletedBlobs: number }> {
-  if (!existsSync(rollbackPath)) throw new Error(`Rollback dosyası bulunamadı: ${rollbackPath}`);
-  const parsed: unknown = JSON.parse(readFileSync(rollbackPath, "utf8"));
-  if (!isMediaBackup(parsed)) throw new Error("Geçersiz medya rollback dosyası.");
+async function rollbackBackup(db: Db, backup: MediaBackup): Promise<{ restored: number; requested: number; deletedBlobs: number }> {
   let restored = 0;
   let deletedBlobs = 0;
-  for (const change of parsed.changes) {
+  for (const change of backup.changes) {
     const set = change.before.set;
     const unset = change.before.unset;
     const update: UpdateFilter<MigrationRecord> = {};
@@ -281,21 +279,34 @@ async function rollback(db: Db, rollbackPath: string): Promise<{ restored: numbe
     restored += result.modifiedCount;
     deletedBlobs += await cleanupBlobs(change.uploadedUrls);
   }
-  return { restored, requested: parsed.changes.length, deletedBlobs };
+  return { restored, requested: backup.changes.length, deletedBlobs };
+}
+async function readRollbackBackup(db: Db, rollbackPath: string, rollbackRunId: string): Promise<MediaBackup> {
+  if (rollbackPath) {
+    if (!existsSync(rollbackPath)) throw new Error(`Rollback dosyası bulunamadı: ${rollbackPath}`);
+    const parsed: unknown = JSON.parse(readFileSync(rollbackPath, "utf8"));
+    if (!isMediaBackup(parsed)) throw new Error("Geçersiz medya rollback dosyası.");
+    return parsed;
+  }
+  const items = await db.collection<DurableBackupItem>("legacy_media_migration_backup_items").find({ run_id: rollbackRunId }).sort({ _id: 1 }).toArray();
+  if (items.length === 0) throw new Error(`Durable rollback kaydı bulunamadı: ${rollbackRunId}`);
+  return { version: 1, generated_at: items[0]?.generated_at || new Date().toISOString(), changes: items.map((item) => item.change), errors: [] };
 }
 async function main(): Promise<void> {
   const { values, flags } = parseArgs(process.argv.slice(2));
   const outputDir = resolve(readArg(values, "output-dir", DEFAULT_OUTPUT_DIR));
   const reportPath = resolve(readArg(values, "report", `${outputDir}/legacy-media-preview.json`));
   const rollbackPath = readArg(values, "rollback");
-  const isRollback = Boolean(rollbackPath);
+  const rollbackRunId = readArg(values, "rollback-run-id");
+  const isRollback = Boolean(rollbackPath || rollbackRunId);
   const isApply = flags.has("apply");
   const expectedConfirm = isRollback ? ROLLBACK_CONFIRM : APPLY_CONFIRM;
   if (isApply && readArg(values, "confirm") !== expectedConfirm) throw new Error(`Apply için --confirm=${expectedConfirm} gereklidir.`);
   if (isRollback && !isApply) throw new Error("Rollback yalnızca --apply ve doğru onay token’ı ile çalışır.");
   const uri = process.env.MONGO_URI;
   if (!uri) throw new Error("MONGO_URI gerekli.");
-  if (isApply && !rollbackPath && !readArg(values, "max-changes")) throw new Error("Apply için zorunlu güvenlik sınırı: --max-changes=<n>.");
+  if (isApply && !isRollback && !readArg(values, "max-changes")) throw new Error("Apply için zorunlu güvenlik sınırı: --max-changes=<n>.");
+  if (isApply && !isRollback && !readArg(values, "run-id")) throw new Error("Apply için zorunlu idempotency kilidi: --run-id=<benzersiz-id>.");
   const maxChanges = positiveInt(values, "max-changes", DEFAULT_MAX_CHANGES);
   if (maxChanges > MAX_RECORDS) throw new Error(`--max-changes en fazla ${MAX_RECORDS} olabilir.`);
   const client = new MongoClient(uri);
@@ -303,7 +314,8 @@ async function main(): Promise<void> {
   try {
     const db = client.db(process.env.MONGO_DB_NAME || undefined);
     if (isRollback) {
-      const result = await rollback(db, resolve(rollbackPath));
+      const backup = await readRollbackBackup(db, rollbackPath ? resolve(rollbackPath) : "", rollbackRunId);
+      const result = await rollbackBackup(db, backup);
       writeJsonAtomic(reportPath, { mode: "rollback", generated_at: new Date().toISOString(), ...result });
       console.log(JSON.stringify({ mode: "rollback", report: reportPath, ...result }, null, 2));
       return;
@@ -314,12 +326,24 @@ async function main(): Promise<void> {
       console.log(JSON.stringify({ mode: "dry-run", report: reportPath, scanned: report.scanned, eligible: report.eligible, invalid: report.invalid, skipped: report.skipped, total_bytes: report.total_bytes, limited: report.limited, max_changes: maxChanges }, null, 2));
       return;
     }
-    const applicable = records.filter((record) => inspectRecord(record).eligible);
-    if (applicable.length > maxChanges) throw new Error(`Apply durduruldu: ${applicable.length} uygun kayıt bulundu, --max-changes=${maxChanges}. Dry-run raporunu inceleyip daha düşük bir parti seçin.`);
+    const eligibleRecords = records.filter((record) => inspectRecord(record).eligible);
+    const applicable = eligibleRecords.slice(0, maxChanges);
+    if (applicable.length === 0) throw new Error("Apply için uygun legacy medya kaydı bulunamadı.");
+    const runId = readArg(values, "run-id");
+    try {
+      await db.collection<{ _id: string; kind: string; created_at: string; max_changes: number; candidate_count: number; status: string }>("legacy_media_migration_runs").insertOne({ _id: runId, kind: "legacy-media", created_at: new Date().toISOString(), max_changes: maxChanges, candidate_count: eligibleRecords.length, status: "started" });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === 11000) throw new Error(`Migration run-id zaten kullanılmış: ${runId}`);
+      throw error;
+    }
     const backupPath = resolve(readArg(values, "backup", `${outputDir}/legacy-media-backup.json`));
     const backup: MediaBackup = { version: 1, generated_at: new Date().toISOString(), changes: [], errors: [] };
     const persistBackup = (): void => writeJsonAtomic(backupPath, backup);
-    const persistBeforeCommit = async (change: PendingChange): Promise<void> => { backup.changes.push(change); persistBackup(); };
+    const persistBeforeCommit = async (change: PendingChange): Promise<void> => {
+      backup.changes.push(change);
+      persistBackup();
+      await db.collection<DurableBackupItem>("legacy_media_migration_backup_items").insertOne({ _id: `${runId}:${backup.changes.length}`, run_id: runId, generated_at: backup.generated_at, change });
+    };
     persistBackup();
     for (const record of applicable) {
       try {
@@ -334,6 +358,7 @@ async function main(): Promise<void> {
     writeJsonAtomic(backupPath, backup);
     const applied = backup.changes.filter((change) => change.state === "committed").length;
     const pending = backup.changes.filter((change) => change.state !== "committed").length;
+    await db.collection<{ _id: string; status: string; finished_at: string; applied: number; pending: number; errors: number }>("legacy_media_migration_runs").updateOne({ _id: runId }, { $set: { status: pending === 0 && backup.errors.length === 0 ? "completed" : "completed_with_errors", finished_at: new Date().toISOString(), applied, pending, errors: backup.errors.length } });
     writeJsonAtomic(reportPath, { ...report, mode: "apply", applied, pending, backup: backupPath, errors: backup.errors.length, max_changes: maxChanges });
     console.log(JSON.stringify({ mode: "apply", report: reportPath, backup: backupPath, applied, pending, errors: backup.errors.length, max_changes: maxChanges }, null, 2));
   } finally {

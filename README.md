@@ -441,7 +441,7 @@ Her iki script de varsayılan olarak veri değiştirmez. Apply ve rollback yaln�
 
 ## Legacy medya migration’ı
 
-Eski bakım kayıtlarında kalan açık `data:*;base64,` fotoğraf ve doğrulanabilir base64 video içerikleri Vercel Blob URL’lerine taşınabilir. Normal Blob URL’leri, mevcut video referansları ve doğrulanamayan içerikler olduğu gibi korunur; migration fiziksel bakım kaydı silmez ve fotoğraf/video alanlarını yalnızca başarılı Blob yüklemesi ile veritabanı güncellemesi birlikte tamamlandığında değiştirir. Her kaydın eski `photos_b64`, `photos` ve `videos` değerleri, veritabanı güncellemesinden önce atomik backup dosyasına yazılır. Blob anahtarları kayıt kimliği, medya sırası ve SHA-256 içerik özetiyle deterministic üretildiği için aynı medya ikinci çalıştırmada yeni rastgele dosya adı oluşturmaz.
+Eski bakım kayıtlarında kalan açık `data:*;base64,` fotoğraf ve doğrulanabilir base64 video içerikleri Vercel Blob URL’lerine taşınabilir. Normal Blob URL’leri, mevcut video referansları ve doğrulanamayan içerikler olduğu gibi korunur; migration fiziksel bakım kaydı silmez ve fotoğraf/video alanlarını yalnızca başarılı Blob yüklemesi ile veritabanı güncellemesi birlikte tamamlandığında değiştirir. Her kaydın eski `photos_b64`, `photos` ve `videos` değerleri, veritabanı güncellemesinden önce atomik backup dosyasına ve apply sırasında `legacy_media_migration_backup_items` koleksiyonuna yazılır. Apply işlemleri benzersiz `--run-id` kilidi ister; aynı run-id ikinci kez çalıştırılırsa işlem başlamadan durur. Blob anahtarları kayıt kimliği, medya sırası ve SHA-256 içerik özetiyle deterministic üretildiği için aynı medya ikinci çalıştırmada yeni rastgele dosya adı oluşturmaz.
 
 Bu scriptin kapsamı `maintenance_records` içindeki legacy fotoğraf/video alanlarıdır. Yağ analizlerindeki `oil_analyses.pdf_b64` alanları mevcut authenticated PDF proxy tarafından geriye dönük olarak okunmaya devam eder; bunlar bu script tarafından otomatik silinmez veya dönüştürülmez. PDF’ler için ayrı bir migration kararı alınırsa aynı dry-run, backup ve pilot parti kuralları uygulanmalıdır.
 
@@ -453,13 +453,14 @@ npm run migrate:legacy-media -- \
   --max-changes=100
 ```
 
-Dry-run hiçbir veritabanı veya Blob değişikliği yapmaz. Apply işlemi varsayılan olarak kapalıdır; çalıştırmak için ayrı bir backup yolu, explicit confirmation token’ı ve zorunlu `--max-changes` sınırı verilmelidir. Uygun bir kayıt sayısı sınırı aşarsa işlem başlamadan durur. Apply sırasında yeni Blob yüklenir, rollback kaydı DB update’inden önce yazılır ve DB güncellemesi başarısız olursa yüklenen Blob’lar temizlenmeye çalışılır:
+Dry-run hiçbir veritabanı veya Blob değişikliği yapmaz. Apply işlemi varsayılan olarak kapalıdır; çalıştırmak için ayrı bir backup yolu, explicit confirmation token’ı, benzersiz `--run-id` ve zorunlu `--max-changes` batch sınırı verilmelidir. `--max-changes` bir üst sınırdır; uygun kayıt sayısı daha yüksekse yalnızca ilk batch seçilir ve raporda tüm dry-run kapsamı ile uygulanan batch ayrı görünür. Apply sırasında yeni Blob yüklenir, rollback kaydı DB update’inden önce hem dedicated dosyaya hem de durable Mongo backup koleksiyonuna yazılır ve DB güncellemesi başarısız olursa yüklenen Blob’lar temizlenmeye çalışılır:
 
 ```bash
 npm run migrate:legacy-media -- \
   --report=migration-output/legacy-media-apply.json \
   --backup=migration-output/legacy-media-backup.json \
   --max-changes=25 \
+  --run-id=legacy-media-2026-08-26-batch-01 \
   --apply \
   --confirm=APPLY-LEGACY-MEDIA-MIGRATION
 ```
@@ -469,12 +470,11 @@ Hatalı bir eşleşmede yalnızca bu migration’ın backup dosyasındaki alanla
 ```bash
 npm run migrate:legacy-media -- \
   --rollback=migration-output/legacy-media-backup.json \
-  --max-changes=25 \
   --apply \
   --confirm=ROLLBACK-LEGACY-MEDIA-MIGRATION
 ```
 
-Bu script bu refaktör paketi kapsamında **production üzerinde çalıştırılmamıştır**. Production migration kararı verilirse önce Atlas snapshot, ayrı Blob store/backup, staging dry-run ve küçük bir pilot parti ile doğrulama yapılmalıdır. `migration-output/` GitHub’a gönderilmemelidir.
+Bu script bu refaktör paketi kapsamında **production üzerinde çalıştırılmamıştır**. Production migration kararı verilirse önce Atlas snapshot, ayrı backup yolu, staging/dry-run ve küçük bir pilot parti ile doğrulama yapılmalıdır. Vercel preview runtime’ında çalıştırılan pilotlarda rollback için `--rollback-run-id=<run-id>` kullanılabilir; bu seçenek durable Mongo backup koleksiyonundaki base64 alanlarını kullanır. `migration-output/` GitHub’a gönderilmemelidir.
 
 ## Birlikte tamamlanan eski bakımlarda süre tekilleştirme
 
