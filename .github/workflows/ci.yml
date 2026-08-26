@@ -29,6 +29,7 @@ jobs:
       JWT_SECRET: agm-ci-only-secret-0123456789
       CRON_SECRET: agm-ci-cron-secret
       E2E_SEED: "1"
+      E2E_ALLOW_LOCAL_RATE_LIMIT: "1"
       E2E_IDENTIFIER: e2e-admin@example.test
       E2E_PASSWORD: e2e-admin-password-123
       E2E_VIEWER_IDENTIFIER: e2e-viewer@example.test
