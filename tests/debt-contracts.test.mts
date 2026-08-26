@@ -307,6 +307,11 @@ test("stable IDs are generated without replacing legacy natural keys", async () 
   assert.match(legacyMediaMigration, /max-changes/);
   assert.match(legacyMediaMigration, /state: "pending"/);
   assert.match(legacyMediaMigration, /candidateQuery/);
+  assert.match(legacyMediaMigration, /createHash\("sha256"\)/);
+  assert.match(legacyMediaMigration, /legacyBlobPath/);
+  assert.match(legacyMediaMigration, /addRandomSuffix: false/);
+  assert.match(legacyMediaMigration, /allowOverwrite: true/);
+  assert.doesNotMatch(legacyMediaMigration, /randomUUID()/);
 });
 
 test("repository exposes CI validation commands", async () => {

@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { ObjectId, MongoClient, type Db, type Filter, type UpdateFilter } from "mongodb";
 import { del, put } from "@vercel/blob";
 
@@ -30,6 +30,18 @@ const MAX_RECORDS = 10_000;
 const DEFAULT_MAX_CHANGES = 100;
 const MAX_RECORD_MEDIA_BYTES = 8 * 1024 * 1024;
 const PHOTO_MIMES = new Map<PhotoMime, string>([["image/jpeg", "jpg"], ["image/png", "png"], ["image/webp", "webp"]]);
+
+function safeBlobSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "record";
+}
+
+function contentDigest(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex").slice(0, 24);
+}
+
+function legacyBlobPath(recordId: string | ObjectId, kind: "photo" | "video", index: number, buffer: Buffer, extension: string): string {
+  return `legacy-media/${safeBlobSegment(String(recordId))}/${kind}-${index}-${contentDigest(buffer)}.${extension}`;
+}
 
 function parseArgs(argv: readonly string[]): ParsedArgs {
   const values: Record<string, string> = {};
@@ -209,7 +221,7 @@ async function migrateRecord(record: MigrationRecord, db: Db, onBeforeCommit: (c
       const parsed = parsePhoto(value);
       if (!parsed) throw new Error(`Geçersiz veya desteklenmeyen fotoğraf formatı: ${String(record._id)}`);
       const extension = PHOTO_MIMES.get(parsed.mime) || "bin";
-      const blob = await put(`legacy-media/${String(record._id)}/photo-${index}-${randomUUID()}.${extension}`, parsed.buffer, { access: "public", contentType: parsed.mime, ...(token ? { token } : {}) });
+      const blob = await put(legacyBlobPath(record._id, "photo", index, parsed.buffer, extension), parsed.buffer, { access: "public", contentType: parsed.mime, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}) });
       photoUrls.push(blob.url);
       uploadedUrls.push(blob.url);
     }
@@ -220,7 +232,8 @@ async function migrateRecord(record: MigrationRecord, db: Db, onBeforeCommit: (c
     for (const [index, value] of videos.entries()) {
       const parsed = parseVideo(value);
       if (!parsed) { videoRefs.push(value); continue; }
-      const blob = await put(`legacy-media/${String(record._id)}/video-${index}-${randomUUID()}-${parsed.filename}`, parsed.buffer, { access: "public", contentType: parsed.mime, multipart: true, ...(token ? { token } : {}) });
+      const videoExtension = parsed.filename.split(".").pop()?.replace(/[^A-Za-z0-9]/g, "") || "mp4";
+      const blob = await put(legacyBlobPath(record._id, "video", index, parsed.buffer, videoExtension), parsed.buffer, { access: "public", contentType: parsed.mime, multipart: true, addRandomSuffix: false, allowOverwrite: true, ...(token ? { token } : {}) });
       const reference: BlobVideoReference = { url: blob.url, filename: parsed.filename, mime: parsed.mime };
       videoRefs.push(reference);
       uploadedUrls.push(blob.url);

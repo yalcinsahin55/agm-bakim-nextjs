@@ -441,7 +441,9 @@ Her iki script de varsayılan olarak veri değiştirmez. Apply ve rollback yaln�
 
 ## Legacy medya migration’ı
 
-Eski bakım kayıtlarında kalan açık `data:*;base64,` fotoğraf ve doğrulanabilir base64 video içerikleri Vercel Blob URL’lerine taşınabilir. Normal Blob URL’leri, mevcut video referansları ve doğrulanamayan içerikler olduğu gibi korunur; migration fiziksel bakım kaydı silmez ve fotoğraf/video alanlarını yalnızca başarılı Blob yüklemesi ile veritabanı güncellemesi birlikte tamamlandığında değiştirir. Her kaydın eski `photos_b64`, `photos` ve `videos` değerleri, veritabanı güncellemesinden önce atomik backup dosyasına yazılır.
+Eski bakım kayıtlarında kalan açık `data:*;base64,` fotoğraf ve doğrulanabilir base64 video içerikleri Vercel Blob URL’lerine taşınabilir. Normal Blob URL’leri, mevcut video referansları ve doğrulanamayan içerikler olduğu gibi korunur; migration fiziksel bakım kaydı silmez ve fotoğraf/video alanlarını yalnızca başarılı Blob yüklemesi ile veritabanı güncellemesi birlikte tamamlandığında değiştirir. Her kaydın eski `photos_b64`, `photos` ve `videos` değerleri, veritabanı güncellemesinden önce atomik backup dosyasına yazılır. Blob anahtarları kayıt kimliği, medya sırası ve SHA-256 içerik özetiyle deterministic üretildiği için aynı medya ikinci çalıştırmada yeni rastgele dosya adı oluşturmaz.
+
+Bu scriptin kapsamı `maintenance_records` içindeki legacy fotoğraf/video alanlarıdır. Yağ analizlerindeki `oil_analyses.pdf_b64` alanları mevcut authenticated PDF proxy tarafından geriye dönük olarak okunmaya devam eder; bunlar bu script tarafından otomatik silinmez veya dönüştürülmez. PDF’ler için ayrı bir migration kararı alınırsa aynı dry-run, backup ve pilot parti kuralları uygulanmalıdır.
 
 Önce erişimi kısıtlı bir test/staging veritabanında ve Blob store’da dry-run raporu alın:
 
