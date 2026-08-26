@@ -13,6 +13,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import RecordMediaModals from "@/components/RecordMediaModals";
+import MaintenanceRecordDetailsModal from "@/components/MaintenanceRecordDetailsModal";
 import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { ReportAttachment } from "@/lib/types";
@@ -1179,51 +1180,21 @@ export default function KayitlarPage() {
         </div>
       )}
 
-      {/* Bakım Kaydı Detay Modalı */}
       {selectedRecord && (
-        <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/75 backdrop-blur-sm p-0 md:p-4" role="dialog" aria-modal="true" aria-label="Bakım kaydı detayı">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl md:rounded-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in">
-            <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
-              <div>
-                <div className="text-base font-extrabold text-text">{selectedRecord.type_label}</div>
-                <div className="mt-0.5 text-[11px] text-muted">{selectedRecord.engine_name} · {getMaintenanceRecordDate(selectedRecord.maintenance_start_at, selectedRecord.created_at)?.toLocaleDateString("tr-TR") || "—"}</div>
-              </div>
-              <button type="button" onClick={() => setSelectedRecord(null)} className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Detayı kapat">✕</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Motor saati</div><div className="mt-0.5 font-mono font-bold text-amber">{selectedRecord.hour_at_completion.toLocaleString("tr-TR")} sa</div></div>
-              <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Sorumlu teknisyen</div><div className="mt-0.5 font-semibold text-text">{technicianLabel(selectedRecord)}</div><div className="mt-0.5 text-[9.5px] text-faint">{TECHNICIAN_TYPE_LABELS[selectedRecord.technician_type || "mekanik"]}</div></div>
-            </div>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3 text-[11px]">
-              <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Başlangıç</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_start_at ? new Date(selectedRecord.maintenance_start_at).toLocaleString("tr-TR") : "—"}</div></div>
-              <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Bitiş</div><div className="mt-0.5 font-mono text-teal">{selectedRecord.maintenance_end_at ? new Date(selectedRecord.maintenance_end_at).toLocaleString("tr-TR") : "—"}</div></div>
-              <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(selectedRecord.maintenance_duration_minutes)}</div></div>
-            </div>
-            {selectedRecord.technician_contributions?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Teknisyen katkıları:</b><div className="mt-1 flex flex-col gap-0.5">{selectedRecord.technician_contributions.map((contribution) => <span key={`${contribution.id}-${contribution.contribution_role}`}>{contribution.full_name} · {TECHNICIAN_TYPE_LABELS[contribution.technician_type || "mekanik"]} · {contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {formatMaintenanceDuration(contribution.duration_minutes)}</span>)}</div></div> : selectedRecord.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {selectedRecord.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
-            {selectedRecord.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>✓ Yönetici teyidi:</b> {selectedRecord.manager_confirmed_by_name || "Yönetici"} · {selectedRecord.manager_confirmed_at ? new Date(selectedRecord.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : selectedRecord.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {user?.role === "yonetici" && <button type="button" onClick={() => openConfirmation(selectedRecord)} disabled={confirmingId === selectedRecord._id} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-[#071a12] disabled:opacity-50">{confirmingId === selectedRecord._id ? "Teyit ediliyor..." : "✓ Kontrol ettim, teyit et"}</button>}</div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
-            {selectedRecord.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{selectedRecord.completion_confirmed_at ? ` · ${new Date(selectedRecord.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{selectedRecord.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
-            {selectedRecord.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{selectedRecord.pressure_reading} bar</b></div>}
-            {selectedRecord.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {selectedRecord.technician_note}</div>}
-            {selectedRecord.report_attachments?.length ? <div className="mt-4 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3"><div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div><div className="flex flex-col gap-1.5">{selectedRecord.report_attachments.map((attachment) => { const label = <><span className="min-w-0 truncate font-bold">{attachment.filename}</span><span className="flex-shrink-0 text-[9px] text-faint">{attachment.mime === "application/pdf" ? "PDF · Uygulama içinde aç" : attachment.mime.includes("spreadsheet") || attachment.mime.includes("excel") ? "Excel · İndir" : "Word · İndir"} · {formatReportAttachmentSize(attachment.size)} {attachment.mime === "application/pdf" ? "›" : "↓"}</span></>; return attachment.mime === "application/pdf" ? <button key={attachment.id} type="button" onClick={() => setSelectedReportAttachment({ recordId: selectedRecord._id, attachment })} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} PDF önizlemesini aç`}>{label}</button> : <a key={attachment.id} href={reportAttachmentUrl(selectedRecord._id, attachment.id, true)} download={attachment.filename} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} dosyasını indir`}>{label}</a>; })}</div></div> : null}
-            {((selectedRecord.photos || selectedRecord.photos_b64 || []).length > 0 || (selectedRecord.videos || []).length > 0) && (
-              <div className="mt-4">
-                <div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-muted">Medya</div>
-                <div className="flex flex-wrap gap-2">
-                  {(selectedRecord.photos || selectedRecord.photos_b64 || []).map((photo, index) => (
-                    <button type="button" key={`detail-photo-${index}`} onClick={() => setSelectedPhoto(getPhotoSrc(photo))} className="overflow-hidden rounded-lg border border-border hover:scale-105 transition-transform">
-                      <NextImage src={getPhotoSrc(photo)} width={80} height={80} unoptimized className="h-20 w-20 object-cover" alt={`Bakım fotoğrafı ${index + 1}`} />
-                    </button>
-                  ))}
-                  {(selectedRecord.videos || []).map((video, index) => {
-                    const src = getVideoSrc(video);
-                    return src ? <button type="button" key={`detail-video-${index}`} onClick={() => setSelectedVideo({ src, filename: video.filename || "Video" })} className="flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-black text-2xl text-white">▶</button> : null;
-                  })}
-                </div>
-              </div>
-            )}
-            <button type="button" onClick={() => setSelectedRecord(null)} className="mt-4 w-full rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Kapat</button>
-          </div>
-        </div>
+        <MaintenanceRecordDetailsModal
+          record={selectedRecord}
+          technicianLabel={technicianLabel(selectedRecord)}
+          isManager={user?.role === "yonetici"}
+          isConfirming={confirmingId === selectedRecord._id}
+          getPhotoSrc={(photo) => getPhotoSrc(photo)}
+          getVideoSrc={(video) => getVideoSrc(video)}
+          reportAttachmentUrl={(attachmentId, download = false) => reportAttachmentUrl(selectedRecord._id, attachmentId, download)}
+          onClose={() => setSelectedRecord(null)}
+          onOpenConfirmation={() => openConfirmation(selectedRecord)}
+          onReportAttachment={(attachment) => setSelectedReportAttachment({ recordId: selectedRecord._id, attachment })}
+          onPhotoClick={(src) => setSelectedPhoto(src)}
+          onVideoClick={(src, filename) => setSelectedVideo({ src, filename })}
+        />
       )}
 
       <RecordMediaModals
