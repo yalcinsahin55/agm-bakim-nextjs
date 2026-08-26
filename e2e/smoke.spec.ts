@@ -30,6 +30,16 @@ async function login(page: Page, identifier: string, password: string): Promise<
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
 }
 
+async function loginViaFixtureApi(page: Page, identifier: string, password: string): Promise<void> {
+  const response = await page.context().request.post("/api/auth/login", {
+    data: { identifier, password },
+  });
+  const loginBody = await response.text();
+  expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
+  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+}
+
 async function fetchJson(page: Page, url: string, options: { method?: string; body?: unknown } = {}): Promise<JsonResult> {
   return page.evaluate(async ({ url: requestUrl, method, body }) => {
     const response = await fetch(requestUrl, {
@@ -122,7 +132,7 @@ test.describe("AGM Bakım configured authentication", () => {
       !process.env.E2E_VIEWER_IDENTIFIER || !process.env.E2E_VIEWER_PASSWORD,
       "E2E_VIEWER_IDENTIFIER ve E2E_VIEWER_PASSWORD yalnızca izole staging viewer hesabı için ayarlanmalı.",
     );
-    await login(page, process.env.E2E_VIEWER_IDENTIFIER!, process.env.E2E_VIEWER_PASSWORD!);
+    await loginViaFixtureApi(page, process.env.E2E_VIEWER_IDENTIFIER!, process.env.E2E_VIEWER_PASSWORD!);
     const result = await fetchJson(page, "/api/records", { method: "POST", body: {} });
     expect(result.status).toBe(403);
     expect(result.body).toMatchObject({
@@ -136,7 +146,7 @@ test.describe("AGM Bakım configured authentication", () => {
       "Idempotency E2E testi yalnızca izole test kullanıcısı ile çalıştırılmalı.",
     );
     const { engineId, typeKey } = requireFixture();
-    await login(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
     const clientRequestId = uniqueRequestId(testInfo.title, testInfo.retry);
     const payload = maintenancePayload(engineId, typeKey, clientRequestId);
 
@@ -172,7 +182,7 @@ test.describe("AGM Bakım configured authentication", () => {
       "Offline attachment E2E testi yalnızca izole test kullanıcısı ile çalıştırılmalı.",
     );
     const { engineId, typeKey } = requireFixture();
-    await login(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
     const clientRequestId = uniqueRequestId(testInfo.title, testInfo.retry);
     const payload = {
       ...maintenancePayload(engineId, typeKey, clientRequestId),
@@ -206,7 +216,7 @@ test.describe("AGM Bakım configured authentication", () => {
       "Read-only export E2E testi yalnızca izole viewer kullanıcısı ile çalıştırılmalı.",
     );
     const { engineId } = requireFixture();
-    await login(page, process.env.E2E_VIEWER_IDENTIFIER!, process.env.E2E_VIEWER_PASSWORD!);
+    await loginViaFixtureApi(page, process.env.E2E_VIEWER_IDENTIFIER!, process.env.E2E_VIEWER_PASSWORD!);
     const result = await fetchJson(page, `/api/reports/engine/${encodeURIComponent(engineId)}?all=1&type_label=${encodeURIComponent("E2E 1000H Bakım")}`);
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ all: true, truncated: false });
