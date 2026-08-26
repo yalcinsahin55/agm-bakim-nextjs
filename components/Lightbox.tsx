@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface LightboxProps {
   src: string | null;
   alt?: string;
@@ -23,11 +25,15 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
       >
         ✕
       </button>
-      <img
+      <Image
         src={src}
         alt={alt}
+        width={1600}
+        height={1200}
+        unoptimized
+        sizes="(max-width: 768px) 92vw, 85vw"
         onClick={(e) => e.stopPropagation()}
-        className="max-w-full max-h-[85vh] rounded-xl border border-border object-contain shadow-2xl"
+        className="h-auto max-h-[85vh] w-auto max-w-full rounded-xl border border-border object-contain shadow-2xl"
       />
       <div className="absolute bottom-4 left-0 right-0 text-center text-[11px] text-faint">
         Kapatmak için dışarıya dokun

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import TopBar from "@/components/TopBar";
@@ -389,7 +390,7 @@ export default function MotorlarPage() {
               </button>
             </div>
             <div className="bg-white rounded-xl p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
-              {qrDataUrl ? <img src={qrDataUrl} alt={`${qrEngine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}
+              {qrDataUrl ? <Image src={qrDataUrl} width={208} height={208} unoptimized alt={`${qrEngine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}
             </div>
             <p className="text-[11px] text-muted leading-relaxed mt-3">
               Bu kod okutulduğunda uygulama doğrudan bu motorun bakım panelini açar.

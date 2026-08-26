@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import NextImage from "next/image";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
@@ -635,7 +636,7 @@ function EditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }:
                 className="block hover:scale-105 transition-transform"
                 aria-label="Fotoğrafı büyüt"
               >
-                <img src={getPhotoSrc(p, offlinePreviews)} className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
+                <NextImage src={getPhotoSrc(p, offlinePreviews)} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
               </button>
               <button
                 onClick={() => removePhoto(idx)}
@@ -1004,7 +1005,7 @@ export default function KayitlarPage() {
                           className="hover:scale-105 transition-transform"
                           aria-label="Fotoğrafı büyüt"
                         >
-                          <img src={getPhotoSrc(p)} className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
+                          <NextImage src={getPhotoSrc(p)} width={56} height={56} unoptimized className="w-14 h-14 rounded-lg object-cover border border-border" alt="" />
                         </button>
                       ))}
                     </div>
@@ -1222,7 +1223,7 @@ export default function KayitlarPage() {
                 <div className="flex flex-wrap gap-2">
                   {(selectedRecord.photos || selectedRecord.photos_b64 || []).map((photo, index) => (
                     <button type="button" key={`detail-photo-${index}`} onClick={() => setSelectedPhoto(getPhotoSrc(photo))} className="overflow-hidden rounded-lg border border-border hover:scale-105 transition-transform">
-                      <img src={getPhotoSrc(photo)} className="h-20 w-20 object-cover" alt={`Bakım fotoğrafı ${index + 1}`} />
+                      <NextImage src={getPhotoSrc(photo)} width={80} height={80} unoptimized className="h-20 w-20 object-cover" alt={`Bakım fotoğrafı ${index + 1}`} />
                     </button>
                   ))}
                   {(selectedRecord.videos || []).map((video, index) => {
