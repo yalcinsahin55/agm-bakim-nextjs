@@ -42,8 +42,9 @@ async function loginViaFixtureApi(page: Page, identifier: string, password: stri
   });
   const loginBody = await response.text();
   expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-  await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+  expect((await page.context().cookies()).some((cookie) => cookie.name === "agm_session" && cookie.value.length > 0)).toBeTruthy();
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await expect(page.getByPlaceholder("05xx xxx xx xx")).toBeVisible();
 }
 
 async function fetchJson(page: Page, url: string, options: { method?: string; body?: unknown } = {}): Promise<JsonResult> {
