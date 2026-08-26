@@ -19,14 +19,14 @@ type DryRunReport = {
 type BackupSummary = { errors?: Array<{ error?: unknown }> };
 
 const DRY_RUN_BRANCH = "migration-dry-run";
-const PILOT_BRANCH = "migration-pilot";
-const REPORT_PATH = "/tmp/agm-legacy-media-migration.json";
-const BACKUP_PATH = "/tmp/agm-legacy-media-pilot-backup.json";
+const APPLY_BRANCH = "migration-remainder-apply-a";
+const REPORT_PATH = "/tmp/agm-legacy-media-remainder-a-report.json";
+const BACKUP_PATH = "/tmp/agm-legacy-media-remainder-a-backup.json";
 
 function modeForBuild(): "dry-run" | "apply" | null {
   if (process.env.VERCEL !== "1" || process.env.VERCEL_ENV !== "preview") return null;
   if (process.env.VERCEL_GIT_COMMIT_REF === DRY_RUN_BRANCH) return "dry-run";
-  if (process.env.VERCEL_GIT_COMMIT_REF === PILOT_BRANCH) return "apply";
+  if (process.env.VERCEL_GIT_COMMIT_REF === APPLY_BRANCH) return "apply";
   return null;
 }
 
@@ -40,12 +40,12 @@ function main(): void {
   rmSync(REPORT_PATH, { force: true });
   rmSync(BACKUP_PATH, { force: true });
 
-  const runId = `legacy-media-pilot-${process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || "unknown"}`;
+  const runId = `legacy-media-remainder-a-${process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || "unknown"}`;
   const args = [
     "--experimental-strip-types",
     resolve("scripts/migrate-legacy-media.mts"),
     `--report=${REPORT_PATH}`,
-    "--max-changes=5",
+    "--max-changes=6",
     ...(mode === "apply" ? [
       "--apply",
       "--confirm=APPLY-LEGACY-MEDIA-MIGRATION",
