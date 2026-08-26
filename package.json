@@ -13,6 +13,7 @@
     "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config app components lib",
     "test": "node --experimental-strip-types --test tests/*.test.mts",
     "test:e2e": "playwright test",
+    "e2e:seed": "node --experimental-strip-types scripts/seed-e2e.mts",
     "smoke:readonly": "node --experimental-strip-types scripts/smoke-readonly.mts",
     "migrate:stable-keys": "node --experimental-strip-types scripts/migrate-stable-keys.mts",
     "migrate:legacy-role": "node --experimental-strip-types scripts/migrate-legacy-role.mts",

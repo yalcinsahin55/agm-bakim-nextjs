@@ -12,11 +12,27 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      MONGO_URI: mongodb://127.0.0.1:27017/agm-ci
+      MONGO_URI: mongodb://127.0.0.1:27017
+      MONGO_DB_NAME: agm_bakim_e2e
       JWT_SECRET: agm-ci-only-secret-0123456789
       CRON_SECRET: agm-ci-cron-secret
+      E2E_SEED: "1"
+      E2E_IDENTIFIER: e2e-admin@example.test
+      E2E_PASSWORD: e2e-admin-password-123
+      E2E_VIEWER_IDENTIFIER: e2e-viewer@example.test
+      E2E_VIEWER_PASSWORD: e2e-viewer-password-123
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -47,6 +63,9 @@ jobs:
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+
+      - name: Seed isolated E2E database
+        run: npm run e2e:seed
 
       - name: Browser E2E smoke
         run: npm run test:e2e
