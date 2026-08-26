@@ -20,13 +20,15 @@ type BackupSummary = { errors?: Array<{ error?: unknown }> };
 
 const DRY_RUN_BRANCH = "migration-dry-run";
 const PILOT_BRANCH = "migration-pilot";
+const VERIFY_BRANCH = "migration-verify";
 const REPORT_PATH = "/tmp/agm-legacy-media-migration.json";
 const BACKUP_PATH = "/tmp/agm-legacy-media-pilot-backup.json";
 
-function modeForBuild(): "dry-run" | "apply" | null {
+function modeForBuild(): "dry-run" | "apply" | "verify" | null {
   if (process.env.VERCEL !== "1" || process.env.VERCEL_ENV !== "preview") return null;
   if (process.env.VERCEL_GIT_COMMIT_REF === DRY_RUN_BRANCH) return "dry-run";
   if (process.env.VERCEL_GIT_COMMIT_REF === PILOT_BRANCH) return "apply";
+  if (process.env.VERCEL_GIT_COMMIT_REF === VERIFY_BRANCH) return "verify";
   return null;
 }
 
@@ -41,19 +43,37 @@ function main(): void {
   rmSync(BACKUP_PATH, { force: true });
 
   const runId = `legacy-media-pilot-${process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || "unknown"}`;
-  const args = [
-    "--experimental-strip-types",
-    resolve("scripts/migrate-legacy-media.mts"),
-    `--report=${REPORT_PATH}`,
-    "--max-changes=5",
-    ...(mode === "apply" ? [
-      "--apply",
-      "--confirm=APPLY-LEGACY-MEDIA-MIGRATION",
-      `--backup=${BACKUP_PATH}`,
-      `--run-id=${runId}`,
-    ] : []),
-  ];
-  const result = spawnSync(process.execPath, args, { env: process.env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  const env = { ...process.env, MIGRATION_REPORT_PATH: REPORT_PATH };
+  const args = mode === "verify"
+    ? ["--experimental-strip-types", resolve("scripts/vercel-legacy-media-verify.mts")]
+    : [
+      "--experimental-strip-types",
+      resolve("scripts/migrate-legacy-media.mts"),
+      `--report=${REPORT_PATH}`,
+      "--max-changes=5",
+      ...(mode === "apply" ? [
+        "--apply",
+        "--confirm=APPLY-LEGACY-MEDIA-MIGRATION",
+        `--backup=${BACKUP_PATH}`,
+        `--run-id=${runId}`,
+      ] : []),
+    ];
+  const result = spawnSync(process.execPath, args, { env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  if (mode === "verify") {
+    if (result.status !== 0) {
+      console.error(JSON.stringify({ migration: "legacy-media-verify", mode, ok: false, reason: "verification failed" }));
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const verification = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
+      console.log(JSON.stringify({ migration: "legacy-media-verify", mode, ok: true, ...verification }));
+    } catch {
+      console.error(JSON.stringify({ migration: "legacy-media-verify", mode, ok: false, reason: "verification output unreadable" }));
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   if (result.status !== 0 || !existsSync(REPORT_PATH)) {
     console.error(JSON.stringify({ migration: "legacy-media", mode, ok: false, reason: mode === "apply" ? "pilot apply failed" : "dry-run failed" }));
