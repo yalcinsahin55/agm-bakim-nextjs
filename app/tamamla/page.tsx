@@ -11,6 +11,8 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
 import MaintenanceEvidencePreview from "@/components/MaintenanceEvidencePreview";
+import MaintenanceTimeTracking from "@/components/MaintenanceTimeTracking";
+import MaintenanceChecklist from "@/components/MaintenanceChecklist";
 import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
@@ -652,21 +654,17 @@ export default function TamamlaPage() {
               <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu kayda yazılır.</p>
             </section>
 
-            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="time-tracking-heading">
-              <div className="mb-3 flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">02 · Zaman takibi</div><h2 id="time-tracking-heading" className="mt-1 text-base font-extrabold text-text">Başlangıç ve bitiş</h2></div><span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">ZORUNLU</span></div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-[10.5px] font-bold text-muted">Başlangıç
-                  <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2.5 text-sm font-mono text-text outline-none focus:border-amber" />
-                </label>
-                <label className="text-[10.5px] font-bold text-muted">Bitiş
-                  <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2.5 text-sm font-mono text-text outline-none focus:border-amber" />
-                </label>
-              </div>
-              <div className={`mt-3 rounded-xl border px-3 py-3 ${timeTrackingReady ? "border-green/30 bg-green/10 text-green" : "border-red/30 bg-red/10 text-red"}`} role="status"><div className="text-[10px] font-bold uppercase tracking-wide">{timeTrackingReady ? "Toplam bakım süresi" : "Zaman bilgisi eksik"}</div><div className="mt-1 text-lg font-extrabold">{timeTrackingReady ? formatMaintenanceDuration(maintenanceDurationMinutes) : "Geçerli başlangıç ve bitiş girin"}</div><div className="mt-1 text-[10px] text-muted">Bakım birden fazla gün sürebilir; gerçek tarih-saatleri seçin.</div></div>
-              {(typeKey === "krank" || typeKey === "intercooler") && <div className="mt-3 rounded-xl border border-teal/30 bg-teal/5 p-3"><label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Fark basıncı (bar)
-                <input type="number" step="0.1" value={pressure} onChange={(event) => setPressure(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm font-mono text-teal outline-none focus:border-teal" />
-              </label></div>}
-            </section>
+            <MaintenanceTimeTracking
+              maintenanceStartAt={maintenanceStartAt}
+              maintenanceEndAt={maintenanceEndAt}
+              timeTrackingReady={timeTrackingReady}
+              maintenanceDurationMinutes={maintenanceDurationMinutes}
+              showPressure={typeKey === "krank" || typeKey === "intercooler"}
+              pressure={pressure}
+              onStartChange={setMaintenanceStartAt}
+              onEndChange={setMaintenanceEndAt}
+              onPressureChange={setPressure}
+            />
           </div>
 
           <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="technician-source-heading">
@@ -687,8 +685,13 @@ export default function TamamlaPage() {
           {otherTypes.length > 0 && <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="additional-maintenance-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">04 · Birlikte tamamlanan bakımlar</div><h2 id="additional-maintenance-heading" className="mt-1 text-base font-extrabold text-text">Aynı işlemde tamamlanan diğer bakım türleri</h2><p className="mt-1 text-[10px] leading-4 text-faint">İşaretlenen bakım türleri aynı saat ve tarihle kaydedilir. Motor için tanımlı olmayan bakımda periyodu ayrıca girebilirsiniz.</p></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{otherTypes.map((type) => { const tracked = trackedKeys.has(type.key); const checked = extraKeys.includes(type.key); return <div key={type.key} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9.5px] text-faint">· tanımlı değil</span>}</label>{checked && !tracked && <label className="mt-2 block pl-6 text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-[11px] font-mono text-text" /></label>}</div>; })}</div></section>}
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="checklist-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">05 · Kontrol listesi</div><h2 id="checklist-heading" className="mt-1 text-base font-extrabold text-text">Bakım doğrulaması</h2><p className="mt-1 text-[10px] text-faint">Kaydetmeden önce tüm maddeleri işaretleyin.</p></div><div className="grid gap-1.5">{checklistItems.map((item) => <label key={item} className="flex items-center gap-2.5 rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text"><input type="checkbox" checked={checklist[item] === true} onChange={(event) => setChecklist((current) => ({ ...current, [item]: event.target.checked }))} />{item}</label>)}</div><div className={`mt-3 rounded-lg px-3 py-2.5 text-[10.5px] ${checklistComplete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{checklistComplete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div></section>
 
+            <MaintenanceChecklist
+              items={checklistItems}
+              values={checklist}
+              complete={checklistComplete}
+              onItemChange={(item, checked) => setChecklist((current) => ({ ...current, [item]: checked }))}
+            />
             <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="evidence-heading">
               <div className="mb-3">
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">06 · Kanıt ve notlar</div>
