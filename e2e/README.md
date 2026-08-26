@@ -22,7 +22,10 @@ E2E_IDENTIFIER=staging-user \
 E2E_PASSWORD='staging-password' \
 E2E_VIEWER_IDENTIFIER=staging-viewer \
 E2E_VIEWER_PASSWORD='staging-viewer-password' \
+E2E_FIXTURE_ENGINE_ID='staging-e2e-engine' \
+E2E_FIXTURE_TYPE_KEY='staging-e2e-type' \
+ \
 npm run test:e2e
 ```
 
-Parolalar source code’a, commit’e veya log’a yazılmamalıdır. CI kullanımı GitHub Actions secret’ları üzerinden yapılmalıdır. `E2E_IDENTIFIER` ve viewer değişkenleri ayarlanmadığında ilgili testler bilinçli olarak skip olur; anonim login shell, protected health endpoint ve service-worker offline shell testleri yine çalışır.
+Parolalar source code’a, commit’e veya log’a yazılmamalıdır. CI kullanımı GitHub Actions secret’ları üzerinden yapılmalıdır. `E2E_IDENTIFIER` ve viewer değişkenleri ayarlanmadığında ilgili testler bilinçli olarak skip olur; anonim login shell, protected health endpoint ve service-worker offline shell testleri yine çalışır. Mutation, duplicate/idempotency ve export testleri ayrıca `E2E_FIXTURE_ENGINE_ID` ile `E2E_FIXTURE_TYPE_KEY` değerlerini ister; bu iki değer yoksa testler skip edilir. Bu değerler yalnızca aynı izole test DB’sinde seed edilmiş fixture kimlikleri olmalıdır; production DB, production Blob store ve gerçek kullanıcı hesabı kullanılmamalıdır.
