@@ -4,7 +4,7 @@ import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnic
 import type { AssistantPeriod, AssistantQuery, AssistantIntent, AssistantStatusFilter } from "@/lib/assistantPolicy";
 import { enginesCollection, maintenanceTypesCollection, recordsCollection, pressureReadingsCollection, oilAnalysesCollection, equipmentInfoCollection, notificationsCollection } from "@/lib/dbCollections";
 import { buildMaintenanceForecastRows, dateKeyLabel, summarizeMaintenanceForecast, validForecastYear, validMaintenancePeriodHours } from "@/lib/maintenanceForecast";
-import { isAllowedReportAttachmentUrl, isReportAttachmentId, isReportAttachmentMime } from "@/lib/reportAttachments";
+import { formatMinutes, formatPerformanceNumber, formatUnknownDate, safeReportAttachments } from "@/lib/assistantToolOutput";
 import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -39,7 +39,6 @@ type TechnicianAggregateRow = { _id?: unknown; technician?: string; technician_t
 type TechnicianDetailTypeRow = { _id?: string; count?: number };
 type TechnicianDetailEngineRow = { _id?: { engine_id?: string; engine?: string }; count?: number };
 type ExternalServiceAggregateRow = { totals?: Array<{ count?: number; duration?: number }>; services?: Array<{ _id?: string; count?: number; duration?: number }>; engines?: Array<{ _id?: string; engine?: string; count?: number }> };
-type ReportAttachmentRow = { id?: unknown; url?: unknown; filename?: unknown; mime?: unknown; size?: unknown; uploaded_at?: unknown };
 type MaintenanceWorkRow = { total_duration_minutes: number; last_duration_minutes: number; completed_count: number; last_completed_at: string | null };
 
 function currentTurkeyDateKey(): string {
@@ -182,44 +181,7 @@ async function buildRecordMatch(db: Db, query: AssistantQuery, extra: Record<str
   return clauses.length ? { $and: clauses } : {};
 }
 
-function formatMinutes(value: number): string {
-  const minutes = Math.max(0, Math.round(value || 0));
-  const days = Math.floor(minutes / (24 * 60));
-  const hours = Math.floor((minutes % (24 * 60)) / 60);
-  const remaining = minutes % 60;
-  const parts: string[] = [];
-  if (days) parts.push(`${days} gün`);
-  if (hours) parts.push(`${hours} saat`);
-  if (remaining || parts.length === 0) parts.push(`${remaining} dakika`);
-  return parts.join(" ");
-}
 
-function safeReportAttachments(recordId: unknown, value: unknown): Array<Record<string, unknown>> {
-  if (!Array.isArray(value)) return [];
-  const id = String(recordId || "");
-  if (!id) return [];
-  return value.flatMap((candidate) => {
-    if (!candidate || typeof candidate !== "object") return [];
-    const attachment = candidate as ReportAttachmentRow;
-    if (!isReportAttachmentId(attachment.id) || !isAllowedReportAttachmentUrl(attachment.url)) return [];
-    const filename = typeof attachment.filename === "string" && attachment.filename.trim() ? attachment.filename : "rapor-eki";
-    if (!isReportAttachmentMime(attachment.mime)) return [];
-    const mime = attachment.mime;
-    const size = typeof attachment.size === "number" && Number.isFinite(attachment.size) && attachment.size > 0 ? Math.min(20 * 1024 * 1024, Math.round(attachment.size)) : null;
-    const uploadedAt = formatUnknownDate(attachment.uploaded_at);
-    const attachmentId = String(attachment.id);
-    const basePath = `/api/records/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`;
-    return [{
-      id: attachmentId,
-      filename,
-      mime,
-      size,
-      uploaded_at: uploadedAt,
-      href: `${basePath}?inline=1`,
-      download_href: `${basePath}?download=1`,
-    }];
-  });
-}
 
 function buildMaintenanceWorkIndex(records: Array<Record<string, unknown>>): Map<string, MaintenanceWorkRow> {
   const eventRows = new Map<string, { pairKey: string; duration: number; completedAt: string | null }>();
@@ -733,10 +695,6 @@ function dataDateMatch(field: string, query: AssistantQuery): Record<string, unk
   return start ? { [field]: { $gte: start } } : {};
 }
 
-function formatUnknownDate(value: unknown): string | null {
-  const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : null;
-  return date && Number.isFinite(date.getTime()) ? date.toISOString() : null;
-}
 
 function isDateInAssistantQuery(value: unknown, query: AssistantQuery): boolean {
   const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : null;
@@ -760,9 +718,6 @@ function historyDayKey(value: unknown): string | null {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function formatPerformanceNumber(value: number | null): string {
-  return value === null || !Number.isFinite(value) ? "veri yok" : value.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
-}
 
 async function getEngineData(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
