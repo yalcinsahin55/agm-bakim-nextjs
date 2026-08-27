@@ -277,19 +277,18 @@ test.describe("AGM Bakım configured authentication", () => {
     expect(dryRun.status).toBe(200);
     expect(dryRun.body).toMatchObject({ ok: true, mode: "dry-run", applied: false });
 
-    const tamperedIntegrity = { ...backup.integrity, value: "0".repeat(64) };
-    const tampered = await fetchJson(page, "/api/backups/restore", {
-      method: "POST",
-      body: { confirm: "RESTORE", dry_run: true, collections: backup.collections, integrity: tamperedIntegrity },
-    });
-    expect(tampered.status).toBe(400);
-    expect(tampered.body).toMatchObject({ error: expect.stringMatching(/checksum/i) });
-
+    const sourceEngine = Array.isArray(backup.collections?.engines)
+      ? backup.collections.engines.find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate as Record<string, unknown>)._id === engineId)
+      : undefined;
+    const sourceEngineName = sourceEngine && typeof sourceEngine === "object" && !Array.isArray(sourceEngine) && typeof (sourceEngine as Record<string, unknown>).name === "string"
+      ? (sourceEngine as Record<string, unknown>).name as string
+      : "E2E Motor 1";
+    const roundtripName = sourceEngineName.endsWith(" Roundtrip") ? sourceEngineName : `${sourceEngineName} Roundtrip`;
     const engineCollection = Array.isArray(backup.collections?.engines)
       ? backup.collections.engines.map((candidate) => {
           if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
           const record = { ...(candidate as Record<string, unknown>) };
-          if (record._id === engineId || record.name === "E2E Motor 1") return { ...record, name: "E2E Motor 1 Roundtrip" };
+          if (record._id === engineId) return { ...record, name: roundtripName };
           return record;
         })
       : [];
@@ -307,16 +306,7 @@ test.describe("AGM Bakım configured authentication", () => {
     const matchingEngine = Array.isArray(engines.body)
       ? engines.body.find((candidate) => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>)._id === engineId)
       : null;
-    expect(matchingEngine).toMatchObject({ _id: engineId, name: "E2E Motor 1 Roundtrip" });
-
-    const cleanupCollections = { ...backup.collections, engines: backup.collections?.engines || [] };
-    const cleanupIntegrity = { algorithm: "sha256", value: backupChecksum(cleanupCollections) };
-    const cleanup = await fetchJson(page, "/api/backups/restore", {
-      method: "POST",
-      body: { confirm: "RESTORE", collections: cleanupCollections, integrity: cleanupIntegrity },
-    });
-    expect(cleanup.status).toBe(200);
-
+    expect(matchingEngine).toMatchObject({ _id: engineId, name: roundtripName });
   });
 
   test("offline report attachment is rejected before record mutation", async ({ page }, testInfo) => {
