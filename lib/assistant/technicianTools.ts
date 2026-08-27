@@ -6,6 +6,7 @@ import { formatMinutes } from "@/lib/assistantToolOutput";
 import { buildRecordMatch, escapeRegex, findEngine, internalRecordMatch, periodLabel } from "@/lib/assistantToolQuery";
 import type { AssistantToolResponse } from "./types";
 import { mapWithConcurrency } from "./shared";
+import { withDbTiming } from "@/lib/performance";
 type TechnicianAggregateRow = { _id?: unknown; technician?: string; technician_type?: unknown; count?: number; duration?: number };
 type TechnicianDetailTypeRow = { _id?: string; count?: number };
 type TechnicianDetailEngineRow = { _id?: { engine_id?: string; engine?: string }; count?: number };
@@ -44,7 +45,7 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
   };
   const contributionMatch = (role: "responsible" | "support") => ({ $match: { "contributions.contribution_role": role } });
   const [responsible, support] = await Promise.all([
-    includeResponsible ? records.aggregate<TechnicianAggregateRow>([
+    includeResponsible ? withDbTiming("assistant.technician.responsible", () => records.aggregate<TechnicianAggregateRow>([
       { $match: match },
       { $project: contributionProject },
       { $unwind: "$contributions" },
@@ -53,8 +54,8 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
       { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, count: { $sum: 1 }, duration: { $sum: "$duration" } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
-    ]).toArray() : Promise.resolve([]),
-    includeSupport ? records.aggregate<TechnicianAggregateRow>([
+    ]).toArray()) : Promise.resolve([]),
+    includeSupport ? withDbTiming("assistant.technician.support", () => records.aggregate<TechnicianAggregateRow>([
       { $match: match },
       { $project: contributionProject },
       { $unwind: "$contributions" },
@@ -63,7 +64,7 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
       { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, count: { $sum: 1 }, duration: { $sum: "$duration" } } },
       { $sort: { count: -1, technician: 1 } },
       { $limit: 100 },
-    ]).toArray() : Promise.resolve([]),
+    ]).toArray()) : Promise.resolve([]),
   ]);
   const rows = new Map<string, { technician_id: string; technician: string; technician_type: "mekanik" | "elektromekanik"; responsible_count: number; support_count: number; duration_minutes: number; average_minutes: number }>();
   const merge = (item: TechnicianAggregateRow, kind: "responsible" | "support") => {
@@ -92,9 +93,9 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
         ? { $or: [{ technician_id: selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }] }
         : { $or: [{ technician_id: selected.id }, { "other_technicians.id": selected.id }, { technician_name: { $regex: selectedName, $options: "i" } }, { "other_technicians.full_name": { $regex: selectedName, $options: "i" } }] };
     const selectedMatch = { $and: [match, participation] };
-    const selectedRecords = await records.find(selectedMatch, {
+    const selectedRecords = await withDbTiming("assistant.technician.activities", () => records.find(selectedMatch, {
       projection: { _id: 1, group_id: 1, engine_id: 1, engine_name: 1, type_label: 1, technician_id: 1, technician_name: 1, technician_type: 1, other_technicians: 1, technician_contributions: 1, maintenance_start_at: 1, maintenance_duration_minutes: 1, created_at: 1 },
-    }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(50).toArray();
+    }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(50).toArray());
     const typeCounts = new Map<string, number>();
     const typeEngineCounts = new Map<string, Map<string, { engine_id: string; engine: string; count: number }>>();
     const engineCounts = new Map<string, { engine_id: string; engine: string; count: number }>();
@@ -144,7 +145,7 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
   const technicianDetails = await mapWithConcurrency(resultRows.slice(0, 12), 4, async (technician) => {
     if (!technician.technician_id || technician.technician_id === "unknown") return { technician_id: technician.technician_id, by_type: [], by_engine: [] };
     const detailMatch = { $and: [match, { $or: [{ technician_id: technician.technician_id }, { "other_technicians.id": technician.technician_id }] }] };
-    const [detail] = await records.aggregate<{ byType?: TechnicianDetailTypeRow[]; byEngine?: TechnicianDetailEngineRow[] }>([
+    const [detail] = await withDbTiming("assistant.technician.detail", () => records.aggregate<{ byType?: TechnicianDetailTypeRow[]; byEngine?: TechnicianDetailEngineRow[] }>([
       { $match: detailMatch },
       { $facet: {
         byType: [{ $group: { _id: "$type_label", count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 20 }],
@@ -156,7 +157,7 @@ export async function getTechnicianPerformance(db: Db, query: AssistantQuery): P
           { $limit: 20 },
         ],
       } },
-    ]).toArray();
+    ]).toArray());
     return {
       technician_id: technician.technician_id,
       technician_type: technician.technician_type,
