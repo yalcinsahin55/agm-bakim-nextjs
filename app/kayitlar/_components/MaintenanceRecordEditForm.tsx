@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import NextImage from "next/image";
 import { toast } from "sonner";
 import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
 import { queueRecord, type QueuedMedia } from "@/lib/offlineQueue";
-import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
-import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
-import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, type TechnicianOption } from "@/lib/technicians";
+import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 import { compressImage } from "@/lib/imageCompression";
 import type { ReportAttachment } from "@/lib/types";
 import type { Engine, MaintenanceRecord, MaintenanceType, VideoItem } from "../_types";
-import { getPhotoSrc } from "../_lib/recordMedia";
 import { hoursInputToMinutes, minutesToHoursInput } from "../_lib/recordDisplay";
-import { withTimeout, makeOfflineId, getVideoSrc, toLocalDateTimeInput } from "../_lib/recordMedia";
+import { withTimeout, makeOfflineId, toLocalDateTimeInput } from "../_lib/recordMedia";
+import { RecordEditEngineSection, RecordEditTechnicianSourceSection } from "./RecordEditAdminSections";
+import RecordEditCollaborationSections from "./RecordEditCollaborationSections";
+import RecordEditMediaSection from "./RecordEditMediaSection";
+import RecordEditScheduleSection from "./RecordEditScheduleSection";
 
 export interface MaintenanceRecordEditFormProps {
   record: MaintenanceRecord;
@@ -122,14 +123,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       });
     }
     setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
-  }
-
-  function toggleExtra(key: string, checked: boolean): void {
-    setExtraKeys((current) => checked ? [...new Set([...current, key])] : current.filter((currentKey) => currentKey !== key));
-    if (checked && extraPeriods[key] === undefined) {
-      const type = maintenanceTypes.find((item) => item.key === key);
-      setExtraPeriods((current) => ({ ...current, [key]: type?.default_period_hours || 1000 }));
-    }
   }
 
   function removeVideo(index: number): void {
@@ -343,140 +336,74 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
 
   return (
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
-      {isAdmin && <div className="rounded-lg border border-purple-400/30 bg-purple-400/5 p-2.5">
-        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım motoru</label>
-        <p className="mt-0.5 text-[10px] text-faint">Yanlış motora kaydedilmişse doğru motoru seçin. Aynı olayda birlikte tamamlanan kardeş kayıtlar da birlikte taşınır.</p>
-        <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-300">
-          {!engines.some((engine) => engine._id === record.engine_id) && <option value={record.engine_id}>{record.engine_name} (mevcut)</option>}
-          {engines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
-        </select>
-        {engineId !== record.engine_id && <div className="mt-2 rounded-lg bg-purple-400/10 px-2 py-1.5 text-[10px] text-purple-100">Motor değişikliği: <b>{record.engine_name}</b> → <b>{engines.find((engine) => engine._id === engineId)?.name || "Yeni motor"}</b>. Eski motorun bakım takibi geri hesaplanacak.</div>}
-      </div>}
-      {isAdmin && <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
-        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı</label>
-        <p className="mt-0.5 text-[10px] text-faint">Kayıtlı teknisyen veya dış servis/garanti bakım kaynağı seçilebilir.</p>
-        <select value={technicianSource} onChange={(event) => { const nextSource = event.target.value as "internal" | "external_service"; setTechnicianSource(nextSource); if (nextSource === "external_service") { setOtherTechnicianIds([]); setResponsibleTechnicianId(EXTERNAL_SERVICE_TECHNICIAN_ID); } else if (responsibleTechnicianId === EXTERNAL_SERVICE_TECHNICIAN_ID) { setResponsibleTechnicianId(technicians[0]?.id || ""); } }} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
-          <option value="internal">Kayıtlı teknisyen</option>
-          <option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
-        </select>
-        {technicianSource === "external_service" ? <>
-          <input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber" />
-          <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu kayıt teknisyen performansına dahil edilmez ve yalnızca yönetici tarafından düzenlenebilir.</div>
-        </> : <> <select value={responsibleTechnicianId} onChange={(event) => { const nextId = event.target.value; setResponsibleTechnicianId(nextId); setOtherTechnicianIds((current) => current.filter((id) => id !== nextId)); }} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-amber">
-          {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
-          {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</option>)}
-        </select>
-        <label className="mt-2 block text-[10px] font-bold text-muted">Sorumlu teknisyen çalışma süresi (saat)
-          <input type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-        </label>
-        <div className="mt-1 text-[9.5px] text-faint">Her kişinin gerçek çalışma süresini ayrı gir. Varsayılan değer kaydın mevcut sorumlu süresidir.</div></>}
-      </div>}
-      <label className="text-[10.5px] font-bold text-muted uppercase">Motor Çalışma Saati</label>
-      <input
-        type="number"
-        value={hours}
-        onChange={(e) => setHours(e.target.value)}
-        className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+      <RecordEditEngineSection isAdmin={isAdmin} record={record} engines={engines} engineId={engineId} setEngineId={setEngineId} />
+      <RecordEditTechnicianSourceSection
+        isAdmin={isAdmin}
+        record={record}
+        technicianSource={technicianSource}
+        setTechnicianSource={setTechnicianSource}
+        externalServiceName={externalServiceName}
+        setExternalServiceName={setExternalServiceName}
+        responsibleTechnicianId={responsibleTechnicianId}
+        setResponsibleTechnicianId={setResponsibleTechnicianId}
+        responsibleTechnicianDuration={responsibleTechnicianDuration}
+        setResponsibleTechnicianDuration={setResponsibleTechnicianDuration}
+        setOtherTechnicianIds={setOtherTechnicianIds}
+        technicians={technicians}
+        responsibleTechnicians={responsibleTechnicians}
       />
-      <div className="rounded-lg border border-amber/30 bg-amber/5 p-2.5">
-        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım Başlangıç ve Bitiş Zamanı</div>
-        <div className="mt-0.5 text-[10px] text-faint">Haftalar süren bakımlar için tarih ve saati birlikte seçin.</div>
-        {(!record.maintenance_start_at || !record.maintenance_end_at) && <div className="mt-2 rounded-lg bg-amber/10 px-2 py-1.5 text-[10px] text-amber">Bu eski kayıtta zaman bilgisi bulunmuyor. Kaydedebilmek için başlangıç ve bitiş tarih-saatini tamamlayın.</div>}
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="text-[10px] font-bold text-muted">Başlangıç
-            <input required type="datetime-local" value={maintenanceStartAt} max={maintenanceEndAt || undefined} onChange={(event) => setMaintenanceStartAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-          </label>
-          <label className="text-[10px] font-bold text-muted">Bitiş
-            <input required type="datetime-local" value={maintenanceEndAt} min={maintenanceStartAt || undefined} onChange={(event) => setMaintenanceEndAt(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-          </label>
-        </div>
-        <div className={`mt-2 rounded-lg px-2 py-1.5 text-[10px] ${calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ? "bg-green/10 text-green" : "bg-red/10 text-red"}`} role="status">{formatMaintenanceDuration(calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt)) !== "—" ? `Toplam süre: ${formatMaintenanceDuration(calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt))}` : "Geçerli bir başlangıç ve bitiş zamanı girin."}</div>
-      </div>
-      <textarea
-        value={techNote}
-        onChange={(e) => setTechNote(e.target.value)}
-        placeholder="Bakımcı Notu"
-        rows={2}
-        className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm resize-none outline-none focus:border-teal transition"
+      <RecordEditScheduleSection
+        record={record}
+        hours={hours}
+        setHours={setHours}
+        maintenanceStartAt={maintenanceStartAt}
+        setMaintenanceStartAt={setMaintenanceStartAt}
+        maintenanceEndAt={maintenanceEndAt}
+        setMaintenanceEndAt={setMaintenanceEndAt}
+        techNote={techNote}
+        setTechNote={setTechNote}
+        pressure={pressure}
+        setPressure={setPressure}
       />
-      {(record.type_key === "krank" || record.type_key === "intercooler" || record.pressure_reading != null) && (
-        <input
-          type="number"
-          step="0.1"
-          value={pressure}
-          onChange={(e) => setPressure(e.target.value)}
-          placeholder="Fark Basıncı (bar)"
-          className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition"
-        />
-      )}
-
-      {technicianSource !== "external_service" && supportTechnicians.length > 0 && <div className="rounded-lg border border-teal/30 bg-teal/5 p-2.5">
-        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bu bakımda çalışan diğer teknisyenler</div>
-        <div className="mt-0.5 text-[10px] text-faint">Sorumlu teknisyen dışında, bu bakım türünde destek yetkisi bulunan kişileri seç.</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{supportTechnicians.map((technician) => <div key={technician.id} className="rounded-lg bg-panel2 px-2 py-1.5 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => { setOtherTechnicianIds((current) => event.target.checked ? [...new Set([...current, technician.id])] : current.filter((id) => id !== technician.id)); setOtherTechnicianDurations((current) => event.target.checked ? { ...current, [technician.id]: normalizeTechnicianContributionDuration(current[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60) } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== technician.id))); }} />{technician.full_name} <span className="text-[9px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-1 ml-6 flex items-center gap-1 text-[9.5px] text-faint">Çalışma süresi ({isAdmin ? "saat" : "dk"})<input type="number" min="0" max={isAdmin ? 8784 : 366 * 24 * 60} step={isAdmin ? "0.25" : "15"} value={isAdmin ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt) ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: isAdmin ? (hoursInputToMinutes(event.target.value) ?? 0) : Number(event.target.value) }))} className="w-16 rounded-md border border-border bg-panel px-1.5 py-1 text-right font-mono text-[10px] text-text" /></label>}</div>)}</div>
-      </div>}
-
-      {availableExtraTypes.length > 0 && <div className="rounded-lg border border-purple-400/30 bg-purple-400/5 p-2.5">
-        <div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Birlikte tamamlanan bakım türünü sonradan ekle</div>
-        <p className="mt-0.5 text-[10px] leading-4 text-faint">Seçtiğiniz türler bu kayıtla aynı bakım olayına bağlanır; başlangıç-bitiş zamanı ve teknisyen katkıları ortak kalır. Bu nedenle aynı anda yapılan bakım türleri teknisyen süresini ikinci kez artırmaz.</p>
-        {groupTypes.length > 0 && <div className="mt-2 rounded-lg bg-panel2 px-2 py-1.5 text-[10px] text-purple-200">Bu olayda zaten kayıtlı: {[...new Set([record.type_label, ...groupTypes.map((type) => type.type_label)])].join(" · ")}</div>}
-        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">{availableExtraTypes.map((type) => {
-          const checked = extraKeys.includes(type.key);
-          const tracked = trackedExtraTypeKeys.has(type.key);
-          return <div key={type.key} className="rounded-lg bg-panel2 px-2.5 py-2 text-[11px] text-text"><label className="flex items-center gap-2"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9px] text-faint">· periyot isteyecek</span>}</label>{checked && !tracked && <label className="mt-1.5 ml-6 block text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" min="1" step="1" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-md border border-border bg-panel px-2 py-1.5 text-[10.5px] font-mono text-text" /></label>}</div>;
-        })}</div>
-      </div>}
-
-      {offlineMedia.length > 0 && (
-        <div className="rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-2 text-[10.5px] text-amber">
-          {offlineMedia.length} medya/rapor eki bağlantı gelince yüklenecek; kaydettiğinde güncelleme kuyruğa alınır.
-        </div>
-      )}
-      <ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={busy || mediaBusy} />
-      {photos.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {photos.map((p, idx) => (
-            <div key={idx} className="relative">
-              <button
-                type="button"
-                onClick={() => onPhotoClick && onPhotoClick(getPhotoSrc(p, offlinePreviews, transientPhotoUrls))}
-                className="block hover:scale-105 transition-transform"
-                aria-label="Fotoğrafı büyüt"
-              >
-                <NextImage src={getPhotoSrc(p, offlinePreviews, transientPhotoUrls)} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
-              </button>
-              <button
-                onClick={() => removePhoto(idx)}
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px] hover:bg-red hover:text-white transition"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-        {mediaBusy ? "Fotoğraf işleniyor..." : "📷 Fotoğraf ekle"}
-        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || mediaBusy} onChange={addPhotos} className="hidden" />
-      </label>
-
-      {videos.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {videos.map((v, idx) => (
-            <div key={idx} className="flex items-center justify-between bg-panel2 rounded-lg px-2.5 py-1.5 text-[11px] text-muted">
-              🎬 {v.filename || "Video"}
-              <button onClick={() => removeVideo(idx)} className="text-red hover:scale-110 transition">
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-        {mediaBusy ? "Video yükleniyor..." : "🎬 Video ekle (max 100MB)"}
-        <input type="file" accept="video/*" multiple disabled={busy || mediaBusy} onChange={addVideos} className="hidden" />
-      </label>
-
+      <RecordEditCollaborationSections
+        record={record}
+        isAdmin={isAdmin}
+        technicianSource={technicianSource}
+        supportTechnicians={supportTechnicians}
+        otherTechnicianIds={otherTechnicianIds}
+        setOtherTechnicianIds={setOtherTechnicianIds}
+        otherTechnicianDurations={otherTechnicianDurations}
+        setOtherTechnicianDurations={setOtherTechnicianDurations}
+        maintenanceStartAt={maintenanceStartAt}
+        maintenanceEndAt={maintenanceEndAt}
+        availableExtraTypes={availableExtraTypes}
+        trackedExtraTypeKeys={trackedExtraTypeKeys}
+        extraKeys={extraKeys}
+        extraPeriods={extraPeriods}
+        setExtraKeys={setExtraKeys}
+        setExtraPeriods={setExtraPeriods}
+        groupTypes={groupTypes}
+        maintenanceTypes={maintenanceTypes}
+      />
+      <RecordEditMediaSection
+        photos={photos}
+        videos={videos}
+        reportAttachments={reportAttachments}
+        offlineMedia={offlineMedia}
+        offlinePreviews={offlinePreviews}
+        transientPhotoUrls={transientPhotoUrls}
+        busy={busy}
+        mediaBusy={mediaBusy}
+        setReportAttachments={setReportAttachments}
+        setReportAttachmentBusy={setReportAttachmentBusy}
+        onPhotoClick={onPhotoClick}
+        onAddPhotos={addPhotos}
+        onAddVideos={addVideos}
+        onRemovePhoto={removePhoto}
+        onRemoveVideo={removeVideo}
+        onOfflineReportFile={handleOfflineReportFile}
+        onRemoveReportAttachment={removeReportAttachment}
+      />
       <div className="flex gap-2 mt-1">
         <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">
           Vazgeç
