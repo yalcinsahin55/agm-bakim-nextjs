@@ -388,6 +388,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const queue = await source("lib/offlineQueue.ts");
   const complete = await source("app/tamamla/page.tsx");
   const records = await source("app/kayitlar/page.tsx");
+  const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
+  const recordsMedia = await source("app/kayitlar/_lib/recordMedia.ts");
   const recordMediaModals = await source("components/RecordMediaModals.tsx");
   const pdfPreview = await source("components/PdfPreview.tsx");
   const qrPage = await source("app/qr-etiketleri/page.tsx");
@@ -486,12 +488,12 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(queue, /job\.payload\.report_attachments/);
   assert.match(queue, /uploadReportAttachment/);
   assert.match(complete, /<ReportAttachmentPicker/);
-  assert.match(records, /<ReportAttachmentPicker/);
+  assert.match(recordsEditForm, /<ReportAttachmentPicker/);
   assert.doesNotMatch(complete, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(records, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(oilPage, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(complete, /getMediaDisplayUrl/);
-  assert.match(records, /getMediaDisplayUrl/);
+  assert.match(recordsMedia, /getMediaDisplayUrl/);
   assert.match(records, /selectedReportAttachment/);
   assert.match(records, /<RecordMediaModals/);
   assert.match(recordMediaModals, /<PdfPreview/);
@@ -577,6 +579,8 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   const helper = await source("lib/reassignMaintenanceEngine.ts");
   const schemas = await source("lib/schemas.ts");
   const recordsPage = await source("app/kayitlar/page.tsx");
+  const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
+  const confirmationHook = await source("app/kayitlar/_hooks/useRecordConfirmation.ts");
   const confirmationModal = await source("components/MaintenanceConfirmationModal.tsx");
   assert.match(schemas, /recordConfirmationSchema = z\.object\(\{[\s\S]*engine_id/);
   assert.match(update, /engineChangeRequested/);
@@ -596,8 +600,8 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   assert.match(helper, /tracking_source: "record"/);
   assert.match(confirmationModal, /Bakımın bağlı olduğu motor/);
   assert.match(confirmationModal, /Bakım motoru/);
-  assert.match(recordsPage, /engine_id: isAdmin \? engineId/);
-  assert.match(recordsPage, /selectedEngineId/);
+  assert.match(recordsEditForm, /engine_id: isAdmin \? engineId/);
+  assert.match(confirmationHook, /selectedEngineId/);
   assert.match(recordsPage, /engines=\{sortedEngines\}/);
 });
 

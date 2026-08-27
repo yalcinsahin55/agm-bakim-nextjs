@@ -9,7 +9,7 @@ function readProjectFile(relativePath: string): string {
 
 test("all previously warned image call sites use Next Image", () => {
   const files = [
-    "app/kayitlar/page.tsx",
+    "app/kayitlar/_components/MaintenanceRecordEditForm.tsx",
     "components/MaintenanceEvidencePreview.tsx",
     "app/motorlar/page.tsx",
     "app/qr-etiketleri/page.tsx",
@@ -48,7 +48,7 @@ test("Vercel keeps the notification refresh cron after optional MongoDB probing 
 });
 test("maintenance media handlers always clear loading state after processing", () => {
   const completionSource = readProjectFile("app/tamamla/page.tsx");
-  const editSource = readProjectFile("app/kayitlar/page.tsx");
+  const editSource = readProjectFile("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const compressionSource = readProjectFile("lib/imageCompression.ts");
 
   assert.match(completionSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
