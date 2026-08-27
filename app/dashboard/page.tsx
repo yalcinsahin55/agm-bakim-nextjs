@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch } from "@/lib/apiCache";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import { canAccessRoute } from "@/lib/permissions";
+import DashboardActionRail from "@/components/DashboardActionRail";
 
 interface DashboardEngine {
   _id: string;
@@ -304,6 +305,8 @@ export default function DashboardPage() {
             <span className="text-muted">Sistem aktif</span>
           </div>
         </div>
+
+        <DashboardActionRail role={user?.role} enginesCount={sortedEngines.length} counts={counts} />
 
         {counts.gecikmis > 0 && (
           <div className="bg-red/10 border border-red/40 rounded-card p-4 mb-4 flex items-center gap-3 animate-fade-in">

@@ -142,6 +142,20 @@ test.describe("AGM Bakım configured authentication", () => {
     await login(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
   });
 
+  test("dashboard operasyon raili yetkili kısayolları render eder", async ({ page }) => {
+    test.skip(
+      !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD,
+      "Dashboard operasyon raili E2E testi yalnızca izole test kullanıcısı ile çalıştırılmalı.",
+    );
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Sıradaki iş" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Bakım tamamla/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Bakım kayıtları/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Motor durumları/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Bildirim merkezi/ })).toBeVisible();
+  });
+
   test("QR quick-mode saha akışı motor ve bakım türünü görünür biçimde kilitler", async ({ page }) => {
     test.skip(
       !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD,
