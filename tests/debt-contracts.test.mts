@@ -222,6 +222,7 @@ test("backup export and restore share sanitized format helpers", async () => {
 test("large history and administrative list paths expose bounded reads", async () => {
   const pressure = await source("app/api/pressure-readings/route.ts");
   const summary = await source("app/api/backups/summary/route.ts");
+  const indexMigration = await source("scripts/migrate-app-indexes.mts");
   const maintenanceTypes = await source("app/api/maintenance-types/route.ts");
   const users = await source("app/api/users/route.ts");
   const engines = await source("app/api/engines/route.ts");
@@ -230,6 +231,9 @@ test("large history and administrative list paths expose bounded reads", async (
   assert.match(pressure, /has_more/);
   assert.match(summary, /backup-summary/);
   assert.match(summary, /await ensureAppIndexes\(db\)/);
+  assert.match(indexMigration, /--dry-run/);
+  assert.match(indexMigration, /ensureAppIndexes/);
+  assert.match(indexMigration, /listMissingIndexes/);
   assert.match(maintenanceTypes, /maintenance-type-list/);
   assert.match(users, /projection:/);
   assert.match(engines, /history: \{ \$slice: -250 \}/);

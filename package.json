@@ -18,7 +18,8 @@
     "migrate:stable-keys": "node --experimental-strip-types scripts/migrate-stable-keys.mts",
     "migrate:legacy-role": "node --experimental-strip-types scripts/migrate-legacy-role.mts",
     "migrate:legacy-media": "node --experimental-strip-types scripts/migrate-legacy-media.mts",
-    "migrate:technician-source": "node --experimental-strip-types scripts/migrate-technician-source.mts"
+    "migrate:technician-source": "node --experimental-strip-types scripts/migrate-technician-source.mts",
+    "migrate:app-indexes": "node --experimental-strip-types scripts/migrate-app-indexes.mts"
   },
   "dependencies": {
     "@upstash/redis": "1.38.2",
