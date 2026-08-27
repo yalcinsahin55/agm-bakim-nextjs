@@ -528,6 +528,8 @@ test("assistant engine history and maintenance health expose filtered reports an
   const assistantShared = await source("lib/assistant/shared.ts");
   const assistantPage = await source("app/asistan/page.tsx");
   const assistantDetails = await source("components/AssistantResultDetails.tsx");
+  const assistantDomainDetails = await source("components/AssistantDomainResults.tsx");
+  const assistantRecordDetails = await source("components/AssistantRecordResults.tsx");
   assert.match(policy, /showAll\?: boolean/);
   assert.match(policy, /tüm\|bütün\|hepsi/);
   assert.match(policy, /asksEngineMaintenanceDuration/);
@@ -543,9 +545,11 @@ test("assistant engine history and maintenance health expose filtered reports an
   assert.match(assistantShared, /mapWithConcurrency/);
   assert.match(technicianTools, /mapWithConcurrency\(resultRows\.slice\(0, 12\), 4/);
   assert.match(assistantPage, /AssistantResultDetails/);
-  assert.match(assistantDetails, /Rapor ekleri:/);
-  assert.match(assistantDetails, /Son bakımdan beri motor çalışması/);
-  assert.match(assistantDetails, /maintenance_health/);
+  assert.match(assistantDetails, /AssistantDomainResults/);
+  assert.match(assistantDetails, /AssistantRecordResults/);
+  assert.match(assistantDomainDetails, /Son bakımdan beri motor çalışması/);
+  assert.match(assistantDomainDetails, /maintenance_health/);
+  assert.match(assistantRecordDetails, /Rapor ekleri:/);
 });
 
 
