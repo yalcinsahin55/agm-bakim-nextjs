@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import LoadCards from "@/components/LoadCards";
@@ -9,7 +8,6 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch } from "@/lib/apiCache";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
-import { canAccessRoute } from "@/lib/permissions";
 import DashboardActionRail from "@/components/DashboardActionRail";
 import DashboardAssistant from "./_components/DashboardAssistant";
 import EngineHealthDetails from "./_components/EngineHealthDetails";

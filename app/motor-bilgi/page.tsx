@@ -12,7 +12,7 @@ import EquipmentInfoAddForm from "./_components/EquipmentInfoAddForm";
 import EquipmentInfoCard from "./_components/EquipmentInfoCard";
 import EquipmentInfoImportPanel from "./_components/EquipmentInfoImportPanel";
 import { FIELDS, emptyForm } from "./_lib/types";
-import type { EquipmentEngine, EquipmentInfo, EquipmentResponse, FieldValues } from "./_lib/types";
+import type { EquipmentEngine, EquipmentInfo, EquipmentResponse } from "./_lib/types";
 import { fileToBase64 } from "./_lib/fileToBase64";
 
 export default function MotorBilgiPage() {

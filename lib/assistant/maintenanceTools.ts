@@ -3,7 +3,7 @@ import { type PanelItem } from "@/lib/status";
 import type { AssistantQuery } from "@/lib/assistantPolicy";
 import { enginesCollection, maintenanceTypesCollection, recordsCollection } from "@/lib/dbCollections";
 import { buildMaintenanceForecastRows, summarizeMaintenanceForecast, validForecastYear, validMaintenancePeriodHours } from "@/lib/maintenanceForecast";
-import { formatMinutes, formatUnknownDate, safeReportAttachments } from "@/lib/assistantToolOutput";
+import { formatMinutes, safeReportAttachments } from "@/lib/assistantToolOutput";
 import { buildRecordMatch, externalExpression, findEngine, periodLabel, resolveMaintenanceType } from "@/lib/assistantToolQuery";
 import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 import type { AssistantToolResponse } from "./types";

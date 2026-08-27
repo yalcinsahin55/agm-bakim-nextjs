@@ -9,7 +9,6 @@ import Lightbox from "@/components/Lightbox";
 import RecordMediaModals from "@/components/RecordMediaModals";
 import MaintenanceRecordDetailsModal from "@/components/MaintenanceRecordDetailsModal";
 import MaintenanceConfirmationModal from "@/components/MaintenanceConfirmationModal";
-import MaintenanceRecordCard from "@/components/MaintenanceRecordCard";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import type { ReportAttachment } from "@/lib/types";
@@ -26,7 +25,6 @@ import RecordPagination from "./_components/RecordPagination";
 export default function KayitlarPage() {
   const { user } = useCurrentUser();
   const {
-    engines,
     sortedEngines,
     records,
     setRecords,

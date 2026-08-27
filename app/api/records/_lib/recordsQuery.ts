@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ObjectId, type Filter } from "mongodb";
-import { enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
+import { recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureAppIndexes } from "@/lib/dbIndexes";

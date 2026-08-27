@@ -7,7 +7,6 @@ import QRCode from "qrcode";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
-import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";

@@ -1,6 +1,5 @@
 "use client";
 
-import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
 import { hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 
