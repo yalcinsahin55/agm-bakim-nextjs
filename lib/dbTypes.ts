@@ -61,6 +61,7 @@ export interface AuditLogDocument {
   action: AuditAction;
   entity: string;
   entity_id?: string | null;
+  request_id?: string;
   summary: string;
   before?: unknown;
   after?: unknown;

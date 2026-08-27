@@ -1,8 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 
 const SLOW_REQUEST_MS = 500;
 const REQUEST_ID_HEADER = "X-Request-Id";
 const OBSERVABILITY_PREFIX = "[api-observability]";
+const requestContext = new AsyncLocalStorage<string>();
+
+export function getCurrentRequestId(): string | undefined {
+  return requestContext.getStore();
+}
 
 type ApiRequestLike = Pick<Request, "method" | "headers">;
 
@@ -57,7 +63,7 @@ export async function withApiTiming<T extends Response>(
   const role = safeIdentity(options.userRole);
 
   try {
-    const response = await handler();
+    const response = await requestContext.run(requestId, handler);
     const elapsedMs = durationMs(startedAt);
     response.headers.set("Server-Timing", `app;dur=${elapsedMs}`);
     response.headers.set(REQUEST_ID_HEADER, requestId);
