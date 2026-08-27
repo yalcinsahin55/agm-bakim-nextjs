@@ -6,6 +6,8 @@ type JsonResult = {
   body: unknown;
 };
 
+const fixtureSessionCookies = new Map<string, string>();
+
 function requireFixture(): { engineId: string; typeKey: string } {
   const engineId = process.env.E2E_FIXTURE_ENGINE_ID?.trim();
   const typeKey = process.env.E2E_FIXTURE_TYPE_KEY?.trim();
@@ -33,21 +35,26 @@ async function login(page: Page, identifier: string, password: string): Promise<
 }
 
 async function loginViaFixtureApi(page: Page, identifier: string, password: string): Promise<void> {
-  // Local E2E fallback keeps an in-memory IP quota for the whole server process.
-  // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
-  // without changing the production limiter or trusting this header in production.
-  const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
-  const response = await page.context().request.post("/api/auth/login", {
-    headers: { "x-forwarded-for": fixtureIp },
-    data: { identifier, password },
-  });
-  const loginBody = await response.text();
-  expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
-  const setCookie = response.headers()["set-cookie"] || "";
-  const headerMatch = setCookie.match(/(?:^|,\s*)agm_session=([^;]+)/);
-  const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
-  const sessionCookie = headerMatch?.[1] || existingCookie || "";
-  expect(sessionCookie.length).toBeGreaterThan(0);
+  const cachedSessionCookie = fixtureSessionCookies.get(identifier);
+  let sessionCookie = cachedSessionCookie || "";
+  if (!sessionCookie) {
+    // Local E2E fallback keeps an in-memory IP quota for the whole server process.
+    // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
+    // without changing the production limiter or trusting this header in production.
+    const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
+    const response = await page.context().request.post("/api/auth/login", {
+      headers: { "x-forwarded-for": fixtureIp },
+      data: { identifier, password },
+    });
+    const loginBody = await response.text();
+    expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
+    const setCookie = response.headers()["set-cookie"] || "";
+    const headerMatch = setCookie.match(/(?:^|,\s*)agm_session=([^;]+)/);
+    const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
+    sessionCookie = headerMatch?.[1] || existingCookie || "";
+    expect(sessionCookie.length).toBeGreaterThan(0);
+    fixtureSessionCookies.set(identifier, sessionCookie);
+  }
   const loginOrigin = new URL(process.env.E2E_BASE_URL || "http://127.0.0.1:3000").origin;
   await page.context().addCookies([{
     name: "agm_session",
