@@ -8,7 +8,8 @@ const source = (relativePath: string): Promise<string> => readFile(path.join(roo
 
 test("protected APIs keep server-side authentication and role guards", async () => {
   const routePaths = [
-    "app/api/records/route.ts",
+    "app/api/records/_lib/recordsQuery.ts",
+    "app/api/records/_lib/recordCreate.ts",
     "app/api/users/route.ts",
     "app/api/backups/export/route.ts",
     "app/api/assistant/route.ts",
@@ -26,19 +27,18 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
     source("app/api/audit-logs/route.ts"),
     source("app/api/media/file/route.ts"),
     source("app/api/oil-analyses/[id]/file/route.ts"),
-    source("app/api/records/route.ts"),
+    source("app/api/records/_lib/recordsQuery.ts"),
     source("app/api/records/interval-summary/route.ts"),
     source("app/api/reports/engine/[id]/route.ts"),
     source("app/api/users/technicians/route.ts"),
     source("app/api/engines/route.ts"),
     source("app/api/maintenance-types/panel/route.ts"),
   ]);
-  const recordsQuery = await source("app/api/records/_lib/recordsQuery.ts");
   for (const route of routes) assert.match(route, /enforceApiRateLimit\(/);
   assert.match(routes[0], /audit-log-read/);
   assert.match(routes[1], /media-read/);
   assert.match(routes[2], /oil-analysis-file-read/);
-  assert.match(recordsQuery, /records-read/);
+  assert.match(routes[3], /records-read/);
   assert.match(routes[4], /records-interval-summary-read/);
   assert.match(routes[5], /engine-report-read/);
   assert.match(routes[6], /technician-list-read/);
@@ -57,12 +57,13 @@ test("legacy media and oil PDF fallback remain bounded", async () => {
 
 test("record date and bulk update safeguards stay in place", async () => {
   const records = await source("app/api/records/route.ts");
+  const recordCreate = await source("app/api/records/_lib/recordCreate.ts");
   const recordHelpers = await source("app/api/records/_lib/recordRouteHelpers.ts");
   const maintenanceTypes = await source("app/api/maintenance-types/[key]/route.ts");
   const engineHours = await source("app/api/engines/hours/route.ts");
   const importHours = await source("app/api/import/hours/route.ts");
   assert.match(recordHelpers, /function parseDateOnly/);
-  assert.match(records, /Geriye dönük bakım tarihi geçerli bir takvim tarihi olmalıdır/);
+  assert.match(recordCreate, /Geriye dönük bakım tarihi geçerli bir takvim tarihi olmalıdır/);
   assert.match(maintenanceTypes, /typesCol\.bulkWrite/);
   assert.match(engineHours, /enginesCol\.bulkWrite/);
   assert.match(engineHours, /writeAuditLog/);
@@ -380,6 +381,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const uploadHelper = await source("lib/reportAttachmentUpload.ts");
   const schema = await source("lib/schemas.ts");
   const create = await source("app/api/records/route.ts");
+  const createModule = await source("app/api/records/_lib/recordCreate.ts");
   const update = await source("app/api/records/[id]/route.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
@@ -438,11 +440,11 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(upload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(schema, /report_attachments/);
   assert.match(schema, /isAllowedReportAttachmentUrl/);
-  assert.match(create, /normalizedReportAttachments/);
-  assert.match(create, /buildExtraClientRequestId/);
-  assert.match(create, /client_request_id: recordClientRequestId \|\| undefined/);
-  assert.match(create, /buildExtraClientRequestId\(client_request_id, ex\.type_key\)/);
-  assert.match(create, /report_attachments: isPrimary/);
+  assert.match(createModule, /normalizedReportAttachments/);
+  assert.match(createModule, /buildExtraClientRequestId/);
+  assert.match(createModule, /client_request_id: recordClientRequestId \|\| undefined/);
+  assert.match(createModule, /buildExtraClientRequestId\(client_request_id, ex\.type_key\)/);
+  assert.match(createModule, /report_attachments: isPrimary/);
   assert.match(update, /update\.report_attachments = normalizedReportAttachments/);
   assert.match(fileRoute, /record-attachment-read/);
   assert.match(fileRoute, /fetchStoredBlob/);
@@ -733,7 +735,7 @@ test("large JSON mutation routes enforce transport body limits", async () => {
   const routePaths = [
     "app/api/auth/login/route.ts",
     "app/api/auth/register/route.ts",
-    "app/api/records/route.ts",
+    "app/api/records/_lib/recordCreate.ts",
     "app/api/records/[id]/route.ts",
     "app/api/equipment-info/import/route.ts",
     "app/api/import/hours/route.ts",
