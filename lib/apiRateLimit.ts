@@ -4,8 +4,8 @@ import { getClientIp } from "@/lib/rate-limit";
 import { checkDistributedRateLimit, checkDistributedRateLimitBatch, type RateLimitFailureMode } from "@/lib/redisRateLimit";
 
 const FAIL_CLOSED_SCOPES = new Set([
-  "login-ip",
-  "login-identifier",
+  "login-ip-v2",
+  "login-identifier-v2",
   "register",
   "seed",
   "backup-restore",

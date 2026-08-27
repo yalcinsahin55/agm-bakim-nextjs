@@ -32,10 +32,11 @@ async function postLogin(req: NextRequest) {
     const normalizedIdentifier = isValidPhone(identifier) ? normalizePhone(identifier) : identifier.toLowerCase().trim();
     // 🔒 IP ve gerçek normalize edilmiş identifier limitleri tek Redis kararında uygulanır.
     const clientIp = getClientIp(req);
-    const rateLimited = await enforceCompositeRateLimit(req, [
-      { scope: "login-ip", limit: 5, windowMs: 10 * 60 * 1000, identity: clientIp },
-      { scope: "login-identifier", limit: 8, windowMs: 10 * 60 * 1000, identity: normalizedIdentifier },
-    ]);
+    const rateLimitRequests = [
+      { scope: "login-identifier-v2", limit: 8, windowMs: 10 * 60 * 1000, identity: normalizedIdentifier },
+      ...(clientIp !== "unknown" ? [{ scope: "login-ip-v2", limit: 5, windowMs: 10 * 60 * 1000, identity: clientIp }] : []),
+    ];
+    const rateLimited = await enforceCompositeRateLimit(req, rateLimitRequests);
     if (rateLimited) return rateLimited;
 
     const db = await getDb();
