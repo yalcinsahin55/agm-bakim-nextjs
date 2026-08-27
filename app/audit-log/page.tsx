@@ -59,6 +59,21 @@ const roleLabels: Record<string, string> = {
   goruntuleyici: "Görüntüleyici",
 };
 
+const PASSWORD_RESET_SEARCH = "şifresi yönetici tarafından sıfırlandı";
+const PASSWORD_RESET_FILTERS: AuditFilters = {
+  q: PASSWORD_RESET_SEARCH,
+  action: "update",
+  entity: "user",
+  from: "",
+  to: "",
+};
+
+function isPasswordResetAudit(item: Pick<AuditItem, "action" | "entity" | "summary">): boolean {
+  return item.action === "update"
+    && item.entity === "user"
+    && item.summary.toLocaleLowerCase("tr-TR").includes(PASSWORD_RESET_SEARCH);
+}
+
 function actionClass(action: string): string {
   if (action === "delete") return "border-red/30 bg-red/10 text-red";
   if (action === "create") return "border-green/30 bg-green/10 text-green";
@@ -99,6 +114,9 @@ export default function AuditLogPage() {
     () => Object.values(filters).filter(Boolean).length,
     [filters],
   );
+  const passwordResetFilterActive = filters.q === PASSWORD_RESET_SEARCH
+    && filters.action === "update"
+    && filters.entity === "user";
 
   async function load(nextPage = 1, nextFilters = filters, options: { silent?: boolean } = {}) {
     if (options.silent) setRefreshing(true);
@@ -171,6 +189,12 @@ export default function AuditLogPage() {
     setPage(1);
   }
 
+  function applyPasswordResetFilter() {
+    setDraftFilters(PASSWORD_RESET_FILTERS);
+    setFilters(PASSWORD_RESET_FILTERS);
+    setPage(1);
+  }
+
   function updateDraft(field: keyof AuditFilters, value: string) {
     setDraftFilters((current) => ({ ...current, [field]: value }));
   }
@@ -227,6 +251,16 @@ export default function AuditLogPage() {
               <button type="button" onClick={clearFilters} className="text-[10px] font-bold text-muted hover:text-amber">Temizle</button>
             )}
           </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={applyPasswordResetFilter}
+              className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${passwordResetFilterActive ? "border-amber/50 bg-amber/10 text-amber" : "border-border text-muted hover:border-amber/40 hover:text-amber"}`}
+            >
+              Şifre sıfırlama kayıtları
+            </button>
+            {passwordResetFilterActive && <span className="text-[10px] text-faint">Yönetici parola sıfırlamaları · kullanıcı güncellemesi</span>}
+          </div>
           <div className="flex flex-col gap-2">
             <input
               value={draftFilters.q}
@@ -273,11 +307,19 @@ export default function AuditLogPage() {
               <div className="text-sm font-bold">Kayıt bulunamadı</div>
               <div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div>
             </div>
-          ) : items.map((item) => (
-            <article key={item._id} className="rounded-card border border-border bg-panel p-3.5 transition hover:border-borderlt">
+          ) : items.map((item) => {
+            const passwordReset = isPasswordResetAudit(item);
+            return (
+            <article key={item._id} className={`rounded-card border bg-panel p-3.5 transition hover:border-borderlt ${passwordReset ? "border-amber/50 bg-amber/5" : "border-border"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="break-words text-[13px] font-bold text-text">{item.summary || "İşlem kaydı"}</div>
+                  {passwordReset && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                      <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-1 font-extrabold text-amber">Şifre sıfırlama</span>
+                      <span className="text-faint">Önceki oturumlar geçersiz kılındı</span>
+                    </div>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted">
                     <span className="font-semibold">{item.user_name || "Bilinmeyen kullanıcı"}</span>
                     <span className="text-faint">·</span>
@@ -296,7 +338,8 @@ export default function AuditLogPage() {
                 Ayrıntıları görüntüle
               </button>
             </article>
-          ))}
+            );
+          })}
         </section>
 
         {totalPages > 1 && (
@@ -323,6 +366,11 @@ export default function AuditLogPage() {
                 <div className="text-[12px] font-bold text-text">{selected.summary || "İşlem kaydı"}</div>
                 <div className="mt-1 text-[10.5px] text-muted">{selected.user_name} · {roleLabels[selected.user_role] || selected.user_role}</div>
               </div>
+              {isPasswordResetAudit(selected) && (
+                <div className="mt-3 rounded-xl border border-amber/30 bg-amber/10 px-3 py-2 text-[10.5px] leading-relaxed text-amber">
+                  <strong>Güvenlik kaydı:</strong> Parola değeri audit kaydına yazılmaz ve gösterilmez. Session sürümü artırılarak önceki oturumlar geçersiz kılınır; aşağıdaki sonraki değer yalnızca bu sürüm bilgisini içerir.
+                </div>
+              )}
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Önceki değer</div>
