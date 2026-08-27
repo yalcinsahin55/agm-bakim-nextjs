@@ -376,8 +376,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const update = await source("app/api/records/[id]/route.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
-  const pdfSecurity = await source("lib/pdfSecurity.ts");
   const assistantExport = await source("app/api/assistant/export/route.ts");
+  const assistantExportLogo = await source("lib/assistantExportLogo.ts");
+  const pdfSecurity = await source("lib/pdfSecurity.ts");
   const blobStorage = await source("lib/blobStorage.ts");
   const nextConfig = await source("next.config.ts");
   const mediaUpload = await source("lib/mediaUpload.ts");
@@ -448,7 +449,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(pdfSecurity, /\.private\.blob\.vercel-storage\.com/);
   assert.match(pdfSecurity, /\.blob\.vercel-storage\.com/);
   assert.match(pdfSecurity, /readResponseBytes/);
-  assert.match(assistantExport, /readResponseBytes/);
+  assert.match(assistantExportLogo, /readResponseBytes/);
   assert.match(blobStorage, /from "@vercel\/blob"/);
   assert.match(blobStorage, /MEDIA_READ_WRITE_TOKEN/);
   assert.match(blobStorage, /BLOB_READ_WRITE_TOKEN/);
@@ -569,11 +570,15 @@ test("assistant exports preserve report filenames and maintenance work metrics",
 test("all generated PDF and Excel reports use the shared Yeşil Global logo", async () => {
   const branding = await source("lib/exportBranding.ts");
   const assistantExport = await source("app/api/assistant/export/route.ts");
+  const assistantExportPdf = await source("lib/assistantExportPdf.ts");
+  const assistantExportExcel = await source("lib/assistantExportExcel.ts");
   const pdfExport = await source("app/api/export/pdf/route.ts");
   const excelExport = await source("app/api/export/excel/route.ts");
   assert.match(branding, /yesil-global-logo\.png/);
   assert.match(branding, /yesil-global-logo\.jpg/);
-  assert.match(assistantExport, /loadDefaultExportLogo/);
+  assert.match(assistantExport, /assistantExportPdf|assistantExportExcel/);
+  assert.match(assistantExportPdf, /loadDefaultExportLogo/);
+  assert.match(assistantExportExcel, /loadDefaultExportLogo/);
   assert.doesNotMatch(assistantExport, /yesil-global-logo\.jpg/);
   assert.match(pdfExport, /loadDefaultExportLogo/);
   assert.match(pdfExport, /doc\.image\(logo\.buffer/);
