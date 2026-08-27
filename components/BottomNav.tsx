@@ -24,6 +24,7 @@ const ITEMS: MenuItem[] = [
 const TECHNICIAN_ITEMS: MenuItem[] = [
   { href: "/tamamla", label: "Tamamla", icon: "✅" },
   { href: "/kayitlar", label: "Kayıtlar", icon: "📋" },
+  { href: "/hesap", label: "Şifre", icon: "🔐" },
 ];
 
 export default function BottomNav() {
