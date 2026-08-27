@@ -11,7 +11,7 @@ test("all previously warned image call sites use Next Image", () => {
   const files = [
     "app/kayitlar/_components/RecordEditMediaSection.tsx",
     "components/MaintenanceEvidencePreview.tsx",
-    "app/motorlar/page.tsx",
+    "app/motorlar/_components/EngineQrModal.tsx",
     "app/qr-etiketleri/page.tsx",
     "components/Lightbox.tsx",
   ];

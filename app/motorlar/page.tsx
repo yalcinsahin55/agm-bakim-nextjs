@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import TopBar from "@/components/TopBar";
@@ -11,33 +10,11 @@ import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
-import { getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
-
-interface MotorEngine {
-  _id: string;
-  name: string;
-  hours?: number;
-  load_kw?: number;
-  updated_at?: string | Date;
-  maintenance_count?: number;
-}
-
-interface MotorMaintenanceRecord {
-  _id?: string;
-  group_id?: string;
-  type_key?: string;
-  type_label?: string;
-  hour_at_completion?: number;
-  technician_name?: string;
-  maintenance_start_at?: string | Date;
-  created_at?: string | Date;
-}
-
-interface EngineResponse {
-  name?: string;
-  error?: string;
-}
+import EngineAddForm from "./_components/EngineAddForm";
+import EngineMaintenanceCard from "./_components/EngineMaintenanceCard";
+import EngineQrModal from "./_components/EngineQrModal";
+import type { EngineResponse, MotorEngine, MotorMaintenanceRecord } from "./_lib/types";
 
 export default function MotorlarPage() {
   const router = useRouter();
@@ -232,125 +209,31 @@ export default function MotorlarPage() {
         </div>
         <div className="mb-3 text-[11px] text-muted">{visibleEngines.length} / {sorted.length} motor gösteriliyor</div>
         {showAdd && (
-          <form onSubmit={addEngine} className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
-            <div className="text-[12px] font-bold text-teal mb-2">➕ Yeni Motor Ekle</div>
-            <div className="flex flex-col gap-2">
-              <input
-                required placeholder="Motor adı (örn. Motor 7)" value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number" placeholder="Güncel saat" value={newHours}
-                  onChange={(e) => setNewHours(e.target.value)}
-                  className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
-                />
-                <input
-                  type="number" placeholder="Yük (kW)" value={newLoad}
-                  onChange={(e) => setNewLoad(e.target.value)}
-                  className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
-                />
-              </div>
-              <button
-                type="submit" disabled={saving}
-                className="py-2.5 rounded-lg bg-teal text-[#06181b] text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
-              >
-                {saving ? "Ekleniyor..." : "💾 Kaydet"}
-              </button>
-            </div>
-          </form>
+          <EngineAddForm
+            name={newName}
+            hours={newHours}
+            load={newLoad}
+            saving={saving}
+            onNameChange={setNewName}
+            onHoursChange={setNewHours}
+            onLoadChange={setNewLoad}
+            onSubmit={addEngine}
+          />
         )}
 
         <div className="flex flex-col gap-1.5">
-          {visibleEngines.map((e) => {
-            const recs = (recordsByEngine[e._id] || [])
-              .slice()
-              .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-            const open = openId === e._id;
-            const recordsLoading = loadingEngineId === e._id;
-            return (
-              <div
-                key={e._id}
-                className="bg-panel border border-border rounded-card overflow-hidden hover:border-borderlt transition-all"
-              >
-                <button
-                  onClick={() => void toggleEngine(e._id)}
-                  className="w-full flex items-center gap-3 p-3 text-left"
-                  aria-expanded={open}
-                  aria-label={`${e.name} motor detaylarını ${open ? "kapat" : "aç"}`}
-                >
-                  <EngineBadge name={e.name} size={36} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-bold text-text truncate">{e.name}</div>
-                    <div className="text-[10.5px] text-faint mt-0.5">
-                      {(typeof e.maintenance_count === "number" ? e.maintenance_count : recs.length)} bakım · {(e.load_kw || 0).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} kW
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="font-mono text-[13px] font-bold text-amber">
-                      {(e.hours || 0).toLocaleString("tr-TR")}
-                    </div>
-                    <div className="text-[8.5px] text-faint tracking-wide">SAAT</div>
-                  </div>
-                  <span className={`text-faint transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
-                </button>
-
-                {open && (
-                  <div className="border-t border-border bg-[#12161d] p-3 animate-fade-in">
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div className="bg-panel2 rounded-lg p-2 text-center">
-                        <div className="text-[9px] text-faint uppercase font-bold">Yük</div>
-                        <div className="font-mono text-[13px] font-bold text-teal mt-0.5">
-                          {(e.load_kw || 0).toLocaleString("tr-TR")} kW
-                        </div>
-                      </div>
-                      <div className="bg-panel2 rounded-lg p-2 text-center">
-                        <div className="text-[9px] text-faint uppercase font-bold">Son Güncelleme</div>
-                        <div className="text-[11px] font-bold text-text mt-0.5">
-                          {e.updated_at ? new Date(e.updated_at).toLocaleDateString("tr-TR") : "-"}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setQrEngine(e)}
-                      className="w-full mb-3 py-2 rounded-lg border border-amber/40 bg-amber/10 text-amber text-[11px] font-bold hover:bg-amber/20 active:scale-[.98] transition"
-                    >
-                      ▣ Hızlı bakım QR kodu göster ve indir
-                    </button>
-
-                    {recordsLoading ? (
-                      <div className="text-center text-[11px] text-muted py-4">Bakım geçmişi yükleniyor...</div>
-                    ) : recs.length === 0 ? (
-                      <div className="text-center text-[11px] text-faint py-4">
-                        Henüz bakım kaydı yok.
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
-                        {recs.slice(0, 20).map((r) => (
-                                                      <div key={r._id || r.group_id || `${e._id}-${r.type_key || r.type_label || "record"}`} className="flex items-center justify-between bg-panel rounded-lg px-2.5 py-2 border border-border">
-
-                            <div className="min-w-0">
-                              <div className="text-[11.5px] font-semibold text-text truncate">{r.type_label}</div>
-                              <div className="text-[9.5px] text-faint">
-                                {getMaintenanceRecordDate(r.maintenance_start_at, r.created_at)?.toLocaleDateString("tr-TR") || "—"} · {r.technician_name || ""}
-                              </div>
-                            </div>
-                            <div className="font-mono text-[11px] text-amber flex-shrink-0">
-                              {(r.hour_at_completion || 0).toLocaleString("tr-TR")} sa
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {visibleEngines.map((engine) => (
+            <EngineMaintenanceCard
+              key={engine._id}
+              engine={engine}
+              records={recordsByEngine[engine._id] || []}
+              open={openId === engine._id}
+              recordsLoading={loadingEngineId === engine._id}
+              onToggle={() => void toggleEngine(engine._id)}
+              onShowQr={() => setQrEngine(engine)}
+            />
+          ))}
         </div>
-
         {sorted.length === 0 && (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
             <div className="text-4xl mb-3">⚙️</div>
@@ -366,62 +249,12 @@ export default function MotorlarPage() {
         )}
       </div>
       {qrEngine && (
-        <div
-          className="fixed inset-0 z-50 bg-black/75 p-4 flex items-center justify-center"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${qrEngine.name} QR kodu`}
-          onClick={() => setQrEngine(null)}
-        >
-          <div
-            className="w-full max-w-sm bg-panel border border-border rounded-2xl p-4 shadow-2xl text-center"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-left">
-                <div className="text-[10px] uppercase tracking-wider text-amber font-bold">Motor QR Kodu</div>
-                <div className="text-base font-extrabold text-text mt-0.5">{qrEngine.name}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setQrEngine(null)}
-                className="w-8 h-8 rounded-lg border border-border text-muted hover:text-text hover:bg-panel2 transition"
-                aria-label="QR penceresini kapat"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="bg-white rounded-xl p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
-              {qrDataUrl ? <Image src={qrDataUrl} width={208} height={208} unoptimized alt={`${qrEngine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}
-            </div>
-            <p className="text-[11px] text-muted leading-relaxed mt-3">
-              Bu kod okutulduğunda uygulama doğrudan bu motorun bakım panelini açar.
-            </p>
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => void copyQrLink()}
-                className="py-2.5 rounded-lg border border-border text-muted text-[11px] font-bold hover:bg-panel2 transition"
-              >
-                Bağlantıyı kopyala
-              </button>
-              <a
-                href={qrDataUrl || undefined}
-                download={`${qrEngine.name.replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-qr.png`}
-                className={`py-2.5 rounded-lg bg-amber text-[#161006] text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
-              >
-                PNG indir
-              </a>
-            </div>
-            <button
-              type="button"
-              onClick={() => setQrEngine(null)}
-              className="w-full mt-2 py-2.5 rounded-lg bg-panel2 border border-border text-text text-[11px] font-bold hover:bg-border transition"
-            >
-              Kapat
-            </button>
-          </div>
-        </div>
+        <EngineQrModal
+          engine={qrEngine}
+          qrDataUrl={qrDataUrl}
+          onClose={() => setQrEngine(null)}
+          onCopy={() => void copyQrLink()}
+        />
       )}
       <BottomNav />
     </div>
