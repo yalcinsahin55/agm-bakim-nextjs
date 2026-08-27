@@ -19,7 +19,6 @@ import MaintenanceRecordCard from "@/components/MaintenanceRecordCard";
 import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { ReportAttachment } from "@/lib/types";
-import { formatReportAttachmentSize } from "@/lib/reportAttachments";
 import { engineSortKey } from "@/lib/status";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";

@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import NextImage from "next/image";
 import type { ReportAttachment, VideoRef } from "@/lib/types";
-import { formatReportAttachmentSize } from "@/lib/reportAttachments";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import type { TechnicianType } from "@/lib/types";
 

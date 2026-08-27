@@ -547,7 +547,6 @@ test("assistant engine history and maintenance health expose filtered reports an
 
 test("assistant exports preserve report filenames and maintenance work metrics", async () => {
   const exportLib = await source("lib/assistantExport.ts");
-  const assistantPage = await source("app/asistan/page.tsx");
   const assistantDetails = await source("components/AssistantResultDetails.tsx");
   assert.match(exportLib, /worked_hours/);
   assert.match(exportLib, /attachments: "Rapor ekleri"/);

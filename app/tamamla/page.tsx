@@ -14,7 +14,6 @@ import MaintenanceEvidencePreview from "@/components/MaintenanceEvidencePreview"
 import MaintenanceTimeTracking from "@/components/MaintenanceTimeTracking";
 import MaintenanceChecklist from "@/components/MaintenanceChecklist";
 import MaintenanceDefinitionSection from "@/components/MaintenanceDefinitionSection";
-import { STATUS_LABELS } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
@@ -22,7 +21,7 @@ import type { MaintenanceType, ReportAttachment, VideoRef } from "@/lib/types";
 import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { calculateMaintenanceDurationFromDates, formatMaintenanceDuration, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 import { compressImage } from "@/lib/imageCompression";
 
 const CHECKLIST_TEMPLATES = {
@@ -650,7 +649,6 @@ export default function TamamlaPage() {
               qrTypeKey={qrTypeKey}
               chosenItem={chosenItem}
               chosenType={chosenType}
-              isPrimaryNew={isPrimaryNew}
               onEngineChange={setEngineId}
               onTypeChange={setTypeKey}
               onPrimaryPeriodChange={setPrimaryPeriod}
