@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 
 const SLOW_REQUEST_MS = 500;
+const SLOW_DB_OPERATION_MS = 250;
 const REQUEST_ID_HEADER = "X-Request-Id";
 const OBSERVABILITY_PREFIX = "[api-observability]";
 const requestContext = new AsyncLocalStorage<string>();
@@ -39,11 +40,53 @@ function errorName(error: unknown): string {
   return "UnknownError";
 }
 
+function safeOperation(value: string): string {
+  return value.length <= 100 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : "unknown_operation";
+}
+
 function writeLog(level: "info" | "warn" | "error", event: string, fields: Record<string, unknown>): void {
   const payload = JSON.stringify({ event, ...fields, timestamp: new Date().toISOString() });
   if (level === "error") console.error(OBSERVABILITY_PREFIX, payload);
   else if (level === "warn") console.warn(OBSERVABILITY_PREFIX, payload);
   else console.info(OBSERVABILITY_PREFIX, payload);
+}
+
+/**
+ * Measures internal DB/cache work and emits only slow operations, errors, or explicitly
+ * enabled request logs. Query parameters, headers, and bodies are never logged.
+ */
+export async function withDbTiming<T>(
+  operation: string,
+  handler: () => Promise<T>,
+  options: { thresholdMs?: number; source?: "db" | "cache" } = {},
+): Promise<T> {
+  const startedAt = performance.now();
+  const thresholdMs = Number.isFinite(options.thresholdMs) && Number(options.thresholdMs) >= 0 ? Number(options.thresholdMs) : SLOW_DB_OPERATION_MS;
+  const normalizedOperation = safeOperation(operation);
+  try {
+    const result = await handler();
+    const elapsedMs = durationMs(startedAt);
+    if (process.env.API_OBSERVABILITY_LOG_ALL === "true" || elapsedMs >= thresholdMs) {
+      writeLog("warn", "db_operation", {
+        operation: normalizedOperation,
+        source: options.source || "db",
+        duration_ms: elapsedMs,
+        ...(elapsedMs >= thresholdMs ? { performance: "slow_db_operation" } : {}),
+        ...(getCurrentRequestId() ? { request_id: getCurrentRequestId() } : {}),
+      });
+    }
+    return result;
+  } catch (error) {
+    writeLog("error", "db_error", {
+      operation: normalizedOperation,
+      source: options.source || "db",
+      duration_ms: durationMs(startedAt),
+      error_code: "DB_OPERATION_FAILED",
+      error_name: errorName(error),
+      ...(getCurrentRequestId() ? { request_id: getCurrentRequestId() } : {}),
+    });
+    throw error;
+  }
 }
 
 /**

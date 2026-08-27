@@ -8,6 +8,7 @@ import { buildRecordMatch, externalExpression, findEngine, periodLabel, resolveM
 import { getOrBuildMaintenancePanelServerPayload } from "@/lib/maintenancePanelServer";
 import type { AssistantToolResponse } from "./types";
 import { buildMaintenanceWorkIndex } from "./shared";
+import { withDbTiming } from "@/lib/performance";
 export type SummaryTotalsRow = { total?: number; unique_events?: number; external?: number; duration?: number };
 export type SummaryEngineRow = { _id?: string; engine?: string; count?: number; type_stats?: Array<{ type?: string; count?: number }> };
 export type SummaryTypeRow = { _id?: string; count?: number; engines?: Array<{ engine_id?: string; engine?: string; count?: number }> };
@@ -17,7 +18,7 @@ export async function getMaintenanceSummary(db: Db, query: AssistantQuery): Prom
   const records = recordsCollection(db);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
   const match = await buildRecordMatch(db, query);
-  const [row] = await records.aggregate<SummaryAggregateRow>([
+  const [row] = await withDbTiming("assistant.maintenance_summary.aggregate", () => records.aggregate<SummaryAggregateRow>([
     { $match: match },
     {
       $facet: {
@@ -73,7 +74,7 @@ export async function getMaintenanceSummary(db: Db, query: AssistantQuery): Prom
         ],
       },
     },
-  ]).toArray();
+  ]).toArray());
   const totals = row?.totals?.[0] || { total: 0, external: 0, duration: 0 };
   const total = Number(totals.total || 0);
   const external = Number(totals.external || 0);
@@ -242,9 +243,9 @@ export async function getEngineMaintenanceHistory(db: Db, query: AssistantQuery)
 export async function getMaintenanceHealth(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
   const { items: snapshotItems } = await getOrBuildMaintenancePanelServerPayload(db);
   const workMatch = await buildRecordMatch(db, query);
-  const workRecords = await recordsCollection(db).find(workMatch, {
+  const workRecords = await withDbTiming("assistant.maintenance_health.work_records", () => recordsCollection(db).find(workMatch, {
     projection: { _id: 1, group_id: 1, engine_id: 1, type_key: 1, type_label: 1, maintenance_duration_minutes: 1, maintenance_start_at: 1, created_at: 1 },
-  }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(5000).toArray();
+  }).sort({ maintenance_start_at: -1, created_at: -1 }).limit(5000).toArray());
   const workIndex = buildMaintenanceWorkIndex(workRecords as Array<Record<string, unknown>>);
   const selectedEngine = query.engineQuery ? await findEngine(db, query.engineQuery) : null;
   const selectedType = await resolveMaintenanceType(db, query);
