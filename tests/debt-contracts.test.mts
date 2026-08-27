@@ -284,7 +284,7 @@ test("maintenance status snapshot is shared and invalidated across read paths", 
   const panelCache = await source("lib/maintenancePanelServer.ts");
   const panelRoute = await source("app/api/maintenance-types/panel/route.ts");
   const notifications = await source("lib/notifications.ts");
-  const assistant = await source("lib/assistantTools.ts");
+  const assistant = await source("lib/assistant/maintenanceTools.ts");
   const reportFilters = await source("lib/reportFilterQuery.ts");
   assert.match(panelCache, /PANEL_CACHE_TTL_MS = 10_000/);
   assert.match(panelCache, /getOrBuildMaintenancePanelServerPayload/);
@@ -523,7 +523,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
 
 test("assistant engine history and maintenance health expose filtered reports and work metrics", async () => {
   const policy = await source("lib/assistantPolicy.ts");
-  const tools = await source("lib/assistantTools.ts");
+  const maintenanceTools = await source("lib/assistant/maintenanceTools.ts");
+  const technicianTools = await source("lib/assistant/technicianTools.ts");
+  const assistantShared = await source("lib/assistant/shared.ts");
   const assistantPage = await source("app/asistan/page.tsx");
   const assistantDetails = await source("components/AssistantResultDetails.tsx");
   assert.match(policy, /showAll\?: boolean/);
@@ -531,15 +533,15 @@ test("assistant engine history and maintenance health expose filtered reports an
   assert.match(policy, /asksEngineMaintenanceDuration/);
   assert.match(policy, /yearOnly/);
   assert.match(policy, /extractMaintenanceTypeQuery/);
-  assert.match(tools, /safeReportAttachments/);
-  assert.match(tools, /report_attachment_count/);
-  assert.match(tools, /query\.showAll \? 500 : 20/);
-  assert.match(tools, /worked_since_last_hours/);
-  assert.match(tools, /worked_duration_minutes/);
-  assert.match(tools, /worked_since_last_hours/);
-  assert.match(tools, /buildRecordMatch\(db, query\)/);
-  assert.match(tools, /mapWithConcurrency/);
-  assert.match(tools, /mapWithConcurrency\(resultRows\.slice\(0, 12\), 4/);
+  assert.match(maintenanceTools, /safeReportAttachments/);
+  assert.match(maintenanceTools, /report_attachment_count/);
+  assert.match(maintenanceTools, /query\.showAll \? 500 : 20/);
+  assert.match(maintenanceTools, /worked_since_last_hours/);
+  assert.match(maintenanceTools, /worked_duration_minutes/);
+  assert.match(maintenanceTools, /worked_since_last_hours/);
+  assert.match(maintenanceTools, /buildRecordMatch\(db, query\)/);
+  assert.match(assistantShared, /mapWithConcurrency/);
+  assert.match(technicianTools, /mapWithConcurrency\(resultRows\.slice\(0, 12\), 4/);
   assert.match(assistantPage, /AssistantResultDetails/);
   assert.match(assistantDetails, /Rapor ekleri:/);
   assert.match(assistantDetails, /Son bakımdan beri motor çalışması/);
