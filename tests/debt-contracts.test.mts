@@ -389,6 +389,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const complete = await source("app/tamamla/page.tsx");
   const records = await source("app/kayitlar/page.tsx");
   const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
+  const recordsEditMedia = await source("app/kayitlar/_components/RecordEditMediaSection.tsx");
   const recordsMedia = await source("app/kayitlar/_lib/recordMedia.ts");
   const recordMediaModals = await source("components/RecordMediaModals.tsx");
   const pdfPreview = await source("components/PdfPreview.tsx");
@@ -488,7 +489,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(queue, /job\.payload\.report_attachments/);
   assert.match(queue, /uploadReportAttachment/);
   assert.match(complete, /<ReportAttachmentPicker/);
-  assert.match(recordsEditForm, /<ReportAttachmentPicker/);
+  assert.match(recordsEditMedia, /<ReportAttachmentPicker/);
   assert.doesNotMatch(complete, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(records, /\/api\/blob\/upload-server/);
   assert.doesNotMatch(oilPage, /\/api\/blob\/upload-server/);
