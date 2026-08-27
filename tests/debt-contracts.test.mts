@@ -33,11 +33,12 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
     source("app/api/engines/route.ts"),
     source("app/api/maintenance-types/panel/route.ts"),
   ]);
+  const recordsQuery = await source("app/api/records/_lib/recordsQuery.ts");
   for (const route of routes) assert.match(route, /enforceApiRateLimit\(/);
   assert.match(routes[0], /audit-log-read/);
   assert.match(routes[1], /media-read/);
   assert.match(routes[2], /oil-analysis-file-read/);
-  assert.match(routes[3], /records-read/);
+  assert.match(recordsQuery, /records-read/);
   assert.match(routes[4], /records-interval-summary-read/);
   assert.match(routes[5], /engine-report-read/);
   assert.match(routes[6], /technician-list-read/);
@@ -56,10 +57,11 @@ test("legacy media and oil PDF fallback remain bounded", async () => {
 
 test("record date and bulk update safeguards stay in place", async () => {
   const records = await source("app/api/records/route.ts");
+  const recordHelpers = await source("app/api/records/_lib/recordRouteHelpers.ts");
   const maintenanceTypes = await source("app/api/maintenance-types/[key]/route.ts");
   const engineHours = await source("app/api/engines/hours/route.ts");
   const importHours = await source("app/api/import/hours/route.ts");
-  assert.match(records, /function parseDateOnly/);
+  assert.match(recordHelpers, /function parseDateOnly/);
   assert.match(records, /Geriye dönük bakım tarihi geçerli bir takvim tarihi olmalıdır/);
   assert.match(maintenanceTypes, /typesCol\.bulkWrite/);
   assert.match(engineHours, /enginesCol\.bulkWrite/);
@@ -133,8 +135,10 @@ test("engine hours and maintenance type changes are audited with before/after da
 
 test("records list does not reintroduce media payloads", async () => {
   const records = await source("app/api/records/route.ts");
-  assert.match(records, /Liste endpointinde medya gönderilmez/);
-  assert.match(records, /include_media/);
+  const recordsQuery = await source("app/api/records/_lib/recordsQuery.ts");
+  assert.match(recordsQuery, /Liste endpointinde medya gönderilmez/);
+  assert.match(recordsQuery, /include_media/);
+  assert.match(records, /getRecords/);
 });
 
 test("notification page is GET-first and the bell uses a lightweight unread count", async () => {
