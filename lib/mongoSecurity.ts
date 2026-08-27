@@ -4,3 +4,7 @@ export function isSafeMongoPathSegment(value: unknown, maxLength = 120): value i
     && value.length <= maxLength
     && !/[.$\0]/.test(value);
 }
+
+export function isMongoDuplicateKeyError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
+}

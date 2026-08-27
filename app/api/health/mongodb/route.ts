@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { ensureAppIndexes, getAppIndexStatus } from "@/lib/dbIndexes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,15 +40,19 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     const db = await getDb();
     await db.command({ ping: 1 });
+    await ensureAppIndexes(db);
+    const indexes = getAppIndexStatus();
+    const healthy = indexes.state !== "degraded";
     return NextResponse.json(
       {
-        ok: true,
+        ok: healthy,
         service: "mongodb",
-        status: "healthy",
+        status: healthy ? "healthy" : "degraded",
+        indexes,
         latency_ms: Date.now() - startedAt,
         checked_at: new Date().toISOString(),
       },
-      { status: 200, headers: noStoreHeaders() },
+      { status: healthy ? 200 : 503, headers: noStoreHeaders() },
     );
   } catch (error) {
     console.error(

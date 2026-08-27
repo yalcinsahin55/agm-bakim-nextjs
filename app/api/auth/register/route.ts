@@ -10,6 +10,7 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { withApiTiming } from "@/lib/performance";
 import { MAX_AUTH_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
+import { isMongoDuplicateKeyError } from "@/lib/mongoSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,9 @@ async function postRegister(req: NextRequest) {
     });
     return res;
   } catch (error) {
+    if (isMongoDuplicateKeyError(error)) {
+      return NextResponse.json({ error: "İlk kullanıcı oluşturma işlemi aynı anda başka bir istek tarafından tamamlandı veya kayıt zaten mevcut." }, { status: 409 });
+    }
     console.error("Kayıt olma hatası:", error instanceof Error ? error.name : "UnknownError");
     return NextResponse.json({ error: "Kayıt işlemi sırasında bir hata oluştu." }, { status: 500 });
   }

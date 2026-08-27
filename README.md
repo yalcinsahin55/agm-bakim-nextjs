@@ -314,8 +314,9 @@ npx web-push generate-vapid-keys
 2. `MONGO_URI`, `MONGO_DB_NAME` ve `JWT_SECRET` değişkenlerini en az Production ortamında tanımlayın.
 3. Medya kullanılacaksa Vercel Storage üzerinden bir Blob store oluşturun ve Blob değişkenlerini projeye bağlayın.
 4. Web Push kullanılacaksa üç VAPID değişkenini, otomatik bakım bildirimleri kullanılacaksa `CRON_SECRET` değerini ekleyin.
-5. GitHub’ın `main` dalına yapılan push’larda otomatik deployment başlatılır.
-6. Deployment tamamlandıktan sonra Vercel’de durumun **Ready** olduğunu, Production domain’in doğru olduğunu ve login sayfasının açıldığını kontrol edin.
+5. Production’da `/api/seed` endpointi varsayılan olarak kapalıdır; yalnızca kontrollü bir operasyon gerekiyorsa `SEED_ENDPOINT_ENABLED=true` açıkça tanımlanmalıdır. CI/Preview seed scripti (`E2E_SEED=1`) bu endpointten bağımsızdır.
+6. GitHub’ın `main` dalına yapılan push’larda otomatik deployment başlatılır.
+7. Deployment tamamlandıktan sonra Vercel’de durumun **Ready** olduğunu, Production domain’in doğru olduğunu ve login sayfasının açıldığını kontrol edin.
 
 Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı veritabanı veya Blob değerleri tanımlanması önerilir. `PDF_ALLOWED_HOSTS` ve `PUSH_ALLOWED_HOSTS` yalnızca gerçekten kullanılan, güvenilir HTTPS hostları için doldurulmalıdır; bu allowlist’ler SSRF riskini azaltmak amacıyla sunucu tarafında doğrulanır. Yerel build sırasında üretim veritabanına yazmamak için ayrı bir test veritabanı kullanın.
 
@@ -355,6 +356,8 @@ Bildirimler sayfasındaki push ayarı Web Push aboneliğini cihaz bazında `push
 Bakım durumu yeni bir gecikmiş, kritik veya yaklaşan uyarıya dönüştüğünde ilgili kullanıcı için push gönderilir. Tüm aktif kullanıcıların bakım durumunu toplu yenileyen `/api/cron/refresh` görevi mevcut Vercel planının zamanlama sınırları içinde günlük çalışır; kullanıcıya ait bakım kaydı değişiklikleri ise best-effort bildirim yenilemesiyle daha erken tetiklenebilir.
 
 Çevrimdışı bakım kayıtları IndexedDB kuyruğunda idempotent `client_request_id` ile saklanır. Android/Chrome Background Sync çalıştığında medya veya rapor eki olmayan kayıtlar uygulama tamamen kapalıyken de yalnızca izinli `/api/records` endpoint’lerine ve sınırlı gövde boyutuyla gönderilebilir. Fotoğraf, video veya PDF/Excel/Word eki içeren işler Blob yükleme adımı nedeniyle uygulama yeniden açıldığında client akışıyla tamamlanır; bu işler bağlantı geri geldikten sonra uygulamanın en az bir kez açılmasını gerektirir. Service worker cache sürümü değişikliklerde artırılır ve eski cache’ler activate aşamasında temizlenir.
+
+Cron başarı/başarısızlıkları ve Mongo index bootstrap durumu `[api-observability]` structured loglarında request ID ve sınırlı hata alanlarıyla görünür. Yetkili `GET /api/health/mongodb` endpointi Mongo ping ile birlikte index durumunu döndürür; kritik index sorunu varsa `503` verir. Ayrıntılı kurulum ve operasyon notları için [`docs/observability-runbook.md`](docs/observability-runbook.md) dosyasına bakın.
 
 ## Yedekleme ve veri güvenliği
 
@@ -566,7 +569,7 @@ git status --short --branch
 
 Bildirimler sayfası açılırken GET endpointi yalnızca mevcut bildirimleri okur. Bakım durumlarının yeniden hesaplanması ve eski bildirimlerin temizlenmesi yalnızca oturum ve rate-limit korumalı `POST /api/notifications/refresh` endpointi üzerinden yapılır. Eski `GET /api/notifications?refresh=1` çağrıları mutation çalıştırmadan 405 döner.
 
-Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılmalıdır. Komut satırı veya API çağrısı gerekiyorsa gövdeye `confirm: "RESTORE"` ve `dry_run: true` gönderildiğinde hiçbir veri yazılmaz; yalnızca koleksiyon bazında uygulanacak ve atlanacak kayıt özeti döner. Gerçek merge işlemi batch `bulkWrite` ile yapılır ve yedekleme rate-limit’i ile korunur.
+Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılmalıdır. Yalnızca checksum içeren v2 yedekler kabul edilir. Komut satırı veya API çağrısı gerekiyorsa gövdeye `confirm: "RESTORE"`, `integrity` ve `dry_run: true` gönderildiğinde checksum ile bütünlük doğrulanır, hiçbir veri yazılmaz ve yalnızca koleksiyon bazında uygulanacak/atlanacak kayıt özeti döner. Production’da gerçek restore checksum doğrulamasından sonra tek MongoDB transaction içinde kontrollü merge olarak uygulanır; transaction başlatılamazsa işlem durdurulur. Preview/development/test ortamlarında mevcut batch `bulkWrite` merge davranışı korunur. Restore işlemi yedekleme rate-limit’i ile korunur ve yalnızca allowlist’teki motor, bakım türü, bakım kaydı ve yağ analizi koleksiyonlarını etkiler.
 
 Üretim doğrulamasında gerçek kayıt oluşturmadan login sayfasını, auth yönlendirmelerini, yeni rotaların açılışını ve Vercel deployment durumunu kontrol edin. Gerçek kullanıcı hesabıyla özellik testi yapılacaksa test verisinin üretim kayıtlarına karışmamasına dikkat edin.
 

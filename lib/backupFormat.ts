@@ -39,6 +39,33 @@ export interface BackupIntegrity {
   value: string;
 }
 
+export function isProductionBackupEnvironment(): boolean {
+  return (process.env.VERCEL_ENV || process.env.NODE_ENV) === "production";
+}
+
+export function validateBackupIntegrity(
+  collections: unknown,
+  integrity: unknown,
+  required: boolean,
+): { ok: true } | { ok: false; error: string } {
+  if (integrity === undefined) {
+    return required
+      ? { ok: false, error: "Production geri yüklemesi için yedek checksum bilgisi zorunludur." }
+      : { ok: true };
+  }
+  if (!integrity || typeof integrity !== "object" || Array.isArray(integrity)) {
+    return { ok: false, error: "Geçersiz yedek bütünlük bilgisi." };
+  }
+  const integrityRecord = integrity as Record<string, unknown>;
+  if (integrityRecord.algorithm !== "sha256" || typeof integrityRecord.value !== "string" || !/^[a-f0-9]{64}$/i.test(integrityRecord.value)) {
+    return { ok: false, error: "Geçersiz yedek checksum bilgisi." };
+  }
+  if (computeBackupChecksum(collections) !== integrityRecord.value.toLowerCase()) {
+    return { ok: false, error: "Yedek checksum doğrulaması başarısız." };
+  }
+  return { ok: true };
+}
+
 export function backupEnvironmentMetadata(): { app: string; node_env: "production" | "preview" | "development" | "test" | "unknown" } {
   const raw = process.env.VERCEL_ENV || process.env.NODE_ENV;
   const node_env = raw === "production" || raw === "preview" || raw === "development" || raw === "test" ? raw : "unknown";

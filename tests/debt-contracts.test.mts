@@ -190,6 +190,7 @@ test("notifications are ordered by their latest notification event", async () =>
 test("backup and upload large-payload paths use bounded processing", async () => {
   const backupExport = await source("app/api/backups/export/route.ts");
   const backupRestore = await source("app/api/backups/restore/route.ts");
+  const backupPlan = await source("lib/backupRestore.ts");
   const uploadChunk = await source("app/api/upload-chunk/route.ts");
   const assistant = await source("app/api/assistant/route.ts");
   const requestLimits = await source("lib/requestLimits.ts");
@@ -198,7 +199,7 @@ test("backup and upload large-payload paths use bounded processing", async () =>
   assert.match(backupExport, /new ReadableStream/);
   assert.match(backupExport, /backup-export/);
   assert.match(backupRestore, /dry-run/);
-  assert.match(backupRestore, /bulkWrite/);
+  assert.match(backupPlan, /bulkWrite/);
   assert.match(assistant, /readRequestTextLimited/);
   assert.match(backupRestore, /readRequestTextLimited/);
   assert.match(requestLimits, /RequestBodyTooLargeError/);
@@ -226,17 +227,22 @@ test("backup export and restore share sanitized format helpers", async () => {
   const backupFormat = await source("lib/backupFormat.ts");
   const backupExport = await source("app/api/backups/export/route.ts");
   const backupRestore = await source("app/api/backups/restore/route.ts");
+  const backupPlan = await source("lib/backupRestore.ts");
   assert.match(backupFormat, /EXPORT_BLOCKED_KEYS/);
   assert.match(backupFormat, /RESTORE_BLOCKED_KEYS/);
   assert.match(backupFormat, /function sanitizeBackupValue/);
   assert.match(backupFormat, /function cleanRestoredValue/);
   assert.match(backupFormat, /computeBackupChecksum/);
+  assert.match(backupFormat, /validateBackupIntegrity/);
   assert.match(backupFormat, /backupEnvironmentMetadata/);
   assert.match(backupExport, /sanitizeBackupValue/);
   assert.match(backupExport, /integrity/);
-  assert.match(backupRestore, /cleanRestoredValue/);
-  assert.match(backupRestore, /computeBackupChecksum/);
-  assert.match(backupRestore, /for \(const name of RESTORE_COLLECTIONS\)/);
+  assert.match(backupRestore, /validateBackupIntegrity/);
+  assert.match(backupRestore, /isProductionBackupEnvironment/);
+  assert.match(backupRestore, /applyRestorePlanTransaction/);
+  assert.match(backupPlan, /buildRestorePlan/);
+  assert.match(backupPlan, /applyRestorePlanMerge/);
+  assert.match(backupPlan, /withTransaction/);
 });
 
 test("large history and administrative list paths expose bounded reads", async () => {
@@ -291,6 +297,8 @@ test("security headers include CSP without breaking same-origin oil PDF framing"
   assert.match(nextConfig, /https:\/\/\*\.blob\.vercel-storage\.com/);
   assert.match(nextConfig, /frame-ancestors 'self'/);
   assert.match(nextConfig, /X-Frame-Options.*SAMEORIGIN/);
+  assert.match(nextConfig, /Permissions-Policy.*camera=\(\), microphone=\(\), geolocation=\(\)/);
+  assert.doesNotMatch(nextConfig, /X-XSS-Protection/);
 });
 
 test("maintenance status snapshot is shared and invalidated across read paths", async () => {
@@ -767,6 +775,69 @@ test("notification detail targets the selected dashboard motor health card", asy
   assert.match(dashboard, /new URLSearchParams\(window\.location\.search\)/u);
   assert.match(dashboard, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/u);
   assert.match(dashboard, /id=\{healthCardId\(engine\._id\)\}/u);
+});
+
+
+test("migration scripts keep rerun and rollback guards explicit", async () => {
+  const legacyRole = await source("scripts/migrate-legacy-role.mts");
+  const stableKeys = await source("scripts/migrate-stable-keys.mts");
+  const technicianSource = await source("scripts/migrate-technician-source.mts");
+  const groupedMaintenance = await source("scripts/migrate-grouped-maintenance-records.mts");
+  const legacyMedia = await source("scripts/migrate-legacy-media.mts");
+  assert.match(legacyRole, /role: "planlamaci"/);
+  assert.match(legacyRole, /role: "teknisyen"/);
+  assert.match(stableKeys, /stable_id: \{ \$exists: false \}/);
+  assert.match(stableKeys, /stable_id: change\.stable_id/);
+  assert.match(technicianSource, /fieldsEqual\(record, classification\.fields\)/);
+  assert.match(technicianSource, /createUpdate\(plan\)/);
+  assert.match(technicianSource, /restoreUpdate\(entry\)/);
+  assert.match(groupedMaintenance, /group_id: \{ \$exists: false \}/);
+  assert.match(groupedMaintenance, /stableGroupId\(group\.signature\)/);
+  assert.match(legacyMedia, /legacyBlobPath\(record\._id/);
+  assert.match(legacyMedia, /allowOverwrite: true/);
+  assert.match(legacyMedia, /persistBeforeCommit/);
+});
+
+test("first-user bootstrap duplicate is reported as a conflict", async () => {
+  const register = await source("app/api/auth/register/route.ts");
+  const mongoSecurity = await source("lib/mongoSecurity.ts");
+  assert.match(mongoSecurity, /code === 11000/);
+  assert.match(register, /isMongoDuplicateKeyError/);
+  assert.match(register, /status: 409/);
+  assert.match(register, /İlk kullanıcı oluşturma işlemi/);
+});
+
+
+test("operational observability exposes index and cron failures without sensitive payloads", async () => {
+  const performance = await source("lib/performance.ts");
+  const indexes = await source("lib/dbIndexes.ts");
+  const cron = await source("app/api/cron/refresh/route.ts");
+  const health = await source("app/api/health/mongodb/route.ts");
+  assert.match(performance, /export function logOperationalEvent/);
+  assert.match(performance, /safeFields/);
+  assert.doesNotMatch(performance, /request\.headers|request\.body|password|token/);
+  assert.match(indexes, /db_index_error/);
+  assert.match(indexes, /db_index_bootstrap_degraded/);
+  assert.match(indexes, /getAppIndexStatus/);
+  assert.match(cron, /cron_refresh_succeeded/);
+  assert.match(cron, /cron_refresh_failed/);
+  assert.match(cron, /source: "cron"/);
+  assert.match(health, /ensureAppIndexes\(db\)/);
+  assert.match(health, /status: healthy \? "healthy" : "degraded"/);
+  assert.match(health, /status: healthy \? 200 : 503/);
+  assert.match(health, /error: "unauthorized"/);
+});
+
+
+test("seed endpoint is opt-in in production but remains available in preview/local", async () => {
+  const policy = await source("lib/seedPolicy.ts");
+  const route = await source("app/api/seed/route.ts");
+  assert.match(policy, /SEED_ENDPOINT_ENABLED/);
+  assert.match(policy, /VERCEL_ENV === "production"/);
+  assert.match(policy, /return !productionLike \|\| environment\.SEED_ENDPOINT_ENABLED === "true"/);
+  assert.match(route, /isSeedEndpointEnabled\(\)/);
+  assert.match(route, /status: 404/);
+  assert.match(route, /Production seed endpointi/);
 });
 
 test("large JSON mutation routes enforce transport body limits", async () => {

@@ -1,21 +1,56 @@
 import type { Db } from "mongodb";
+import { logOperationalEvent } from "@/lib/performance";
 
 // Serverless sıcak instance içinde aynı indeks kurulumunu tekrar tekrar çalıştırma.
-// Her indeks ayrı yakalanır; mevcut veride bir çakışma olması tüm uygulamayı kilitlememelidir.
+// Her indeks ayrı yakalanır; mevcut veride bir çakışma olması tüm uygulamayı kilitlemez,
+// ancak artık structured log ve health endpoint üzerinden görünür olur.
 declare global {
   var _agmIndexPromise: Promise<void> | undefined;
+  var _agmIndexStatus: AppIndexStatus | undefined;
+}
+
+export type AppIndexStatus = {
+  state: "initializing" | "ready" | "degraded";
+  failed_count: number;
+  failed_indexes: string[];
+  checked_at: string | null;
+};
+
+type IndexCreationResult = { ok: boolean; label: string };
+
+function indexLabel(keys: Record<string, 1 | -1>, options?: Record<string, unknown>): string {
+  const named = options?.name;
+  if (typeof named === "string" && named.length > 0 && named.length <= 120) return named;
+  return Object.entries(keys).map(([key, direction]) => `${key}:${direction}`).join(",").slice(0, 120);
 }
 
 async function createIndexSafely(
   collection: ReturnType<Db["collection"]>,
   keys: Record<string, 1 | -1>,
   options?: Record<string, unknown>,
-): Promise<void> {
+): Promise<IndexCreationResult> {
+  const label = indexLabel(keys, options);
   try {
     await collection.createIndex(keys, options as never);
+    return { ok: true, label };
   } catch (error) {
-    console.warn("[DB indexes] Index hazırlanamadı; mevcut index/veri kontrol edilmeli:", error instanceof Error ? error.name : "UnknownError");
+    logOperationalEvent("error", "db_index_error", {
+      index: label,
+      error_code: "DB_INDEX_CREATE_FAILED",
+      error_name: error instanceof Error ? error.name : "UnknownError",
+    });
+    return { ok: false, label };
   }
+}
+
+export function getAppIndexStatus(): AppIndexStatus {
+  const status = global._agmIndexStatus || {
+    state: "initializing",
+    failed_count: 0,
+    failed_indexes: [],
+    checked_at: null,
+  } satisfies AppIndexStatus;
+  return { ...status, failed_indexes: [...status.failed_indexes] };
 }
 
 export function ensureAppIndexes(db: Db): Promise<void> {
@@ -30,6 +65,13 @@ export function ensureAppIndexes(db: Db): Promise<void> {
     const pressureReadings = db.collection("pressure_readings");
     const engines = db.collection("engines");
     const equipmentInfo = db.collection("equipment_info");
+
+    global._agmIndexStatus = {
+      state: "initializing",
+      failed_count: 0,
+      failed_indexes: [],
+      checked_at: null,
+    };
 
     global._agmIndexPromise = Promise.all([
       createIndexSafely(records, { engine_id: 1, type_label: 1, created_at: -1 }),
@@ -72,7 +114,24 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(oilAnalyses, { analysis_date: -1, created_at: -1 }, { name: "oil_analyses_date_desc" }),
       createIndexSafely(pressureReadings, { engine_id: 1, reading_date: 1, created_at: 1 }, { name: "pressure_readings_engine_date_asc" }),
       createIndexSafely(pressureReadings, { reading_date: 1, created_at: 1 }, { name: "pressure_readings_date_asc" }),
-    ]).then(() => undefined);
+    ]).then((results) => {
+      const failedIndexes = results.filter((result) => !result.ok).map((result) => result.label);
+      global._agmIndexStatus = {
+        state: failedIndexes.length > 0 ? "degraded" : "ready",
+        failed_count: failedIndexes.length,
+        failed_indexes: failedIndexes.slice(0, 20),
+        checked_at: new Date().toISOString(),
+      };
+      if (failedIndexes.length > 0) {
+        logOperationalEvent("error", "db_index_bootstrap_degraded", {
+          error_code: "DB_INDEX_BOOTSTRAP_DEGRADED",
+          failed_count: failedIndexes.length,
+          failed_indexes: failedIndexes.slice(0, 20),
+        });
+      } else {
+        logOperationalEvent("info", "db_index_bootstrap_ready", { index_count: results.length });
+      }
+    });
   }
 
   return global._agmIndexPromise;

@@ -51,6 +51,23 @@ function writeLog(level: "info" | "warn" | "error", event: string, fields: Recor
   else console.info(OBSERVABILITY_PREFIX, payload);
 }
 
+export function logOperationalEvent(
+  level: "info" | "warn" | "error",
+  event: string,
+  fields: Record<string, unknown> = {},
+): void {
+  const safeFields: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (!/^[A-Za-z0-9_.-]{1,80}$/.test(key)) continue;
+    if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      safeFields[key] = typeof value === "string" ? value.slice(0, 500) : value;
+    } else if (Array.isArray(value)) {
+      safeFields[key] = value.filter((item): item is string => typeof item === "string").slice(0, 20).map((item) => item.slice(0, 120));
+    }
+  }
+  writeLog(level, safeOperation(event), safeFields);
+}
+
 /**
  * Measures internal DB/cache work and emits only slow operations, errors, or explicitly
  * enabled request logs. Query parameters, headers, and bodies are never logged.
