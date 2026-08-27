@@ -732,7 +732,7 @@ test("notification detail targets the selected dashboard motor health card", asy
   assert.match(notifications, /maintenanceDashboardHref/u);
   assert.match(notifications, /new URLSearchParams\(\{ engine: engineId, maintenance: typeKey \}\)/u);
   assert.match(dashboard, /new URLSearchParams\(window\.location\.search\)/u);
-  assert.match(dashboard, /scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/u);
+  assert.match(dashboard, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/u);
   assert.match(dashboard, /id=\{healthCardId\(engine\._id\)\}/u);
 });
 

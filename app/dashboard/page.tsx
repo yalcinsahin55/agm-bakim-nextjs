@@ -56,7 +56,7 @@ export default function DashboardPage() {
     if (loading || !selectedHealthEngineId) return;
     const target = document.getElementById(healthCardId(selectedHealthEngineId));
     if (!target) return;
-    const timer = window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    const timer = window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     return () => window.clearTimeout(timer);
   }, [loading, selectedHealthEngineId]);
 
