@@ -5,6 +5,7 @@ import { sendPushToUser } from "./push";
 import { ensureAppIndexes } from "./dbIndexes";
 import { getOrBuildMaintenancePanelServerPayload } from "./maintenancePanelServer";
 import { notificationsCollection, usersCollection } from "@/lib/dbCollections";
+import { isMongoDuplicateKeyError } from "@/lib/mongoSecurity";
 
 function notificationText(status: "gecikmis" | "kritik" | "yaklasiyor", engineName: string, typeLabel: string, remaining: number) {
   if (status === "gecikmis") {
@@ -171,7 +172,22 @@ async function syncUserNotifications(db: Db, user: User, actionable: ActionableP
     };
   });
   if (updates.length > 0) {
-    await collection.bulkWrite(updates.map((item) => item.update), { ordered: false });
+    try {
+      await collection.bulkWrite(updates.map((item) => item.update), { ordered: false });
+    } catch (error) {
+      // Aynı kullanıcı için eşzamanlı refresh istekleri unique dedupe_key upsert yarışına
+      // girebilir. MongoDB duplicate-key BulkWriteError döndürürse tamamlanan upsert’leri
+      // idempotent biçimde yeniden uygula; gerçek/network hatalarını gizleme.
+      if (!isMongoDuplicateKeyError(error)) throw error;
+      for (const item of updates) {
+        try {
+          await collection.bulkWrite([item.update], { ordered: true });
+        } catch (retryError) {
+          if (!isMongoDuplicateKeyError(retryError)) throw retryError;
+          await collection.updateOne({ dedupe_key: item.dedupeKey }, item.update.updateOne.update, { upsert: false });
+        }
+      }
+    }
   }
   for (const item of updates) {
     if (!item.previous || item.previous.status !== item.status) {
