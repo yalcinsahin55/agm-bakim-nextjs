@@ -11,6 +11,12 @@ interface BackupSummary {
   latest_maintenance_at: string | null;
 }
 
+interface BackupPayload {
+  version?: unknown;
+  collections?: unknown;
+  integrity?: unknown;
+}
+
 const COLLECTION_LABELS: Record<string, string> = {
   users: "Kullanıcı",
   engines: "Motor",
@@ -43,8 +49,8 @@ export default function YedeklemePage() {
 
   async function readRestorePayload() {
     if (!restoreFile) throw new Error("Önce bir JSON yedek dosyası seçin.");
-    const backup = JSON.parse(await restoreFile.text()) as { version?: unknown; collections?: unknown };
-    if (backup.version !== 1 || !backup.collections) throw new Error("Geçersiz veya desteklenmeyen yedek dosyası.");
+    const backup = JSON.parse(await restoreFile.text()) as BackupPayload;
+    if (backup.version !== 2 || !backup.collections || !backup.integrity) throw new Error("Geçersiz veya desteklenmeyen checksum’lı v2 yedek dosyası.");
     return backup;
   }
 
@@ -57,7 +63,7 @@ export default function YedeklemePage() {
       const response = await fetch("/api/backups/restore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ collections: backup.collections, confirm: "RESTORE", dry_run: true }),
+        body: JSON.stringify({ collections: backup.collections, integrity: backup.integrity, confirm: "RESTORE", dry_run: true }),
       });
       const data = await response.json() as { error?: string; summary?: Record<string, number>; skipped?: Record<string, number> };
       if (!response.ok) throw new Error(data.error || "Dry-run başarısız.");
@@ -80,11 +86,12 @@ export default function YedeklemePage() {
       const response = await fetch("/api/backups/restore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ collections: backup.collections, confirm: "RESTORE" }),
+        body: JSON.stringify({ collections: backup.collections, integrity: backup.integrity, confirm: "RESTORE" }),
       });
-      const data = await response.json();
+      const data = await response.json() as { error?: string; mode?: string };
       if (!response.ok) throw new Error(data.error || "Geri yükleme başarısız.");
-      setRestoreMessage("Yedek güvenli merge modunda geri yüklendi. Sayfayı yenilemen önerilir.");
+      const modeLabel = data.mode === "transaction" ? "transaction" : "kontrollü merge";
+      setRestoreMessage(`Yedek checksum doğrulaması sonrasında ${modeLabel} modunda geri yüklendi. Sayfayı yenilemen önerilir.`);
       setRestoreFile(null);
       setRestoreConfirm("");
     } catch (error) {
@@ -137,7 +144,7 @@ export default function YedeklemePage() {
         </section>
         <section className="mt-4 rounded-card border border-red/30 bg-red/5 p-4 text-[11px] leading-5 text-muted">
           <div className="text-[13px] font-bold text-text">Güvenli yedekten geri yükle</div>
-          <p className="mt-1">Bu işlem yalnızca motor, bakım türü, bakım kaydı ve yağ analizi verilerini <b className="text-amber">merge</b> eder. Kullanıcılar, şifreler, bildirimler ve büyük medya alanları geri yüklenmez. Mevcut veriler silinmez.</p>
+          <p className="mt-1">Bu işlem checksum doğrulamasından sonra yalnızca motor, bakım türü, bakım kaydı ve yağ analizi verilerini geri yükler. Production’da transaction, diğer ortamlarda kontrollü <b className="text-amber">merge</b> kullanılır. Kullanıcılar, şifreler, bildirimler ve büyük medya alanları geri yüklenmez; mevcut veriler silinmez.</p>
           <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-borderlt px-3 py-3 text-[12px] text-muted hover:border-amber">
             <span className="text-lg">📄</span><span className="flex-1 truncate">{restoreFile ? restoreFile.name : "JSON yedek dosyası seç"}</span>
             <input type="file" accept="application/json,.json" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} className="hidden" />
