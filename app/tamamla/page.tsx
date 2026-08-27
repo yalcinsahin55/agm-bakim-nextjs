@@ -28,6 +28,7 @@ import { useCompletionEvidenceMedia } from "./_hooks/useCompletionEvidenceMedia"
 import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
 import { checklistForType } from "./_lib/checklist";
 import { buildCompletionPayload } from "./_lib/completionPayload";
+import { getCompletionValidationError } from "./_lib/completionValidation";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 
 export default function TamamlaPage() {
@@ -239,40 +240,23 @@ export default function TamamlaPage() {
   }, [responsibleTechnicianId, responsibleTechnicians, selectableTechnicians]);
 
   async function submit() {
-    if (!chosenType) {
-      toast.error("Lütfen bir bakım türü seçin.");
-      return;
-    }
-    if (!checklistComplete) {
-      toast.error("Bakımı tamamlamadan önce kontrol listesindeki tüm maddeleri işaretleyin.");
-      return;
-    }
-    if (!timeTrackingReady) {
-      toast.error("Bakım başlangıç ve bitiş tarih-saatlerini geçerli şekilde girin.");
-      return;
-    }
-    if (!evidenceReady) {
-      toast.error("Bakım kanıtı için en az bir not, fotoğraf veya video ekleyin.");
-      return;
-    }
-    if (isManagerInternalRecord && (!responsibleDurationMinutes || responsibleDurationMinutes <= 0)) {
-      toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
-      return;
-    }
-    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleDurationMinutes !== null && responsibleDurationMinutes > maintenanceDurationMinutes) {
-      toast.error("Sorumlu teknisyen süresi toplam bakım süresini aşamaz.");
-      return;
-    }
     const selectedSupportIds = otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
     const selectedSupportDurations = selectedSupportIds.map((id) => normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 0));
-    if (isManagerInternalRecord && selectedSupportDurations.some((duration) => duration <= 0)) {
-      toast.error("Seçilen her destek teknisyeni için 0’dan büyük çalışma süresini saat olarak girin.");
+    const validationError = getCompletionValidationError({
+      chosenTypePresent: Boolean(chosenType),
+      checklistComplete,
+      timeTrackingReady,
+      evidenceReady,
+      isManagerInternalRecord,
+      responsibleDurationMinutes,
+      maintenanceDurationMinutes,
+      selectedSupportDurations,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
-    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && selectedSupportDurations.some((duration) => duration > maintenanceDurationMinutes)) {
-      toast.error("Destek teknisyeni süresi toplam bakım süresini aşamaz.");
-      return;
-    }
+    if (!chosenType) return;
     
     setSubmitting(true);
     const clientRequestId = clientRequestIdRef.current || makeOfflineId();
