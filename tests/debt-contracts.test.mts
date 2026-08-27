@@ -390,6 +390,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const recordMediaModals = await source("components/RecordMediaModals.tsx");
   const pdfPreview = await source("components/PdfPreview.tsx");
   const qrPage = await source("app/qr-etiketleri/page.tsx");
+  const quickLink = await source("lib/quickMaintenanceLink.ts");
   const oilPage = await source("app/yag-analizleri/page.tsx");
   assert.match(helper, /REPORT_ATTACHMENT_MAX_BYTES = 20 \* 1024 \* 1024/);
   assert.match(helper, /\.xlsx/);
@@ -503,8 +504,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(qrPage, /QRCode\.toDataURL\(buildLink\(item\)/);
   assert.match(qrPage, /width: 420/);
   assert.match(qrPage, /errorCorrectionLevel: "M"/);
-  assert.match(qrPage, /engine_id=\$\{encodeURIComponent\(item\.id\)\}/);
-  assert.match(qrPage, /type_key=\$\{encodeURIComponent\(item\.id\)\}/);
+  assert.match(quickLink, /engine_id/);
+  assert.match(quickLink, /type_key/);
+  assert.match(qrPage, /kamera eklemez/);
   assert.match(qrPage, /window\.print\(\)/);
   assert.match(records, /setSelectedReportAttachment\(\{ recordId: selectedRecord\._id, attachment \}\)/);
   assert.match(recordMediaModals, /reportAttachmentUrl\(selectedReportAttachment\.recordId, selectedReportAttachment\.attachment\.id\)/);

@@ -12,6 +12,7 @@ import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { getMaintenanceRecordDate } from "@/lib/maintenanceTime";
+import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 
 interface MotorEngine {
   _id: string;
@@ -99,9 +100,10 @@ export default function MotorlarPage() {
       setQrDataUrl("");
       return;
     }
-    const value = typeof window === "undefined"
-      ? `/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`
-      : `${window.location.origin}/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`;
+    const value = buildQuickMaintenanceLink({
+      origin: typeof window === "undefined" ? "" : window.location.origin,
+      engineId: qrEngine._id,
+    });
     QRCode.toDataURL(value, { width: 320, margin: 2, errorCorrectionLevel: "M" })
       .then((dataUrl) => setQrDataUrl(dataUrl))
       .catch(() => {
@@ -112,7 +114,7 @@ export default function MotorlarPage() {
 
   async function copyQrLink() {
     if (!qrEngine) return;
-    const value = `${window.location.origin}/tamamla?engine_id=${encodeURIComponent(qrEngine._id)}&mode=quick&plant_id=avcikoru`;
+    const value = buildQuickMaintenanceLink({ origin: window.location.origin, engineId: qrEngine._id });
     try {
       await navigator.clipboard.writeText(value);
       toast.success("Motor bağlantısı kopyalandı.");

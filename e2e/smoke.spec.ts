@@ -142,6 +142,21 @@ test.describe("AGM Bakım configured authentication", () => {
     await login(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
   });
 
+  test("QR quick-mode saha akışı motor ve bakım türünü görünür biçimde kilitler", async ({ page }) => {
+    test.skip(
+      !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD,
+      "QR quick-mode E2E testi yalnızca izole test kullanıcısı ile çalıştırılmalı.",
+    );
+    const { engineId, typeKey } = requireFixture();
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+    await page.goto(`/tamamla?engine_id=${encodeURIComponent(engineId)}&type_key=${encodeURIComponent(typeKey)}&mode=quick&plant_id=avcikoru`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("quick-maintenance-banner")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hızlı bakım akışı" })).toBeVisible();
+    await expect(page.getByTestId("quick-maintenance-engine")).toContainText("QR ile önseçildi ve kilitlendi");
+    await expect(page.getByTestId("quick-maintenance-type")).toContainText("QR ile önseçildi ve kilitlendi");
+    await expect(page.getByTestId("quick-maintenance-exit")).toBeVisible();
+  });
+
   test("viewer cannot create a maintenance record", async ({ page }) => {
     test.skip(
       !process.env.E2E_VIEWER_IDENTIFIER || !process.env.E2E_VIEWER_PASSWORD,
