@@ -382,7 +382,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const schema = await source("lib/schemas.ts");
   const create = await source("app/api/records/route.ts");
   const createModule = await source("app/api/records/_lib/recordCreate.ts");
-  const update = await source("app/api/records/[id]/route.ts");
+  const updatePatch = await source("app/api/records/[id]/_lib/recordPatch.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
   const assistantExport = await source("app/api/assistant/export/route.ts");
@@ -445,7 +445,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(createModule, /client_request_id: recordClientRequestId \|\| undefined/);
   assert.match(createModule, /buildExtraClientRequestId\(client_request_id, ex\.type_key\)/);
   assert.match(createModule, /report_attachments: isPrimary/);
-  assert.match(update, /update\.report_attachments = normalizedReportAttachments/);
+  assert.match(updatePatch, /update\.report_attachments = normalizedReportAttachments/);
   assert.match(fileRoute, /record-attachment-read/);
   assert.match(fileRoute, /fetchStoredBlob/);
   assert.match(fileRoute, /readPdfResponse/);
@@ -602,7 +602,7 @@ test("all generated PDF and Excel reports use the shared Yeşil Global logo", as
   assert.match(excelExport, /Yeşil Global Enerji · AGM Bakım Merkezi/);
 });
 test("engine reassignment stays manager-only and repairs grouped maintenance tracking", async () => {
-  const update = await source("app/api/records/[id]/route.ts");
+  const updatePatch = await source("app/api/records/[id]/_lib/recordPatch.ts");
   const confirm = await source("app/api/records/[id]/confirm/route.ts");
   const helper = await source("lib/reassignMaintenanceEngine.ts");
   const schemas = await source("lib/schemas.ts");
@@ -611,11 +611,11 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   const confirmationHook = await source("app/kayitlar/_hooks/useRecordConfirmation.ts");
   const confirmationModal = await source("components/MaintenanceConfirmationModal.tsx");
   assert.match(schemas, /recordConfirmationSchema = z\.object\(\{[\s\S]*engine_id/);
-  assert.match(update, /engineChangeRequested/);
-  assert.match(update, /Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir/);
-  assert.match(update, /reassignMaintenanceRecordEngine/);
-  assert.match(update, /session\.withTransaction/);
-  assert.match(update, /effectiveEngineId/);
+  assert.match(updatePatch, /engineChangeRequested/);
+  assert.match(updatePatch, /Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir/);
+  assert.match(updatePatch, /reassignMaintenanceRecordEngine/);
+  assert.match(updatePatch, /session\.withTransaction/);
+  assert.match(updatePatch, /effectiveEngineId/);
   assert.match(confirm, /user\.role !== "yonetici"/);
   assert.match(confirm, /recordConfirmationSchema/);
   assert.match(confirm, /reassignMaintenanceRecordEngine/);
@@ -736,7 +736,7 @@ test("large JSON mutation routes enforce transport body limits", async () => {
     "app/api/auth/login/route.ts",
     "app/api/auth/register/route.ts",
     "app/api/records/_lib/recordCreate.ts",
-    "app/api/records/[id]/route.ts",
+    "app/api/records/[id]/_lib/recordPatch.ts",
     "app/api/equipment-info/import/route.ts",
     "app/api/import/hours/route.ts",
     "app/api/pressure-readings/import/route.ts",
