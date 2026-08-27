@@ -29,6 +29,7 @@ import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
 import { checklistForType } from "./_lib/checklist";
 import { buildCompletionPayload } from "./_lib/completionPayload";
 import { getCompletionValidationError } from "./_lib/completionValidation";
+import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 
 export default function TamamlaPage() {
@@ -301,25 +302,27 @@ export default function TamamlaPage() {
     });
 
     try {
-      if (!navigator.onLine || offlineMedia.length > 0) {
-        await queueRecord(payload, offlineMedia);
+      const submitResult = await submitCompletion({
+        payload,
+        offlineMedia,
+        isOnline: navigator.onLine,
+        queue: queueRecord,
+        post: (requestPayload) => fetch("/api/records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        }),
+      });
+      if (submitResult.kind === "queued") {
         toast.dismiss(loadingToast);
-        toast.success(navigator.onLine ? "Kayıt ve rapor ekleri senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt ve rapor ekleri güvenle kuyruğa alındı.");
+        toast.success(submitResult.shouldSync ? "Kayıt ve rapor ekleri senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt ve rapor ekleri güvenle kuyruğa alındı.");
         clientRequestIdRef.current = null;
-        if (navigator.onLine) void syncOfflineQueue();
+        if (submitResult.shouldSync) void syncOfflineQueue();
         router.push("/dashboard");
         return;
       }
-
-      const res = await fetch("/api/records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
+      if (submitResult.kind === "submitted") {
+        const { data } = submitResult;
         toast.dismiss(loadingToast);
         toast.success(user?.role === "yonetici" || data.confirmed ? `${data.completed.join(", ")} bakımı kaydedildi ve teyit edildi.` : `${data.completed.join(", ")} bakımı kaydedildi. Yönetici teyidi bekleniyor.`);
         invalidateMaintenancePanel();
@@ -328,7 +331,7 @@ export default function TamamlaPage() {
         router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);
-        toast.error(data.error || "Kayıt sırasında bir hata oluştu.");
+        toast.error(submitResult.error);
       }
     } catch (error) {
       toast.dismiss(loadingToast);
