@@ -210,8 +210,12 @@ test("backup export and restore share sanitized format helpers", async () => {
   assert.match(backupFormat, /RESTORE_BLOCKED_KEYS/);
   assert.match(backupFormat, /function sanitizeBackupValue/);
   assert.match(backupFormat, /function cleanRestoredValue/);
+  assert.match(backupFormat, /computeBackupChecksum/);
+  assert.match(backupFormat, /backupEnvironmentMetadata/);
   assert.match(backupExport, /sanitizeBackupValue/);
+  assert.match(backupExport, /integrity/);
   assert.match(backupRestore, /cleanRestoredValue/);
+  assert.match(backupRestore, /computeBackupChecksum/);
   assert.match(backupRestore, /for \(const name of RESTORE_COLLECTIONS\)/);
 });
 

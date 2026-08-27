@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Document } from "mongodb";
-import { BACKUP_COLLECTIONS, sanitizeBackupValue } from "@/lib/backupFormat";
+import { BACKUP_COLLECTIONS, BACKUP_FORMAT_VERSION, backupEnvironmentMetadata, sanitizeBackupValue } from "@/lib/backupFormat";
+import { createHash } from "node:crypto";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
@@ -34,20 +35,25 @@ async function getBackupExport(req: NextRequest) {
     async start(controller) {
       const enqueue = (value: string) => controller.enqueue(encoder.encode(value));
       try {
-        enqueue(`{"version":1,"exportedAt":${JSON.stringify(exportedAt)},"database":${JSON.stringify(db.databaseName)},"collections":{`);
+        const checksum = createHash("sha256");
+        const hashCollections = (value: string) => { checksum.update(value); enqueue(value); };
+        enqueue(`{"version":${BACKUP_FORMAT_VERSION},"exportedAt":${JSON.stringify(exportedAt)},"database":${JSON.stringify(db.databaseName)},"environment":${JSON.stringify(backupEnvironmentMetadata())},"collections":`);
+        hashCollections("{");
         for (const [index, name] of BACKUP_COLLECTIONS.entries()) {
-          if (index > 0) enqueue(",");
-          enqueue(`${JSON.stringify(name)}:[`);
+          if (index > 0) hashCollections(",");
+          hashCollections(`${JSON.stringify(name)}:[`);
           let firstDocument = true;
           const cursor = db.collection<Document>(name).find({});
           for await (const document of cursor) {
-            if (!firstDocument) enqueue(",");
-            enqueue(JSON.stringify(sanitizeBackupValue(document)));
+            if (!firstDocument) hashCollections(",");
+            hashCollections(JSON.stringify(sanitizeBackupValue(document)));
             firstDocument = false;
           }
-          enqueue("]");
+          hashCollections("]");
         }
-        enqueue("}}" );
+        hashCollections("}");
+        enqueue(`,"integrity":{"algorithm":"sha256","value":${JSON.stringify(checksum.digest("hex"))}}`);
+        enqueue("}");
         controller.close();
       } catch (error) {
         controller.error(error);

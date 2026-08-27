@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ObjectId, type AnyBulkWriteOperation } from "mongodb";
-import { RESTORE_COLLECTIONS, cleanRestoredValue, getRestoreIdentity, type RestorableDocument } from "@/lib/backupFormat";
+import { RESTORE_COLLECTIONS, cleanRestoredValue, computeBackupChecksum, getRestoreIdentity, type RestorableDocument } from "@/lib/backupFormat";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageUsers } from "@/lib/permissions";
@@ -31,10 +31,21 @@ async function postBackupRestore(req: NextRequest) {
       }
       throw error;
     }
-    const body = JSON.parse(bodyText) as { confirm?: unknown; dry_run?: unknown; collections?: unknown };
+    const body = JSON.parse(bodyText) as { confirm?: unknown; dry_run?: unknown; collections?: unknown; integrity?: unknown };
     if (body.confirm !== "RESTORE") return NextResponse.json({ error: "Geri yüklemeyi onaylamak için RESTORE yazılmalıdır." }, { status: 400 });
     const collections = body.collections;
     if (!collections || typeof collections !== "object" || Array.isArray(collections)) return NextResponse.json({ error: "Geçersiz yedek dosyası." }, { status: 400 });
+    const integrity = body.integrity;
+    if (integrity !== undefined) {
+      if (!integrity || typeof integrity !== "object" || Array.isArray(integrity)) return NextResponse.json({ error: "Geçersiz yedek bütünlük bilgisi." }, { status: 400 });
+      const integrityRecord = integrity as Record<string, unknown>;
+      if (integrityRecord.algorithm !== "sha256" || typeof integrityRecord.value !== "string" || !/^[a-f0-9]{64}$/i.test(integrityRecord.value)) {
+        return NextResponse.json({ error: "Geçersiz yedek checksum bilgisi." }, { status: 400 });
+      }
+      if (computeBackupChecksum(collections) !== integrityRecord.value.toLowerCase()) {
+        return NextResponse.json({ error: "Yedek checksum doğrulaması başarısız." }, { status: 400 });
+      }
+    }
     const dryRun = body.dry_run === true;
 
     const summary: Record<string, number> = {};

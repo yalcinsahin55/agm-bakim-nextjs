@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { ObjectId } from "mongodb";
 
 export type BackupJsonValue = null | boolean | number | string | BackupJsonValue[] | { [key: string]: BackupJsonValue };
@@ -29,6 +30,25 @@ const RESTORE_BLOCKED_KEYS = new Set([
 ]);
 
 export type RestorableDocument = Record<string, unknown> & { _id?: string | ObjectId };
+
+export const BACKUP_FORMAT_VERSION = 2;
+export const BACKUP_ENVIRONMENT = "agm-bakim-nextjs";
+
+export interface BackupIntegrity {
+  algorithm: "sha256";
+  value: string;
+}
+
+export function backupEnvironmentMetadata(): { app: string; node_env: "production" | "preview" | "development" | "test" | "unknown" } {
+  const raw = process.env.VERCEL_ENV || process.env.NODE_ENV;
+  const node_env = raw === "production" || raw === "preview" || raw === "development" || raw === "test" ? raw : "unknown";
+  return { app: BACKUP_ENVIRONMENT, node_env };
+}
+
+export function computeBackupChecksum(value: unknown): string {
+  const canonical = JSON.stringify(value);
+  return createHash("sha256").update(canonical).digest("hex");
+}
 
 export function sanitizeBackupValue(value: unknown): BackupJsonValue {
   if (value === null) return null;
