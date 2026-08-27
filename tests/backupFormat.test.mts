@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ObjectId } from "mongodb";
-import { cleanRestoredValue, getRestoreIdentity, sanitizeBackupValue } from "../lib/backupFormat.ts";
+import { backupEnvironmentMetadata, cleanRestoredValue, computeBackupChecksum, getRestoreIdentity, sanitizeBackupValue } from "../lib/backupFormat.ts";
 
 test("backup export removes secrets and normalizes non-JSON values", () => {
   const id = new ObjectId("507f1f77bcf86cd799439011");
@@ -44,4 +44,17 @@ test("restore identity accepts safe string and ObjectId ids only", () => {
   assert.equal(getRestoreIdentity({ _id: new ObjectId("507f1f77bcf86cd799439011") }), "507f1f77bcf86cd799439011");
   assert.equal(getRestoreIdentity({ _id: "bad.id" }), null);
   assert.equal(getRestoreIdentity({ _id: { $oid: "not-an-object-id" } }), null);
+});
+test("backup checksum is deterministic over the sanitized collections envelope", () => {
+  const collections = { engines: [{ _id: "agm-1", name: "AGM-1" }], maintenance_records: [] };
+  const checksum = computeBackupChecksum(collections);
+  assert.match(checksum, /^[a-f0-9]{64}$/);
+  assert.equal(computeBackupChecksum(collections), checksum);
+  assert.notEqual(computeBackupChecksum({ ...collections, engines: [{ _id: "agm-2", name: "AGM-1" }] }), checksum);
+});
+
+test("backup environment metadata contains only bounded non-secret deployment information", () => {
+  const metadata = backupEnvironmentMetadata();
+  assert.equal(metadata.app, "agm-bakim-nextjs");
+  assert.ok(["production", "preview", "development", "test", "unknown"].includes(metadata.node_env));
 });
