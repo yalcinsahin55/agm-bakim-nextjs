@@ -1,6 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
+import DurationInput from "@/components/DurationInput";
 import {
   EXTERNAL_SERVICE_TECHNICIAN_ID,
   EXTERNAL_SERVICE_TECHNICIAN_NAME,
@@ -41,8 +42,8 @@ type TechnicianSourceSectionProps = {
   setExternalServiceName: Dispatch<SetStateAction<string>>;
   responsibleTechnicianId: string;
   setResponsibleTechnicianId: Dispatch<SetStateAction<string>>;
-  responsibleTechnicianDuration: string | number;
-  setResponsibleTechnicianDuration: Dispatch<SetStateAction<string | number>>;
+  responsibleTechnicianDurationMinutes: number | null;
+  setResponsibleTechnicianDurationMinutes: Dispatch<SetStateAction<number | null>>;
   setOtherTechnicianIds: Dispatch<SetStateAction<string[]>>;
   technicians: TechnicianOption[];
   responsibleTechnicians: TechnicianOption[];
@@ -57,8 +58,8 @@ export function RecordEditTechnicianSourceSection({
   setExternalServiceName,
   responsibleTechnicianId,
   setResponsibleTechnicianId,
-  responsibleTechnicianDuration,
-  setResponsibleTechnicianDuration,
+  responsibleTechnicianDurationMinutes,
+  setResponsibleTechnicianDurationMinutes,
   setOtherTechnicianIds,
   technicians,
   responsibleTechnicians,
@@ -92,10 +93,10 @@ export function RecordEditTechnicianSourceSection({
         {record.technician_id !== EXTERNAL_SERVICE_TECHNICIAN_ID && !technicians.some((technician) => technician.id === record.technician_id) && <option value={record.technician_id}>{record.technician_name || "Mevcut sorumlu"} (mevcut)</option>}
         {responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type || "mekanik"] || "Mekanik teknisyen"}</option>)}
       </select>
-      <label className="mt-2 block text-[10px] font-bold text-muted">Sorumlu teknisyen çalışma süresi (saat)
-        <input type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono outline-none focus:border-amber" />
-      </label>
-      <div className="mt-1 text-[9.5px] text-faint">Her kişinin gerçek çalışma süresini ayrı gir. Varsayılan değer kaydın mevcut sorumlu süresidir.</div>
+      <div className="mt-2">
+        <DurationInput valueMinutes={responsibleTechnicianDurationMinutes} onChange={setResponsibleTechnicianDurationMinutes} maxMinutes={366 * 24 * 60} required label="Sorumlu teknisyen çalışma süresi" />
+        <div className="mt-1 text-[9.5px] text-faint">Saat ve dakika olarak gir. Varsayılan değer kaydın mevcut sorumlu süresidir.</div>
+      </div>
     </>}
   </div>;
 }

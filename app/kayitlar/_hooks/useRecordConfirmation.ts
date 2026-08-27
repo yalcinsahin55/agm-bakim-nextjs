@@ -4,7 +4,7 @@ import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 import { EXTERNAL_SERVICE_TECHNICIAN_ID } from "@/lib/technicians";
 import type { MaintenanceRecord } from "../_types";
-import { confirmationContributionRows, hoursInputToMinutes, minutesToHoursInput } from "../_lib/recordDisplay";
+import { confirmationContributionRows } from "../_lib/recordDisplay";
 
 interface ConfirmationUser {
   id?: string;
@@ -32,7 +32,7 @@ interface ConfirmationResponse {
 export function useRecordConfirmation({ user, setRecords, setSelectedRecord }: UseRecordConfirmationOptions) {
   const [confirmationRecord, setConfirmationRecord] = useState<MaintenanceRecord | null>(null);
   const [confirmationEngineId, setConfirmationEngineId] = useState("");
-  const [confirmationDurations, setConfirmationDurations] = useState<Record<string, string>>({});
+  const [confirmationDurations, setConfirmationDurations] = useState<Record<string, number | null>>({});
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const confirmationRows = useMemo(
@@ -40,7 +40,7 @@ export function useRecordConfirmation({ user, setRecords, setSelectedRecord }: U
     [confirmationRecord],
   );
   const confirmationTotalMinutes = useMemo(
-    () => confirmationRows.reduce((total, row) => total + (hoursInputToMinutes(confirmationDurations[row.id] || "") || 0), 0),
+    () => confirmationRows.reduce((total, row) => total + (confirmationDurations[row.id] ?? 0), 0),
     [confirmationDurations, confirmationRows],
   );
   const isExternalService = confirmationRecord
@@ -52,19 +52,19 @@ export function useRecordConfirmation({ user, setRecords, setSelectedRecord }: U
     const rows = confirmationContributionRows(record);
     setConfirmationRecord(record);
     setConfirmationEngineId(record.engine_id);
-    setConfirmationDurations(Object.fromEntries(rows.map((row) => [row.id, minutesToHoursInput(row.duration_minutes)])));
+    setConfirmationDurations(Object.fromEntries(rows.map((row) => [row.id, row.duration_minutes ?? null])));
   }
 
-  async function confirmRecord(record: MaintenanceRecord, durationInputs: Record<string, string>, selectedEngineId: string) {
+  async function confirmRecord(record: MaintenanceRecord, durationInputs: Record<string, number | null>, selectedEngineId: string) {
     if (user?.role !== "yonetici" || record.manager_confirmation_status !== "pending" || confirmingId === record._id) return;
     const rows = confirmationContributionRows(record);
     const recordIsExternalService = record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID;
     const technicianContributions = recordIsExternalService ? [] : rows.map((row) => ({
       id: row.id,
-      duration_minutes: hoursInputToMinutes(durationInputs[row.id] || "") ?? -1,
+      duration_minutes: durationInputs[row.id] ?? -1,
     }));
     if (!recordIsExternalService && technicianContributions.some((item) => item.duration_minutes <= 0)) {
-      toast.error("Teyit için tüm çalışan kişilerin saatini 0’dan büyük girin.");
+      toast.error("Teyit için tüm çalışan kişilerin süresini saat ve dakika olarak 0’dan büyük girin.");
       return;
     }
     if (!window.confirm("Kişi bazlı çalışma sürelerini kontrol ettim ve bu bakım kaydını teyit etmek istiyorum.")) return;

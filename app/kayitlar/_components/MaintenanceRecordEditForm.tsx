@@ -7,7 +7,6 @@ import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 import type { Engine, MaintenanceRecord } from "../_types";
-import { hoursInputToMinutes, minutesToHoursInput } from "../_lib/recordDisplay";
 import { toLocalDateTimeInput } from "../_lib/recordMedia";
 import { RecordEditEngineSection, RecordEditTechnicianSourceSection } from "./RecordEditAdminSections";
 import RecordEditCollaborationSections from "./RecordEditCollaborationSections";
@@ -40,7 +39,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? "external_service" : "internal");
   const [externalServiceName, setExternalServiceName] = useState(record.external_service_name || "");
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState(record.technician_id);
-  const [responsibleTechnicianDuration, setResponsibleTechnicianDuration] = useState<string | number>(minutesToHoursInput(initialResponsibleMinutes));
+  const [responsibleTechnicianDurationMinutes, setResponsibleTechnicianDurationMinutes] = useState<number | null>(initialResponsibleMinutes ?? null);
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
   const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, transientPhotoUrls, reportAttachmentBusy, mediaBusy, setReportAttachments, setReportAttachmentBusy, addPhotos, addVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useRecordEditMedia({
@@ -75,9 +74,9 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       toast.error("Motor için henüz tanımlı olmayan ek bakım türlerine geçerli bir periyot saati girin.");
       return;
     }
-    const responsibleDurationMinutes = isAdmin && technicianSource !== "external_service" ? hoursInputToMinutes(String(responsibleTechnicianDuration)) : null;
+    const responsibleDurationMinutes = isAdmin && technicianSource !== "external_service" ? responsibleTechnicianDurationMinutes : null;
     if (isAdmin && technicianSource !== "external_service" && (!responsibleDurationMinutes || responsibleDurationMinutes <= 0)) {
-      toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
+      toast.error("Sorumlu teknisyen için 0’dan büyük çalışma süresini saat ve dakika olarak girin.");
       return;
     }
     if (isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null && responsibleDurationMinutes > maintenanceDurationMinutes) {
@@ -151,8 +150,8 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
         setExternalServiceName={setExternalServiceName}
         responsibleTechnicianId={responsibleTechnicianId}
         setResponsibleTechnicianId={setResponsibleTechnicianId}
-        responsibleTechnicianDuration={responsibleTechnicianDuration}
-        setResponsibleTechnicianDuration={setResponsibleTechnicianDuration}
+        responsibleTechnicianDurationMinutes={responsibleTechnicianDurationMinutes}
+        setResponsibleTechnicianDurationMinutes={setResponsibleTechnicianDurationMinutes}
         setOtherTechnicianIds={setOtherTechnicianIds}
         technicians={technicians}
         responsibleTechnicians={responsibleTechnicians}

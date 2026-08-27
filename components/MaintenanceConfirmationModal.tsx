@@ -1,5 +1,6 @@
 "use client";
 
+import DurationInput from "@/components/DurationInput";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { TechnicianType } from "@/lib/types";
@@ -33,12 +34,12 @@ interface MaintenanceConfirmationModalProps {
   engines: readonly ConfirmationEngineOption[];
   rows: readonly ConfirmationContributionRow[];
   engineId: string;
-  durationInputs: Record<string, string>;
+  durationInputs: Record<string, number | null>;
   totalMinutes: number;
   isExternalService: boolean;
   confirming: boolean;
   onEngineChange: (engineId: string) => void;
-  onDurationChange: (technicianId: string, value: string) => void;
+  onDurationChange: (technicianId: string, value: number | null) => void;
   onClose: () => void;
   onCancel: () => void;
   onConfirm: () => void;
@@ -69,7 +70,7 @@ export default function MaintenanceConfirmationModal({
           </div>
           <button type="button" onClick={onClose} className="h-8 w-8 flex-shrink-0 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Teyit penceresini kapat">✕</button>
         </div>
-        <div className="rounded-xl border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber"><b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerler saat cinsindendir; örnek: <b>8,5</b> = 8 saat 30 dakika.</div>
+        <div className="rounded-xl border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber"><b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerleri saat ve dakika olarak girin; örnek: <b>8 sa 30 dk</b>.</div>
         <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
           <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımın bağlı olduğu motor</label>
           <p className="mt-0.5 text-[10px] leading-relaxed text-faint">Teknisyen yanlış motora bakım yaptıysa doğru motoru seçin. Yönetici teyit ettiğinde aynı gruptaki tüm bakım türleri yeni motora taşınır ve eski motorun bakım takibi yeniden hesaplanır.</p>
@@ -87,7 +88,7 @@ export default function MaintenanceConfirmationModal({
           <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/10 p-3 text-[11px] text-purple-100"><b>Dış hizmet kaydı</b><div className="mt-1 text-[10.5px] text-purple-200">Bu kayıtta kayıtlı personel bulunmadığı için kişi bazlı çalışma süresi girilmeyecek. Kontrol ettikten sonra teyit edebilirsin.</div></div>
         ) : (
           <div className="mt-3 flex flex-col gap-2">
-            {rows.map((row) => <label key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel2 px-3 py-2.5"><span className="min-w-0"><span className="block truncate text-[12px] font-bold text-text">{row.full_name}</span><span className="mt-0.5 block text-[10px] text-faint">{row.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {TECHNICIAN_TYPE_LABELS[row.technician_type || "mekanik"] || "Mekanik teknisyen"}</span></span><span className="flex flex-shrink-0 items-center gap-1.5 text-[10px] text-muted"><input type="number" min="0.25" max={366 * 24} step="0.25" required value={durationInputs[row.id] || ""} onChange={(event) => onDurationChange(row.id, event.target.value)} className="w-24 rounded-lg border border-border bg-panel px-2 py-2 text-right font-mono text-[12px] text-text outline-none focus:border-amber" aria-label={`${row.full_name} çalışma süresi (saat)`} /> saat</span></label>)}
+            {rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel2 px-3 py-2.5"><div className="min-w-0"><div className="truncate text-[12px] font-bold text-text">{row.full_name}</div><div className="mt-0.5 text-[10px] text-faint">{row.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {TECHNICIAN_TYPE_LABELS[row.technician_type || "mekanik"] || "Mekanik teknisyen"}</div></div><DurationInput valueMinutes={durationInputs[row.id] ?? null} onChange={(value) => onDurationChange(row.id, value)} maxMinutes={366 * 24 * 60} compact required label={`${row.full_name} çalışma süresi`} /></div>)}
           </div>
         )}
         {!isExternalService && <div className="mt-3 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-[10.5px] text-teal">Toplam kişi katkısı: <b>{formatMaintenanceDuration(totalMinutes)}</b> · Mesai ve farklı günlerdeki çalışma bu toplamda birlikte tutulur.</div>}

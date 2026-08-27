@@ -36,18 +36,6 @@ export function confirmationContributionRows(record: MaintenanceRecord): Confirm
   return rows;
 }
 
-export function minutesToHoursInput(minutes: number | undefined): string {
-  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return "";
-  return String(Number((minutes / 60).toFixed(2)));
-}
-
-export function hoursInputToMinutes(value: string): number | null {
-  const hours = Number(value.trim().replace(",", "."));
-  if (!Number.isFinite(hours) || hours <= 0) return null;
-  const minutes = Math.round(hours * 60);
-  return minutes > 0 && minutes <= 366 * 24 * 60 ? minutes : null;
-}
-
 export function maintenanceDayKey(record: MaintenanceRecord): string {
   const date = getMaintenanceRecordDate(record.maintenance_start_at, record.created_at);
   if (!date || !Number.isFinite(date.getTime())) return "unknown";

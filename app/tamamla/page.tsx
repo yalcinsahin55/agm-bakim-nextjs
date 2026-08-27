@@ -22,7 +22,7 @@ import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technician
 import type { MaintenanceType } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import AdditionalMaintenanceTypes from "./_components/AdditionalMaintenanceTypes";
 import { useCompletionEvidenceMedia } from "./_hooks/useCompletionEvidenceMedia";
 import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
@@ -56,9 +56,9 @@ export default function TamamlaPage() {
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
   const [responsibleTechnicianId, setResponsibleTechnicianId] = useState("");
-  const [responsibleTechnicianDuration, setResponsibleTechnicianDuration] = useState<string | number>("");
+  const [responsibleTechnicianDurationMinutes, setResponsibleTechnicianDurationMinutes] = useState<number | null>(null);
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>([]);
-  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, string | number>>({});
+  const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>({});
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
@@ -180,7 +180,7 @@ export default function TamamlaPage() {
   const maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt);
   const timeTrackingReady = maintenanceDurationMinutes !== null;
   const isManagerInternalRecord = user?.role === "yonetici" && technicianSource !== "external_service";
-  const responsibleDurationMinutes = isManagerInternalRecord ? hoursInputToMinutes(responsibleTechnicianDuration) : null;
+  const responsibleDurationMinutes = isManagerInternalRecord ? responsibleTechnicianDurationMinutes : null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0 || reportAttachments.length > 0;
 
   function toggleExtra(key: string, checked: boolean) {
@@ -225,10 +225,10 @@ export default function TamamlaPage() {
   );
 
   useEffect(() => {
-    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleTechnicianDuration === "") {
-      setResponsibleTechnicianDuration(minutesToHoursInput(maintenanceDurationMinutes));
+    if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleTechnicianDurationMinutes === null) {
+      setResponsibleTechnicianDurationMinutes(maintenanceDurationMinutes);
     }
-  }, [isManagerInternalRecord, maintenanceDurationMinutes, responsibleTechnicianDuration]);
+  }, [isManagerInternalRecord, maintenanceDurationMinutes, responsibleTechnicianDurationMinutes]);
 
   useEffect(() => {
     setOtherTechnicianIds((current) => {
@@ -429,7 +429,7 @@ export default function TamamlaPage() {
             technicianSource={technicianSource}
             externalServiceName={externalServiceName}
             responsibleTechnicianId={responsibleTechnicianId}
-            responsibleTechnicianDuration={responsibleTechnicianDuration}
+            responsibleTechnicianDurationMinutes={responsibleTechnicianDurationMinutes}
             responsibleTechnicians={responsibleTechnicians}
             selectableTechnicians={selectableTechnicians}
             otherTechnicianIds={otherTechnicianIds}
@@ -438,9 +438,9 @@ export default function TamamlaPage() {
             onTechnicianSourceChange={changeTechnicianSource}
             onExternalServiceNameChange={setExternalServiceName}
             onResponsibleTechnicianChange={changeResponsibleTechnician}
-            onResponsibleTechnicianDurationChange={setResponsibleTechnicianDuration}
+            onResponsibleTechnicianDurationChange={setResponsibleTechnicianDurationMinutes}
             onOtherTechnicianToggle={toggleOtherTechnician}
-            onOtherTechnicianDurationChange={(id, value) => setOtherTechnicianDurations((current) => ({ ...current, [id]: value }))}
+            onOtherTechnicianDurationChange={(id, value) => setOtherTechnicianDurations((current) => ({ ...current, [id]: value ?? 0 }))}
           />
 
           <AdditionalMaintenanceTypes
