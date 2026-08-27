@@ -4,7 +4,6 @@ import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb, getMongoClient } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { canWriteMaintenance } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { buildEngineStateUpdate, recomputeLastMaintenance } from "@/lib/maintenance";
@@ -21,48 +20,12 @@ import { recordSchema, formatZodError } from "@/lib/schemas";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { withApiTiming } from "@/lib/performance";
-import type { MaintenanceTechnicianContribution, User } from "@/lib/types";
+import { getRecord } from "./_lib/recordRead";
+import { deleteRecord } from "./_lib/recordDelete";
+import { canModify, parseRecordId } from "./_lib/recordDetailHelpers";
+import type { MaintenanceTechnicianContribution } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-function parseRecordId(value: string): ObjectId | null {
-  return ObjectId.isValid(value) ? new ObjectId(value) : null;
-}
-
-function canModify(user: User, record: MaintenanceRecordDocument): boolean {
-  return canWriteMaintenance(user.role) && (user.role === "yonetici" || record.technician_id === user._id);
-}
-
-async function getRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const db = await getDb();
-  const usersCol = usersCollection(db);
-  const user = await getCurrentUser(req, usersCol);
-  if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  await ensureAppIndexes(db);
-
-  const recordId = parseRecordId(id);
-  if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
-  const includeMedia = req.nextUrl.searchParams.get("include_media") === "true";
-  const record = await recordsCollection(db).findOne(
-    { _id: recordId },
-    includeMedia ? undefined : { projection: { photos_b64: 0, videos: 0 } },
-  );
-  if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
-  if (req.nextUrl.searchParams.get("include_group") === "true" && record.group_id) {
-    const groupTypes = await recordsCollection(db).find(
-      { group_id: record.group_id },
-      { projection: { type_key: 1, type_label: 1 }, limit: 50 },
-    ).toArray();
-    return NextResponse.json({
-      ...record,
-      group_types: groupTypes
-        .filter((item) => typeof item.type_key === "string" && typeof item.type_label === "string")
-        .map((item) => ({ type_key: item.type_key, type_label: item.type_label })),
-    });
-  }
-  return NextResponse.json(record);
-}
 
 async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -460,40 +423,6 @@ async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id:
   await refreshUserMaintenanceNotificationsBestEffort(db, user);
   return NextResponse.json({ ok: true });
 }
-
-async function deleteRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const db = await getDb();
-  const usersCol = usersCollection(db);
-  const user = await getCurrentUser(req, usersCol);
-  if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-  const rateLimited = await enforceApiRateLimit(req, "records-delete", 60, 10 * 60 * 1000, user._id);
-  if (rateLimited) return rateLimited;
-  await ensureAppIndexes(db);
-
-  const recordId = parseRecordId(id);
-  if (!recordId) return NextResponse.json({ error: "Geçersiz kayıt kimliği." }, { status: 400 });
-  const recordsCol = recordsCollection(db);
-  const record = await recordsCol.findOne({ _id: recordId });
-  if (!record) return NextResponse.json({ error: "Kayıt bulunamadı." }, { status: 404 });
-  if (!canModify(user, record)) return NextResponse.json({ error: "Bu kaydı silme yetkiniz yok." }, { status: 403 });
-
-  await recordsCol.deleteOne({ _id: record._id });
-  await recomputeLastMaintenance(db, record.engine_id, record.type_key, record.tracking_state_before);
-  await writeAuditLog(db, {
-    user,
-    action: "delete",
-    entity: "maintenance_record",
-    entityId: id,
-    summary: `${record.engine_name} · ${record.type_label} bakım kaydı silindi; motor bakım takibi yeniden hesaplandı`,
-    before: record,
-  });
-
-  invalidateMaintenancePanelServerCache();
-  await refreshUserMaintenanceNotificationsBestEffort(db, user);
-  return NextResponse.json({ ok: true });
-}
-
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   return withApiTiming("GET /api/records/[id]", () => getRecord(req, context), { request: req });
