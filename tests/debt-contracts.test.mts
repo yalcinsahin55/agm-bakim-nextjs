@@ -643,6 +643,30 @@ test("Android TWA asset links stay public and match the signed package", async (
   assert.match(middleware, /\.well-known/);
 });
 
+test("offline queue jobs stay bound to the authenticated owner", async () => {
+  const queue = await source("lib/offlineQueue.ts");
+  const create = await source("app/api/records/_lib/recordCreate.ts");
+  const patch = await source("app/api/records/[id]/_lib/recordPatch.ts");
+  const completion = await source("app/tamamla/_lib/completionSubmit.ts");
+  const pwa = await source("components/PwaRegister.tsx");
+  const login = await source("app/login/page.tsx");
+  const logout = await source("components/LogoutButton.tsx");
+  assert.match(queue, /ownerUserId: string/);
+  assert.match(queue, /const ownerUserId = options\.ownerUserId\.trim\(\)/);
+  assert.match(queue, /ownerUserId: string \}/);
+  assert.match(queue, /OFFLINE_OWNER_HEADER/);
+  assert.match(create, /hasOfflineOwnerMismatch/);
+  assert.match(create, /OFFLINE_OWNER_HEADER/);
+  assert.match(patch, /hasOfflineOwnerMismatch/);
+  assert.match(patch, /OFFLINE_OWNER_HEADER/);
+  assert.match(completion, /ownerUserId: string/);
+  assert.match(completion, /ownerUserId: input\.ownerUserId/);
+  assert.match(pwa, /getCurrentUserId/);
+  assert.match(pwa, /syncOfflineQueue\(ownerUserId\)/);
+  assert.match(login, /notifyAuthChanged\(\)/);
+  assert.match(logout, /notifyAuthChanged\(\)/);
+});
+
 test("service worker keeps push handling and closed-window metadata sync bounded", async () => {
   const serviceWorker = await source("lib/serviceWorker.ts");
   assert.match(serviceWorker, /addEventListener\("push"/);
@@ -651,6 +675,8 @@ test("service worker keeps push handling and closed-window metadata sync bounded
   assert.match(serviceWorker, /isMetadataOnlyOfflineJob/);
   assert.match(serviceWorker, /value\.media\.length === 0/);
   assert.match(serviceWorker, /client_request_id/);
+  assert.match(serviceWorker, /ownerUserId/);
+  assert.match(serviceWorker, /getCurrentWorkerUserId/);
 });
 
 test("push subscription endpoints keep request bodies bounded and typed", async () => {
@@ -663,11 +689,20 @@ test("push subscription endpoints keep request bodies bounded and typed", async 
   assert.match(limits, /MAX_PUSH_SUBSCRIPTION_REQUEST_BYTES = 32 \* 1024/);
 });
 
+test("service worker caches only public shell and static assets", async () => {
+  const serviceWorker = await source("lib/serviceWorker.ts");
+  assert.match(serviceWorker, /isPublicCacheRequest/);
+  assert.match(serviceWorker, /SHELL_ASSETS\.includes\(url\.pathname\)/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/_next\/static\/"\)/);
+  assert.match(serviceWorker, /response\.ok && isPublicRequest/);
+  assert.match(serviceWorker, /new Request\(request, \{ cache: "no-store" \}\)/);
+});
+
 test("service worker updates bypass stale script caches", async () => {
   const serviceWorker = await source("lib/serviceWorker.ts");
   const pwaRegister = await source("components/PwaRegister.tsx");
   const pushToggle = await source("components/PushNotificationToggle.tsx");
-  assert.match(serviceWorker, /agm-bakim-shell-v4/);
+  assert.match(serviceWorker, /agm-bakim-shell-v5/);
   assert.match(serviceWorker, /caches\.delete/);
   assert.match(pwaRegister, /updateViaCache: "none"/);
   assert.match(pwaRegister, /registration.update()/);
@@ -681,6 +716,8 @@ test("closed-window worker sync only targets bounded record jobs", async () => {
   assert.match(serviceWorker, /\/\^\\\/api\\\/records\\\//);
   assert.match(serviceWorker, /MAX_WORKER_SYNC_BODY_BYTES = 512 \* 1024/);
   assert.match(serviceWorker, /credentials: "same-origin"/);
+  assert.match(serviceWorker, /OFFLINE_OWNER_HEADER/);
+  assert.match(serviceWorker, /candidate\.ownerUserId !== ownerUserId/);
 });
 
 test("sidebar labels delayed maintenance separately from the unread bell", async () => {

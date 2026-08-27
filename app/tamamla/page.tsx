@@ -102,7 +102,7 @@ export default function TamamlaPage() {
         setPendingOfflineCount(remaining);
         return;
       }
-      void getPendingOfflineCount().then(setPendingOfflineCount).catch(() => {});
+      void getPendingOfflineCount(user?.id || user?._id || "").then(setPendingOfflineCount).catch(() => {});
     };
     window.addEventListener("online", updateConnection);
     window.addEventListener("offline", updateConnection);
@@ -113,7 +113,7 @@ export default function TamamlaPage() {
       window.removeEventListener("offline", updateConnection);
       window.removeEventListener("offline-queue:changed", updateQueue);
     };
-  }, [loadPanel]);
+  }, [loadPanel, user?.id, user?._id]);
 
   const engineList = useMemo(
     () => [...engines].sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })),
@@ -307,6 +307,7 @@ export default function TamamlaPage() {
         offlineMedia,
         isOnline: navigator.onLine,
         queue: queueRecord,
+        ownerUserId: currentUserId,
         post: (requestPayload) => fetch("/api/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -317,7 +318,7 @@ export default function TamamlaPage() {
         toast.dismiss(loadingToast);
         toast.success(submitResult.shouldSync ? "Kayıt ve rapor ekleri senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt ve rapor ekleri güvenle kuyruğa alındı.");
         clientRequestIdRef.current = null;
-        if (submitResult.shouldSync) void syncOfflineQueue();
+        if (submitResult.shouldSync) void syncOfflineQueue(currentUserId);
         router.push("/dashboard");
         return;
       }

@@ -21,6 +21,7 @@ import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLim
 import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import type { TechnicianOption } from "@/lib/technicians";
 import { buildExtraClientRequestId, parseDateOnly } from "./recordRouteHelpers";
+import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 
 export async function postRecord(req: NextRequest) {
   let operationStep = "initialize";
@@ -30,6 +31,9 @@ export async function postRecord(req: NextRequest) {
     const usersCol = usersCollection(db);
     const user = await getCurrentUser(req, usersCol);
     if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+    if (hasOfflineOwnerMismatch(req.headers.get(OFFLINE_OWNER_HEADER), user._id)) {
+      return NextResponse.json({ error: "Çevrimdışı kayıt başka kullanıcı oturumunda oluşturulmuş; güvenlik nedeniyle gönderilmedi." }, { status: 403 });
+    }
     await ensureAppIndexes(db);
     const currentUser = user;
     if (user.role === "goruntuleyici") {

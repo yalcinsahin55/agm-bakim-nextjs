@@ -21,6 +21,7 @@ import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
 import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 import { canModify, parseRecordId } from "./recordDetailHelpers";
 import type { MaintenanceTechnicianContribution } from "@/lib/types";
+import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 
 
 export async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +30,9 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   const usersCol = usersCollection(db);
   const user = await getCurrentUser(req, usersCol);
   if (!user) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  if (hasOfflineOwnerMismatch(req.headers.get(OFFLINE_OWNER_HEADER), user._id)) {
+    return NextResponse.json({ error: "Çevrimdışı kayıt başka kullanıcı oturumunda oluşturulmuş; güvenlik nedeniyle gönderilmedi." }, { status: 403 });
+  }
   const rateLimited = await enforceApiRateLimit(req, "records-update", 120, 10 * 60 * 1000, user._id);
   if (rateLimited) return rateLimited;
   await ensureAppIndexes(db);

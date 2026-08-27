@@ -4,6 +4,7 @@ import { uploadVideoChunked } from "@/lib/chunkUpload";
 import { uploadReportAttachment } from "@/lib/reportAttachmentUpload";
 import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
+import { OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 
 const DB_NAME = "agm-bakim-offline";
 const DB_VERSION = 1;
@@ -20,6 +21,7 @@ export interface QueuedMedia {
 
 export interface QueuedRecordJob {
   id: string;
+  ownerUserId: string;
   createdAt: string;
   method: "POST" | "PATCH";
   endpoint: string;
@@ -71,18 +73,21 @@ export function isOfflinePlaceholder(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(OFFLINE_PREFIX);
 }
 
-let activeSync: Promise<{ synced: number; remaining: number; error?: string }> | null = null;
+const activeSyncByOwner = new Map<string, Promise<{ synced: number; remaining: number; error?: string }>>();
 
 export async function queueRecord(
   payload: Record<string, unknown>,
   media: QueuedMedia[],
-  options: { method?: "POST" | "PATCH"; endpoint?: string } = {},
+  options: { method?: "POST" | "PATCH"; endpoint?: string; ownerUserId: string },
 ): Promise<string> {
+  const ownerUserId = options.ownerUserId.trim();
+  if (!ownerUserId) throw new Error("Oturum doğrulanamadı. Çevrimdışı kayıt oluşturulamadı.");
   const database = await openDatabase();
   const id = makeId();
   const jobPayload = { ...payload, client_request_id: id };
   const job: QueuedRecordJob = {
     id,
+    ownerUserId,
     createdAt: new Date().toISOString(),
     method: options.method || "POST",
     endpoint: options.endpoint || "/api/records",
@@ -97,12 +102,13 @@ export async function queueRecord(
     transaction.onerror = () => reject(transaction.error || new Error("Çevrimdışı kayıt saklanamadı."));
   });
   database.close();
-  void getPendingOfflineCount().then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
+  void getPendingOfflineCount(ownerUserId).then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
   void requestBackgroundSync();
   return id;
 }
 
-export async function listQueuedRecords(): Promise<QueuedRecordJob[]> {
+export async function listQueuedRecords(ownerUserId: string): Promise<QueuedRecordJob[]> {
+  const normalizedOwnerId = ownerUserId.trim();
   const database = await openDatabase();
   const jobs = await new Promise<QueuedRecordJob[]>((resolve, reject) => {
     const request = database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
@@ -110,11 +116,11 @@ export async function listQueuedRecords(): Promise<QueuedRecordJob[]> {
     request.onerror = () => reject(request.error || new Error("Çevrimdışı kayıtlar okunamadı."));
   });
   database.close();
-  return jobs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return jobs.filter((job) => job.ownerUserId === normalizedOwnerId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export async function getPendingOfflineCount(): Promise<number> {
-  return (await listQueuedRecords()).length;
+export async function getPendingOfflineCount(ownerUserId: string): Promise<number> {
+  return (await listQueuedRecords(ownerUserId)).length;
 }
 
 async function removeQueuedRecord(id: string): Promise<void> {
@@ -175,12 +181,12 @@ function replaceReportPlaceholder(attachments: unknown, id: string, url: string)
   }) : [];
 }
 
-async function runOfflineSync(): Promise<{ synced: number; remaining: number; error?: string }> {
+async function runOfflineSync(ownerUserId: string): Promise<{ synced: number; remaining: number; error?: string }> {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    return { synced: 0, remaining: await getPendingOfflineCount(), error: "İnternet bağlantısı yok." };
+    return { synced: 0, remaining: await getPendingOfflineCount(ownerUserId), error: "İnternet bağlantısı yok." };
   }
 
-  const jobs = await listQueuedRecords();
+  const jobs = await listQueuedRecords(ownerUserId);
   let synced = 0;
   let lastError: string | undefined;
   for (const originalJob of jobs) {
@@ -216,26 +222,29 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
 
       const response = await fetch(job.endpoint, {
         method: job.method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          [OFFLINE_OWNER_HEADER]: ownerUserId,
+        },
         body: JSON.stringify(job.payload),
       });
       const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error || `Kayıt gönderilemedi (HTTP ${response.status}).`);
       await removeQueuedRecord(job.id);
       synced += 1;
-      const remaining = await getPendingOfflineCount();
+      const remaining = await getPendingOfflineCount(ownerUserId);
       dispatchChanged(remaining);
     } catch (error) {
       job.retryCount += 1;
       job.lastError = error instanceof Error ? error.message : "Bilinmeyen senkronizasyon hatası.";
       await updateQueuedRecord(job);
       lastError = job.lastError;
-      void getPendingOfflineCount().then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
+      void getPendingOfflineCount(ownerUserId).then((remaining) => dispatchChanged(remaining)).catch(() => dispatchChanged());
       break;
     }
   }
 
-  const remaining = await getPendingOfflineCount();
+  const remaining = await getPendingOfflineCount(ownerUserId);
   dispatchChanged(remaining);
   if (synced > 0 && typeof window !== "undefined") {
     invalidateMaintenancePanel();
@@ -244,7 +253,14 @@ async function runOfflineSync(): Promise<{ synced: number; remaining: number; er
   return { synced, remaining, error: lastError };
 }
 
-export function syncOfflineQueue(): Promise<{ synced: number; remaining: number; error?: string }> {
-  if (!activeSync) activeSync = runOfflineSync().finally(() => { activeSync = null; });
-  return activeSync;
+export function syncOfflineQueue(ownerUserId: string): Promise<{ synced: number; remaining: number; error?: string }> {
+  const normalizedOwnerId = ownerUserId.trim();
+  if (!normalizedOwnerId) return Promise.resolve({ synced: 0, remaining: 0, error: "Oturum doğrulanamadı." });
+  const activeSync = activeSyncByOwner.get(normalizedOwnerId);
+  if (activeSync) return activeSync;
+  const nextSync = runOfflineSync(normalizedOwnerId).finally(() => {
+    activeSyncByOwner.delete(normalizedOwnerId);
+  });
+  activeSyncByOwner.set(normalizedOwnerId, nextSync);
+  return nextSync;
 }

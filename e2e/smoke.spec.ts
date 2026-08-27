@@ -171,6 +171,22 @@ test.describe("AGM Bakım configured authentication", () => {
     await expect(page.getByTestId("quick-maintenance-exit")).toBeVisible();
   });
 
+  test("offline owner mismatch is rejected before record mutation", async ({ page }) => {
+    test.skip(
+      !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD || !process.env.E2E_VIEWER_IDENTIFIER,
+      "Offline owner izolasyonu E2E testi yalnızca izole admin/viewer fixture kullanıcılarıyla çalıştırılmalı.",
+    );
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+    const response = await page.context().request.post("/api/records", {
+      headers: { "x-agm-offline-owner": "e2e-viewer" },
+      data: {},
+    });
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringMatching(/başka kullanıcı|güvenlik nedeniyle/i),
+    });
+  });
+
   test("viewer cannot create a maintenance record", async ({ page }) => {
     test.skip(
       !process.env.E2E_VIEWER_IDENTIFIER || !process.env.E2E_VIEWER_PASSWORD,

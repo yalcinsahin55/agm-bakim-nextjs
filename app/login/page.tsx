@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { canAccessRoute, defaultRouteForRole } from "@/lib/permissions";
 import { invalidateCachedFetch } from "@/lib/apiCache";
+import { notifyAuthChanged } from "@/lib/authClient";
 
 interface LoginForm {
   identifier: string;
@@ -78,6 +79,7 @@ export default function LoginPage() {
       // Aynı tarayıcıda rol değiştirirken önceki kullanıcının /api/auth/me cevabı
       // 30 saniyelik cache'ten gelmesin; menü ve RoleGuard yeni hesabı görsün.
       invalidateCachedFetch("/api/auth/me");
+      notifyAuthChanged();
       toast.success("Giriş başarılı, hoş geldiniz.");
 
       const role = typeof data.user?.role === "string" ? data.user.role : undefined;

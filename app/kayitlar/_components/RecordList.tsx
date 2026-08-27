@@ -105,6 +105,7 @@ export default function RecordList({
                       onCancel={onEditCancel}
                       onSaved={onEditSaved}
                       isAdmin={user?.role === "yonetici"}
+                      ownerUserId={user?.id || user?._id || ""}
                       engines={sortedEngines}
                     />
                   ) : null}
