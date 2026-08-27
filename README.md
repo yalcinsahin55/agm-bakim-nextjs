@@ -241,7 +241,7 @@ lib/
 ├── spreadsheetSecurity.ts       # Excel formül enjeksiyonu kaçışı
 ├── mongoSecurity.ts             # Dinamik Mongo path doğrulaması
 └── ...
-middleware.ts                   # Route koruması ve auth yönlendirmeleri
+proxy.ts                        # Route koruması ve auth yönlendirmeleri
 public/                          # Manifest, ikon ve küçük statik dosyalar
 vercel.json                      # Cron zamanlaması
 .env.example                    # Environment değişkeni örneği
