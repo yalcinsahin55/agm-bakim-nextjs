@@ -22,11 +22,12 @@ import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technician
 import type { MaintenanceType } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
+import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import AdditionalMaintenanceTypes from "./_components/AdditionalMaintenanceTypes";
 import { useCompletionEvidenceMedia } from "./_hooks/useCompletionEvidenceMedia";
 import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
 import { checklistForType } from "./_lib/checklist";
+import { buildCompletionPayload } from "./_lib/completionPayload";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 
 export default function TamamlaPage() {
@@ -282,40 +283,38 @@ export default function TamamlaPage() {
     todayStart.setHours(0, 0, 0, 0);
     const isBackdated = Number.isFinite(startDate.getTime()) && startDate.getTime() < todayStart.getTime();
 
-    const extra_types = extraKeys.flatMap((k) => {
-      const t = types.find((tt) => tt.key === k);
-      if (!t) return [];
-      const trackedForEngine = trackedKeys.has(k);
-      return [{
-        type_key: k, type_label: t.label,
-        period: trackedForEngine ? undefined : Number(extraPeriods[k]),
-      }];
-    });
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
-    const payload = {
-      client_request_id: clientRequestId,
-      engine_id: engineId, type_key: chosenType.key, type_label: chosenType.label,
-      technician_source: technicianSource,
-      ...(isManagerInternalRecord && responsibleTechnicianId ? { responsible_technician_id: responsibleTechnicianId } : {}),
-      ...(isManagerInternalRecord && responsibleDurationMinutes !== null ? { responsible_technician_duration: responsibleDurationMinutes } : {}),
-      external_service_name: technicianSource === "external_service" ? externalServiceName.trim() || undefined : undefined,
-      hour_at_completion: Number(hours), technician_note: techNote,
-      time_tracking_version: TIME_TRACKING_VERSION,
-      maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
-      maintenance_end_at: new Date(maintenanceEndAt).toISOString(),
+    const payload = buildCompletionPayload({
+      clientRequestId: clientRequestId,
+      engineId,
+      chosenType,
+      technicianSource,
+      isManagerInternalRecord,
+      responsibleTechnicianId,
+      responsibleDurationMinutes,
+      externalServiceName,
+      hours,
+      techNote,
+      maintenanceStartAt,
+      maintenanceEndAt,
       photos,
       videos,
-      report_attachments: reportAttachments,
-      pressure_reading: pressure !== "" ? Number(pressure) : undefined,
-      backdated: isBackdated,
-      period: isPrimaryNew ? Number(primaryPeriod) : undefined, extra_types,
-      other_technician_ids: otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)),
-      other_technician_durations: Object.fromEntries(otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id)).map((id) => [id, normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 60)])
-),
-      checklist: checklistItems.map((label) => ({ label, completed: checklist[label] === true })),
-      completion_confirmation: true,
-    };
+      reportAttachments,
+      pressure,
+      isBackdated,
+      isPrimaryNew,
+      primaryPeriod,
+      types,
+      extraKeys,
+      extraPeriods,
+      trackedKeys,
+      selectedSupportIds,
+      otherTechnicianDurations,
+      maintenanceDurationMinutes,
+      checklistItems,
+      checklist,
+    });
 
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
