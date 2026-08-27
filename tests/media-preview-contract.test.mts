@@ -18,14 +18,14 @@ test("new maintenance form renders unsaved media without persisted-record proxy"
 
 test("edit form distinguishes transient uploads from persisted record media", () => {
   const media = readProjectFile("app/kayitlar/_lib/recordMedia.ts");
-  const editForm = readProjectFile("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
+  const editHook = readProjectFile("app/kayitlar/_hooks/useRecordEditMedia.ts");
   const editMedia = readProjectFile("app/kayitlar/_components/RecordEditMediaSection.tsx");
   assert.match(media, /export function getPhotoSrc\(photo: string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
   assert.match(media, /return transientUrls\?\.has\(photo\) \? photo : getMediaDisplayUrl\(photo, "image"\)/);
   assert.match(media, /export function getVideoSrc\(v: VideoItem \| string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
-  assert.match(editForm, /const \[transientPhotoUrls, setTransientPhotoUrls\] = useState<Set<string>>/);
+  assert.match(editHook, /const \[transientPhotoUrls, setTransientPhotoUrls\] = useState<Set<string>>/);
   assert.match(editMedia, /getPhotoSrc\(photo, offlinePreviews, transientPhotoUrls\)/);
-  assert.match(editForm, /setTransientPhotoUrls\(\(current\) =>/);
+  assert.match(editHook, /setTransientPhotoUrls\(\(current\) =>/);
 });
 test("media proxy only serves URLs already attached to a maintenance record", () => {
   const source = readProjectFile("app/api/media/file/route.ts");
