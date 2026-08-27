@@ -13,6 +13,11 @@ import {
   resolveReportAttachmentMime,
   sanitizeReportAttachmentFilename,
 } from "@/lib/reportAttachments";
+import {
+  buildPrivateBlobPilotPath,
+  getPrivateBlobPilotStoreId,
+  shouldUsePrivateBlobPilot,
+} from "@/lib/privateBlobPilot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,12 +91,27 @@ async function postUpload(request: NextRequest) {
     const pathname = idempotencyKey
       ? `${folder}/offline-${idempotencyKey}-${safeName}`
       : `${folder}/${Date.now()}-${safeName}`;
+    const usePrivatePilot = shouldUsePrivateBlobPilot(folder);
+    const uploadPath = usePrivatePilot
+      ? buildPrivateBlobPilotPath(folder, pathname.slice(`${folder}/`.length))
+      : pathname;
     // Vercel Production’da Blob SDK, bağlı mağaza için OIDC yetkilendirmesini otomatik kullanır.
-    // Manuel token/storeId yalnızca local veya Vercel dışı ortamlarda geçirilir.
-    const token = process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
-    const storeId = process.env.VERCEL ? undefined : (process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined);
-    const blob = await put(pathname, file, {
-      access: "public",
+    // Private pilot için storeId açıkça mevcut private MEDIA store’a sabitlenir; böylece
+    // Vercel’in varsayılan public BLOB_STORE_ID’si ile karışmaz.
+    const token = process.env.VERCEL
+      ? undefined
+      : (usePrivatePilot ? (process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN) : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN));
+    const storeId = usePrivatePilot
+      ? getPrivateBlobPilotStoreId()
+      : process.env.VERCEL ? undefined : (process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined);
+    if (usePrivatePilot && !storeId && !token) {
+      return NextResponse.json(
+        { error: "Private Blob pilot depolama bağlantısı yapılandırılmamış.", code: "PRIVATE_BLOB_PILOT_CREDENTIALS_UNAVAILABLE" },
+        { status: 503 },
+      );
+    }
+    const blob = await put(uploadPath, file, {
+      access: usePrivatePilot ? "private" : "public",
       addRandomSuffix: !idempotencyKey,
       ...(idempotencyKey ? { allowOverwrite: true } : {}),
       ...(token ? { token } : {}),

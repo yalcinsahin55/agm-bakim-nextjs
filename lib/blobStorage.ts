@@ -16,8 +16,10 @@ function isPrivateBlobUrl(value: string): boolean {
 }
 
 function readBlobCredentials(): { token?: string; storeId?: string } {
-  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
-  const storeId = process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID;
+  // AGM’de public ve private store aynı projeye bağlı olabilir. Private URL’ler
+  // MEDIA store credential’ıyla okunmalı; aksi halde public store token’ı seçilebilir.
+  const token = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+  const storeId = process.env.PRIVATE_BLOB_STORE_ID || process.env.MEDIA_STORE_ID || process.env.BLOB_STORE_ID;
   return {
     ...(token ? { token } : {}),
     ...(storeId ? { storeId } : {}),
