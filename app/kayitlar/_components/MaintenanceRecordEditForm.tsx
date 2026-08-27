@@ -16,6 +16,7 @@ import { withTimeout, makeOfflineId, toLocalDateTimeInput } from "../_lib/record
 import { RecordEditEngineSection, RecordEditTechnicianSourceSection } from "./RecordEditAdminSections";
 import RecordEditCollaborationSections from "./RecordEditCollaborationSections";
 import RecordEditMediaSection from "./RecordEditMediaSection";
+import { useRecordEditReferenceData } from "../_hooks/useRecordEditReferenceData";
 import RecordEditScheduleSection from "./RecordEditScheduleSection";
 
 export interface MaintenanceRecordEditFormProps {
@@ -41,9 +42,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
   const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
   const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
-  const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
-  const [maintenanceTypes, setMaintenanceTypes] = useState<MaintenanceType[]>([]);
-  const [groupTypes, setGroupTypes] = useState<Array<{ type_key: string; type_label: string }>>(() => record.extra_types || []);
+  const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
   const initialResponsibleContribution = (record.technician_contributions || []).find((contribution) => contribution.contribution_role === "responsible");
@@ -88,24 +87,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
     Object.values(previewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     previewUrlsRef.current = {};
   }, []);
-
-  useEffect(() => {
-    fetch("/api/users/technicians")
-      .then(async (response) => { if (response.ok) setTechnicians(await response.json()); })
-      .catch(() => {});
-    fetch("/api/maintenance-types")
-      .then(async (response) => { if (response.ok) setMaintenanceTypes(await response.json()); })
-      .catch(() => {});
-    fetch(`/api/records/${record._id}?include_group=true`)
-      .then(async (response) => {
-        if (!response.ok) return;
-        const data = await response.json() as { group_types?: Array<{ type_key?: unknown; type_label?: unknown }> };
-        if (Array.isArray(data.group_types)) {
-          setGroupTypes(data.group_types.filter((type): type is { type_key: string; type_label: string } => typeof type?.type_key === "string" && typeof type?.type_label === "string"));
-        }
-      })
-      .catch(() => {});
-  }, [record._id]);
 
   function removePhoto(index: number): void {
     const photo = photos[index];
