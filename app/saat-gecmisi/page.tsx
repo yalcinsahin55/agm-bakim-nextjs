@@ -9,89 +9,10 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
-
-interface HistoryEntry {
-  date: string;
-  hours: number;
-  load_kw?: number;
-}
-
-interface Engine {
-  _id: string;
-  name: string;
-  hours: number;
-  load_kw?: number;
-}
-
-interface HistorySummary {
-  first: HistoryEntry | null;
-  last: HistoryEntry | null;
-  has_load: boolean;
-}
-
-interface HistoryResponse {
-  history: HistoryEntry[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  summary: HistorySummary;
-}
-
-interface ChartPoint {
-  y: number;
-  label: string;
-}
-
-const HISTORY_PAGE_SIZE = 250;
-
-function MiniLineChart({ points, color = "#e8952f", label = "" }: { points: ChartPoint[]; color?: string; label?: string }) {
-  if (points.length < 2) return null;
-  const w = 400, h = 140, pad = 15;
-  const ys = points.map((p) => p.y);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const range = maxY - minY || 1;
-  
-  const path = points.map((p, i) => {
-    const x = pad + (i / (points.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((p.y - minY) / range) * (h - pad * 2);
-    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-
-  const areaPath = path + ` L${pad + (w - pad * 2)},${h - pad} L${pad},${h - pad} Z`;
-
-  return (
-    <div className="relative bg-panel border border-border rounded-card p-3 hover:border-borderlt transition-all group">
-      {label && <div className="text-[10px] text-faint uppercase font-bold mb-2">{label}</div>}
-      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
-        <defs>
-          <linearGradient id={`gradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill={`url(#gradient-${color})`} />
-        <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => {
-          const x = pad + (i / (points.length - 1)) * (w - pad * 2);
-          const y = h - pad - ((p.y - minY) / range) * (h - pad * 2);
-          return (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r="4"
-              fill={color}
-              className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            >
-              <title>{`${p.label || i + 1}: ${p.y.toLocaleString("tr-TR")}`}</title>
-            </circle>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
+import HistoryRecordList from "./_components/HistoryRecordList";
+import HistorySummaryPanel from "./_components/HistorySummaryPanel";
+import type { Engine, HistoryEntry, HistoryResponse, HistorySummary } from "./_lib/types";
+import { HISTORY_PAGE_SIZE } from "./_lib/types";
 
 export default function SaatGecmisiPage() {
   const router = useRouter();
@@ -264,109 +185,39 @@ export default function SaatGecmisiPage() {
           </div>
         ) : (
           <div className="animate-fade-in">
-            {/* Modern İstatistik Kartları */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm">📈</span>
-                  <div className="text-[9px] text-faint uppercase font-bold">Toplam Artış</div>
-                </div>
-                <div className="font-mono text-[15px] font-bold text-text mt-1">{totalDelta.toLocaleString("tr-TR")} sa</div>
-              </div>
-              <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm">⚡</span>
-                  <div className="text-[9px] text-faint uppercase font-bold">Günlük Ort.</div>
-                </div>
-                <div className="font-mono text-[15px] font-bold text-amber mt-1">{avgPerDay.toFixed(1)} sa</div>
-              </div>
-              <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm">📋</span>
-                  <div className="text-[9px] text-faint uppercase font-bold">Kayıt Sayısı</div>
-                </div>
-                <div className="font-mono text-[15px] font-bold text-text mt-1">{historyTotal}</div>
-              </div>
-            </div>
+            <HistorySummaryPanel
+              history={history}
+              totalDelta={totalDelta}
+              avgPerDay={avgPerDay}
+              historyTotal={historyTotal}
+              hasLoadData={hasLoadData}
+            />
 
-            {/* Geliştirilmiş Grafikler */}
-            <div className="mb-4">
-              <MiniLineChart points={history.map((h) => ({ y: h.hours, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#e8952f" label="Çalışma Saati" />
-            </div>
-
-            {hasLoadData && (
-              <div className="mb-4">
-                <MiniLineChart points={history.filter((h) => typeof h.load_kw === "number").map((h) => ({ y: h.load_kw as number, label: new Date(h.date).toLocaleDateString("tr-TR") }))} color="#3fb5c4" label="Yük (kW)" />
-              </div>
-            )}
-
-            {/* Geçmiş Kayıtlar */}
-            {historyLoading && <div className="text-[11px] text-muted mb-2">Geçmiş yükleniyor...</div>}
-            <div className="flex flex-col gap-1.5">
-              {[...history].reverse().map((h, idx) => {
-                const realIdx = history.length - 1 - idx;
-                const prev = history[realIdx - 1];
-                const delta = prev ? h.hours - prev.hours : null;
-                const isEditing = editingIdx === realIdx;
-
-                if (isEditing) {
-                  return (
-                    <div key={realIdx} className="bg-panel border border-teal/40 rounded-xl px-3 py-2.5 flex flex-col gap-2 animate-fade-in">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <input type="date" value={editDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setEditDate(e.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] outline-none focus:border-teal" />
-                        <input type="number" value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder="Saat" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono outline-none focus:border-teal" />
-                        <input type="number" value={editLoad} onChange={(e) => setEditLoad(e.target.value)} placeholder="Yük (kW)" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono outline-none focus:border-teal" />
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingIdx(null)} className="flex-1 py-1.5 rounded-lg border border-border text-muted font-bold text-[11.5px] hover:bg-panel2 transition">Vazgeç</button>
-                        <button onClick={() => saveEdit(realIdx)} disabled={saving} className="flex-1 py-1.5 rounded-lg bg-teal text-[#06181b] font-bold text-[11.5px] disabled:opacity-50 hover:brightness-110 transition"> Kaydet</button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div key={realIdx} className="flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5 group">
-                    <span className="text-[12px] text-text flex-shrink-0 w-20">{new Date(h.date).toLocaleDateString("tr-TR")}</span>
-                    <span className="font-mono text-[12.5px] font-semibold text-text flex-1 text-center">
-                      {h.hours.toLocaleString("tr-TR")} sa
-                      {typeof h.load_kw === "number" && <span className="text-teal"> · {h.load_kw.toLocaleString("tr-TR")} kW</span>}
-                    </span>
-                    <span className="font-mono text-[11.5px] text-amber flex-shrink-0">{delta === null ? "İlk kayıt" : `+${delta.toLocaleString("tr-TR")}`}</span>
-                    {canEdit && (
-                      confirmDeleteIdx === realIdx ? (
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button onClick={() => deleteEntry(realIdx)} disabled={saving} className="text-[10px] font-bold text-[#1a1206] bg-red rounded-md px-1.5 py-1 hover:brightness-110 transition">Evet</button>
-                          <button onClick={() => setConfirmDeleteIdx(null)} className="text-[10px] font-bold text-muted border border-border rounded-md px-1.5 py-1 hover:bg-panel2 transition">Vazgeç</button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition">
-                          <button onClick={() => startEdit(realIdx)} className="text-[11px] text-teal px-1 hover:scale-110 transition">✏️</button>
-                          <button onClick={() => setConfirmDeleteIdx(realIdx)} className="text-[11px] text-red px-1 hover:scale-110 transition">🗑️</button>
-                        </div>
-                      )
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {historyTotal > history.length && (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-border bg-panel px-3 py-2">
-                <button
-                  type="button"
-                  disabled={historyPage <= 1 || historyLoading}
-                  onClick={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.max(1, page - 1)); }}
-                  className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted disabled:opacity-40"
-                >Önceki</button>
-                <span className="text-[11px] text-muted">Sayfa {historyPage} / {historyTotalPages} · {historyTotal} kayıt</span>
-                <button
-                  type="button"
-                  disabled={historyPage >= historyTotalPages || historyLoading}
-                  onClick={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.min(historyTotalPages, page + 1)); }}
-                  className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted disabled:opacity-40"
-                >Sonraki</button>
-              </div>
-            )}
+            <HistoryRecordList
+              history={history}
+              historyLoading={historyLoading}
+              editingIdx={editingIdx}
+              editDate={editDate}
+              editHours={editHours}
+              editLoad={editLoad}
+              confirmDeleteIdx={confirmDeleteIdx}
+              saving={saving}
+              canEdit={canEdit}
+              historyPage={historyPage}
+              historyTotal={historyTotal}
+              historyTotalPages={historyTotalPages}
+              onEditDateChange={setEditDate}
+              onEditHoursChange={setEditHours}
+              onEditLoadChange={setEditLoad}
+              onStartEdit={startEdit}
+              onCancelEdit={() => setEditingIdx(null)}
+              onSaveEdit={saveEdit}
+              onDelete={deleteEntry}
+              onRequestDelete={setConfirmDeleteIdx}
+              onCancelDelete={() => setConfirmDeleteIdx(null)}
+              onPrevious={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.max(1, page - 1)); }}
+              onNext={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.min(historyTotalPages, page + 1)); }}
+            />
           </div>
         )}
       </div>
