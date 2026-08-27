@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { uploadVideoChunked } from "@/lib/chunkUpload";
-import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
-import { getPendingOfflineCount, queueRecord, syncOfflineQueue, type QueuedMedia } from "@/lib/offlineQueue";
+import { getPendingOfflineCount, queueRecord, syncOfflineQueue } from "@/lib/offlineQueue";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -21,15 +19,15 @@ import CompletionSubmitBar from "./_components/CompletionSubmitBar";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technicians";
-import type { MaintenanceType, ReportAttachment, VideoRef } from "@/lib/types";
+import type { MaintenanceType } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
-import { compressImage } from "@/lib/imageCompression";
 import AdditionalMaintenanceTypes from "./_components/AdditionalMaintenanceTypes";
+import { useCompletionEvidenceMedia } from "./_hooks/useCompletionEvidenceMedia";
 import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
 import { checklistForType } from "./_lib/checklist";
-import { makeOfflineId, withTimeout } from "./_lib/offlineHelpers";
+import { makeOfflineId } from "./_lib/offlineHelpers";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -62,44 +60,13 @@ export default function TamamlaPage() {
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
 
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [videos, setVideos] = useState<VideoRef[]>([]);
-  const [videoBusy, setVideoBusy] = useState(false);
-  const [reportAttachments, setReportAttachments] = useState<ReportAttachment[]>([]);
-  const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
+  const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, photoBusy, videoBusy, reportAttachmentBusy, setReportAttachments, setReportAttachmentBusy, handlePhotos, handleVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useCompletionEvidenceMedia();
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
-  const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
-  const offlinePreviewUrlsRef = useRef<Record<string, string>>({});
   const clientRequestIdRef = useRef<string | null>(null);
-  
+
   const [submitting, setSubmitting] = useState(false);
-
-  function createOfflinePreview(id: string, blob: Blob): string {
-    const url = URL.createObjectURL(blob);
-    offlinePreviewUrlsRef.current[id] = url;
-    setOfflinePreviews((current) => ({ ...current, [id]: url }));
-    return url;
-  }
-
-  function revokeOfflinePreview(id: string): void {
-    const url = offlinePreviewUrlsRef.current[id];
-    if (url) URL.revokeObjectURL(url);
-    delete offlinePreviewUrlsRef.current[id];
-    setOfflinePreviews((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
-  }
-
-  useEffect(() => () => {
-    Object.values(offlinePreviewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-    offlinePreviewUrlsRef.current = {};
-  }, []);
 
   const loadPanel = useCallback(async () => {
     try {
@@ -212,146 +179,6 @@ export default function TamamlaPage() {
   const isManagerInternalRecord = user?.role === "yonetici" && technicianSource !== "external_service";
   const responsibleDurationMinutes = isManagerInternalRecord ? hoursInputToMinutes(responsibleTechnicianDuration) : null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0 || reportAttachments.length > 0;
-
-  async function handlePhotos(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length || photoBusy) {
-      e.target.value = "";
-      return;
-    }
-    setPhotoBusy(true);
-    const uploaded: string[] = [];
-    try {
-      for (const f of files) {
-        try {
-          const compressed = await compressImage(f);
-          const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-          if (!navigator.onLine) {
-            const id = makeOfflineId();
-            setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-            createOfflinePreview(id, compressed);
-            uploaded.push(`offline:${id}`);
-            continue;
-          }
-          const url = await withTimeout(
-            uploadMaintenanceMedia(
-              new File([compressed], photoName, { type: "image/jpeg" }),
-              "photo",
-            ),
-            150_000,
-            "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.",
-          );
-          uploaded.push(url);
-        } catch (error) {
-          if (!navigator.onLine) {
-            try {
-              const compressed = await compressImage(f);
-              const id = makeOfflineId();
-              const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-              setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-              createOfflinePreview(id, compressed);
-              uploaded.push(`offline:${id}`);
-              continue;
-            } catch {
-              // Aşağıdaki genel hata kullanıcıya gösterilir.
-            }
-          }
-          const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-          toast.error(`${f.name} yüklenemedi: ${message}`);
-        }
-      }
-    } finally {
-      setPhotos((prev) => [...prev, ...uploaded]);
-      setPhotoBusy(false);
-      e.target.value = "";
-    }
-  }
-
-  function removePhoto(idx: number) {
-    const photo = photos[idx];
-    if (photo && photo.startsWith("offline:")) {
-      const id = photo.slice("offline:".length);
-      setOfflineMedia((current) => current.filter((media) => media.id !== id));
-      revokeOfflinePreview(id);
-    }
-    setPhotos((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  // Videolar küçük parçalara bölünerek uygulama API’sine gönderilir ve Blob’a yazılır.
-  async function handleVideos(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length || videoBusy) {
-      e.target.value = "";
-      return;
-    }
-
-    if (videos.length + files.length > 5) {
-      toast.warning("Toplamda en fazla 5 video ekleyebilirsiniz.");
-      e.target.value = "";
-      return;
-    }
-
-    setVideoBusy(true);
-    try {
-      for (const f of files) {
-        if (f.size > 100 * 1024 * 1024) {
-          toast.error(`${f.name} çok büyük (en fazla 100MB).`);
-          continue;
-        }
-        if (!navigator.onLine) {
-          const id = makeOfflineId();
-          setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-          createOfflinePreview(id, f);
-          setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
-          continue;
-        }
-        try {
-          const url = await withTimeout(
-            uploadVideoChunked(f.type ? f : new File([f], f.name, { type: "video/mp4", lastModified: f.lastModified })),
-            600_000,
-            "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
-          );
-          setVideos((current) => [...current, { url, filename: f.name }]);
-        } catch (err) {
-          if (!navigator.onLine) {
-            const id = makeOfflineId();
-            setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-            createOfflinePreview(id, f);
-            setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name }]);
-            continue;
-          }
-          const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
-          toast.error(`${f.name} yüklenemedi: ${message}`);
-        }
-      }
-    } finally {
-      setVideoBusy(false);
-      e.target.value = "";
-    }
-  }
-
-  function removeVideo(idx: number) {
-    const video = videos[idx];
-    if (video?.url?.startsWith("offline:")) {
-      const id = video.url.slice("offline:".length);
-      setOfflineMedia((current) => current.filter((media) => media.id !== id));
-      revokeOfflinePreview(id);
-    }
-    setVideos((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function handleOfflineReportFile(file: File, attachment: ReportAttachment): void {
-    const id = attachment.url.startsWith("offline:") ? attachment.url.slice("offline:".length) : makeOfflineId();
-    setOfflineMedia((current) => [...current, { id, kind: "report", name: attachment.filename, type: attachment.mime, blob: file }]);
-    createOfflinePreview(id, file);
-  }
-
-  function removeReportAttachment(attachment: ReportAttachment): void {
-    if (!attachment.url.startsWith("offline:")) return;
-    const id = attachment.url.slice("offline:".length);
-    setOfflineMedia((current) => current.filter((media) => media.id !== id));
-    revokeOfflinePreview(id);
-  }
 
   function toggleExtra(key: string, checked: boolean) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));

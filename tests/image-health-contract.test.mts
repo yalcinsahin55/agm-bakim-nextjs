@@ -48,15 +48,21 @@ test("Vercel keeps the notification refresh cron after optional MongoDB probing 
 });
 test("maintenance media handlers always clear loading state after processing", () => {
   const completionSource = readProjectFile("app/tamamla/page.tsx");
+  const completionMediaHook = readProjectFile("app/tamamla/_hooks/useCompletionEvidenceMedia.ts");
   const completionEvidenceSource = readProjectFile("app/tamamla/_components/CompletionEvidenceSection.tsx");
   const editSource = readProjectFile("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const editMediaHook = readProjectFile("app/kayitlar/_hooks/useRecordEditMedia.ts");
   const compressionSource = readProjectFile("lib/imageCompression.ts");
 
-  assert.match(completionSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
-  assert.match(completionSource, /try \{[\s\S]*setPhotos\(\(prev\) => \[\.\.\.prev, \.\.\.uploaded\]\);[\s\S]*setPhotoBusy\(false\);[\s\S]*e\.target\.value = "";[\s\S]*\} finally/);
+  assert.match(completionMediaHook, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
+  assert.match(completionSource, /useCompletionEvidenceMedia/);
+  assert.match(completionMediaHook, /videos\.length \+ files\.length > 5/);
+  assert.match(completionMediaHook, /uploadVideoChunked\([\s\S]*600_000/);
+  assert.match(completionMediaHook, /setOfflineMedia\(\(current\) =>/);
+  assert.match(completionMediaHook, /URL\.revokeObjectURL/);
+  assert.match(completionMediaHook, /try \{[\s\S]*setPhotos\(\(current\) => \[\.\.\.current, \.\.\.uploaded\]\);[\s\S]*setPhotoBusy\(false\);[\s\S]*event\.target\.value = "";[\s\S]*\} finally/);
   assert.match(completionEvidenceSource, /disabled=\{submitting \|\| photoBusy \|\| videoBusy/);
-  assert.match(completionSource, /uploadMaintenanceMedia\([\s\S]*150_000/);
+  assert.match(completionMediaHook, /uploadMaintenanceMedia\([\s\S]*150_000/);
   assert.match(editMediaHook, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
   assert.match(editMediaHook, /const \[mediaBusy, setMediaBusy\] = useState\(false\)/);
   assert.match(editMediaHook, /setMediaBusy\(true\);[\s\S]*setMediaBusy\(false\);/);
