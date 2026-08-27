@@ -132,6 +132,11 @@ test("engine hours and maintenance type changes are audited with before/after da
   assert.match(maintenanceTypeChange, /afterAudit/);
   assert.match(maintenanceTypeChange, /bakım türü silindi/);
   assert.match(auditPage, /maintenance_type: "Bakım türü"/);
+  assert.match(auditPage, /PASSWORD_RESET_SEARCH = "şifresi yönetici tarafından sıfırlandı"/);
+  assert.match(auditPage, /action: "update"/);
+  assert.match(auditPage, /entity: "user"/);
+  assert.match(auditPage, /Önceki oturumlar geçersiz kılındı/);
+  assert.doesNotMatch(auditPage, /password_hash/);
 });
 
 test("records list does not reintroduce media payloads", async () => {
