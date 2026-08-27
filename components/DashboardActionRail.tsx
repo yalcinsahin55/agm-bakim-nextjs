@@ -6,7 +6,7 @@ import { canAccessRoute, canWriteMaintenance, normalizeRole } from "@/lib/permis
 import type { PanelItem, StatusKey } from "@/lib/status";
 import { STATUS_LABELS } from "@/lib/status";
 import { buildOperationQueue, filterOperationItems } from "@/app/dashboard/_lib/operationQueue";
-import { ENGINE_STATUS_VIEW, type DashboardHealthRow, type DashboardEngine } from "@/app/dashboard/_lib/types";
+import { ENGINE_STATUS_VIEW, type DashboardHealthRow } from "@/app/dashboard/_lib/types";
 
 type DashboardActionRailProps = {
   role: string | undefined;

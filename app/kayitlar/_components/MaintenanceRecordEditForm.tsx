@@ -6,7 +6,7 @@ import { queueRecord } from "@/lib/offlineQueue";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
-import type { Engine, MaintenanceRecord, MaintenanceType } from "../_types";
+import type { Engine, MaintenanceRecord } from "../_types";
 import { hoursInputToMinutes, minutesToHoursInput } from "../_lib/recordDisplay";
 import { toLocalDateTimeInput } from "../_lib/recordMedia";
 import { RecordEditEngineSection, RecordEditTechnicianSourceSection } from "./RecordEditAdminSections";

@@ -1,5 +1,4 @@
 import PDFDocument from "pdfkit";
-import type PDFKit from "pdfkit";
 import { getPdfFontPaths } from "@/lib/pdfFonts";
 import { loadDefaultExportLogo } from "@/lib/exportBranding";
 import { fetchExportLogo } from "@/lib/assistantExportLogo";

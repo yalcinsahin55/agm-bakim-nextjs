@@ -56,7 +56,6 @@ test("legacy media and oil PDF fallback remain bounded", async () => {
 });
 
 test("record date and bulk update safeguards stay in place", async () => {
-  const records = await source("app/api/records/route.ts");
   const recordCreate = await source("app/api/records/_lib/recordCreate.ts");
   const recordHelpers = await source("app/api/records/_lib/recordRouteHelpers.ts");
   const maintenanceTypes = await source("app/api/maintenance-types/[key]/route.ts");
@@ -140,8 +139,8 @@ test("engine hours and maintenance type changes are audited with before/after da
 });
 
 test("records list does not reintroduce media payloads", async () => {
-  const records = await source("app/api/records/route.ts");
   const recordsQuery = await source("app/api/records/_lib/recordsQuery.ts");
+  const records = await source("app/api/records/route.ts");
   assert.match(recordsQuery, /Liste endpointinde medya gönderilmez/);
   assert.match(recordsQuery, /include_media/);
   assert.match(records, /getRecords/);
@@ -386,12 +385,10 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const presignedUpload = await source("app/api/blob/upload-presigned/route.ts");
   const uploadHelper = await source("lib/reportAttachmentUpload.ts");
   const schema = await source("lib/schemas.ts");
-  const create = await source("app/api/records/route.ts");
   const createModule = await source("app/api/records/_lib/recordCreate.ts");
   const updatePatch = await source("app/api/records/[id]/_lib/recordPatch.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
-  const assistantExport = await source("app/api/assistant/export/route.ts");
   const assistantExportLogo = await source("lib/assistantExportLogo.ts");
   const pdfSecurity = await source("lib/pdfSecurity.ts");
   const blobStorage = await source("lib/blobStorage.ts");
@@ -405,7 +402,6 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const complete = await source("app/tamamla/page.tsx");
   const completeEvidence = await source("app/tamamla/_components/CompletionEvidenceSection.tsx");
   const records = await source("app/kayitlar/page.tsx");
-  const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const recordsEditMedia = await source("app/kayitlar/_components/RecordEditMediaSection.tsx");
   const recordsMedia = await source("app/kayitlar/_lib/recordMedia.ts");
   const recordMediaModals = await source("components/RecordMediaModals.tsx");
@@ -590,11 +586,11 @@ test("assistant exports preserve report filenames and maintenance work metrics",
 
 test("all generated PDF and Excel reports use the shared Yeşil Global logo", async () => {
   const branding = await source("lib/exportBranding.ts");
-  const assistantExport = await source("app/api/assistant/export/route.ts");
   const assistantExportPdf = await source("lib/assistantExportPdf.ts");
   const assistantExportExcel = await source("lib/assistantExportExcel.ts");
   const pdfExport = await source("app/api/export/pdf/route.ts");
   const excelExport = await source("app/api/export/excel/route.ts");
+  const assistantExport = await source("app/api/assistant/export/route.ts");
   assert.match(branding, /yesil-global-logo\.png/);
   assert.match(branding, /yesil-global-logo\.jpg/);
   assert.match(assistantExport, /assistantExportPdf|assistantExportExcel/);
@@ -609,11 +605,11 @@ test("all generated PDF and Excel reports use the shared Yeşil Global logo", as
 });
 test("engine reassignment stays manager-only and repairs grouped maintenance tracking", async () => {
   const updatePatch = await source("app/api/records/[id]/_lib/recordPatch.ts");
+  const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const confirm = await source("app/api/records/[id]/confirm/route.ts");
   const helper = await source("lib/reassignMaintenanceEngine.ts");
   const schemas = await source("lib/schemas.ts");
   const recordsPage = await source("app/kayitlar/page.tsx");
-  const recordsEditForm = await source("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const confirmationHook = await source("app/kayitlar/_hooks/useRecordConfirmation.ts");
   const confirmationModal = await source("components/MaintenanceConfirmationModal.tsx");
   assert.match(schemas, /recordConfirmationSchema = z\.object\(\{[\s\S]*engine_id/);
