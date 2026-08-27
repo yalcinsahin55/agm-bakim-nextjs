@@ -40,6 +40,12 @@ const GROUPS = [
     ],
   },
   {
+    title: "Hesap",
+    items: [
+      { href: "/hesap", icon: "🔐", label: "Hesap ve Şifre", desc: "Şifrenizi güvenle değiştirin" },
+    ],
+  },
+  {
     title: "Yönetim",
     admin: true,
     items: [

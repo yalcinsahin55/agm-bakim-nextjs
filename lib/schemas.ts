@@ -46,9 +46,33 @@ export const adminUserSchema = z.object({
   allowed_work_domains: z.array(workDomainSchema).max(3).optional(),
 });
 
+const passwordInputSchema = z
+  .string({ required_error: "Şifre gereklidir." })
+  .min(6, "Şifre en az 6 karakter olmalıdır.")
+  .max(128, "Şifre çok uzun.");
+
+export const passwordChangeSchema = z.object({
+  current_password: passwordInputSchema,
+  new_password: passwordInputSchema,
+  confirm_password: passwordInputSchema,
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Yeni şifre ve tekrarı aynı olmalıdır.",
+  path: ["confirm_password"],
+});
+
+export const passwordResetSchema = z.object({
+  new_password: passwordInputSchema,
+  confirm_password: passwordInputSchema,
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Yeni şifre ve tekrarı aynı olmalıdır.",
+  path: ["confirm_password"],
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type AdminUserInput = z.infer<typeof adminUserSchema>;
+export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
+export type PasswordResetInput = z.infer<typeof passwordResetSchema>;
 
 // 📋 Bakım kaydı validasyonu
 export const recordSchema = z.object({

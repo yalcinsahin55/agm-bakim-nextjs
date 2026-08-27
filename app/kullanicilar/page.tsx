@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { invalidateCachedFetch } from "@/lib/apiCache";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -53,6 +54,10 @@ export default function KullanicilarPage() {
   const [form, setForm] = useState({ full_name: "", phone: "", password: "", role: "teknisyen", technician_type: "mekanik" });
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
@@ -122,6 +127,44 @@ export default function KullanicilarPage() {
     } catch {
       toast.dismiss(loadingToast);
       toast.error("Sunucu hatası.");
+    }
+  }
+
+  async function resetUserPassword(u: UserRow): Promise<void> {
+    if (resetPassword !== resetPasswordConfirmation) {
+      toast.error("Yeni şifre ve tekrarı aynı olmalıdır.");
+      return;
+    }
+    setResettingPassword(true);
+    const loadingToast = toast.loading("Kullanıcı şifresi sıfırlanıyor...");
+    try {
+      const res = await fetch(`/api/users/${u.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: resetPassword, confirm_password: resetPasswordConfirmation }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; requiresLogin?: boolean };
+      if (!res.ok) {
+        toast.dismiss(loadingToast);
+        toast.error(data.error || "Kullanıcı şifresi sıfırlanamadı.");
+        return;
+      }
+      toast.dismiss(loadingToast);
+      toast.success("Kullanıcı şifresi sıfırlandı; eski oturumları kapatıldı.");
+      setResetUserId(null);
+      setResetPassword("");
+      setResetPasswordConfirmation("");
+      if (data.requiresLogin) {
+        invalidateCachedFetch("/api/auth/me");
+        router.replace("/login");
+        return;
+      }
+      load();
+    } catch {
+      toast.dismiss(loadingToast);
+      toast.error("Sunucu hatası.");
+    } finally {
+      setResettingPassword(false);
     }
   }
 
@@ -289,6 +332,22 @@ export default function KullanicilarPage() {
                 <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current ? current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item) : current)} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
                 <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="shrink-0 whitespace-nowrap rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
               </div>
+              {resetUserId === u.id ? (
+                <div className="mb-2 rounded-lg border border-amber/30 bg-amber/5 p-2.5">
+                  <div className="mb-2 text-[10px] font-bold text-amber">{u.full_name} için yeni şifre belirle</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Yeni şifre" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
+                    <input type="password" value={resetPasswordConfirmation} onChange={(event) => setResetPasswordConfirmation(event.target.value)} placeholder="Yeni şifre tekrarı" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-[#1a1206] disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</button>
+                    <button onClick={() => { setResetUserId(null); setResetPassword(""); setResetPasswordConfirmation(""); }} disabled={resettingPassword} className="rounded-lg border border-border px-2.5 py-2 text-[10px] font-bold text-muted">Vazgeç</button>
+                  </div>
+                  <p className="mt-2 text-[9px] leading-relaxed text-faint">Yeni şifreyi kullanıcıya güvenli bir kanaldan iletin. Eski oturumlar işlem sonrasında geçersiz olur.</p>
+                </div>
+              ) : (
+                <button onClick={() => { setResetUserId(u.id); setResetPassword(""); setResetPasswordConfirmation(""); }} className="mb-2 w-full rounded-lg border border-amber/30 px-2.5 py-2 text-[10px] font-bold text-amber hover:bg-amber/10 transition">Şifreyi sıfırla</button>
+              )}
               <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value as RoleKey })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
                   {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
