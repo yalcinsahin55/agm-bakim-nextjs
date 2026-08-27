@@ -48,12 +48,13 @@ test("Vercel keeps the notification refresh cron after optional MongoDB probing 
 });
 test("maintenance media handlers always clear loading state after processing", () => {
   const completionSource = readProjectFile("app/tamamla/page.tsx");
+  const completionEvidenceSource = readProjectFile("app/tamamla/_components/CompletionEvidenceSection.tsx");
   const editSource = readProjectFile("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
   const compressionSource = readProjectFile("lib/imageCompression.ts");
 
   assert.match(completionSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
   assert.match(completionSource, /try \{[\s\S]*setPhotos\(\(prev\) => \[\.\.\.prev, \.\.\.uploaded\]\);[\s\S]*setPhotoBusy\(false\);[\s\S]*e\.target\.value = "";[\s\S]*\} finally/);
-  assert.match(completionSource, /disabled=\{submitting \|\| photoBusy \|\| videoBusy/);
+  assert.match(completionEvidenceSource, /disabled=\{submitting \|\| photoBusy \|\| videoBusy/);
   assert.match(completionSource, /uploadMaintenanceMedia\([\s\S]*150_000/);
   assert.match(editSource, /import \{ compressImage \} from "@\/lib\/imageCompression"/);
   assert.match(editSource, /const \[mediaBusy, setMediaBusy\] = useState\(false\)/);

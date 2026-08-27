@@ -10,15 +10,18 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import Lightbox from "@/components/Lightbox";
-import MaintenanceEvidencePreview from "@/components/MaintenanceEvidencePreview";
 import MaintenanceTimeTracking from "@/components/MaintenanceTimeTracking";
 import MaintenanceChecklist from "@/components/MaintenanceChecklist";
 import MaintenanceDefinitionSection from "@/components/MaintenanceDefinitionSection";
+import CompletionQuickBanner from "./_components/CompletionQuickBanner";
+import CompletionOfflineStatus from "./_components/CompletionOfflineStatus";
+import CompletionTechnicianSection from "./_components/CompletionTechnicianSection";
+import CompletionEvidenceSection from "./_components/CompletionEvidenceSection";
+import CompletionSubmitBar from "./_components/CompletionSubmitBar";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
-import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_NAME, TECHNICIAN_TYPE_LABELS, type TechnicianOption } from "@/lib/technicians";
+import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technicians";
 import type { MaintenanceType, ReportAttachment, VideoRef } from "@/lib/types";
-import ReportAttachmentPicker from "@/components/ReportAttachmentPicker";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
@@ -598,41 +601,20 @@ export default function TamamlaPage() {
           </div>
         </div>
 
-        {quickMode && (
-          <section className="mb-3 rounded-2xl border border-teal/40 bg-gradient-to-br from-teal/10 via-panel to-panel p-4" role="status" aria-labelledby="quick-maintenance-heading" data-testid="quick-maintenance-banner">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal">01 · Saha başlangıcı</div>
-                <h2 id="quick-maintenance-heading" className="mt-1 text-base font-extrabold text-text">Hızlı bakım akışı</h2>
-                <p className="mt-1 max-w-2xl text-[10.5px] leading-4 text-muted">QR bağlantısı motoru veya bakım türünü önseçti. Başlamadan önce aşağıdaki bilgiyi ve bakım saatlerini kontrol edin; kaydetme işlemi mevcut onay, kanıt ve offline kurallarıyla devam eder.</p>
-              </div>
-              <span className={`w-fit flex-shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-extrabold ${isOnline ? "border-green/30 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber"}`}>{isOnline ? "BAĞLANTI HAZIR" : "ÇEVRİMDIŞI KUYRUK"}</span>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-xl border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-engine">
-                <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Motor</div>
-                <div className="mt-1 truncate text-[12px] font-extrabold text-text">{engineId ? engines.find((engine) => engine._id === engineId)?.name || "Motor yükleniyor..." : "Motor seçilecek"}</div>
-                <div className="mt-1 text-[9.5px] text-muted">{qrEngineId ? "QR ile önseçildi ve kilitlendi" : "Saha başlangıcında seçin"}</div>
-              </div>
-              <div className="rounded-xl border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-type">
-                <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Bakım türü</div>
-                <div className="mt-1 truncate text-[12px] font-extrabold text-text">{typeKey ? types.find((type) => type.key === typeKey)?.label || "Bakım türü yükleniyor..." : "Bakım türü seçilecek"}</div>
-                <div className="mt-1 text-[9.5px] text-muted">{qrTypeKey ? "QR ile önseçildi ve kilitlendi" : "Saha başlangıcında seçin"}</div>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-col gap-2 text-[10px] leading-4 text-muted sm:flex-row sm:items-center sm:justify-between">
-              <span><strong className="text-teal">Sıradaki adım:</strong> bakım zamanı → ekip katkısı → kontrol listesi → kanıt → kaydet.</span>
-              {(qrEngineId || qrTypeKey) && <button type="button" onClick={() => router.replace("/tamamla")} className="w-fit rounded-lg border border-border px-2.5 py-1.5 font-bold text-muted transition hover:border-teal/50 hover:text-text" data-testid="quick-maintenance-exit">Manuel akışa geç</button>}
-            </div>
-          </section>
-        )}
-        {(!isOnline || pendingOfflineCount > 0 || offlineMedia.length > 0) && (
-          <div className="mb-3 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-amber" role="status">
-            <div className="font-bold">{!isOnline ? "Çevrimdışı çalışma açık." : "Senkronizasyon bekleyen kayıt var."}</div>
-            <div className="mt-0.5 text-[10px] text-muted">{!isOnline ? "Kayıt ve seçtiğiniz medya/rapor ekleri cihazda tutulur; bağlantı gelince arka planda veya uygulama yeniden açıldığında gönderilir." : `${pendingOfflineCount} kayıt gönderilmeyi bekliyor. Medya veya rapor eki olan işler için bağlantı geldikten sonra uygulamayı açık tutun.`}</div>
-            {isOnline && pendingOfflineCount > 0 && <button type="button" onClick={() => { window.dispatchEvent(new Event("offline-queue:sync")); }} className="mt-2 rounded-lg border border-amber/40 px-2.5 py-1.5 text-[10px] font-bold text-amber">Şimdi senkronize et</button>}
-          </div>
-        )}
+        {quickMode && <CompletionQuickBanner
+          isOnline={isOnline}
+          engineName={engineId ? engines.find((engine) => engine._id === engineId)?.name || "Motor yükleniyor..." : ""}
+          typeName={typeKey ? types.find((type) => type.key === typeKey)?.label || "Bakım türü yükleniyor..." : ""}
+          qrEngineId={qrEngineId}
+          qrTypeKey={qrTypeKey}
+          onExitQuickMode={() => router.replace("/tamamla")}
+        />}
+        <CompletionOfflineStatus
+          isOnline={isOnline}
+          pendingOfflineCount={pendingOfflineCount}
+          hasOfflineMedia={offlineMedia.length > 0}
+          onSyncNow={() => { window.dispatchEvent(new Event("offline-queue:sync")); }}
+        />
 
         <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="space-y-3">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
@@ -668,20 +650,24 @@ export default function TamamlaPage() {
             />
           </div>
 
-          <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="technician-source-heading">
-            <div className="mb-3 flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">03 · Teknisyen ve kaynak</div><h2 id="technician-source-heading" className="mt-1 text-base font-extrabold text-text">Ekip katkısı</h2></div><span className="rounded-full border border-border bg-panel2 px-2 py-1 text-[9px] font-bold text-faint">YÖNETİCİ KONTROLLÜ</span></div>
-            {user?.role === "yonetici" ? <>
-              <label className="block text-[10.5px] font-bold uppercase tracking-wide text-muted">Sorumlu kaynağı
-                <select value={technicianSource} onChange={(event) => changeTechnicianSource(event.target.value as "internal" | "external_service")} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400 sm:max-w-md">
-                  <option value="internal">Kayıtlı teknisyenler / benim hesabım</option><option value="external_service">{EXTERNAL_SERVICE_TECHNICIAN_NAME}</option>
-                </select>
-              </label>
-              {technicianSource === "external_service" ? <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]"><input value={externalServiceName} onChange={(event) => setExternalServiceName(event.target.value)} placeholder="Servis veya firma adı (isteğe bağlı)" maxLength={160} className="w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400" /><div className="rounded-lg bg-purple-400/10 px-3 py-2.5 text-[10.5px] leading-4 text-purple-200">Bu kayıt sorumlu teknisyen performansına dahil edilmez; geçmişte dış hizmet olarak görünür.</div></div> : <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]"><label className="text-[10.5px] font-bold text-muted">Yetkili / sorumlu bakımcı
-                <select id="responsible-technician" value={responsibleTechnicianId} onChange={(event) => changeResponsibleTechnician(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-purple-400"><option value="">Varsayılan: benim hesabım</option>{responsibleTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.full_name} · {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</option>)}</select></label><label className="text-[10.5px] font-bold text-muted">Sorumlu teknisyen çalışma süresi (saat)
-                <input id="responsible-technician-duration" type="number" min="0.25" max="8784" step="0.25" value={responsibleTechnicianDuration === "" ? minutesToHoursInput(maintenanceDurationMinutes ?? 60) : responsibleTechnicianDuration} onChange={(event) => setResponsibleTechnicianDuration(event.target.value)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm font-mono text-text outline-none focus:border-purple-400" /><span className="mt-1 block text-[9.5px] text-faint">Varsayılan değer toplam bakım süresidir.</span></label></div>}
-            </> : <div className="rounded-lg border border-teal/20 bg-teal/5 px-3 py-2.5 text-[10.5px] text-muted">Kayıt, giriş yapan teknisyen hesabı adına oluşturulacak. Yönetici onayı gerektiren alanlar yalnızca yöneticilere gösterilir.</div>}
-            {technicianSource !== "external_service" && selectableTechnicians.length > 0 && <div className="mt-4 border-t border-border pt-3"><div className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Diğer çalışan teknisyenler</div><p className="mt-1 text-[10px] text-faint">Sorumlu teknisyen dışında bu bakımda çalışan ekip üyelerini seçin ve kişi bazlı sürelerini girin.</p><div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{selectableTechnicians.map((technician) => <div key={technician.id} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={otherTechnicianIds.includes(technician.id)} onChange={(event) => toggleOtherTechnician(technician.id, event.target.checked)} />{technician.full_name}<span className="text-[9.5px] text-faint">· {TECHNICIAN_TYPE_LABELS[technician.technician_type] || "Mekanik teknisyen"}</span></label>{otherTechnicianIds.includes(technician.id) && <label className="mt-2 flex items-center justify-between gap-2 text-[9.5px] text-faint">Çalışma süresi ({user?.role === "yonetici" ? "saat" : "dk"})<input type="number" min="0" max={user?.role === "yonetici" ? 8784 : 366 * 24 * 60} step={user?.role === "yonetici" ? "0.25" : "15"} value={user?.role === "yonetici" ? minutesToHoursInput(normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)) : normalizeTechnicianContributionDuration(otherTechnicianDurations[technician.id], maintenanceDurationMinutes ?? 60)} onChange={(event) => setOtherTechnicianDurations((current) => ({ ...current, [technician.id]: user?.role === "yonetici" ? (hoursInputToMinutes(event.target.value) ?? 0) : event.target.value }))} className="w-24 rounded-md border border-border bg-panel px-2 py-1.5 text-right font-mono text-[10.5px] text-text" /></label>}</div>)}</div></div>}
-          </section>
+          <CompletionTechnicianSection
+            isManager={user?.role === "yonetici"}
+            technicianSource={technicianSource}
+            externalServiceName={externalServiceName}
+            responsibleTechnicianId={responsibleTechnicianId}
+            responsibleTechnicianDuration={responsibleTechnicianDuration}
+            responsibleTechnicians={responsibleTechnicians}
+            selectableTechnicians={selectableTechnicians}
+            otherTechnicianIds={otherTechnicianIds}
+            otherTechnicianDurations={otherTechnicianDurations}
+            maintenanceDurationMinutes={maintenanceDurationMinutes}
+            onTechnicianSourceChange={changeTechnicianSource}
+            onExternalServiceNameChange={setExternalServiceName}
+            onResponsibleTechnicianChange={changeResponsibleTechnician}
+            onResponsibleTechnicianDurationChange={setResponsibleTechnicianDuration}
+            onOtherTechnicianToggle={toggleOtherTechnician}
+            onOtherTechnicianDurationChange={(id, value) => setOtherTechnicianDurations((current) => ({ ...current, [id]: value }))}
+          />
 
           {otherTypes.length > 0 && <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="additional-maintenance-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">04 · Birlikte tamamlanan bakımlar</div><h2 id="additional-maintenance-heading" className="mt-1 text-base font-extrabold text-text">Aynı işlemde tamamlanan diğer bakım türleri</h2><p className="mt-1 text-[10px] leading-4 text-faint">İşaretlenen bakım türleri aynı saat ve tarihle kaydedilir. Motor için tanımlı olmayan bakımda periyodu ayrıca girebilirsiniz.</p></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{otherTypes.map((type) => { const tracked = trackedKeys.has(type.key); const checked = extraKeys.includes(type.key); return <div key={type.key} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9.5px] text-faint">· tanımlı değil</span>}</label>{checked && !tracked && <label className="mt-2 block pl-6 text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-[11px] font-mono text-text" /></label>}</div>; })}</div></section>}
 
@@ -693,40 +679,40 @@ export default function TamamlaPage() {
               complete={checklistComplete}
               onItemChange={(item, checked) => setChecklist((current) => ({ ...current, [item]: checked }))}
             />
-            <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="evidence-heading">
-              <div className="mb-3">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">06 · Kanıt ve notlar</div>
-                <h2 id="evidence-heading" className="mt-1 text-base font-extrabold text-text">Bakım kanıtları</h2>
-                <p className="mt-1 text-[10px] text-faint">En az bir not, fotoğraf/video veya PDF/Excel/Word rapor eki eklenmesi zorunludur.</p>
-              </div>
-              <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">
-                Bakımcı notu
-                <textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" />
-              </label>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60">
-                  <span>{photoBusy ? "Fotoğraflar işleniyor..." : "Fotoğraf ekle"}<span className="mt-1 block text-[9px] text-faint">Birden fazla seçebilirsiniz</span></span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={submitting || photoBusy || videoBusy} onChange={handlePhotos} className="hidden" />
-                </label>
-                <label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60">
-                  <span>{videoBusy ? "Videolar yükleniyor..." : "Video ekle"}<span className="mt-1 block text-[9px] text-faint">En fazla 5 adet · 100MB</span></span>
-                  <input type="file" accept="video/*" multiple disabled={submitting || photoBusy || videoBusy} onChange={handleVideos} className="hidden" />
-                </label>
-              </div>
-              <ReportAttachmentPicker attachments={reportAttachments} onChange={setReportAttachments} onOfflineFile={handleOfflineReportFile} onBusyChange={setReportAttachmentBusy} onRemove={removeReportAttachment} disabled={submitting} />
-              <MaintenanceEvidencePreview
-                photos={photos}
-                videos={videos}
-                offlinePreviews={offlinePreviews}
-                onPhotoClick={(src) => setSelectedPhoto(src)}
-                onRemovePhoto={removePhoto}
-                onRemoveVideo={removeVideo}
-              />
-              {!evidenceReady && <div className="mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2.5 text-[10.5px] text-amber" role="status">Bakımı kaydetmek için en az bir bakım notu, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtı ekleyin.</div>}
-            </section>
+            <CompletionEvidenceSection
+              techNote={techNote}
+              setTechNote={setTechNote}
+              photos={photos}
+              videos={videos}
+              reportAttachments={reportAttachments}
+              offlinePreviews={offlinePreviews}
+              photoBusy={photoBusy}
+              videoBusy={videoBusy}
+              submitting={submitting}
+              evidenceReady={evidenceReady}
+              setReportAttachments={setReportAttachments}
+              setReportAttachmentBusy={setReportAttachmentBusy}
+              onPhotosChange={handlePhotos}
+              onVideosChange={handleVideos}
+              onOfflineReportFile={handleOfflineReportFile}
+              onRemoveReportAttachment={removeReportAttachment}
+              onPhotoClick={setSelectedPhoto}
+              onRemovePhoto={removePhoto}
+              onRemoveVideo={removeVideo}
+            />
           </div>
 
-          <div className="flex flex-col-reverse items-stretch justify-between gap-3 rounded-2xl border border-border bg-panel p-3 sm:flex-row sm:items-center"><div className="text-[10px] text-faint">Kaydetmeden önce zaman, kontrol listesi ve kanıt alanlarını doğrulayın.</div><div className="flex gap-2 sm:min-w-[320px] sm:justify-end"><button type="button" onClick={() => router.back()} className="flex-1 rounded-lg border border-border bg-panel2 px-4 py-3 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text sm:flex-none">İptal</button><button type="submit" disabled={submitting || photoBusy || videoBusy || reportAttachmentBusy || !chosenType || !checklistComplete || !timeTrackingReady || !evidenceReady} className="flex-1 rounded-lg bg-amber px-5 py-3 text-[12px] font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[220px]">{submitting ? "Kaydediliyor..." : "BAKIMI TAMAMLA"}</button></div></div>
+          <CompletionSubmitBar
+            submitting={submitting}
+            photoBusy={photoBusy}
+            videoBusy={videoBusy}
+            reportAttachmentBusy={reportAttachmentBusy}
+            hasChosenType={Boolean(chosenType)}
+            checklistComplete={checklistComplete}
+            timeTrackingReady={timeTrackingReady}
+            evidenceReady={evidenceReady}
+            onCancel={() => router.back()}
+          />
         </form>
       </main>
 
