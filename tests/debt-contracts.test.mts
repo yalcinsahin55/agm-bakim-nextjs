@@ -150,6 +150,7 @@ test("notification page is GET-first and the bell uses a lightweight unread coun
   const notificationBell = await source("components/NotificationBell.tsx");
   const unreadCache = await source("lib/notificationUnreadCache.ts");
   assert.match(notificationsGet, /Bildirim yenileme için POST/);
+  assert.match(notificationsGet, /setCachedUnreadCount\(user\._id, unreadCount\)/);
   assert.match(notificationsRefresh, /export async function POST/);
   assert.match(unreadCount, /notifications-unread-count/);
   assert.match(unreadCount, /countDocuments\(\{ user_id: user\._id, read_at: null \}\)/);

@@ -6,6 +6,7 @@ import { listUserNotificationsWithCurrentStatuses } from "@/lib/notifications";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { notificationsCollection, usersCollection } from "@/lib/dbCollections";
 import { withApiTiming } from "@/lib/performance";
+import { setCachedUnreadCount } from "@/lib/notificationUnreadCache";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ async function getNotifications(req: NextRequest) {
       listUserNotificationsWithCurrentStatuses(db, user._id, limit),
       notificationsCollection(db).countDocuments({ user_id: user._id, read_at: null }),
     ]);
+    setCachedUnreadCount(user._id, unreadCount);
     return NextResponse.json({ notifications, unreadCount, hasMore: notifications.length === limit });
   } catch (error) {
     console.error("Bildirimler yüklenirken hata:", error instanceof Error ? error.name : "UnknownError");
