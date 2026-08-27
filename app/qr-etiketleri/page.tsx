@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import TopBar from "@/components/TopBar";
 import Skeleton from "@/components/Skeleton";
+import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 
 type Engine = { _id: string; name: string };
 type MaintenanceType = { _id?: string; key: string; label: string };
@@ -60,9 +61,10 @@ export default function QrEtiketleriPage() {
   }, [items]);
 
   function buildLink(item: QrItem): string {
-    const query = item.kind === "engine" ? `engine_id=${encodeURIComponent(item.id)}` : `type_key=${encodeURIComponent(item.id)}`;
     const origin = typeof window === "undefined" ? "" : window.location.origin;
-    return `${origin}/tamamla?${query}&mode=quick&plant_id=avcikoru`;
+    return item.kind === "engine"
+      ? buildQuickMaintenanceLink({ origin, engineId: item.id })
+      : buildQuickMaintenanceLink({ origin, typeKey: item.id });
   }
 
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function QrEtiketleriPage() {
             </div>
           </div>
           <div className="mt-3 rounded-lg border border-amber/25 bg-amber/5 px-3 py-2 text-[10px] leading-relaxed text-muted">Hizalamanın doğru çıkması için yazdırma penceresinde <strong className="text-amber">Ölçek: %100 / Gerçek boyut</strong> ve <strong className="text-amber">Kenar boşlukları: Yok</strong> seçeneğini kullan.</div>
+          <div className="mt-2 rounded-lg border border-teal/25 bg-teal/5 px-3 py-2 text-[10px] leading-relaxed text-muted"><strong className="text-teal">Saha akışı:</strong> Etiketteki QR bağlantısı uygulamaya kamera eklemez; telefonun mevcut QR okuyucusu ile açıldığında Hızlı Bakım ekranına gider. Motor etiketi motoru, bakım türü etiketi bakım türünü önseçer.</div>
           <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel2 p-1">
             <button type="button" onClick={() => setMode("engine")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "engine" ? "bg-teal/15 text-teal shadow-sm" : "text-muted"}`}>Motor QR etiketleri</button>
             <button type="button" onClick={() => setMode("type")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "type" ? "bg-amber/15 text-amber shadow-sm" : "text-muted"}`}>Bakım türü QR etiketleri</button>
