@@ -164,13 +164,16 @@ test("notification page is GET-first and the bell uses a lightweight unread coun
 test("notifications are ordered by their latest notification event", async () => {
   const notificationModule = await source("lib/notifications.ts");
   const notificationsPage = await source("app/bildirimler/page.tsx");
+  const notificationGrouping = await source("app/bildirimler/_lib/notificationGroups.ts");
+  const notificationGroup = await source("app/bildirimler/_components/NotificationGroupCard.tsx");
   assert.match(notificationModule, /last_notified_at/);
   assert.match(notificationModule, /\$ifNull: \["\$last_notified_at", "\$created_at"\]/);
   assert.match(notificationModule, /_notification_sort_at: -1, created_at: -1, _id: -1/);
   assert.match(notificationModule, /sort_at: isNewNotification/);
-  assert.match(notificationsPage, /function sortNewestFirst\(notifications: Notification\[\]\)/);
-  assert.match(notificationsPage, /last_notified_at \?\? notification\.created_at/);
-  assert.match(notificationsPage, /Geldi: \{formatNotificationDate\(notification\)\}/);
+  assert.match(notificationGrouping, /function sortNewestFirst\(notifications: Notification\[\]\)/);
+  assert.match(notificationGrouping, /last_notified_at \?\? notification\.created_at/);
+  assert.match(notificationGroup, /Geldi: \{formatNotificationDate\(notification\)\}/);
+  assert.match(notificationsPage, /groupNotifications/);
   assert.match(await source("lib/dbIndexes.ts"), /notifications_user_sort_at_desc/);
 });
 
