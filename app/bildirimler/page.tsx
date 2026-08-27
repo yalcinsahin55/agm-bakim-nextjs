@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -111,6 +112,7 @@ export default function NotificationsPage() {
   const [loadError, setLoadError] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ gecikmis: true, kritik: true });
   const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
+  const router = useRouter();
 
   const load = useCallback(async (refresh = false) => {
     setLoadError("");
@@ -122,14 +124,14 @@ export default function NotificationsPage() {
         ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" })
         : await fetch("/api/notifications?limit=500", { cache: "no-store" });
       if (response.status === 401) {
-        window.location.href = "/login";
+        router.push("/login");
         return null;
       }
       if (!response.ok && shouldRefresh) {
         response = await fetch("/api/notifications?limit=500", { cache: "no-store" });
       }
       if (response.status === 401) {
-        window.location.href = "/login";
+        router.push("/login");
         return null;
       }
       if (!response.ok) throw new Error("Bildirimler yüklenemedi");
@@ -154,7 +156,7 @@ export default function NotificationsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => { load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
 

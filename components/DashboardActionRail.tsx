@@ -2,6 +2,8 @@ import Link from "next/link";
 import { canAccessRoute } from "@/lib/permissions";
 import type { StatusKey } from "@/lib/status";
 
+import type { JSX } from "react";
+
 type DashboardActionRailProps = {
   role: string | undefined;
   enginesCount: number;

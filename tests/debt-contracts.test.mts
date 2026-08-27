@@ -84,8 +84,9 @@ test("TypeScript strictness, npm tooling, and CI lint gate stay explicit", async
   assert.match(packageJson.devDependencies.jiti, /^\^2\./);
   assert.match(ci, /name: ESLint/);
   assert.match(ci, /run: npm run lint/);
-  assert.match(eslintConfig, /FlatCompat/);
+  assert.match(eslintConfig, /eslint-config-next\/core-web-vitals/);
   assert.match(eslintConfig, /next\/core-web-vitals/);
+  assert.match(eslintConfig, /react-hooks\/set-state-in-effect.*off/);
   assert.match(packageJson.scripts.lint, /--flag unstable_native_nodejs_ts_config/);
   assert.match(packageJson.scripts["build:service-worker"], /lib\/serviceWorker\.ts/);
   assert.match(packageJson.scripts.predev, /build:service-worker/);
@@ -356,8 +357,8 @@ test("session identity stays stable across phone changes", async () => {
   assert.match(root, /getCurrentUser/);
 });
 
-test("no protected UI route relies on middleware as its authorization boundary", async () => {
-  const middleware = await source("middleware.ts");
+test("no protected UI route relies on proxy as its authorization boundary", async () => {
+  const middleware = await source("proxy.ts");
   const permissions = await source("lib/permissions.ts");
   assert.match(middleware, /\.well-known/);
   assert.match(permissions, /canAccessRoute/);
@@ -603,7 +604,7 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
 
 test("Android TWA asset links stay public and match the signed package", async () => {
   const assetLinks = await source("public/.well-known/assetlinks.json");
-  const middleware = await source("middleware.ts");
+  const middleware = await source("proxy.ts");
   assert.match(assetLinks, /"package_name":\s*"com\.avcikoru\.bakim"/);
   assert.match(assetLinks, /3B:64:AC:01:49:D3:11:40:2D:C3:5D:74:E5:37:FF:2E:A5:3D:BA:4F:C7:B8:9B:FD:BA:A9:FE:70:C2:57:C9:0B/);
   assert.match(middleware, /\.well-known/);
