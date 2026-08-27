@@ -17,16 +17,15 @@ test("new maintenance form renders unsaved media without persisted-record proxy"
 });
 
 test("edit form distinguishes transient uploads from persisted record media", () => {
-  const source = readProjectFile("app/kayitlar/page.tsx");
-
-  assert.match(source, /function getPhotoSrc\(photo: string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
-  assert.match(source, /return transientUrls\?\.has\(photo\) \? photo : getMediaDisplayUrl\(photo, "image"\)/);
-  assert.match(source, /function getVideoSrc\(v: VideoItem \| string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
-  assert.match(source, /const \[transientPhotoUrls, setTransientPhotoUrls\] = useState<Set<string>>/);
-  assert.match(source, /getPhotoSrc\(p, offlinePreviews, transientPhotoUrls\)/);
-  assert.match(source, /setTransientPhotoUrls\(\(current\) =>/);
+  const media = readProjectFile("app/kayitlar/_lib/recordMedia.ts");
+  const editForm = readProjectFile("app/kayitlar/_components/MaintenanceRecordEditForm.tsx");
+  assert.match(media, /export function getPhotoSrc\(photo: string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
+  assert.match(media, /return transientUrls\?\.has\(photo\) \? photo : getMediaDisplayUrl\(photo, "image"\)/);
+  assert.match(media, /export function getVideoSrc\(v: VideoItem \| string, previews: Record<string, string> = \{\}, transientUrls\?: ReadonlySet<string>\)/);
+  assert.match(editForm, /const \[transientPhotoUrls, setTransientPhotoUrls\] = useState<Set<string>>/);
+  assert.match(editForm, /getPhotoSrc\(p, offlinePreviews, transientPhotoUrls\)/);
+  assert.match(editForm, /setTransientPhotoUrls\(\(current\) =>/);
 });
-
 test("media proxy only serves URLs already attached to a maintenance record", () => {
   const source = readProjectFile("app/api/media/file/route.ts");
 
