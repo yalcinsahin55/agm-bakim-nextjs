@@ -526,6 +526,12 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
 
 test("assistant engine history and maintenance health expose filtered reports and work metrics", async () => {
   const policy = await source("lib/assistantPolicy.ts");
+  const policyTypes = await source("lib/assistantPolicyTypes.ts");
+  const policyPatterns = await source("lib/assistantPolicyPatterns.ts");
+  const policyDateRanges = await source("lib/assistantPolicyDateRanges.ts");
+  const policyFilters = await source("lib/assistantPolicyFilters.ts");
+  const policyIntent = await source("lib/assistantPolicyIntent.ts");
+  const policySource = [policy, policyTypes, policyPatterns, policyDateRanges, policyFilters, policyIntent].join("\n");
   const maintenanceTools = await source("lib/assistant/maintenanceTools.ts");
   const technicianTools = await source("lib/assistant/technicianTools.ts");
   const assistantShared = await source("lib/assistant/shared.ts");
@@ -533,11 +539,11 @@ test("assistant engine history and maintenance health expose filtered reports an
   const assistantDetails = await source("components/AssistantResultDetails.tsx");
   const assistantDomainDetails = await source("components/AssistantDomainResults.tsx");
   const assistantRecordDetails = await source("components/AssistantRecordResults.tsx");
-  assert.match(policy, /showAll\?: boolean/);
-  assert.match(policy, /tüm\|bütün\|hepsi/);
-  assert.match(policy, /asksEngineMaintenanceDuration/);
-  assert.match(policy, /yearOnly/);
-  assert.match(policy, /extractMaintenanceTypeQuery/);
+  assert.match(policySource, /showAll\?: boolean/);
+  assert.match(policyPatterns, /tüm\|bütün\|hepsi/);
+  assert.match(policyIntent, /asksEngineMaintenanceDuration/);
+  assert.match(policyDateRanges, /yearOnly/);
+  assert.match(policyFilters, /extractMaintenanceTypeQuery/);
   assert.match(maintenanceTools, /safeReportAttachments/);
   assert.match(maintenanceTools, /report_attachment_count/);
   assert.match(maintenanceTools, /query\.showAll \? 500 : 20/);
