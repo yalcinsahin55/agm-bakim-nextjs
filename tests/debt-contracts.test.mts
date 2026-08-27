@@ -389,6 +389,7 @@ test("no protected UI route relies on proxy as its authorization boundary", asyn
 test("maintenance report attachments stay bounded, authenticated, and offline-safe", async () => {
   const helper = await source("lib/reportAttachments.ts");
   const upload = await source("app/api/blob/upload-server/route.ts");
+  const privateBlobPilot = await source("lib/privateBlobPilot.ts");
   const clientUpload = await source("app/api/blob/upload-client/route.ts");
   const presignedUpload = await source("app/api/blob/upload-presigned/route.ts");
   const uploadHelper = await source("lib/reportAttachmentUpload.ts");
@@ -430,6 +431,12 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(upload, /maxVideoSize/);
   assert.match(upload, /idempotency_key/);
   assert.match(upload, /allowOverwrite/);
+  assert.match(upload, /shouldUsePrivateBlobPilot/);
+  assert.match(upload, /access: usePrivatePilot \? "private" : "public"/);
+  assert.match(upload, /PRIVATE_BLOB_PILOT_CREDENTIALS_UNAVAILABLE/);
+  assert.match(privateBlobPilot, /VERCEL_ENV === "preview"/);
+  assert.match(privateBlobPilot, /PRIVATE_BLOB_PILOT_ENABLED === "true"/);
+  assert.match(privateBlobPilot, /private-pilot/);
   assert.match(clientUpload, /handleUpload/);
   assert.match(clientUpload, /REPORT_UPLOAD_PREFIX/);
   assert.match(clientUpload, /REPORT_UPLOAD_TOKEN = process\.env\.VERCEL/);
@@ -470,8 +477,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(pdfSecurity, /readResponseBytes/);
   assert.match(assistantExportLogo, /readResponseBytes/);
   assert.match(blobStorage, /from "@vercel\/blob"/);
-  assert.match(blobStorage, /MEDIA_READ_WRITE_TOKEN/);
-  assert.match(blobStorage, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(blobStorage, /MEDIA_READ_WRITE_TOKEN \|\| process\.env\.BLOB_READ_WRITE_TOKEN/);
+  assert.match(blobStorage, /PRIVATE_BLOB_STORE_ID \|\| process\.env\.MEDIA_STORE_ID/);
   assert.match(blobStorage, /access: "private"/);
   assert.match(nextConfig, /source: "\/api\/oil-analyses\/:id\/file"/);
   assert.match(nextConfig, /source: "\/api\/records\/:id\/attachments\/:attachmentId"/);
