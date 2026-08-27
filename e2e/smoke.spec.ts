@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 type JsonResult = {
@@ -78,6 +79,10 @@ async function fetchJson(page: Page, url: string, options: { method?: string; bo
 function uniqueRequestId(testTitle: string, retry: number): string {
   const safeTitle = testTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 35);
   return `e2e-${safeTitle}-${retry}-${Date.now()}`;
+}
+
+function backupChecksum(collections: unknown): string {
+  return createHash("sha256").update(JSON.stringify(collections)).digest("hex");
 }
 
 function maintenancePayload(engineId: string, typeKey: string, clientRequestId: string): Record<string, unknown> {
@@ -234,6 +239,77 @@ test.describe("AGM Bakım configured authentication", () => {
     expect(matching[0]?.technician_contributions).toEqual([
       expect.objectContaining({ contribution_role: "responsible", duration_minutes: 60 }),
     ]);
+  });
+
+  test("backup export, checksum dry-run and restore round-trip stay isolated", async ({ page }) => {
+    test.skip(
+      !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD,
+      "Backup restore E2E testi yalnızca izole test yöneticisi ile çalıştırılmalı.",
+    );
+    const { engineId } = requireFixture();
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+
+    const exportResponse = await page.context().request.get("/api/backups/export");
+    expect(exportResponse.status()).toBe(200);
+    const backupText = await exportResponse.text();
+    expect(backupText).not.toMatch(/password_hash|VAPID_PRIVATE_KEY|photos_b64|data_b64/);
+    const backup = JSON.parse(backupText) as {
+      version?: number;
+      collections?: Record<string, unknown>;
+      integrity?: { algorithm?: string; value?: string };
+    };
+    expect(backup.version).toBe(2);
+    expect(backup.integrity).toMatchObject({ algorithm: "sha256" });
+    expect(backup.collections).toBeDefined();
+    expect(backup.integrity?.value).toBe(backupChecksum(backup.collections));
+
+    const dryRun = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", dry_run: true, collections: backup.collections, integrity: backup.integrity },
+    });
+    expect(dryRun.status).toBe(200);
+    expect(dryRun.body).toMatchObject({ ok: true, mode: "dry-run", applied: false });
+
+    const tamperedIntegrity = { ...backup.integrity, value: "0".repeat(64) };
+    const tampered = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", dry_run: true, collections: backup.collections, integrity: tamperedIntegrity },
+    });
+    expect(tampered.status).toBe(400);
+    expect(tampered.body).toMatchObject({ error: expect.stringMatching(/checksum/i) });
+
+    const engineCollection = Array.isArray(backup.collections?.engines)
+      ? backup.collections.engines.map((candidate) => {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
+          const record = { ...(candidate as Record<string, unknown>) };
+          if (record._id === engineId || record.name === "E2E Motor 1") return { ...record, name: "E2E Motor 1 Roundtrip" };
+          return record;
+        })
+      : [];
+    const roundtripCollections = { ...backup.collections, engines: engineCollection };
+    const roundtripIntegrity = { algorithm: "sha256", value: backupChecksum(roundtripCollections) };
+    const restored = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", collections: roundtripCollections, integrity: roundtripIntegrity },
+    });
+    expect(restored.status).toBe(200);
+    expect(restored.body).toMatchObject({ ok: true, mode: "merge" });
+
+    const engines = await fetchJson(page, "/api/engines");
+    expect(engines.status).toBe(200);
+    const matchingEngine = Array.isArray(engines.body)
+      ? engines.body.find((candidate) => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>)._id === engineId)
+      : null;
+    expect(matchingEngine).toMatchObject({ _id: engineId, name: "E2E Motor 1 Roundtrip" });
+
+    const cleanupCollections = { ...backup.collections, engines: backup.collections?.engines || [] };
+    const cleanupIntegrity = { algorithm: "sha256", value: backupChecksum(cleanupCollections) };
+    const cleanup = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", collections: cleanupCollections, integrity: cleanupIntegrity },
+    });
+    expect(cleanup.status).toBe(200);
+
   });
 
   test("offline report attachment is rejected before record mutation", async ({ page }, testInfo) => {
