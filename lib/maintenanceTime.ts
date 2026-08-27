@@ -55,6 +55,33 @@ export function hoursInputToMinutes(value: unknown): number | null {
   return Math.round(hours * 60);
 }
 
+export interface DurationParts {
+  hours: string;
+  minutes: string;
+}
+
+export function splitDurationMinutes(value: number | null | undefined): DurationParts {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return { hours: "", minutes: "" };
+  const totalMinutes = Math.floor(value);
+  return {
+    hours: String(Math.floor(totalMinutes / 60)),
+    minutes: String(totalMinutes % 60).padStart(2, "0"),
+  };
+}
+
+export function durationPartsToMinutes(
+  hoursValue: unknown,
+  minutesValue: unknown,
+  maxMinutes = 366 * 24 * 60,
+): number | null {
+  if ((hoursValue === undefined || hoursValue === null || hoursValue === "") && (minutesValue === undefined || minutesValue === null || minutesValue === "")) return null;
+  const hours = hoursValue === undefined || hoursValue === null || hoursValue === "" ? 0 : Number(hoursValue);
+  const minutes = minutesValue === undefined || minutesValue === null || minutesValue === "" ? 0 : Number(minutesValue);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || minutes < 0 || minutes > 59) return null;
+  const totalMinutes = hours * 60 + minutes;
+  return totalMinutes <= maxMinutes ? totalMinutes : null;
+}
+
 export function formatMaintenanceDuration(minutes: number | undefined | null): string {
   if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) return "—";
   if (minutes === 0) return "0 dk";

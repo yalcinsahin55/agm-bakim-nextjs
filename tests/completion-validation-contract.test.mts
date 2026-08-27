@@ -33,9 +33,9 @@ test("completion validation preserves internal technician duration safeguards", 
     selectedSupportDurations: [60],
   };
 
-  assert.equal(getCompletionValidationError({ ...base, responsibleDurationMinutes: 0 }), "Sorumlu teknisyen için 0’dan büyük çalışma süresini saat olarak girin.");
+  assert.equal(getCompletionValidationError({ ...base, responsibleDurationMinutes: 0 }), "Sorumlu teknisyen için 0’dan büyük çalışma süresini saat ve dakika olarak girin.");
   assert.equal(getCompletionValidationError({ ...base, responsibleDurationMinutes: 180 }), "Sorumlu teknisyen süresi toplam bakım süresini aşamaz.");
-  assert.equal(getCompletionValidationError({ ...base, selectedSupportDurations: [0] }), "Seçilen her destek teknisyeni için 0’dan büyük çalışma süresini saat olarak girin.");
+  assert.equal(getCompletionValidationError({ ...base, selectedSupportDurations: [0] }), "Seçilen her destek teknisyeni için 0’dan büyük çalışma süresini saat ve dakika olarak girin.");
   assert.equal(getCompletionValidationError({ ...base, selectedSupportDurations: [180] }), "Destek teknisyeni süresi toplam bakım süresini aşamaz.");
   assert.equal(getCompletionValidationError(base), null);
 });

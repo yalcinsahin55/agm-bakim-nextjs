@@ -4,8 +4,10 @@ import ExcelJS from "exceljs";
 import {
   calculateMaintenanceDurationFromDates,
   calculateMaintenanceDurationMinutes,
+  durationPartsToMinutes,
   hoursInputToMinutes,
   normalizeTechnicianContributionDuration,
+  splitDurationMinutes,
 } from "../lib/maintenanceTime.ts";
 import { canAccessRoute, canManageUsers, canWriteMaintenance, defaultRouteForRole, hasPermission, normalizeRole } from "../lib/permissions.ts";
 import {
@@ -127,6 +129,12 @@ test("technician contribution durations preserve zero and reject invalid input",
   assert.equal(normalizeTechnicianContributionDuration("not-a-number", 45), 45);
   assert.equal(hoursInputToMinutes("2.5"), 150);
   assert.equal(hoursInputToMinutes(-1), null);
+  assert.deepEqual(splitDurationMinutes(150), { hours: "2", minutes: "30" });
+  assert.equal(durationPartsToMinutes("2", "30"), 150);
+  assert.equal(durationPartsToMinutes("0", "30"), 30);
+  assert.equal(durationPartsToMinutes("2.5", "0"), null);
+  assert.equal(durationPartsToMinutes("1", "60"), null);
+  assert.equal(durationPartsToMinutes("", ""), null);
 });
 
 test("maintenance status boundaries remain deterministic", () => {
