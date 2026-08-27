@@ -17,7 +17,6 @@ interface MaintenanceDefinitionSectionProps {
   qrTypeKey: string | null;
   chosenItem?: PanelItem;
   chosenType?: MaintenanceType;
-  isPrimaryNew: boolean;
   onEngineChange: (value: string) => void;
   onTypeChange: (value: string) => void;
   onPrimaryPeriodChange: (value: number) => void;
@@ -37,7 +36,6 @@ export default function MaintenanceDefinitionSection({
   qrTypeKey,
   chosenItem,
   chosenType,
-  isPrimaryNew,
   onEngineChange,
   onTypeChange,
   onPrimaryPeriodChange,
