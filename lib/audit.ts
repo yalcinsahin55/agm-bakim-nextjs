@@ -3,6 +3,7 @@ import type { ClientSession } from "mongodb";
 import type { User } from "@/lib/types";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { auditLogsCollection } from "@/lib/dbCollections";
+import { getCurrentRequestId } from "@/lib/performance";
 
 export type AuditAction = "create" | "update" | "delete" | "login" | "export" | "upload";
 
@@ -39,6 +40,7 @@ export async function writeAuditLog(db: Db, input: AuditInput): Promise<void> {
     entity: input.entity,
     entity_id: input.entityId || null,
     summary: input.summary,
+    ...(getCurrentRequestId() ? { request_id: getCurrentRequestId() } : {}),
     before: compact(input.before),
     after: compact(input.after),
     created_at: new Date(),
