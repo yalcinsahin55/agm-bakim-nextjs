@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { uploadVideoChunked } from "@/lib/chunkUpload";
-import { uploadMaintenanceMedia } from "@/lib/mediaUpload";
-import { queueRecord, type QueuedMedia } from "@/lib/offlineQueue";
+import { queueRecord } from "@/lib/offlineQueue";
 import { invalidateMaintenancePanel } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, EXTERNAL_SERVICE_TECHNICIAN_ID, type TechnicianOption } from "@/lib/technicians";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
-import { compressImage } from "@/lib/imageCompression";
-import type { ReportAttachment } from "@/lib/types";
-import type { Engine, MaintenanceRecord, MaintenanceType, VideoItem } from "../_types";
+import type { Engine, MaintenanceRecord, MaintenanceType } from "../_types";
 import { hoursInputToMinutes, minutesToHoursInput } from "../_lib/recordDisplay";
-import { withTimeout, makeOfflineId, toLocalDateTimeInput } from "../_lib/recordMedia";
+import { toLocalDateTimeInput } from "../_lib/recordMedia";
 import { RecordEditEngineSection, RecordEditTechnicianSourceSection } from "./RecordEditAdminSections";
 import RecordEditCollaborationSections from "./RecordEditCollaborationSections";
 import RecordEditMediaSection from "./RecordEditMediaSection";
 import { useRecordEditReferenceData } from "../_hooks/useRecordEditReferenceData";
+import { useRecordEditMedia } from "../_hooks/useRecordEditMedia";
 import RecordEditScheduleSection from "./RecordEditScheduleSection";
 
 export interface MaintenanceRecordEditFormProps {
@@ -35,13 +32,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
-  const [photos, setPhotos] = useState<string[]>(record.photos || record.photos_b64 || []);
-  const [videos, setVideos] = useState<VideoItem[]>(record.videos || []);
-  const [transientPhotoUrls, setTransientPhotoUrls] = useState<Set<string>>(() => new Set());
-  const [reportAttachments, setReportAttachments] = useState<ReportAttachment[]>(record.report_attachments || []);
-  const [reportAttachmentBusy, setReportAttachmentBusy] = useState(false);
-  const [offlineMedia, setOfflineMedia] = useState<QueuedMedia[]>([]);
-  const [offlinePreviews, setOfflinePreviews] = useState<Record<string, string>>({});
   const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
@@ -53,9 +43,12 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [responsibleTechnicianDuration, setResponsibleTechnicianDuration] = useState<string | number>(minutesToHoursInput(initialResponsibleMinutes));
   const [otherTechnicianIds, setOtherTechnicianIds] = useState<string[]>(record.technician_source === "external_service" || record.technician_id === EXTERNAL_SERVICE_TECHNICIAN_ID ? [] : record.other_technician_ids || []);
   const [otherTechnicianDurations, setOtherTechnicianDurations] = useState<Record<string, number>>(Object.fromEntries((record.technician_contributions || []).filter((contribution) => contribution.contribution_role === "support").map((contribution) => [contribution.id, contribution.duration_minutes])));
+  const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, transientPhotoUrls, reportAttachmentBusy, mediaBusy, setReportAttachments, setReportAttachmentBusy, addPhotos, addVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useRecordEditMedia({
+    initialPhotos: record.photos || record.photos_b64 || [],
+    initialVideos: record.videos || [],
+    initialReportAttachments: record.report_attachments || [],
+  });
   const [busy, setBusy] = useState(false);
-  const [mediaBusy, setMediaBusy] = useState(false);
-  const previewUrlsRef = useRef<Record<string, string>>({});
   const historicalTypeKeys = useMemo(() => new Set([record.type_key, ...(record.extra_types || []).map((extra) => extra.type_key), ...groupTypes.map((type) => type.type_key)]), [record.type_key, record.extra_types, groupTypes]);
   const selectedTypeKeys = useMemo(() => new Set([...historicalTypeKeys, ...extraKeys]), [historicalTypeKeys, extraKeys]);
   const selectedMaintenanceTypes = maintenanceTypes.filter((type) => selectedTypeKeys.has(type.key));
@@ -64,175 +57,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const canWorkOnSelectedTypes = (technician: TechnicianOption, role: "responsible" | "support") => selectedMaintenanceTypes.length === 0 || selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, role));
   const responsibleTechnicians = technicians.filter((technician) => canWorkOnSelectedTypes(technician, "responsible"));
   const supportTechnicians = technicians.filter((technician) => technician.id !== responsibleTechnicianId && canWorkOnSelectedTypes(technician, "support"));
-
-  function createOfflinePreview(id: string, blob: Blob): string {
-    const url = URL.createObjectURL(blob);
-    previewUrlsRef.current[id] = url;
-    setOfflinePreviews((current) => ({ ...current, [id]: url }));
-    return url;
-  }
-
-  function revokeOfflinePreview(id: string): void {
-    const url = previewUrlsRef.current[id];
-    if (url) URL.revokeObjectURL(url);
-    delete previewUrlsRef.current[id];
-    setOfflinePreviews((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
-  }
-
-  useEffect(() => () => {
-    Object.values(previewUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-    previewUrlsRef.current = {};
-  }, []);
-
-  function removePhoto(index: number): void {
-    const photo = photos[index];
-    const id = photo?.startsWith("offline:") ? photo.slice("offline:".length) : "";
-    if (id) {
-      revokeOfflinePreview(id);
-      setOfflineMedia((current) => current.filter((media) => media.id !== id));
-    }
-    if (photo && (photo.startsWith("http://") || photo.startsWith("https://"))) {
-      setTransientPhotoUrls((current) => {
-        if (!current.has(photo)) return current;
-        const next = new Set(current);
-        next.delete(photo);
-        return next;
-      });
-    }
-    setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
-  }
-
-  function removeVideo(index: number): void {
-    const video = videos[index];
-    const url = typeof video === "string" ? video : video?.url;
-    const id = url?.startsWith("offline:") ? url.slice("offline:".length) : "";
-    if (id) {
-      revokeOfflinePreview(id);
-      setOfflineMedia((current) => current.filter((media) => media.id !== id));
-    }
-    setVideos((current) => current.filter((_, currentIndex) => currentIndex !== index));
-  }
-
-  function handleOfflineReportFile(file: File, attachment: ReportAttachment): void {
-    const id = attachment.url.startsWith("offline:") ? attachment.url.slice("offline:".length) : makeOfflineId();
-    setOfflineMedia((current) => [...current, { id, kind: "report", name: attachment.filename, type: attachment.mime, blob: file }]);
-    createOfflinePreview(id, file);
-  }
-
-  function removeReportAttachment(attachment: ReportAttachment): void {
-    if (!attachment.url.startsWith("offline:")) return;
-    const id = attachment.url.slice("offline:".length);
-    revokeOfflinePreview(id);
-    setOfflineMedia((current) => current.filter((media) => media.id !== id));
-  }
-
-  async function addPhotos(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length || mediaBusy) {
-      e.target.value = "";
-      return;
-    }
-    setMediaBusy(true);
-    const uploaded: string[] = [];
-    try {
-      for (const f of files) {
-        try {
-          const compressed = await compressImage(f);
-          const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-          if (!navigator.onLine) {
-            const id = makeOfflineId();
-            setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-            createOfflinePreview(id, compressed);
-            uploaded.push(`offline:${id}`);
-            continue;
-          }
-          const url = await withTimeout(
-            uploadMaintenanceMedia(
-              new File([compressed], photoName, { type: "image/jpeg" }),
-              "photo",
-            ),
-            150_000,
-            "Fotoğraf yükleme zaman aşımına uğradı. İnternet bağlantısını kontrol edip tekrar deneyin.",
-          );
-          uploaded.push(url);
-        } catch (error) {
-          if (!navigator.onLine) {
-            try {
-              const compressed = await compressImage(f);
-              const id = makeOfflineId();
-              const photoName = `${f.name.replace(/\.[^/.]+$/, "")}.jpg`;
-              setOfflineMedia((current) => [...current, { id, kind: "photo", name: photoName, type: "image/jpeg", blob: compressed }]);
-              createOfflinePreview(id, compressed);
-              uploaded.push(`offline:${id}`);
-              continue;
-            } catch {
-              // Genel hata aşağıda gösterilir.
-            }
-          }
-          const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-          toast.error(`${f.name} yüklenemedi: ${message}`);
-        }
-      }
-    } finally {
-      setTransientPhotoUrls((current) => {
-        const next = new Set(current);
-        uploaded.filter((url) => url.startsWith("http://") || url.startsWith("https://")).forEach((url) => next.add(url));
-        return next;
-      });
-      setPhotos((p) => [...p, ...uploaded]);
-      setMediaBusy(false);
-      e.target.value = "";
-    }
-  }
-
-  async function addVideos(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length || mediaBusy) {
-      e.target.value = "";
-      return;
-    }
-    setMediaBusy(true);
-    try {
-      for (const f of files) {
-        if (f.size > 100 * 1024 * 1024) {
-          toast.error(`'${f.name}' çok büyük (en fazla 100MB).`);
-          continue;
-        }
-        if (!navigator.onLine) {
-          const id = makeOfflineId();
-          setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-          createOfflinePreview(id, f);
-          setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
-          continue;
-        }
-        try {
-          const url = await withTimeout(
-            uploadVideoChunked(f.type ? f : new File([f], f.name, { type: "video/mp4", lastModified: f.lastModified })),
-            600_000,
-            "Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.",
-          );
-          setVideos((v) => [...v, { url, filename: f.name, mime: f.type || "video/mp4" }]);
-        } catch (err: unknown) {
-          if (!navigator.onLine) {
-            const id = makeOfflineId();
-            setOfflineMedia((current) => [...current, { id, kind: "video", name: f.name, type: f.type || "video/mp4", blob: f }]);
-            createOfflinePreview(id, f);
-            setVideos((current) => [...current, { url: `offline:${id}`, filename: f.name, mime: f.type || "video/mp4" }]);
-            continue;
-          }
-          const message = err instanceof Error ? err.message.slice(0, 100) : "bilinmeyen hata";
-          toast.error(`${f.name} yüklenemedi: ${message}`);
-        }
-      }
-    } finally {
-      setMediaBusy(false);
-      e.target.value = "";
-    }
-  }
 
   async function save() {
     const maintenanceDurationMinutes = calculateMaintenanceDurationFromDates(maintenanceStartAt, maintenanceEndAt);
