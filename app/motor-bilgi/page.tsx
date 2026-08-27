@@ -8,65 +8,12 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
-
-type FieldKey = "kaver_tipi" | "hava_filtresi" | "krankcase" | "esanjor_tipi" | "dungs" | "radyator_tipi" | "not";
-type FieldValues = Record<FieldKey, string>;
-
-interface EquipmentInfo extends FieldValues {
-  _id: string;
-  engine_name: string;
-}
-
-interface EquipmentEngine {
-  _id: string;
-  name: string;
-}
-
-interface EquipmentResponse {
-  name?: string;
-  updated?: number;
-  error?: string;
-}
-
-const FIELDS: Array<[FieldKey, string]> = [
-  ["kaver_tipi", "Kaver Tipi"], ["hava_filtresi", "Hava Filtresi"], ["krankcase", "Krankcase"],
-  ["esanjor_tipi", "Eşanjör Tipi"], ["dungs", "Dungs"], ["radyator_tipi", "Radyatör Tipi"], ["not", "Not"],
-];
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Dosya okunamadı."));
-        return;
-      }
-      resolve(reader.result.split(",")[1] || "");
-    };
-    reader.onerror = () => reject(reader.error || new Error("Dosya okunamadı."));
-    reader.readAsDataURL(file);
-  });
-}
-
-function EmptyForm(): FieldValues {
-  return Object.fromEntries(FIELDS.map(([key]) => [key, ""])) as FieldValues;
-}
-
-function FieldInputs({ values, onChange }: { values: FieldValues; onChange: (key: FieldKey, value: string) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {FIELDS.map(([key, label]) => (
-        <div key={key} className={key === "not" ? "col-span-2" : ""}>
-          <label className="text-[9.5px] font-bold text-faint uppercase tracking-wide">{label}</label>
-          <input
-            value={values[key] || ""} onChange={(e) => onChange(key, e.target.value)}
-            className="w-full bg-panel2 border border-border rounded-lg px-2.5 py-2 text-[12.5px] mt-1 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
+import EquipmentInfoAddForm from "./_components/EquipmentInfoAddForm";
+import EquipmentInfoCard from "./_components/EquipmentInfoCard";
+import EquipmentInfoImportPanel from "./_components/EquipmentInfoImportPanel";
+import { FIELDS, emptyForm } from "./_lib/types";
+import type { EquipmentEngine, EquipmentInfo, EquipmentResponse, FieldValues } from "./_lib/types";
+import { fileToBase64 } from "./_lib/fileToBase64";
 
 export default function MotorBilgiPage() {
   const router = useRouter();
@@ -82,11 +29,11 @@ export default function MotorBilgiPage() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [newEngineName, setNewEngineName] = useState("");
-  const [newFields, setNewFields] = useState(EmptyForm());
+  const [newFields, setNewFields] = useState(emptyForm());
   const [adding, setAdding] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState(EmptyForm());
+  const [editFields, setEditFields] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
 
   async function load() {
@@ -153,7 +100,7 @@ export default function MotorBilgiPage() {
 
   function startEdit(item: EquipmentInfo) {
     setEditingId(item._id);
-    const f = EmptyForm();
+    const f = emptyForm();
     FIELDS.forEach(([key]) => { f[key] = item[key] || ""; });
     setEditFields(f);
   }
@@ -198,7 +145,7 @@ export default function MotorBilgiPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success("Motor bilgisi eklendi! 🛠️");
-        setNewEngineName(""); setNewFields(EmptyForm()); setShowAdd(false);
+        setNewEngineName(""); setNewFields(emptyForm()); setShowAdd(false);
         load();
       } else {
         const d = await res.json();
@@ -251,54 +198,24 @@ export default function MotorBilgiPage() {
             </div>
 
             {showAdd && (
-              <div className="bg-panel border border-amber/40 rounded-card p-3.5 mb-4 animate-fade-in">
-                <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Motor</label>
-                {engineNamesWithoutCard.length > 0 ? (
-                  <select value={newEngineName} onChange={(e) => setNewEngineName(e.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition">
-                    <option value="">Seçiniz...</option>
-                    {engineNamesWithoutCard.map((n) => <option key={n} value={n}>{n}</option>)}
-                    <option value="__custom__">Listede yok, adını yazacağım...</option>
-                  </select>
-                ) : null}
-                {(engineNamesWithoutCard.length === 0 || newEngineName === "__custom__") && (
-                  <input
-                    value={newEngineName === "__custom__" ? "" : newEngineName}
-                    onChange={(e) => setNewEngineName(e.target.value)}
-                    placeholder="Motor adı (örn. AGM 40)"
-                    className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition"
-                  />
-                )}
-                <FieldInputs values={newFields} onChange={(k, v) => setNewFields((prev) => ({ ...prev, [k]: v }))} />
-                <button onClick={addNew} disabled={adding} className="w-full mt-3 py-2.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
-                  {adding ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
-                      Ekleniyor...
-                    </span>
-                  ) : "💾 Motor Bilgisini Kaydet"}
-                </button>
-              </div>
+              <EquipmentInfoAddForm
+                engineNamesWithoutCard={engineNamesWithoutCard}
+                engineName={newEngineName}
+                fields={newFields}
+                adding={adding}
+                onEngineNameChange={setNewEngineName}
+                onFieldChange={(key, value) => setNewFields((prev) => ({ ...prev, [key]: value }))}
+                onSave={addNew}
+              />
             )}
 
             {showImport && (
-              <div className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
-                <p className="text-[11.5px] text-muted mb-2 leading-relaxed">
-                  <b className="text-teal">Motor No, Kaver Tipi, Hava Filtresi, Krankcase, Eşanjör Tipi, Dungs, Radyatör Tipi, Not</b> sütunlarını içeren bir dosya yükleyin.
-                </p>
-                <label className="flex items-center gap-2 border-2 border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer mb-2 hover:border-amber hover:bg-amber/5 transition">
-                  <span className="text-lg">📊</span>
-                  <span className="flex-1 truncate">{importFile ? importFile.name : "Excel dosyası seç (.xlsx)"}</span>
-                  <input type="file" accept=".xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="hidden" />
-                </label>
-                <button onClick={doImport} disabled={importing || !importFile} className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
-                  {importing ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
-                      İçe aktarılıyor...
-                    </span>
-                  ) : "🚀 İçe Aktar"}
-                </button>
-              </div>
+              <EquipmentInfoImportPanel
+                importFile={importFile}
+                importing={importing}
+                onFileChange={setImportFile}
+                onImport={doImport}
+              />
             )}
           </>
         )}
@@ -320,45 +237,20 @@ export default function MotorBilgiPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {rows.map((r) => {
-              const isEditing = editingId === r._id;
-              return (
-                <div key={r._id} className={`bg-panel border rounded-card p-3.5 transition-all ${isEditing ? "border-teal/40" : "border-border hover:border-borderlt"}`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-[13.5px] font-bold text-text">{r.engine_name || "İsimsiz Motor"}</div>
-                    {canEdit && !isEditing && (
-                      <button onClick={() => startEdit(r)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1 hover:bg-teal/10 transition">✏️ Düzenle</button>
-                    )}
-                  </div>
-
-                  {isEditing ? (
-                    <div className="animate-fade-in">
-                      <FieldInputs values={editFields} onChange={(k, v) => setEditFields((prev) => ({ ...prev, [k]: v }))} />
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={() => setEditingId(null)} className="flex-1 py-2 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">Vazgeç</button>
-                        <button onClick={() => saveEdit(r._id)} disabled={saving} className="flex-1 py-2 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
-                          {saving ? (
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="w-3 h-3 border-2 border-[#06181b]/40 border-t-[#06181b] rounded-full animate-spin" />
-                              Kaydediliyor...
-                            </span>
-                          ) : "💾 Kaydet"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                      {FIELDS.map(([key, label]) => r[key] ? (
-                        <div key={key} className="text-[11px]">
-                          <span className="text-faint">{label}: </span>
-                          <span className="text-muted">{r[key]}</span>
-                        </div>
-                      ) : null)}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {rows.map((item) => (
+              <EquipmentInfoCard
+                key={item._id}
+                item={item}
+                isEditing={editingId === item._id}
+                canEdit={canEdit}
+                editFields={editFields}
+                saving={saving}
+                onStartEdit={startEdit}
+                onFieldChange={(key, value) => setEditFields((prev) => ({ ...prev, [key]: value }))}
+                onCancelEdit={() => setEditingId(null)}
+                onSave={() => saveEdit(item._id)}
+              />
+            ))}
           </div>
         )}
       </div>
