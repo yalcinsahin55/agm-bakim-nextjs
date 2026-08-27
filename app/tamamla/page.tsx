@@ -26,40 +26,10 @@ import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { calculateMaintenanceDurationFromDates, hoursInputToMinutes, minutesToHoursInput, normalizeTechnicianContributionDuration, TIME_TRACKING_VERSION } from "@/lib/maintenanceTime";
 import { compressImage } from "@/lib/imageCompression";
-
-const CHECKLIST_TEMPLATES = {
-  yag: ["Yağ seviyesi ve kaçak kontrolü", "Filtre ve bağlantı kontrolü", "Çalışma sonrası tekrar kontrol"],
-  krank: ["Fark basıncı ölçümü", "Filtre yüzeyi kontrolü", "Bağlantı ve kaçak kontrolü"],
-  intercooler: ["Fark basıncı ölçümü", "Hortum ve kelepçe kontrolü", "Soğutucu yüzey kontrolü"],
-  alternator: ["Kablo ve bağlantı kontrolü", "Görsel hasar kontrolü", "Çalışma testi"],
-  default: ["Görsel genel kontrol", "Bakım işlemi tamamlandı", "Çalışma sonrası kontrol"],
-};
-
-function checklistForType(typeKey: string, label?: string): string[] {
-  const normalized = `${typeKey} ${label || ""}`.toLocaleLowerCase("tr");
-  if (normalized.includes("yağ")) return CHECKLIST_TEMPLATES.yag;
-  if (normalized.includes("krank")) return CHECKLIST_TEMPLATES.krank;
-  if (normalized.includes("intercooler")) return CHECKLIST_TEMPLATES.intercooler;
-  if (normalized.includes("alternat")) return CHECKLIST_TEMPLATES.alternator;
-  return CHECKLIST_TEMPLATES.default;
-}
-
-
-function makeOfflineId(): string {
-  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  });
-}
+import AdditionalMaintenanceTypes from "./_components/AdditionalMaintenanceTypes";
+import CompletionWorkspaceHeader from "./_components/CompletionWorkspaceHeader";
+import { checklistForType } from "./_lib/checklist";
+import { makeOfflineId, withTimeout } from "./_lib/offlineHelpers";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -590,16 +560,7 @@ export default function TamamlaPage() {
         subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""}
       />
       <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
-        <div className="mb-4 flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-end">
-          <div>
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Kayıt çalışma alanı</div>
-            <h1 className="text-xl font-extrabold tracking-tight text-text md:text-2xl">Bakım kaydını tamamla</h1>
-            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Motor, bakım zamanı, ekip katkısı ve kanıtları tek ekranda kontrol ederek kaydı güvenle tamamlayın.</p>
-          </div>
-          <div className={`w-fit rounded-full border px-3 py-1.5 text-[10px] font-bold ${isOnline ? "border-green/30 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber"}`}>
-            {isOnline ? "ÇEVRİMİÇİ" : "ÇEVRİMDIŞI ÇALIŞMA"}
-          </div>
-        </div>
+        <CompletionWorkspaceHeader isOnline={isOnline} />
 
         {quickMode && <CompletionQuickBanner
           isOnline={isOnline}
@@ -669,7 +630,14 @@ export default function TamamlaPage() {
             onOtherTechnicianDurationChange={(id, value) => setOtherTechnicianDurations((current) => ({ ...current, [id]: value }))}
           />
 
-          {otherTypes.length > 0 && <section className="rounded-2xl border border-border bg-panel p-4" aria-labelledby="additional-maintenance-heading"><div className="mb-3"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">04 · Birlikte tamamlanan bakımlar</div><h2 id="additional-maintenance-heading" className="mt-1 text-base font-extrabold text-text">Aynı işlemde tamamlanan diğer bakım türleri</h2><p className="mt-1 text-[10px] leading-4 text-faint">İşaretlenen bakım türleri aynı saat ve tarihle kaydedilir. Motor için tanımlı olmayan bakımda periyodu ayrıca girebilirsiniz.</p></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{otherTypes.map((type) => { const tracked = trackedKeys.has(type.key); const checked = extraKeys.includes(type.key); return <div key={type.key} className="rounded-lg border border-border bg-panel2 px-3 py-2.5"><label className="flex items-center gap-2 text-[11px] text-text"><input type="checkbox" checked={checked} onChange={(event) => toggleExtra(type.key, event.target.checked)} />{type.label}{!tracked && <span className="text-[9.5px] text-faint">· tanımlı değil</span>}</label>{checked && !tracked && <label className="mt-2 block pl-6 text-[9.5px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati<input type="number" value={extraPeriods[type.key] ?? ""} onChange={(event) => setExtraPeriods((current) => ({ ...current, [type.key]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-border bg-panel px-2 py-1.5 text-[11px] font-mono text-text" /></label>}</div>; })}</div></section>}
+          <AdditionalMaintenanceTypes
+            types={otherTypes}
+            trackedKeys={trackedKeys}
+            extraKeys={extraKeys}
+            extraPeriods={extraPeriods}
+            onToggle={toggleExtra}
+            onPeriodChange={(key, value) => setExtraPeriods((current) => ({ ...current, [key]: value }))}
+          />
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
 
