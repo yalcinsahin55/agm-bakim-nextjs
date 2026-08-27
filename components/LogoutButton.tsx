@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { invalidateCachedFetch } from "@/lib/apiCache";
+import { notifyAuthChanged } from "@/lib/authClient";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function LogoutButton() {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("Çıkış isteği başarısız oldu.");
       invalidateCachedFetch("/api/auth/me");
+      notifyAuthChanged();
       toast.success("Güvenli çıkış yapıldı.");
       router.replace("/login");
     } catch {

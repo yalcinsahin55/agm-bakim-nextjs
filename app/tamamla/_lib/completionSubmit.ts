@@ -11,7 +11,8 @@ export interface CompletionSubmitInput {
   payload: Record<string, unknown>;
   offlineMedia: QueuedMedia[];
   isOnline: boolean;
-  queue: (payload: Record<string, unknown>, media: QueuedMedia[]) => Promise<string>;
+  queue: (payload: Record<string, unknown>, media: QueuedMedia[], options: { ownerUserId: string }) => Promise<string>;
+  ownerUserId: string;
   post: (payload: Record<string, unknown>) => Promise<Response>;
 }
 
@@ -22,7 +23,7 @@ export type CompletionSubmitResult =
 
 export async function submitCompletion(input: CompletionSubmitInput): Promise<CompletionSubmitResult> {
   if (!input.isOnline || input.offlineMedia.length > 0) {
-    await input.queue(input.payload, input.offlineMedia);
+    await input.queue(input.payload, input.offlineMedia, { ownerUserId: input.ownerUserId });
     return { kind: "queued", shouldSync: input.isOnline };
   }
 

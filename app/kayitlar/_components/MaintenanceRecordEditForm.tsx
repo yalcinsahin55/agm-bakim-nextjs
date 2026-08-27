@@ -21,10 +21,11 @@ export interface MaintenanceRecordEditFormProps {
   onSaved: () => void;
   onPhotoClick: (src: string) => void;
   isAdmin: boolean;
+  ownerUserId: string;
   engines: Engine[];
 }
 
-export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, engines }: MaintenanceRecordEditFormProps) {
+export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, ownerUserId, engines }: MaintenanceRecordEditFormProps) {
   const [engineId, setEngineId] = useState(record.engine_id);
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
   const [maintenanceStartAt, setMaintenanceStartAt] = useState(toLocalDateTimeInput(record.maintenance_start_at));
@@ -108,7 +109,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
-        await queueRecord(payload, offlineMedia, { method: "PATCH", endpoint: `/api/records/${record._id}` });
+        await queueRecord(payload, offlineMedia, { method: "PATCH", endpoint: `/api/records/${record._id}`, ownerUserId });
         toast.dismiss(loadingToast);
         toast.success(navigator.onLine ? "Güncelleme ve rapor ekleri senkronizasyon kuyruğuna alındı." : "İnternet yok. Güncelleme ve rapor ekleri güvenle kuyruğa alındı.");
         onSaved();

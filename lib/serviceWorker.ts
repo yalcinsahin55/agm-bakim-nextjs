@@ -58,6 +58,7 @@ type NotificationClickEvent = {
 
 type OfflineQueueJob = {
   id: string;
+  ownerUserId: string;
   method: "POST" | "PATCH";
   endpoint: string;
   payload: Record<string, unknown>;
@@ -94,8 +95,15 @@ workerScope.addEventListener("push", (rawEvent) => {
   );
 });
 
-const CACHE_NAME = "agm-bakim-shell-v4";
+const CACHE_NAME = "agm-bakim-shell-v5";
 const SHELL_ASSETS = ["/login", "/manifest.json", "/icon.svg"];
+const OFFLINE_OWNER_HEADER = "x-agm-offline-owner";
+
+function isPublicCacheRequest(request: Request, url: URL): boolean {
+  return request.method === "GET"
+    && url.origin === workerScope.location.origin
+    && (SHELL_ASSETS.includes(url.pathname) || url.pathname.startsWith("/_next/static/"));
+}
 const OFFLINE_DB_NAME = "agm-bakim-offline";
 const OFFLINE_DB_VERSION = 1;
 const OFFLINE_STORE_NAME = "records";
@@ -137,17 +145,19 @@ workerScope.addEventListener("fetch", (rawEvent) => {
   if (request.method !== "GET" || url.origin !== workerScope.location.origin || url.pathname.startsWith("/api/")) return;
 
   const isDocumentRequest = request.destination === "document" || request.headers.get("accept")?.includes("text/html") === true;
+  const isPublicRequest = isPublicCacheRequest(request, url);
+  if (!isDocumentRequest && !isPublicRequest) return;
   const networkRequest = isDocumentRequest ? new Request(request, { cache: "no-store" }) : request;
   event.respondWith(
     fetch(networkRequest)
       .then((response) => {
-        if (response.ok) {
+        if (response.ok && isPublicRequest) {
           const copy = response.clone();
           void workerScope.caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
         }
         return response;
       })
-      .catch(() => workerScope.caches.match(request).then((cached) => cached ?? workerScope.caches.match("/login").then((login) => login ?? new Response("Offline", { status: 503 })))),
+      .catch(() => workerScope.caches.match(isPublicRequest ? request : "/login").then((cached) => cached ?? new Response("Offline", { status: 503 }))),
   );
 });
 
@@ -206,6 +216,8 @@ function isAllowedOfflineEndpoint(endpoint: string): boolean {
 function isMetadataOnlyOfflineJob(value: unknown): value is OfflineQueueJob {
   if (!isRecord(value)) return false;
   return typeof value.id === "string"
+    && typeof value.ownerUserId === "string"
+    && value.ownerUserId.trim().length > 0
     && (value.method === "POST" || value.method === "PATCH")
     && typeof value.endpoint === "string"
     && isAllowedOfflineEndpoint(value.endpoint)
@@ -219,14 +231,28 @@ function syncErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 240) : "Bilinmeyen senkronizasyon hatası.";
 }
 
+async function getCurrentWorkerUserId(): Promise<string | null> {
+  try {
+    const response = await fetch("/api/auth/me", { cache: "no-store", credentials: "same-origin" });
+    if (!response.ok) return null;
+    const data = await response.json().catch(() => ({})) as { id?: unknown; _id?: unknown };
+    const id = typeof data.id === "string" ? data.id : data._id;
+    return typeof id === "string" && id.trim() ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function syncOfflineQueueInWorker(): Promise<void> {
   let database: IDBDatabase | null = null;
   let synced = 0;
   try {
+    const ownerUserId = await getCurrentWorkerUserId();
+    if (!ownerUserId) return;
     database = await openOfflineQueueDatabase();
     const jobs = await readOfflineQueueJobs(database);
     for (const candidate of jobs) {
-      if (!isMetadataOnlyOfflineJob(candidate)) continue;
+      if (!isMetadataOnlyOfflineJob(candidate) || candidate.ownerUserId !== ownerUserId) continue;
       const job: OfflineQueueJob = {
         ...candidate,
         payload: {
@@ -245,7 +271,10 @@ async function syncOfflineQueueInWorker(): Promise<void> {
         const response = await fetch(job.endpoint, {
           method: job.method,
           credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            [OFFLINE_OWNER_HEADER]: ownerUserId,
+          },
           body: serializedPayload,
         });
         if (!response.ok) throw new Error(`Kayıt gönderilemedi (HTTP ${response.status}).`);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
+import { notifyAuthChanged } from "@/lib/authClient";
 import { canAccessRoute } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { MaintenancePanelResponse } from "@/lib/maintenancePanel";
@@ -51,6 +52,7 @@ export default function BottomNav() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       invalidateCachedFetch("/api/auth/me");
+      notifyAuthChanged();
       toast.dismiss(loadingToast);
       toast.success("Güvenli çıkış yapıldı 👋");
       router.push("/login");

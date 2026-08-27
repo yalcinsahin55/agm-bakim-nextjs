@@ -20,7 +20,9 @@ test("submit orchestration queues offline work without calling the API", async (
     payload,
     offlineMedia: media(),
     isOnline: false,
-    queue: async (queuedPayload, queuedMedia) => {
+    ownerUserId: "user-1",
+    queue: async (queuedPayload, queuedMedia, options) => {
+      assert.equal(options.ownerUserId, "user-1");
       queued.push({ payload: queuedPayload, mediaCount: queuedMedia.length });
       return "queue-1";
     },
@@ -40,7 +42,9 @@ test("submit orchestration queues online work when offline media still needs upl
     payload,
     offlineMedia: media(),
     isOnline: true,
-    queue: async () => {
+    ownerUserId: "user-2",
+    queue: async (_payload, _media, options) => {
+      assert.equal(options.ownerUserId, "user-2");
       queueCalled = true;
       return "queue-2";
     },
@@ -60,6 +64,7 @@ test("submit orchestration returns API success data without UI side effects", as
     payload,
     offlineMedia: [],
     isOnline: true,
+    ownerUserId: "user-3",
     queue: async () => "queue-3",
     post: async (postedPayload) => {
       assert.deepEqual(postedPayload, payload);
@@ -75,6 +80,7 @@ test("submit orchestration returns bounded API errors for rejected requests", as
     payload,
     offlineMedia: [],
     isOnline: true,
+    ownerUserId: "user-4",
     queue: async () => "queue-4",
     post: async () => new Response(JSON.stringify({ error: "Kayıt reddedildi." }), { status: 400 }),
   });

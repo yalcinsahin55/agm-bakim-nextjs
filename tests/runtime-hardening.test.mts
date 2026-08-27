@@ -137,6 +137,14 @@ test("technician contribution durations preserve zero and reject invalid input",
   assert.equal(durationPartsToMinutes("", ""), null);
 });
 
+test("offline owner contract rejects mismatched or empty owner claims", async () => {
+  const { hasOfflineOwnerMismatch } = await import("../lib/offlineQueueContract.ts");
+  assert.equal(hasOfflineOwnerMismatch(null, "user-1"), false);
+  assert.equal(hasOfflineOwnerMismatch("user-1", "user-1"), false);
+  assert.equal(hasOfflineOwnerMismatch("user-2", "user-1"), true);
+  assert.equal(hasOfflineOwnerMismatch("", "user-1"), true);
+});
+
 test("maintenance status boundaries remain deterministic", () => {
   assert.equal(statusFor(-1), "gecikmis");
   assert.equal(statusFor(0), "gecikmis");
