@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -9,28 +9,12 @@ import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { engineSortKey } from "@/lib/status";
 import { uploadOilAnalysisPdf } from "@/lib/mediaUpload";
-
-interface Engine {
-  _id: string;
-  name: string;
-  hours: number;
-  load_kw?: number;
-}
-
-interface OilAnalysis {
-  _id: string;
-  engine_id: string;
-  engine_name: string;
-  analysis_date: string;
-  result: string;
-  note?: string;
-  pdf_url?: string;
-  pdf_b64?: string;
-  pdf_filename: string;
-  uploaded_by: string;
-  uploaded_by_id: string;
-  created_at: string;
-}
+import OilAnalysisCard from "./_components/OilAnalysisCard";
+import OilAnalysisFilters from "./_components/OilAnalysisFilters";
+import OilAnalysisForm from "./_components/OilAnalysisForm";
+import OilAnalysisPreviewModal from "./_components/OilAnalysisPreviewModal";
+import OilAnalysisSummary from "./_components/OilAnalysisSummary";
+import type { AnalysisResult, Engine, OilAnalysis } from "./_lib/types";
 
 export default function YagAnalizleriPage() {
   const router = useRouter();
@@ -42,7 +26,7 @@ export default function YagAnalizleriPage() {
 
   const [engineId, setEngineId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [result, setResult] = useState("İyi");
+  const [result, setResult] = useState<AnalysisResult>("İyi");
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -217,10 +201,11 @@ export default function YagAnalizleriPage() {
     <div>
       <TopBar title="Yağ Analizleri" subtitle={`${filtered.length}/${analyses.length} rapor listeleniyor`} />
       <div className="px-4 py-4">
-        <section className="mb-3 rounded-card border border-teal/30 bg-teal/5 p-4">
-          <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">🧪</div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Yağ durum özeti</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yağ analizlerini rapor sonucu ve tarihine göre takip et.</p></div></div>
-          <div className="mt-3 grid grid-cols-3 gap-2"><div className="rounded-xl border border-green/30 bg-green/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">İyi</div><div className="mt-1 font-mono text-lg font-bold text-green">{resultCounts.good}</div></div><div className="rounded-xl border border-amber/30 bg-amber/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Dikkat</div><div className="mt-1 font-mono text-lg font-bold text-amber">{resultCounts.attention}</div></div><div className="rounded-xl border border-red/30 bg-red/10 px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Kötü</div><div className="mt-1 font-mono text-lg font-bold text-red">{resultCounts.bad}</div></div></div>
-        </section>
+        <OilAnalysisSummary
+          good={resultCounts.good}
+          attention={resultCounts.attention}
+          bad={resultCounts.bad}
+        />
         {canWrite && (
           <button
             onClick={() => setShowForm((s) => !s)}
@@ -235,43 +220,32 @@ export default function YagAnalizleriPage() {
         )}
 
         {canWrite && showForm && (
-          <div className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 flex flex-col gap-2 animate-fade-in">
-            <select value={engineId} onChange={(e: ChangeEvent<HTMLSelectElement>) => setEngineId(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
-              {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-            </select>
-            <input type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e: ChangeEvent<HTMLInputElement>) => setDate(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition" />
-            <select value={result} onChange={(e: ChangeEvent<HTMLSelectElement>) => setResult(e.target.value)} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
-              <option>İyi</option><option>Dikkat</option><option>Kötü</option>
-            </select>
-            <textarea value={note} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)} placeholder="Not (opsiyonel)" rows={2} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm resize-none outline-none focus:border-teal transition" />
-            <label className="flex items-center gap-2 border-2 border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-              📄 {file ? file.name : "PDF raporu seç"}
-              <input type="file" accept="application/pdf" onChange={(e: ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] || null)} className="hidden" />
-            </label>
-            <button onClick={submit} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
-              {saving ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
-                  Yükleniyor...
-                </span>
-              ) : "💾 Raporu Kaydet"}
-            </button>
-          </div>
+          <OilAnalysisForm
+            engines={sortedEngines}
+            engineId={engineId}
+            date={date}
+            result={result}
+            note={note}
+            file={file}
+            saving={saving}
+            onEngineChange={setEngineId}
+            onDateChange={setDate}
+            onResultChange={setResult}
+            onNoteChange={setNote}
+            onFileChange={setFile}
+            onSubmit={submit}
+          />
         )}
 
-                  <div className="mb-3 rounded-card border border-border bg-panel p-3">
-
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Motor veya numune ara..." aria-label="Motor veya numune ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <select value={filterEngine} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterEngine(e.target.value)} aria-label="Analiz motor filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal transition">
-              <option value="Tümü">Tüm motorlar</option>
-              {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-            </select>
-            <select value={resultFilter} onChange={(event) => setResultFilter(event.target.value as "Tümü" | "İyi" | "Dikkat" | "Kötü")} aria-label="Analiz sonuç filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal transition">
-              <option value="Tümü">Tüm sonuçlar</option><option value="İyi">İyi</option><option value="Dikkat">Dikkat</option><option value="Kötü">Kötü</option>
-            </select>
-          </div>
-        </div>
+        <OilAnalysisFilters
+          engines={sortedEngines}
+          search={search}
+          filterEngine={filterEngine}
+          resultFilter={resultFilter}
+          onSearchChange={setSearch}
+          onEngineFilterChange={setFilterEngine}
+          onResultFilterChange={setResultFilter}
+        />
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
@@ -280,60 +254,24 @@ export default function YagAnalizleriPage() {
           </div>
         ) : (
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
-            {filtered.map((a) => (
-              <div key={a._id} className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-lg" aria-hidden="true">🧪</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-bold text-text">{a.engine_name}</div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-teal"><span className="h-1.5 w-1.5 rounded-full bg-teal" aria-hidden="true" />{a.result}</div>
-                    <div className="mt-1 text-[11px] text-faint">{new Date(a.analysis_date).toLocaleDateString("tr-TR")} · {a.uploaded_by}</div>
-                    {a.note && <div className="mt-1 text-[11px] text-muted">📝 {a.note}</div>}
-                  </div>
-                  <button type="button" onClick={() => void openPreview(a)} className="flex-shrink-0 rounded-lg border border-teal/40 px-2.5 py-1.5 text-[10.5px] font-bold text-teal hover:bg-teal/10 transition" aria-label={`${a.engine_name} PDF önizlemesini aç`}>PDF’yi aç</button>
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-2 border-t border-border pt-2.5">
-                  <button type="button" onClick={() => void downloadPdf(a)} className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted hover:border-teal/40 hover:text-teal transition">📄 İndir</button>
-                  {(user?.role === "yonetici" || user?._id === a.uploaded_by_id) && (confirmDeleteId === a._id ? <><button type="button" onClick={() => void remove(a._id)} className="rounded-lg bg-red px-2.5 py-1.5 text-[11px] font-bold text-white hover:brightness-110 transition">Evet</button><button type="button" onClick={() => setConfirmDeleteId(null)} className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted hover:bg-panel2 transition">Vazgeç</button></> : <button type="button" onClick={() => setConfirmDeleteId(a._id)} className="rounded-lg border border-red/40 px-2.5 py-1.5 text-[11px] font-bold text-red hover:bg-red/10 transition">Sil</button>)}
-                </div>
-              </div>
+            {filtered.map((analysis) => (
+              <OilAnalysisCard
+                key={analysis._id}
+                analysis={analysis}
+                canDelete={user?.role === "yonetici" || user?._id === analysis.uploaded_by_id}
+                confirmDelete={confirmDeleteId === analysis._id}
+                onPreview={() => void openPreview(analysis)}
+                onDownload={() => void downloadPdf(analysis)}
+                onRequestDelete={() => setConfirmDeleteId(analysis._id)}
+                onConfirmDelete={() => void remove(analysis._id)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/*  PDF Önizleme Penceresi */}
-      {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setPreview(null)}>
-          <div className="relative w-full max-w-3xl h-[85vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="min-w-0 flex-1 text-[12px] font-bold text-text truncate">📄 {preview.pdf_filename}</div>
-              <div className="flex items-center gap-1.5 ml-2">
-                <a
-                  href={`${preview.pdf_url || ""}?download=1`}
-                  className="rounded-lg border border-amber/40 px-2 py-1 text-[10px] font-bold text-amber"
-                >
-                  İndir
-                </a>
-                <button
-                type="button"
-                onClick={() => setPreview(null)}
-                className="w-8 h-8 rounded-full bg-panel text-text text-lg hover:bg-red hover:text-white transition flex-shrink-0 ml-2"
-                  aria-label="Kapat"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <iframe
-              src={preview.pdf_url || (preview.pdf_b64 ? `data:application/pdf;base64,${preview.pdf_b64.replace(/^data:application\/pdf;base64,/, "")}` : undefined)}
-              title={preview.pdf_filename}
-              className="w-full h-[calc(100%-3rem)] rounded-xl border border-border bg-white"
-              aria-label={`${preview.pdf_filename} PDF önizlemesi`}
-            />
-          </div>
-        </div>
-      )}
+      {preview && <OilAnalysisPreviewModal analysis={preview} onClose={() => setPreview(null)} />}
 
       <BottomNav />
     </div>
