@@ -144,15 +144,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <DashboardActionRail role={user?.role} enginesCount={sortedEngines.length} counts={counts} />
-
-        {counts.gecikmis > 0 && (
-          <div className="bg-red/10 border border-red/40 rounded-card p-4 mb-4 flex items-center gap-3 animate-fade-in">
-            <span className="text-2xl" aria-hidden="true">🚨</span>
-            <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-red">Geçmiş bakım bildirimi</div><div className="text-[11px] text-muted mt-0.5">{counts.gecikmis} bakım gecikmiş durumda.</div></div>
-            {canAccessRoute(user?.role, "/bildirimler") && <Link href="/bildirimler" className="flex-shrink-0 px-3 py-2 rounded-lg bg-red text-white text-[11px] font-extrabold hover:brightness-110 transition">Bildirimlere git →</Link>}
-          </div>
-        )}
+        <DashboardActionRail
+          role={user?.role}
+          enginesCount={sortedEngines.length}
+          counts={counts}
+          items={items}
+          healthRows={healthRows}
+        />
 
         <DashboardAssistant />
 

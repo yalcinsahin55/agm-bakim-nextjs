@@ -19,6 +19,13 @@ export interface DashboardAssistantAnswer {
   error?: boolean;
 }
 
+export interface DashboardHealthRow {
+  engine: DashboardEngine;
+  score: number;
+  status: StatusKey;
+  attention: number;
+}
+
 export const ENGINE_STATUS_PRIORITY: StatusKey[] = ["gecikmis", "kritik", "yaklasiyor", "normal"];
 export const ENGINE_STATUS_VIEW: Record<StatusKey, { label: string; dot: string; bar: string; text: string }> = {
   gecikmis: { label: "Gecikmiş", dot: "bg-red", bar: "from-red to-[#ff7a7f]", text: "text-red" },
