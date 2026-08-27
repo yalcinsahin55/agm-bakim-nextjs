@@ -1,15 +1,16 @@
-import { FlatCompat } from "@eslint/eslintrc";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({ baseDirectory: __dirname });
+import nextConfig from "eslint-config-next/core-web-vitals";
 
 const config = [
-  ...compat.extends("next/core-web-vitals"),
+  ...nextConfig,
   {
     ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**"],
+  },
+  {
+    // React Hooks 7 flags existing async data-loading effects as a new error.
+    // Keep this migration behavior-neutral; these effects are intentionally retained.
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
   },
 ];
 

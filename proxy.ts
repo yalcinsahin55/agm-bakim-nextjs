@@ -22,7 +22,7 @@ function unauthorized(req: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(url);
 }
 
-export async function middleware(req: NextRequest): Promise<NextResponse> {
+export async function proxy(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
   // Herkese açık yollar
