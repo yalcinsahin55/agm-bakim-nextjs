@@ -40,6 +40,7 @@ export default defineConfig({
             ...process.env,
             NEXT_TELEMETRY_DISABLED: "1",
             JWT_SECRET: process.env.JWT_SECRET || "agm-e2e-local-secret-only",
+            VERCEL_ENV: process.env.VERCEL_ENV || "test",
             MONGO_URI: process.env.MONGO_URI || "mongodb://127.0.0.1:27017",
             MONGO_DB_NAME: process.env.MONGO_DB_NAME || "agm_bakim_e2e",
           },

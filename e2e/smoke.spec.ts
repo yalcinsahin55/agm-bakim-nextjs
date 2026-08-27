@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 type JsonResult = {
   status: number;
   body: unknown;
 };
+
+const fixtureSessionCookies = new Map<string, string>();
 
 function requireFixture(): { engineId: string; typeKey: string } {
   const engineId = process.env.E2E_FIXTURE_ENGINE_ID?.trim();
@@ -32,21 +35,26 @@ async function login(page: Page, identifier: string, password: string): Promise<
 }
 
 async function loginViaFixtureApi(page: Page, identifier: string, password: string): Promise<void> {
-  // Local E2E fallback keeps an in-memory IP quota for the whole server process.
-  // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
-  // without changing the production limiter or trusting this header in production.
-  const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
-  const response = await page.context().request.post("/api/auth/login", {
-    headers: { "x-forwarded-for": fixtureIp },
-    data: { identifier, password },
-  });
-  const loginBody = await response.text();
-  expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
-  const setCookie = response.headers()["set-cookie"] || "";
-  const headerMatch = setCookie.match(/(?:^|,\s*)agm_session=([^;]+)/);
-  const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
-  const sessionCookie = headerMatch?.[1] || existingCookie || "";
-  expect(sessionCookie.length).toBeGreaterThan(0);
+  const cachedSessionCookie = fixtureSessionCookies.get(identifier);
+  let sessionCookie = cachedSessionCookie || "";
+  if (!sessionCookie) {
+    // Local E2E fallback keeps an in-memory IP quota for the whole server process.
+    // Separate reserved TEST-NET addresses keep admin/viewer fixture retries isolated
+    // without changing the production limiter or trusting this header in production.
+    const fixtureIp = identifier === process.env.E2E_VIEWER_IDENTIFIER ? "203.0.113.11" : "203.0.113.10";
+    const response = await page.context().request.post("/api/auth/login", {
+      headers: { "x-forwarded-for": fixtureIp },
+      data: { identifier, password },
+    });
+    const loginBody = await response.text();
+    expect(response.ok(), `Fixture login failed with ${response.status()}: ${loginBody.slice(0, 240)}`).toBeTruthy();
+    const setCookie = response.headers()["set-cookie"] || "";
+    const headerMatch = setCookie.match(/(?:^|,\s*)agm_session=([^;]+)/);
+    const existingCookie = (await page.context().cookies()).find((cookie) => cookie.name === "agm_session")?.value;
+    sessionCookie = headerMatch?.[1] || existingCookie || "";
+    expect(sessionCookie.length).toBeGreaterThan(0);
+    fixtureSessionCookies.set(identifier, sessionCookie);
+  }
   const loginOrigin = new URL(process.env.E2E_BASE_URL || "http://127.0.0.1:3000").origin;
   await page.context().addCookies([{
     name: "agm_session",
@@ -78,6 +86,10 @@ async function fetchJson(page: Page, url: string, options: { method?: string; bo
 function uniqueRequestId(testTitle: string, retry: number): string {
   const safeTitle = testTitle.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 35);
   return `e2e-${safeTitle}-${retry}-${Date.now()}`;
+}
+
+function backupChecksum(collections: unknown): string {
+  return createHash("sha256").update(JSON.stringify(collections)).digest("hex");
 }
 
 function maintenancePayload(engineId: string, typeKey: string, clientRequestId: string): Record<string, unknown> {
@@ -234,6 +246,67 @@ test.describe("AGM Bakım configured authentication", () => {
     expect(matching[0]?.technician_contributions).toEqual([
       expect.objectContaining({ contribution_role: "responsible", duration_minutes: 60 }),
     ]);
+  });
+
+  test("backup export, checksum dry-run and restore round-trip stay isolated", async ({ page }) => {
+    test.skip(
+      !process.env.E2E_IDENTIFIER || !process.env.E2E_PASSWORD,
+      "Backup restore E2E testi yalnızca izole test yöneticisi ile çalıştırılmalı.",
+    );
+    const { engineId } = requireFixture();
+    await loginViaFixtureApi(page, process.env.E2E_IDENTIFIER!, process.env.E2E_PASSWORD!);
+
+    const exportResponse = await page.context().request.get("/api/backups/export");
+    expect(exportResponse.status()).toBe(200);
+    const backupText = await exportResponse.text();
+    expect(backupText).not.toMatch(/password_hash|VAPID_PRIVATE_KEY|photos_b64|data_b64/);
+    const backup = JSON.parse(backupText) as {
+      version?: number;
+      collections?: Record<string, unknown>;
+      integrity?: { algorithm?: string; value?: string };
+    };
+    expect(backup.version).toBe(2);
+    expect(backup.integrity).toMatchObject({ algorithm: "sha256" });
+    expect(backup.collections).toBeDefined();
+    expect(backup.integrity?.value).toBe(backupChecksum(backup.collections));
+
+    const dryRun = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", dry_run: true, collections: backup.collections, integrity: backup.integrity },
+    });
+    expect(dryRun.status).toBe(200);
+    expect(dryRun.body).toMatchObject({ ok: true, mode: "dry-run", applied: false });
+
+    const sourceEngine = Array.isArray(backup.collections?.engines)
+      ? backup.collections.engines.find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate as Record<string, unknown>)._id === engineId)
+      : undefined;
+    const sourceEngineName = sourceEngine && typeof sourceEngine === "object" && !Array.isArray(sourceEngine) && typeof (sourceEngine as Record<string, unknown>).name === "string"
+      ? (sourceEngine as Record<string, unknown>).name as string
+      : "E2E Motor 1";
+    const roundtripName = sourceEngineName.endsWith(" Roundtrip") ? sourceEngineName : `${sourceEngineName} Roundtrip`;
+    const engineCollection = Array.isArray(backup.collections?.engines)
+      ? backup.collections.engines.map((candidate) => {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
+          const record = { ...(candidate as Record<string, unknown>) };
+          if (record._id === engineId) return { ...record, name: roundtripName };
+          return record;
+        })
+      : [];
+    const roundtripCollections = { ...backup.collections, engines: engineCollection };
+    const roundtripIntegrity = { algorithm: "sha256", value: backupChecksum(roundtripCollections) };
+    const restored = await fetchJson(page, "/api/backups/restore", {
+      method: "POST",
+      body: { confirm: "RESTORE", collections: roundtripCollections, integrity: roundtripIntegrity },
+    });
+    expect(restored.status).toBe(200);
+    expect(restored.body).toMatchObject({ ok: true, mode: "merge" });
+
+    const engines = await fetchJson(page, "/api/engines");
+    expect(engines.status).toBe(200);
+    const matchingEngine = Array.isArray(engines.body)
+      ? engines.body.find((candidate) => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>)._id === engineId)
+      : null;
+    expect(matchingEngine).toMatchObject({ _id: engineId, name: roundtripName });
   });
 
   test("offline report attachment is rejected before record mutation", async ({ page }, testInfo) => {
