@@ -46,6 +46,7 @@ export function canWriteMaintenance(role: Role | string | undefined): boolean {
 const TECHNICIAN_ROUTES = [
   "/tamamla",
   "/kayitlar",
+  "/hesap",
 ];
 
 export function defaultRouteForRole(role: Role | string | undefined): string {
@@ -57,6 +58,7 @@ export function defaultRouteForRole(role: Role | string | undefined): string {
 
 const VIEWER_ROUTES = [
   "/dashboard",
+  "/hesap",
   "/motorlar",
   "/kayitlar",
   "/diger",
