@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 import HistoryRecordList from "./_components/HistoryRecordList";
@@ -17,6 +18,7 @@ import { HISTORY_PAGE_SIZE } from "./_lib/types";
 export default function SaatGecmisiPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
+  const { signal } = useAbortableFetch();
   const [engines, setEngines] = useState<Engine[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState("");
@@ -54,7 +56,7 @@ export default function SaatGecmisiPage() {
     setHistoryLoading(true);
     try {
       const query = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE), page: String(page) });
-      const res = await fetch(`/api/engines/${encodeURIComponent(selected)}/history?${query.toString()}`);
+      const res = await fetch(`/api/engines/${encodeURIComponent(selected)}/history?${query.toString()}`, { signal });
       if (!res.ok) throw new ApiFetchError(res.status);
       const data = await res.json() as HistoryResponse;
       setHistory(data.history || []);
@@ -62,15 +64,16 @@ export default function SaatGecmisiPage() {
       setHistoryTotalPages(data.totalPages || 0);
       setHistorySummary(data.summary || { first: null, last: null, has_load: false });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       else toast.error("Saat geçmişi yüklenemedi.");
     } finally {
-      setHistoryLoading(false);
+      if (!signal.aborted) setHistoryLoading(false);
     }
   }
 
-  useEffect(() => { void loadEngines(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadHistory(historyPage); }, [selected, historyPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!signal.aborted) void loadEngines(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!signal.aborted) void loadHistory(historyPage); }, [selected, historyPage, signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const engine = engines.find((e) => e._id === selected);

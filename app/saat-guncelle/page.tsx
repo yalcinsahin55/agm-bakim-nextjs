@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import type { Engine } from "@/lib/types";
 
@@ -17,6 +18,7 @@ type EngineEditValue = { hours?: string; load_kw?: string };
 export default function SaatGuncellePage() {
   const router = useRouter();
   const { user } = useCurrentUser();
+  const { signal } = useAbortableFetch();
   const [engines, setEngines] = useState<EngineRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, EngineEditValue>>({});
@@ -27,7 +29,7 @@ export default function SaatGuncellePage() {
 
   async function load() {
     try {
-      const res = await fetch("/api/engines", { cache: "no-store" });
+      const res = await fetch("/api/engines", { cache: "no-store", signal });
       if (res.status === 401) { router.push("/login"); return; }
       const data = await res.json().catch(() => null);
       if (!res.ok || !Array.isArray(data)) {
@@ -37,15 +39,16 @@ export default function SaatGuncellePage() {
       }
       setLoadError("");
       setEngines(data as EngineRow[]);
-    } catch {
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       setEngines([]);
       setLoadError("Motor listesi yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(
     () => [...engines].sort((a: EngineRow, b: EngineRow) => engineSortKey(a.name) - engineSortKey(b.name)),

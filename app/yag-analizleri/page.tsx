@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import { uploadOilAnalysisPdf } from "@/lib/mediaUpload";
 import OilAnalysisCard from "./_components/OilAnalysisCard";
@@ -19,6 +20,7 @@ import type { AnalysisResult, Engine, OilAnalysis } from "./_lib/types";
 export default function YagAnalizleriPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
+  const { signal } = useAbortableFetch();
   const [engines, setEngines] = useState<Engine[]>([]);
   const [analyses, setAnalyses] = useState<OilAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ export default function YagAnalizleriPage() {
 
   async function load() {
     try {
-      const [engRes, anaRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/oil-analyses", { cache: "no-store" })]);
+      const [engRes, anaRes] = await Promise.all([fetch("/api/engines", { cache: "no-store", signal }), fetch("/api/oil-analyses", { cache: "no-store", signal })]);
       if (engRes.status === 401 || anaRes.status === 401) { router.push("/login"); return; }
       const engData = await engRes.json().catch(() => null) as unknown;
       const anaData = await anaRes.json().catch(() => null) as unknown;
@@ -53,14 +55,15 @@ export default function YagAnalizleriPage() {
       setEngines(engData as Engine[]);
       setAnalyses(anaData as OilAnalysis[]);
       if (engData.length && !engineId) setEngineId((engData as Engine[])[0]._id);
-    } catch {
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       setLoadError("Yağ analizleri yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 

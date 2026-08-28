@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import type { Notification } from "@/lib/types";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
 import NotificationGroupCard from "./_components/NotificationGroupCard";
@@ -21,6 +22,7 @@ export default function NotificationsPage() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ gecikmis: true, kritik: true });
   const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
   const router = useRouter();
+  const { signal } = useAbortableFetch();
 
   const load = useCallback(async (refresh = false) => {
     setLoadError("");
@@ -29,14 +31,14 @@ export default function NotificationsPage() {
 
     const request = async (shouldRefresh: boolean): Promise<{ notifications?: Notification[] } | null> => {
       let response = shouldRefresh
-        ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store" })
-        : await fetch("/api/notifications?limit=500", { cache: "no-store" });
+        ? await fetch("/api/notifications/refresh", { method: "POST", cache: "no-store", signal })
+        : await fetch("/api/notifications?limit=500", { cache: "no-store", signal });
       if (response.status === 401) {
         router.push("/login");
         return null;
       }
       if (!response.ok && shouldRefresh) {
-        response = await fetch("/api/notifications?limit=500", { cache: "no-store" });
+        response = await fetch("/api/notifications?limit=500", { cache: "no-store", signal });
       }
       if (response.status === 401) {
         router.push("/login");
@@ -58,15 +60,15 @@ export default function NotificationsPage() {
       }
       if (!data) return;
       setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
-    } catch {
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       setLoadError("Bildirimler yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!signal.aborted) { setLoading(false); setRefreshing(false); }
     }
-  }, [router]);
+  }, [router, signal]);
 
-  useEffect(() => { load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
+  useEffect(() => { if (!signal.aborted) load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
 
   async function markRead(id: string) {
     try {
