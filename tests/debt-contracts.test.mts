@@ -28,6 +28,7 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
     source("app/api/media/file/route.ts"),
     source("app/api/oil-analyses/[id]/file/route.ts"),
     source("app/api/records/_lib/recordsQuery.ts"),
+    source("app/api/records/[id]/_lib/recordRead.ts"),
     source("app/api/records/interval-summary/route.ts"),
     source("app/api/reports/engine/[id]/route.ts"),
     source("app/api/users/technicians/route.ts"),
@@ -39,10 +40,11 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
   assert.match(routes[1], /media-read/);
   assert.match(routes[2], /oil-analysis-file-read/);
   assert.match(routes[3], /records-read/);
-  assert.match(routes[4], /records-interval-summary-read/);
-  assert.match(routes[5], /engine-report-read/);
-  assert.match(routes[6], /technician-list-read/);
-  assert.match(routes[7], /engine-list-read/);
+  assert.match(routes[4], /records-read-single/);
+  assert.match(routes[5], /records-interval-summary-read/);
+  assert.match(routes[6], /engine-report-read/);
+  assert.match(routes[7], /technician-list-read/);
+  assert.match(routes[8], /engine-list-read/);
   assert.match(routes[8], /maintenance-panel-read/);
 });
 

@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import EquipmentInfoAddForm from "./_components/EquipmentInfoAddForm";
 import EquipmentInfoCard from "./_components/EquipmentInfoCard";
@@ -18,6 +19,7 @@ import { fileToBase64 } from "./_lib/fileToBase64";
 export default function MotorBilgiPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
+  const { signal } = useAbortableFetch();
   const [items, setItems] = useState<EquipmentInfo[]>([]);
   const [engines, setEngines] = useState<EquipmentEngine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,20 +40,21 @@ export default function MotorBilgiPage() {
 
   async function load() {
     try {
-      const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info"), fetch("/api/engines")]);
+      const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info", { signal }), fetch("/api/engines", { signal })]);
       if (infoRes.status === 401) { router.push("/login"); return; }
       const infoData = await infoRes.json().catch(() => []) as unknown;
       const engData = await engRes.json().catch(() => []) as unknown;
       setItems(Array.isArray(infoData) ? infoData as EquipmentInfo[] : []);
       setEngines(Array.isArray(engData) ? engData as EquipmentEngine[] : []);
-    } catch {
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       toast.error("Veriler yüklenirken bir hata oluştu.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const safe = Array.isArray(items) ? items : [];

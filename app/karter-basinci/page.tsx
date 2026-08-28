@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import PressureEntryForm from "./_components/PressureEntryForm";
 import PressureHistory from "./_components/PressureHistory";
@@ -17,6 +18,7 @@ import { fileToBase64 } from "./_lib/fileToBase64";
 export default function KarterBasinciPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
+  const { signal } = useAbortableFetch();
   const [engines, setEngines] = useState<PressureEngine[]>([]);
   const [readings, setReadings] = useState<PressureReading[]>([]);
   const [readingsTotal, setReadingsTotal] = useState(0);
@@ -39,7 +41,7 @@ export default function KarterBasinciPage() {
 
   const load = useCallback(async () => {
     try {
-      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store" }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store" })]);
+      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store", signal }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store", signal })]);
       if (engRes.status === 401 || readRes.status === 401) { router.push("/login"); return; }
       const engData = await engRes.json().catch(() => null) as unknown;
       const readData = await readRes.json().catch(() => null) as unknown;
@@ -57,12 +59,13 @@ export default function KarterBasinciPage() {
       setReadingPage(typeof pageData?.page === "number" ? pageData.page : 1);
       setHasMoreReadings(pageData?.has_more === true);
       if (engineList.length) setHistoryEngine((current) => current || engineList[0]._id);
-    } catch {
+    } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       setLoadError("Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, [router]);
+  }, [router, signal]);
 
   async function loadMoreReadings() {
     if (loadingMoreReadings || !hasMoreReadings) return;

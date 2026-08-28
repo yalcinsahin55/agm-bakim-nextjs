@@ -5,6 +5,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { cachedFetch } from "@/lib/apiCache";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
 interface BarItem {
   label: string;
@@ -42,6 +43,7 @@ function BarList({ items, color }: { items: BarItem[]; color: string }) {
 }
 
 export default function IstatistikPage() {
+  const { signal } = useAbortableFetch();
   const [summary, setSummary] = useState<AnalyticsSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,14 +61,15 @@ export default function IstatistikPage() {
         byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
       });
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       console.error("İstatistikler yüklenemedi:", loadError);
       setError("İstatistikler yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

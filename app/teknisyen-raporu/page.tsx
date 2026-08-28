@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 
 const PERIODS = [
@@ -64,6 +65,7 @@ function StatCard({ label, value, hint, accent = "text-teal" }: { label: string;
 
 export default function TeknisyenRaporuPage() {
   const router = useRouter();
+  const { signal } = useAbortableFetch();
   const [period, setPeriod] = useState<PeriodKey>("month");
   const [technicianTypeFilter, setTechnicianTypeFilter] = useState<"all" | "mekanik" | "elektromekanik">("all");
   const [summary, setSummary] = useState<AnalyticsResponse>(EMPTY);
@@ -87,17 +89,18 @@ export default function TeknisyenRaporuPage() {
         byTechnicianType: Array.isArray(data.byTechnicianType) ? data.byTechnicianType : [],
       });
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       if (loadError instanceof ApiFetchError && loadError.status === 401) {
         router.push(`/login?redirect=${encodeURIComponent("/teknisyen-raporu")}`);
         return;
       }
       setError("Teknisyen raporu yüklenemedi. Lütfen tekrar deneyin.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
-  useEffect(() => { void load("month"); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!signal.aborted) void load("month"); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalDuration = Number(summary.periodTechnicianDurationMinutes ?? summary.periodDurationMinutes ?? 0);
   const totalTechnicianTasks = Number(summary.periodTechnicianTasks || 0);

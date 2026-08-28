@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { syncOfflineQueue } from "@/lib/offlineQueue";
 import { AUTH_CHANGED_EVENT } from "@/lib/authClient";
+import { initErrorReporter } from "@/lib/errorReporter";
 
 interface AuthMeResponse {
   id?: unknown;
@@ -26,6 +27,7 @@ async function getCurrentUserId(): Promise<string> {
 
 export default function PwaRegister() {
   useEffect(() => {
+    initErrorReporter();
     let disposed = false;
     let handleControllerChange: (() => void) | undefined;
     if ("serviceWorker" in navigator) {
