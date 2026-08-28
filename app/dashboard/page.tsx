@@ -158,9 +158,10 @@ export default function DashboardPage() {
         <LoadCards engines={sortedEngines} />
 
 
-        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
-        <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
+        <section id="dashboard-health-details" className="scroll-mt-24">
+          <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
+          <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
           {healthRows.map(({ engine, score, status, attention }) => {
             const statusView = ENGINE_STATUS_VIEW[status];
             const selected = selectedHealthEngineId === engine._id;
@@ -174,7 +175,8 @@ export default function DashboardPage() {
               {selected && <EngineHealthDetails engine={engine} items={engineItems} onClose={() => setSelectedHealthEngineId("")} />}
             </div>;
           })}
-        </div>
+          </div>
+        </section>
       </div>
       <BottomNav />
     </div>
