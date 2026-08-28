@@ -15,7 +15,7 @@
  */
 
 type ErrorEventPayload = {
-  type: "window_error" | "unhandled_rejection";
+  type: "window_error" | "unhandled_rejection" | "manual_report";
   message: string;
   filename?: string;
   lineno?: number;
