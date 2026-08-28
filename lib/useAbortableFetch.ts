@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * useEffect ile yüklenen veriler için AbortController yönetir.
@@ -14,19 +14,18 @@ import { useEffect, useRef } from "react";
  *     ...
  *   }
  *   useEffect(() => { if (!signal.aborted) load(); }, [signal]);
+ *
+ * Not: Signal ilk render'da aborted=false olan bir controller'dan gelir.
+ * Cleanup (unmount) sırasında abort edilir.
  */
 export function useAbortableFetch(): { signal: AbortSignal } {
-  const controllerRef = useRef<AbortController | null>(null);
-
-  if (!controllerRef.current || controllerRef.current.signal.aborted) {
-    controllerRef.current = new AbortController();
-  }
+  const [controller] = useState(() => new AbortController());
 
   useEffect(() => {
     return () => {
-      controllerRef.current?.abort();
+      controller.abort();
     };
-  }, []);
+  }, [controller]);
 
-  return { signal: controllerRef.current.signal };
+  return { signal: controller.signal };
 }

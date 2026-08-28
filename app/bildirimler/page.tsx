@@ -68,7 +68,7 @@ export default function NotificationsPage() {
     }
   }, [router, signal]);
 
-  useEffect(() => { if (!signal.aborted) load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load]);
+  useEffect(() => { if (!signal.aborted) load().catch(() => setLoadError("Bildirimler yüklenemedi.")); }, [load, signal]);
 
   async function markRead(id: string) {
     try {

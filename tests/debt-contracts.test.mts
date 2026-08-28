@@ -45,7 +45,7 @@ test("sensitive read routes keep user-scoped rate limits", async () => {
   assert.match(routes[6], /engine-report-read/);
   assert.match(routes[7], /technician-list-read/);
   assert.match(routes[8], /engine-list-read/);
-  assert.match(routes[8], /maintenance-panel-read/);
+  assert.match(routes[9], /maintenance-panel-read/);
 });
 
 test("legacy media and oil PDF fallback remain bounded", async () => {
@@ -164,7 +164,7 @@ test("notification page is GET-first and the bell uses a lightweight unread coun
   assert.match(unreadCount, /searchParams\.get\("fresh"\)/);
   assert.match(unreadCache, /CACHE_TTL_MS = 5_000/);
   assert.match(unreadCache, /MAX_CACHE_ENTRIES = 512/);
-  assert.match(notificationsPage, /fetch\("\/api\/notifications\?limit=500", \{ cache: "no-store" \}\)/);
+  assert.match(notificationsPage, /fetch\("\/api\/notifications\?limit=500", \{ cache: "no-store", signal \}\)/);
   assert.match(notificationsPage, /fetch\("\/api\/notifications\/refresh", \{ method: "POST"/);
   assert.match(notificationBell, /UNREAD_COUNT_URL = "\/api\/notifications\/unread-count"/);
   assert.match(notificationBell, /\?fresh=1/);
@@ -753,7 +753,7 @@ test("notification listing uses current panel statuses without requiring refresh
   assert.match(notifications, /loadActionableItems/u);
   assert.match(notifications, /currentMaintenanceNotifications/u);
   assert.match(notifications, /read_at: now/u);
-  assert.match(notificationsPage, /useEffect\(\(\) => \{ load\(\)/u);
+  assert.match(notificationsPage, /useEffect\(\(\) => \{ if \(!signal\.aborted\) load\(\)/u);
 });
 
 test("public login route excludes protected navigation chrome", async () => {
