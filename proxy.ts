@@ -7,7 +7,7 @@ const COOKIE_NAME = "agm_session";
 const PUBLIC_PREFIXES = ["/login", "/api/auth", "/_next", "/fonts", "/sw.js", "/.well-known"];
 // `/api/cron/refresh` session cookie değil, route içinde CRON_SECRET Bearer doğrulaması kullanır.
 // Proxy yalnızca isteği route’a ulaştırır; secret kontrolü cron route’unda kalır.
-const PUBLIC_EXACT_PATHS = new Set(["/icon.svg", "/manifest.json", "/manifest.webmanifest", "/api/cron/refresh"]);
+const PUBLIC_EXACT_PATHS = new Set(["/icon.svg", "/manifest.json", "/manifest.webmanifest", "/api/cron/refresh", "/api/health/mongodb"]);
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_EXACT_PATHS.has(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
