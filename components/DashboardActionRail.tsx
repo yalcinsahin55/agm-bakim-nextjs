@@ -21,6 +21,7 @@ type QueueFilter = "all" | StatusKey;
 
 type QuickAction = {
   href: string;
+  accessPath?: string;
   label: string;
   description: string;
   icon: string;
@@ -30,7 +31,8 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "✓", tone: "amber" },
   { href: "/kayitlar", label: "Bakım kayıtları", description: "Kayıt ara, geçmiş kanıtları incele.", icon: "▤", tone: "teal" },
-  { href: "/motorlar", label: "Motor durumları", description: "Motor sağlık detayına git.", icon: "⚙", tone: "purple" },
+  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor sağlığı", description: "Motor sağlık detaylarına git.", icon: "⚙", tone: "purple" },
+  { href: "/bakim-turleri", label: "Bakım türleri", description: "Tür bazında tüm motorları listele.", icon: "▦", tone: "purple" },
   { href: "/bildirimler", label: "Bildirim merkezi", description: "Dikkat isteyen son olayları aç.", icon: "!", tone: "red" },
 ];
 
@@ -122,7 +124,7 @@ export default function DashboardActionRail(props: DashboardActionRailProps): JS
   const filteredItems = useMemo(() => filterOperationItems(items, queueFilter), [items, queueFilter]);
   const operationQueue = useMemo(() => buildOperationQueue(filteredItems, 6), [filteredItems]);
   const riskRows = useMemo(() => [...healthRows].sort(compareHealthRows).slice(0, 5), [healthRows]);
-  const visibleActions = QUICK_ACTIONS.filter((action) => canAccessRoute(props.role, action.href));
+  const visibleActions = QUICK_ACTIONS.filter((action) => canAccessRoute(props.role, action.accessPath || action.href));
 
   if (!visibleActions.length && !operationQueue.length && !riskRows.length) return <></>;
 
@@ -157,7 +159,7 @@ export default function DashboardActionRail(props: DashboardActionRailProps): JS
             </button>
           );
         })}
-        <Link href="#dashboard-health" className="rounded-xl border border-border bg-panel px-3 py-2 text-left transition hover:border-borderlt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
+        <Link href="#dashboard-health-details" className="rounded-xl border border-border bg-panel px-3 py-2 text-left transition hover:border-borderlt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
           <div className="text-[9px] font-bold uppercase tracking-wide text-faint">İzlenen motor</div>
           <div className="mt-1 font-mono text-xl font-extrabold text-text">{enginesCount}</div>
           <div className="mt-0.5 text-[8.5px] text-muted">motor özeti</div>
@@ -200,7 +202,7 @@ export default function DashboardActionRail(props: DashboardActionRailProps): JS
           {filteredItems.length > operationQueue.length && <Link href="/araliklar" className="mt-2 inline-flex text-[9.5px] font-bold text-teal hover:underline">Tüm bakım planını aç →</Link>}
         </div>
 
-        <div id="dashboard-health" className="rounded-xl border border-border bg-panel p-3" aria-label="Motor risk özeti">
+        <div id="dashboard-risk-summary" className="rounded-xl border border-border bg-panel p-3" aria-label="Motor risk özeti">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div>
               <div className="text-[10px] font-extrabold uppercase tracking-wide text-text">Motor risk özeti</div>
