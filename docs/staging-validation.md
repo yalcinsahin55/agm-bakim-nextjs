@@ -34,7 +34,7 @@ Her testten sonra staging audit log’da kullanıcı, action, entity, entity ID 
 
 Aynı staging motoru için iki ayrı yönetici hesabından aynı anda saat güncellemesi gönderilmelidir. Sonuçların deterministik olması, motor history’nin iki geçerli kaydı içermesi ve arayüzün hata vermemesi beklenir. Aynı `client_request_id` ile iki bakım create isteği gönderildiğinde unique sparse index nedeniyle yalnızca bir grup bakım kaydı oluşmalıdır.
 
-Bir grouped maintenance isteğinde primary kayıt oluşturulduktan sonra istemci bağlantısı kesilerek retry denenmelidir. Retry’nin mevcut primary kaydı duplicate olarak tanıması, aynı media idempotency key’lerini yeniden kullanması ve ikinci bağımsız Blob nesnesi üretmemesi beklenir. İlk çağrı primary kaydı oluşturup extra türlerden önce kesilirse staging’de bu kısmi durum ayrıca incelenmelidir; tam transaction/compensation davranışı şu an ayrı bir geliştirme kararıdır.
+Bir grouped maintenance isteğinde primary kayıt oluşturulduktan sonra istemci bağlantısı kesilerek retry denenmelidir. Retry’nin mevcut primary kaydı duplicate olarak tanıması, aynı media idempotency key’lerini yeniden kullanması ve ikinci bağımsız Blob nesnesi üretmemesi beklenir. Replica set veya sharded MongoDB’de grouped bakımın primary/extra kayıtları, bakım takip güncellemeleri ve motor çalışma saati güncellemesi tek transaction içinde uygulanır; transaction başarısız olursa bu DB yazılarının tamamı geri alınmalıdır. Standalone MongoDB yalnızca production dışı test/Preview fallback’i için desteklenir ve atomiklik sağlamaz; production’da transaction desteği yoksa yazma durdurulur. Audit ve bildirim yenileme transaction sonrasında çalıştığı için ayrıca doğrulanmalıdır.
 
 ## 4. Backup/restore round-trip
 
