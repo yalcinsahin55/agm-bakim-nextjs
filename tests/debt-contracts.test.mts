@@ -57,6 +57,22 @@ test("legacy media and oil PDF fallback remain bounded", async () => {
   assert.match(oil, /data:application\/pdf;base64,/);
 });
 
+test("grouped maintenance creation keeps records, tracking, and engine hours in one transaction", async () => {
+  const recordCreate = await source("app/api/records/_lib/recordCreate.ts");
+  assert.match(recordCreate, /getMongoClient\(\)/);
+  assert.match(recordCreate, /startSession\(\)/);
+  assert.match(recordCreate, /supportsMongoTransactions\(db\)/);
+  assert.match(recordCreate, /const groupedWrite = async \(\) =>/);
+  assert.match(recordCreate, /session\.withTransaction\(groupedWrite\)/);
+  assert.match(recordCreate, /recordsCol\.insertOne\(rec, session \? \{ session \} : undefined\)/);
+  assert.match(recordCreate, /recomputeLastMaintenance\(db, engine_id, tKey, undefined, session\)/);
+  assert.match(recordCreate, /typesCol\.updateOne\([\s\S]*?\{ upsert: true, session \}/);
+  assert.match(recordCreate, /enginesCol\.updateOne/);
+  assert.match(recordCreate, /hours: \{ \$lt: hour_at_completion \}/);
+  assert.match(recordCreate, /\{ session \}/);
+  assert.match(recordCreate, /finally \{[\s\S]*?if \(session\) await session\.endSession\(\)/);
+});
+
 test("record date and bulk update safeguards stay in place", async () => {
   const recordCreate = await source("app/api/records/_lib/recordCreate.ts");
   const recordHelpers = await source("app/api/records/_lib/recordRouteHelpers.ts");

@@ -1,8 +1,9 @@
 import { enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ObjectId } from "mongodb";
-import { getDb } from "@/lib/mongodb";
+import { ObjectId, type ClientSession } from "mongodb";
+import { getDb, getMongoClient } from "@/lib/mongodb";
+import { requiresMongoTransactions, supportsMongoTransactions } from "@/lib/mongoTransactions";
 import { getCurrentUser } from "@/lib/auth";
 import { recordSchema, formatZodError, type RecordInput } from "@/lib/schemas";
 import { writeAuditLog } from "@/lib/audit";
@@ -207,7 +208,15 @@ export async function postRecord(req: NextRequest) {
         .filter((item): item is { label: string; completed: boolean } => item.label.length > 0)
       : [];
 
-    async function insertOneRecord(tKey: string, tLabel: string, isPrimary: boolean, trackingAutoCreated = false, previousTrackingState?: unknown, recordClientRequestId = client_request_id) {
+    async function insertOneRecord(
+      tKey: string,
+      tLabel: string,
+      isPrimary: boolean,
+      trackingAutoCreated = false,
+      previousTrackingState?: unknown,
+      recordClientRequestId = client_request_id,
+      session?: ClientSession,
+    ) {
       const rec: MaintenanceRecordDocument = {
         engine_id, engine_name: engineName, type_key: tKey, type_label: tLabel,
         hour_at_completion,
@@ -247,51 +256,82 @@ export async function postRecord(req: NextRequest) {
         ...(previousTrackingState ? { tracking_state_before: previousTrackingState } : {}),
       };
       if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
-      await recordsCol.insertOne(rec);
-      await recomputeLastMaintenance(db, engine_id, tKey);
+      await recordsCol.insertOne(rec, session ? { session } : undefined);
+      await recomputeLastMaintenance(db, engine_id, tKey, undefined, session);
     }
 
-    if (typeof period === "number") {
-      operationStep = "update_primary_tracking";
-      await typesCol.updateOne(
-        { _id: type_key },
-          { $set: { ...buildEngineStateUpdate(primaryType?.engine_states, engine_id, { period_hours: period, tracking_source: primaryTrackingAutoCreated ? "record" : "manual" }), engine_scope: primaryType?.engine_scope === "all" ? "all" : "explicit" } },
-        { upsert: true }
-      );
+    const mongoClient = await getMongoClient();
+    const transactionSupported = await supportsMongoTransactions(db);
+    if (!transactionSupported && requiresMongoTransactions()) {
+      throw new Error("MongoDB transaction support is required in production.");
     }
-    operationStep = "insert_primary_record";
-    await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState);
-
+    const session = transactionSupported ? mongoClient.startSession() : undefined;
     const completedLabels: string[] = [type_label];
-    if (normalizedExtraTypes.length > 0) {
-      for (const ex of normalizedExtraTypes) {
-        const extraType = await typesCol.findOne({ _id: ex.type_key }, { projection: { engine_states: 1, engine_scope: 1 } });
-        const extraPreviousTrackingState = snapshotTrackingState(extraType?.engine_states?.[engine_id]);
-        const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
-        if (typeof ex.period === "number") {
-          operationStep = "update_extra_tracking";
+
+    try {
+      const groupedWrite = async () => {
+        if (typeof period === "number") {
+          operationStep = "update_primary_tracking";
           await typesCol.updateOne(
-            { _id: ex.type_key },
-            { $set: { ...buildEngineStateUpdate(extraType?.engine_states, engine_id, { period_hours: ex.period, tracking_source: extraTrackingAutoCreated ? "record" : "manual" }), engine_scope: extraType?.engine_scope === "all" ? "all" : "explicit" } },
-            { upsert: true }
+            { _id: type_key },
+            { $set: { ...buildEngineStateUpdate(primaryType?.engine_states, engine_id, { period_hours: period, tracking_source: primaryTrackingAutoCreated ? "record" : "manual" }), engine_scope: primaryType?.engine_scope === "all" ? "all" : "explicit" } },
+            { upsert: true, session },
           );
         }
-        operationStep = "insert_extra_record";
-        await insertOneRecord(ex.type_key, ex.type_label, false, extraTrackingAutoCreated, extraPreviousTrackingState, buildExtraClientRequestId(client_request_id, ex.type_key));
-        completedLabels.push(ex.type_label);
-      }
-    }
 
-    if (hour_at_completion > engine.hours) {
-      operationStep = "update_engine_hours";
-      const stamp = new Date();
-      const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
-      await enginesCol.updateOne(
-        { _id: engine_id },
-        Array.isArray(engine.history)
-          ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
-          : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
-      );
+        operationStep = "insert_primary_record";
+        await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState, client_request_id, session);
+
+        if (normalizedExtraTypes.length > 0) {
+          for (const ex of normalizedExtraTypes) {
+            const extraType = await typesCol.findOne(
+              { _id: ex.type_key },
+              { projection: { engine_states: 1, engine_scope: 1 }, session },
+            );
+            const extraPreviousTrackingState = snapshotTrackingState(extraType?.engine_states?.[engine_id]);
+            const extraTrackingAutoCreated = typeof ex.period === "number" && (!extraType?.engine_states?.[engine_id] || extraType.engine_states[engine_id]?.tracking_source === "record");
+            if (typeof ex.period === "number") {
+              operationStep = "update_extra_tracking";
+              await typesCol.updateOne(
+                { _id: ex.type_key },
+                { $set: { ...buildEngineStateUpdate(extraType?.engine_states, engine_id, { period_hours: ex.period, tracking_source: extraTrackingAutoCreated ? "record" : "manual" }), engine_scope: extraType?.engine_scope === "all" ? "all" : "explicit" } },
+                { upsert: true, session },
+              );
+            }
+            operationStep = "insert_extra_record";
+            await insertOneRecord(
+              ex.type_key,
+              ex.type_label,
+              false,
+              extraTrackingAutoCreated,
+              extraPreviousTrackingState,
+              buildExtraClientRequestId(client_request_id, ex.type_key),
+              session,
+            );
+            completedLabels.push(ex.type_label);
+          }
+        }
+
+        if (hour_at_completion > engine.hours) {
+          operationStep = "update_engine_hours";
+          const stamp = new Date();
+          const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
+          await enginesCol.updateOne(
+            { _id: engine_id, hours: { $lt: hour_at_completion } },
+            Array.isArray(engine.history)
+              ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
+              : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
+            { session },
+          );
+        }
+      };
+      if (session) {
+        await session.withTransaction(groupedWrite);
+      } else {
+        await groupedWrite();
+      }
+    } finally {
+      if (session) await session.endSession();
     }
 
     operationStep = "write_audit";
