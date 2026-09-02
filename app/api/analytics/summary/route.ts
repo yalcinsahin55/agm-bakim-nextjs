@@ -19,6 +19,7 @@ type EngineAggregateRow = { _id?: string; engine?: string; count?: number };
 type TypeAggregateRow = { _id?: string; count?: number };
 type TotalsAggregateRow = { total?: number; thisCount?: number; lastCount?: number };
 type PeriodTotalsAggregateRow = { total?: number; total_duration_minutes?: number; technician_duration_minutes?: number; missing_duration?: number; technician_tasks?: number };
+type PeriodBreakdownRow = { _id?: { month?: string; iso_week_year?: number; iso_week?: number }; count?: number; total_duration_minutes?: number };
 type TechnicianAggregateRow = {
   _id?: unknown;
   technician?: unknown;
@@ -46,11 +47,13 @@ async function getAnalyticsSummary(req: NextRequest) {
   const searchParams = new URL(req.url).searchParams;
   const requestedPeriod = searchParams.get("period") || "all";
   const enginePeriod = VALID_ENGINE_PERIODS.has(requestedPeriod) ? requestedPeriod : "all";
-  const cached = analyticsCache.get(enginePeriod);
+  const requestedWorkPeriod = searchParams.get("workPeriod") || "total";
+  const workPeriod = new Set(["week", "month", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total";
+  const cached = analyticsCache.get(`${enginePeriod}:${workPeriod}`);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.value, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "HIT" } });
   }
-  if (cached) analyticsCache.delete(enginePeriod);
+  if (cached) analyticsCache.delete(`${enginePeriod}:${workPeriod}`);
   const now = new Date();
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -75,7 +78,12 @@ async function getAnalyticsSummary(req: NextRequest) {
       ...(from || to ? [{ $match: { maintenance_date: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } }] : []),
     ];
   };
-  const dateMatch = engineSince ? dateRangeStages(engineSince) : [];
+  const workSince = workPeriod === "week"
+    ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7) - 7 * 11))
+    : workPeriod === "month"
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1))
+      : null;
+  const dateMatch = workSince ? dateRangeStages(workSince) : [];
   const monthlyDateMatch = dateRangeStages(since);
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
@@ -117,7 +125,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     { $group: { _id: "$_id.technician_id", technician: { $first: "$technician" }, technician_type: { $first: "$technician_type" }, [`${role}_count`]: { $sum: 1 }, [`${role}_duration_minutes`]: { $sum: "$duration_minutes" } } },
     { $sort: { [`${role}_count`]: -1, technician: 1 } },
   ];
-  const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals] = await Promise.all([activeTechniciansPromise,
+  const [activeTechnicians, monthly, byEngine, byType, totals, responsibleStaff, supportStaff, periodTotals, periodBreakdown] = await Promise.all([activeTechniciansPromise,
     aggregate<MonthlyAggregateRow>([
       ...monthlyDateMatch,
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$maintenance_date", timezone: "Europe/Istanbul" } }, count: { $sum: 1 } } },
@@ -194,6 +202,12 @@ async function getAnalyticsSummary(req: NextRequest) {
         },
       },
     ]).toArray(),
+    aggregate<PeriodBreakdownRow>([
+      ...dateMatch,
+      { $match: { maintenance_date: { $ne: null } } },
+      { $group: { _id: { month: { $dateToString: { format: "%Y-%m", date: "$maintenance_date", timezone: "Europe/Istanbul" } }, iso_week_year: { $isoWeekYear: { date: "$maintenance_date", timezone: "Europe/Istanbul" } }, iso_week: { $isoWeek: { date: "$maintenance_date", timezone: "Europe/Istanbul" } } }, count: { $sum: 1 }, total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } },
+      { $sort: { "_id.month": 1, "_id.iso_week_year": 1, "_id.iso_week": 1 } },
+    ]).toArray(),
   ]);
   const technicianById = new Map(activeTechnicians.map((technician) => [technician.id, technician]));
   const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
@@ -257,8 +271,10 @@ async function getAnalyticsSummary(req: NextRequest) {
     periodTechnicianDurationMinutes: periodRow.technician_duration_minutes || 0,
     periodMissingDuration: periodRow.missing_duration || 0,
     periodTechnicianTasks: periodRow.technician_tasks || 0,
+    workPeriod,
+    periodBreakdown: periodBreakdown.map((row) => ({ month: row._id?.month || "", week: row._id?.iso_week_year && row._id?.iso_week ? `${row._id.iso_week_year}-W${String(row._id.iso_week).padStart(2, "0")}` : "", count: row.count || 0, total_duration_minutes: row.total_duration_minutes || 0 })),
   };
-  analyticsCache.set(enginePeriod, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
+  analyticsCache.set(`${enginePeriod}:${workPeriod}`, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "MISS" } });
 }
 

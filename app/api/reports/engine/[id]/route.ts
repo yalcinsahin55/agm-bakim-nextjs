@@ -40,8 +40,12 @@ async function getEngineReport(req: NextRequest, context: { params: Promise<{ id
     const to = searchParams.get("to");
     const match: Record<string, unknown> = { engine_id: id };
     if (typeLabel) match.type_label = typeLabel;
-    const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(from || "") ? new Date(`${from}T00:00:00.000Z`) : undefined;
-    const toDate = /^\d{4}-\d{2}-\d{2}$/.test(to || "") ? new Date(`${to}T23:59:59.999Z`) : undefined;
+    const month = searchParams.get("month");
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec(month || "");
+    const monthNumber = monthMatch ? Number(monthMatch[2]) : 0;
+    const validMonth = monthMatch && monthNumber >= 1 && monthNumber <= 12 ? { year: Number(monthMatch[1]), month: monthNumber } : undefined;
+    const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(from || "") ? new Date(`${from}T00:00:00.000Z`) : validMonth ? new Date(Date.UTC(validMonth.year, validMonth.month - 1, 1)) : undefined;
+    const toDate = /^\d{4}-\d{2}-\d{2}$/.test(to || "") ? new Date(`${to}T23:59:59.999Z`) : validMonth ? new Date(Date.UTC(validMonth.year, validMonth.month, 0, 23, 59, 59, 999)) : undefined;
     const validFrom = fromDate && Number.isFinite(fromDate.getTime()) ? fromDate : undefined;
     const validTo = toDate && Number.isFinite(toDate.getTime()) ? toDate : undefined;
     const dateCandidate = maintenanceDateCandidateMatch(validFrom, validTo);

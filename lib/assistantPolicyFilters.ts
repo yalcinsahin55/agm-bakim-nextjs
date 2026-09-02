@@ -51,7 +51,7 @@ export function parseFilters(question: string): Pick<AssistantQuery, "maintenanc
   const durationRange = rawDurationRange ? Object.fromEntries(Object.entries(rawDurationRange).map(([key, value]) => [key, durationInHours ? Number(value) * 60 : value])) as { min?: number; max?: number } : undefined;
   const teamOnly = /\bekip\b|birlikte\s+çalış|birden\s+fazla\s+teknisyen|diğer\s+teknisyen/iu.test(question) ? true : undefined;
   const unreadOnly = /okunmamış|okunmayan|okumadığım/iu.test(question) ? true : undefined;
-  const showAll = /(?:tümünü|hepsini|tamamını)\s+(?:göster|listele|getir)|tüm\s+(?:kayıtları|bakımları|raporları)/iu.test(question) ? true : undefined;
+  const showAll = /(?:tümünü|hepsini|tamamını)\s+(?:göster|listele|getir)|tüm\s+(?:kayıtları|bakımları|raporları|bakım\s+geçmişini|bakım\s+kayıtlarını)/iu.test(question) ? true : undefined;
   const maintenancePeriodHours = extractMaintenancePeriodHours(question);
   return { maintenanceTypeQuery: maintenancePeriodHours ? undefined : extractMaintenanceTypeQuery(question), maintenancePeriodHours, serviceQuery: extractServiceQuery(question), technicianRole, sourceFilter, evidenceFilter, statusFilter, recordFilters: recordFilters.length ? recordFilters : undefined, hourRange, durationRange, teamOnly, unreadOnly, showAll };
 }

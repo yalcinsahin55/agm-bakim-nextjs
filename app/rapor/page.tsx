@@ -88,6 +88,8 @@ export default function RaporPage() {
   const [reportAll, setReportAll] = useState(false);
   const [reportTruncated, setReportTruncated] = useState(false);
   const [engineId, setEngineId] = useState("");
+  const [reportScope, setReportScope] = useState<"all" | "month">("all");
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
 
@@ -112,8 +114,9 @@ export default function RaporPage() {
     if (!engineId) return;
     setLoadingRecords(true);
     try {
-      const query = full ? "all=1" : "page=1&page_size=50";
-      const res = await fetch(`/api/reports/engine/${encodeURIComponent(engineId)}?${query}`);
+      const params = new URLSearchParams(full ? { all: "1" } : { page: "1", page_size: "50" });
+      if (reportScope === "month") params.set("month", reportMonth);
+      const res = await fetch(`/api/reports/engine/${encodeURIComponent(engineId)}?${params.toString()}`);
       if (!res.ok) throw new ApiFetchError(res.status);
       const data = await res.json() as ReportResponse;
       setRecords(data.records || []);
@@ -133,7 +136,7 @@ export default function RaporPage() {
 
   useEffect(() => {
     if (engineId) void loadReport(false);
-  }, [engineId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [engineId, reportScope, reportMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function printReport() {
     try {
@@ -173,13 +176,18 @@ export default function RaporPage() {
       <style>{`@media print { aside, header, nav, .print-hide { display: none !important; } main { padding: 0 !important; margin: 0 !important; } body { background: #fff !important; } #rapor { border: none !important; box-shadow: none !important; border-radius: 0 !important; } .report-mobile-list { display: none !important; } .report-desktop-table { display: block !important; overflow: visible !important; } } @page { margin: 12mm; }`}</style>
       <div className="print-hide"><TopBar title="Motor Bakım Raporu" subtitle="Yazdırılabilir bakım geçmişi" /></div>
       <div className="print-hide px-4 py-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
             {engines.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </select>
+          <select value={reportScope} onChange={(event) => setReportScope(event.target.value as "all" | "month")} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
+            <option value="all">Tüm geçmiş</option>
+            <option value="month">Ay seç</option>
+          </select>
+          {reportScope === "month" && <input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border" aria-label="Rapor ayı" />}
           <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber px-4 py-2.5 text-[13px] font-extrabold text-[#1a1206] transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
         </div>
-        <p className="mt-2 text-[10.5px] text-faint">Önizleme en yeni 50 kaydı hızlı açar. Yazdır seçildiğinde seçili motorun tam geçmişi yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
+        <p className="mt-2 text-[10.5px] text-faint">{reportScope === "month" ? `${reportMonth} ayına ait kayıtlar gösteriliyor.` : "Seçili motorun tüm bakım geçmişi gösteriliyor."} Yazdır seçildiğinde aynı kapsamın tamamı yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>
 
       <div className="px-4 pb-28 md:pb-8">

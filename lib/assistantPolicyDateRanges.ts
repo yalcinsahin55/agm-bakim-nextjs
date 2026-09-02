@@ -106,7 +106,7 @@ export function parseDateRange(question: string): AssistantDateRange | undefined
   }
 
   const dayMonthDates: string[] = [];
-  for (const match of question.matchAll(new RegExp(`(?<!\d)(\d{1,2})\s+(${TURKISH_MONTH_PATTERN})(?:['’][a-zçğıöşü]+)?(?:\s+(\d{4}))?`, "giu"))) {
+  for (const match of question.matchAll(new RegExp(String.raw`(?<!\d)(\d{1,2})\s+(${TURKISH_MONTH_PATTERN})(?:['’][a-zçğıöşü]+)?(?:\s+(\d{4}))?`, "giu"))) {
     const month = TURKISH_MONTHS[match[2].toLocaleLowerCase("tr-TR")];
     const parsed = dateKey(Number(match[3] || currentYear), month, Number(match[1]));
     if (parsed) dayMonthDates.push(parsed);
@@ -114,8 +114,8 @@ export function parseDateRange(question: string): AssistantDateRange | undefined
   if (dayMonthDates.length >= 2) return dateRange(dayMonthDates[0], dayMonthDates[1]);
   if (dayMonthDates.length === 1) return dateRange(dayMonthDates[0]);
 
-  const monthYear = question.match(new RegExp(`(${TURKISH_MONTH_PATTERN})(?:['’]?[a-zçğıöşü]+)?\s+(\d{4})`, "iu"))
-    || question.match(new RegExp(`(\d{4})\s+(${TURKISH_MONTH_PATTERN})`, "iu"));
+  const monthYear = question.match(new RegExp(String.raw`(${TURKISH_MONTH_PATTERN})(?:['’]?[a-zçğıöşü]+)?\s+(\d{4})`, "iu"))
+    || question.match(new RegExp(String.raw`(\d{4})\s+(${TURKISH_MONTH_PATTERN})`, "iu"));
   if (monthYear) {
     const monthName = monthYear[1].match(/^\d/) ? monthYear[2] : monthYear[1];
     const year = Number(monthYear[1].match(/^\d/) ? monthYear[1] : monthYear[2]);
