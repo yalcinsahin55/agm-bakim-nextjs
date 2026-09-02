@@ -23,6 +23,7 @@ import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import type { TechnicianOption } from "@/lib/technicians";
 import { buildExtraClientRequestId, parseDateOnly } from "./recordRouteHelpers";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
+import { insertCreatedMaintenanceRecord } from "./recordCreateInsert";
 
 export async function postRecord(req: NextRequest) {
   let operationStep = "initialize";
@@ -208,7 +209,7 @@ export async function postRecord(req: NextRequest) {
         .filter((item): item is { label: string; completed: boolean } => item.label.length > 0)
       : [];
 
-    async function insertOneRecord(
+    const insertOneRecord = async (
       tKey: string,
       tLabel: string,
       isPrimary: boolean,
@@ -216,49 +217,48 @@ export async function postRecord(req: NextRequest) {
       previousTrackingState?: unknown,
       recordClientRequestId = client_request_id,
       session?: ClientSession,
-    ) {
-      const rec: MaintenanceRecordDocument = {
-        engine_id, engine_name: engineName, type_key: tKey, type_label: tLabel,
-        hour_at_completion,
-        ...(maintenanceStartAt && maintenanceEndAt && maintenanceDurationMinutes ? {
-          time_tracking_version: 2,
-          maintenance_start_at: maintenanceStartAt,
-          maintenance_end_at: maintenanceEndAt,
-          maintenance_duration_minutes: maintenanceDurationMinutes,
-        } : {}),
-        note: isPrimary ? (note || "") : "",
-        technician_note: isPrimary ? (technician_note || "") : "",
-        photos_b64: isPrimary ? (photos_b64 || []) : [],
-        photos: isPrimary ? (photos || []) : [],
-        videos: isPrimary ? (videos || []) : [],
-        report_attachments: isPrimary ? normalizedReportAttachments : [],
-        checklist: isPrimary ? normalizedChecklist : [],
-        ...(isPrimary && completion_confirmation === true ? { completion_confirmed_at: new Date() } : {}),
-        manager_confirmation_status: managerConfirmationStatus,
-        ...(shouldConfirmOnCreate && managerConfirmedAt ? {
-          manager_confirmed_at: managerConfirmedAt,
-          manager_confirmed_by_id: currentUser._id,
-          manager_confirmed_by_name: currentUser.full_name,
-          manager_confirmed_by_role: currentUser.role,
-        } : {}),
-        technician_id: responsibleTechnicianId,
-        technician_name: responsibleTechnicianName,
-        ...(responsibleTechnicianType ? { technician_type: responsibleTechnicianType } : {}),
-        technician_source: useExternalService ? "external_service" : "internal",
-        ...(useExternalService && externalServiceName ? { external_service_name: externalServiceName } : {}),
-        other_technician_ids: otherTechnicians.map((technician) => technician.id),
-        other_technicians: otherTechnicians,
-        technician_contributions: technicianContributions,
-        client_request_id: recordClientRequestId || undefined,
-        created_at: createdAt, backdated: !!backdated,
-        group_id: groupId, grouped_with: isPrimary ? null : tLabel,
-        ...(trackingAutoCreated ? { auto_created_tracking: true } : {}),
-        ...(previousTrackingState ? { tracking_state_before: previousTrackingState } : {}),
-      };
-      if (isPrimary && typeof pressure_reading === "number") rec.pressure_reading = pressure_reading;
-      await recordsCol.insertOne(rec, session ? { session } : undefined);
-      await recomputeLastMaintenance(db, engine_id, tKey, undefined, session);
-    }
+    ): Promise<void> => {
+      await insertCreatedMaintenanceRecord({
+        db,
+        recordsCol,
+        engineId: engine_id,
+        engineName,
+        hourAtCompletion: hour_at_completion,
+        maintenanceStartAt: maintenanceStartAt,
+        maintenanceEndAt: maintenanceEndAt,
+        maintenanceDurationMinutes,
+        note,
+        technicianNote: technician_note,
+        photosB64: photos_b64,
+        photos,
+        videos,
+        reportAttachments: normalizedReportAttachments,
+        checklist: normalizedChecklist,
+        completionConfirmation: completion_confirmation === true,
+        managerConfirmationStatus,
+        shouldConfirmOnCreate,
+        managerConfirmedAt,
+        user,
+        responsibleTechnicianId,
+        responsibleTechnicianName,
+        responsibleTechnicianType,
+        technicianSource: useExternalService ? "external_service" : "internal",
+        externalServiceName,
+        otherTechnicians,
+        technicianContributions,
+        clientRequestId: recordClientRequestId,
+        createdAt,
+        backdated: !!backdated,
+        groupId,
+        typeKey: tKey,
+        typeLabel: tLabel,
+        isPrimary,
+        trackingAutoCreated,
+        previousTrackingState,
+        pressureReading: pressure_reading,
+        session,
+      });
+    };
 
     const mongoClient = await getMongoClient();
     const transactionSupported = await supportsMongoTransactions(db);
