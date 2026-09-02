@@ -8,6 +8,7 @@ import Image from "next/image";
 import TopBar from "@/components/TopBar";
 import Skeleton from "@/components/Skeleton";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
+import { usePageData } from "@/lib/usePageData";
 
 type Engine = { _id: string; name: string };
 type MaintenanceType = { _id?: string; key: string; label: string };
@@ -17,43 +18,39 @@ type QrImageMap = Record<string, string>;
 
 export default function QrEtiketleriPage() {
   const router = useRouter();
-  const [engines, setEngines] = useState<Engine[]>([]);
-  const [types, setTypes] = useState<MaintenanceType[]>([]);
   const [mode, setMode] = useState<QrMode>("engine");
   const [selected, setSelected] = useState<string[]>([]);
   const [qrImages, setQrImages] = useState<QrImageMap>({});
   const [qrTarget, setQrTarget] = useState<QrItem | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    Promise.all([fetch("/api/engines"), fetch("/api/maintenance-types")])
-      .then(async ([engineResponse, typeResponse]) => {
-        if (engineResponse.status === 401 || typeResponse.status === 401) {
-          router.push(`/login?redirect=${encodeURIComponent("/qr-etiketleri")}`);
-          return;
-        }
-        if (!engineResponse.ok || !typeResponse.ok) throw new Error("QR verileri yüklenemedi.");
-        const [engineData, typeData] = await Promise.all([engineResponse.json(), typeResponse.json()]);
-        if (!active) return;
-        setEngines(Array.isArray(engineData) ? engineData : []);
-        setTypes(Array.isArray(typeData) ? typeData : []);
-      })
-      .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : "QR verileri yüklenemedi.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [router]);
+  const { data, loading, error: loadError } = usePageData(
+    async (signal) => {
+      const [engineResponse, typeResponse] = await Promise.all([
+        fetch("/api/engines", { signal }),
+        fetch("/api/maintenance-types", { signal }),
+      ]);
+      if (engineResponse.status === 401 || typeResponse.status === 401) {
+        router.push(`/login?redirect=${encodeURIComponent("/qr-etiketleri")}`);
+        return { engines: [], types: [] };
+      }
+      if (!engineResponse.ok || !typeResponse.ok) throw new Error("QR verileri yüklenemedi.");
+      const [engineData, typeData] = await Promise.all([engineResponse.json(), typeResponse.json()]);
+      return {
+        engines: Array.isArray(engineData) ? engineData as Engine[] : [],
+        types: Array.isArray(typeData) ? typeData as MaintenanceType[] : [],
+      };
+    },
+    { engines: [] as Engine[], types: [] as MaintenanceType[] },
+    [router],
+    "QR verileri yüklenemedi.",
+  );
 
   const items = useMemo<QrItem[]>(
     () => mode === "engine"
-      ? engines.map((engine) => ({ id: engine._id, name: engine.name, kind: "engine" }))
-      : types.map((type) => ({ id: type.key, name: type.label, kind: "type" })),
-    [engines, mode, types],
+      ? data.engines.map((engine) => ({ id: engine._id, name: engine.name, kind: "engine" }))
+      : data.types.map((type) => ({ id: type.key, name: type.label, kind: "type" })),
+    [data.engines, data.types, mode],
   );
 
   useEffect(() => {
@@ -141,7 +138,7 @@ export default function QrEtiketleriPage() {
           </div>
         </section>
 
-        {error && <div className="mb-4 rounded-xl border border-red/40 bg-red/10 px-3 py-2.5 text-[11px] text-red" role="alert">{error}</div>}
+        {(loadError || error) && <div className="mb-4 rounded-xl border border-red/40 bg-red/10 px-3 py-2.5 text-[11px] text-red" role="alert">{loadError || error}</div>}
         <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3" aria-label={mode === "engine" ? "Motor QR seçimi" : "Bakım türü QR seçimi"}>
           {items.map((item) => {
             const checked = selected.includes(item.id);
