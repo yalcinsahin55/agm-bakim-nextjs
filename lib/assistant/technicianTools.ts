@@ -5,6 +5,7 @@ import { recordsCollection } from "@/lib/dbCollections";
 import { formatMinutes } from "@/lib/assistantToolOutput";
 import { buildRecordMatch, escapeRegex, findEngine, internalRecordMatch, periodLabel } from "@/lib/assistantToolQuery";
 import type { AssistantToolResponse } from "./types";
+export { getTechnicianDirectory } from "./technicianDirectoryTool";
 import { mapWithConcurrency } from "./shared";
 import { withDbTiming } from "@/lib/performance";
 type TechnicianAggregateRow = { _id?: unknown; technician?: string; technician_type?: unknown; count?: number; duration?: number };
@@ -237,19 +238,6 @@ export async function getExternalServiceSummary(db: Db, query: AssistantQuery): 
       filters: { service: query.serviceQuery || null, engine: query.engineQuery || null, maintenance_type: query.maintenanceTypeQuery || null, evidence: query.evidenceFilter || null, status: query.statusFilter || null, record_filters: query.recordFilters || [], hour_range: query.hourRange || null, duration_range: query.durationRange || null, team_only: Boolean(query.teamOnly) },
       engines: (row?.engines || []).map((item) => ({ engine_id: item._id, engine: item.engine || "Bilinmeyen", count: Number(item.count || 0) })),
     },
-  };
-}
-
-export async function getTechnicianDirectory(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
-  let technicians = await listActiveTechnicians(db);
-  if (query.technicianRole === "responsible") technicians = technicians.filter((technician) => technician.can_be_responsible);
-  if (query.technicianRole === "support") technicians = technicians.filter((technician) => technician.can_be_support);
-  return {
-    intent: "technician_directory",
-    period: "all",
-    title: "Aktif teknisyen listesi",
-    summary: `${technicians.length} aktif ve onaylı teknisyen bulundu.`,
-    data: { technicians: technicians.map((technician) => ({ id: technician.id, full_name: technician.full_name, technician_type: technician.technician_type, technician_type_label: TECHNICIAN_TYPE_LABELS[technician.technician_type], can_be_responsible: technician.can_be_responsible, can_be_support: technician.can_be_support, allowed_work_domains: technician.allowed_work_domains })) },
   };
 }
 
