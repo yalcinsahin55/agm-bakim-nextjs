@@ -55,7 +55,7 @@ async function postImportPressureReadings(req: NextRequest) {
     return NextResponse.json({ error: "Dosya okunamadı, geçerli bir Excel dosyası olduğundan emin olun." }, { status: 400 });
   }
 
-  const engines = await enginesCollection(db).find().toArray();
+  const engines = await enginesCollection(db).find({}, { projection: { _id: 1, name: 1 } }).toArray();
   const engineNames = new Set(engines.map((engine) => engine._id));
   const docs: Array<Omit<PressureReadingDocument, "_id">> = [];
 
