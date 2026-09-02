@@ -155,7 +155,7 @@ export default function DashboardPage() {
 
 
         <section id="dashboard-health-details" className="scroll-mt-24">
-          <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Sağlık Puanı</h2>
+          <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Bakım Durumu</h2>
           <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
           {healthRows.map(({ engine, score, status, attention }) => {
