@@ -164,7 +164,7 @@ test.describe("AGM Bakım configured authentication", () => {
     await expect(page.getByRole("heading", { name: "Sıradaki iş" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Bakım tamamla/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Bakım kayıtları/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Motor sağlığı/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Motor bakım durumu/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Bakım türleri/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Bildirim merkezi/ })).toBeVisible();
   });

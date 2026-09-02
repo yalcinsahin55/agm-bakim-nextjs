@@ -23,6 +23,7 @@ import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 import { writeRecordPatchAudit } from "./recordPatchAudit";
 import { updateEngineHoursIfAdvanced } from "./recordPatchEngineHours";
+import { createGroupedExtraRecords } from "./recordPatchGrouped";
 
 
 export async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -326,69 +327,32 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
       await updateEngineHoursIfAdvanced(db, effectiveEngineId, hour_at_completion, session);
     }
 
-    // Bu kaydı düzenlerken birlikte tamamlanan ama daha önce hiç kaydedilmemiş başka bakımlar da ekleniyorsa,
-    // her biri aynı motor/grup olayına bağlanır; kişi katkı süresi bakım türü başına çoğalmaz.
     if (Array.isArray(extra_types) && extra_types.length > 0) {
-      const groupId = nextGroupId || record.group_id;
-      if (!groupId) throw new Error("Bakım grubu oluşturulamadı.");
-      const finalHour = typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion;
-      const extraTechnicianContributions: MaintenanceTechnicianContribution[] = technicianContributions;
-      const extraManagerConfirmationStatus = record.manager_confirmation_status || (user.role === "yonetici" ? "confirmed" : "pending");
-      const extraManagerConfirmedAt = extraManagerConfirmationStatus === "confirmed" ? new Date() : undefined;
-      const typesCol = maintenanceTypesCollection(db);
-
-      for (const ex of extra_types) {
-        const extraClientRequestId = `${clientRequestId || `record:${String(record._id)}`}:extra:${String(ex.type_key)}`;
-        const existingExtra = await recordsCol.findOne(
-          {
-            $or: [
-              { group_id: groupId, type_key: ex.type_key },
-              ...(extraClientRequestId ? [{ client_request_id: extraClientRequestId }] : []),
-            ],
-          },
-          { projection: { _id: 1 }, ...options },
-        );
-        if (existingExtra) continue;
-        if (typeof ex.period === "number" && isSafeMongoPathSegment(effectiveEngineId)) {
-          const extraTypeState = selectedTypeDocs.find((type) => String(type._id) === ex.type_key)?.engine_states;
-          await typesCol.updateOne(
-            { _id: ex.type_key },
-            { $set: buildEngineStateUpdate(extraTypeState, effectiveEngineId, { period_hours: ex.period }) },
-            { upsert: true, ...options },
-          );
-        }
-        const extraType = selectedTypeDocs.find((type) => String(type._id) === ex.type_key);
-        await recordsCol.insertOne({
-          engine_id: effectiveEngineId, engine_name: effectiveEngineName,
-          type_key: ex.type_key, type_label: extraType?.label || ex.type_label,
-          hour_at_completion: finalHour,
-          ...(nextStartAt && nextEndAt && nextDurationMinutes ? {
-            time_tracking_version: 2,
-            maintenance_start_at: nextStartAt,
-            maintenance_end_at: nextEndAt,
-            maintenance_duration_minutes: nextDurationMinutes,
-          } : {}),
-          note: "", technician_note: "", photos_b64: [], photos: [], videos: [], report_attachments: [],
-          manager_confirmation_status: extraManagerConfirmationStatus,
-          ...(extraManagerConfirmedAt ? {
-            manager_confirmed_at: extraManagerConfirmedAt,
-            manager_confirmed_by_id: user._id,
-            manager_confirmed_by_name: user.full_name,
-            manager_confirmed_by_role: user.role,
-          } : {}),
-          technician_id: nextResponsibleId, technician_name: nextResponsibleName,
-          ...(useExternalService ? { technician_source: "external_service", ...(externalServiceName ? { external_service_name: externalServiceName } : {}) } : { technician_source: "internal" }),
-          other_technician_ids: useExternalService ? [] : effectiveOtherTechnicians.map((technician) => technician.id),
-          other_technicians: useExternalService ? [] : effectiveOtherTechnicians,
-          technician_contributions: extraTechnicianContributions,
-          ...(extraClientRequestId ? { client_request_id: extraClientRequestId } : {}),
-          technician_type: useExternalService ? undefined : nextResponsibleType,
-          created_at: record.created_at, backdated: !!record.backdated,
-          group_id: groupId, grouped_with: record.type_label,
-        }, options);
-      }
+      await createGroupedExtraRecords({
+        db,
+        recordsCol,
+        record,
+        extraTypes: extra_types,
+        clientRequestId,
+        groupId: nextGroupId || record.group_id,
+        effectiveEngineId,
+        effectiveEngineName,
+        finalHour: typeof hour_at_completion === "number" ? hour_at_completion : record.hour_at_completion,
+        nextStartAt,
+        nextEndAt,
+        nextDurationMinutes,
+        user,
+        useExternalService,
+        externalServiceName,
+        nextResponsibleId,
+        nextResponsibleName,
+        nextResponsibleType,
+        effectiveOtherTechnicians,
+        technicianContributions,
+        selectedTypeDocs,
+        session,
+      });
     }
-
     const affectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
     if (engineChangeRequested || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
       await Promise.all(affectedTypeKeys.map((typeKey) => recomputeLastMaintenance(db, effectiveEngineId, typeKey, undefined, session)));

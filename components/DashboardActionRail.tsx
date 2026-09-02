@@ -31,7 +31,7 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "✓", tone: "amber" },
   { href: "/kayitlar", label: "Bakım kayıtları", description: "Kayıt ara, geçmiş kanıtları incele.", icon: "▤", tone: "teal" },
-  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor sağlığı", description: "Motor sağlık detaylarına git.", icon: "⚙", tone: "purple" },
+  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor bakım durumu", description: "Motor bakım durumuna git.", icon: "⚙", tone: "purple" },
   { href: "/bakim-turleri", label: "Bakım türleri", description: "Tür bazında tüm motorları listele.", icon: "▦", tone: "purple" },
   { href: "/bildirimler", label: "Bildirim merkezi", description: "Dikkat isteyen son olayları aç.", icon: "!", tone: "red" },
 ];
@@ -54,7 +54,7 @@ function rolePresentation(role: string | undefined): { title: string; descriptio
   if (normalizeRole(role) === "goruntuleyici") {
     return {
       title: "İzleme kokpiti",
-      description: "Öncelikleri, motor sağlığını ve bakım geçmişini güvenli biçimde incele.",
+      description: "Öncelikleri, motor bakım durumunu ve bakım geçmişini güvenli biçimde incele.",
       badge: "YALNIZCA İZLEME",
     };
   }
