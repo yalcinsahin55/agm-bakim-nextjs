@@ -50,11 +50,16 @@ async function getAnalyticsSummary(req: NextRequest) {
   const enginePeriod = VALID_ENGINE_PERIODS.has(requestedPeriod) ? requestedPeriod : "all";
   const requestedWorkPeriod = searchParams.get("workPeriod") || "total";
   const workPeriod = (new Set(["week", "month", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total") as "week" | "month" | "total";
-  const cached = analyticsCache.get(`${enginePeriod}:${workPeriod}`);
+  const selectedMonth = searchParams.get("month");
+  const selectedWeekStart = searchParams.get("weekStart");
+  const selectedFrom = searchParams.get("from");
+  const selectedTo = searchParams.get("to");
+  const cacheKey = [enginePeriod, workPeriod, selectedMonth || "", selectedWeekStart || "", selectedFrom || "", selectedTo || ""].join(":");
+  const cached = analyticsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.value, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "HIT" } });
   }
-  if (cached) analyticsCache.delete(`${enginePeriod}:${workPeriod}`);
+  if (cached) analyticsCache.delete(cacheKey);
   const now = new Date();
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -79,7 +84,7 @@ async function getAnalyticsSummary(req: NextRequest) {
       ...(from || to ? [{ $match: { maintenance_date: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } }] : []),
     ];
   };
-  const workRange = analyticsWorkRange(now, workPeriod);
+  const workRange = analyticsWorkRange(now, workPeriod, { month: selectedMonth, weekStart: selectedWeekStart, from: selectedFrom, to: selectedTo });
   const dateMatch = workRange ? dateRangeStages(workRange.from, workRange.to) : [];
   const monthlyDateMatch = dateRangeStages(since);
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
@@ -271,7 +276,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     workPeriod,
     periodBreakdown: periodBreakdown.map((row) => ({ month: row._id?.month || "", week: row._id?.iso_week_year && row._id?.iso_week ? `${row._id.iso_week_year}-W${String(row._id.iso_week).padStart(2, "0")}` : "", count: row.count || 0, total_duration_minutes: row.total_duration_minutes || 0 })),
   };
-  analyticsCache.set(`${enginePeriod}:${workPeriod}`, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
+  analyticsCache.set(cacheKey, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "MISS" } });
 }
 
