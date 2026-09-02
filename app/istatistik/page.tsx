@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { cachedFetch } from "@/lib/apiCache";
-import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import { usePageData } from "@/lib/usePageData";
 
 type FilterMode = "all" | "date";
 
@@ -47,22 +47,16 @@ function BarList({ items, color }: { items: BarItem[]; color: string }) {
 }
 
 export default function IstatistikPage() {
-  const { signal } = useAbortableFetch();
-  const [summary, setSummary] = useState<AnalyticsSummary>(EMPTY_SUMMARY);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [selectedFrom, setSelectedFrom] = useState("");
   const [selectedTo, setSelectedTo] = useState("");
-
-  async function load() {
-    setError("");
-    try {
+  const { data: summary, loading, error, reload } = usePageData<AnalyticsSummary>(
+    async () => {
       const params = new URLSearchParams({ workPeriod: "total" });
       if (filterMode === "date" && selectedFrom) params.set("from", selectedFrom);
       if (filterMode === "date" && selectedTo) params.set("to", selectedTo);
       const data = await cachedFetch<AnalyticsSummary>(`/api/analytics/summary?${params.toString()}`, 30_000);
-      setSummary({
+      return {
         total: Number(data.total || 0),
         thisCount: Number(data.thisCount || 0),
         lastCount: Number(data.lastCount || 0),
@@ -71,17 +65,12 @@ export default function IstatistikPage() {
         byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
         workPeriod: data.workPeriod,
         periodBreakdown: Array.isArray(data.periodBreakdown) ? data.periodBreakdown : [],
-      });
-    } catch (loadError) {
-      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      console.error("İstatistikler yüklenemedi:", loadError);
-      setError("İstatistikler yüklenemedi. Lütfen tekrar deneyin.");
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }
-
-  useEffect(() => { if (!signal.aborted) void load(); }, [signal, filterMode, selectedFrom, selectedTo]); // eslint-disable-line react-hooks/exhaustive-deps
+      };
+    },
+    EMPTY_SUMMARY,
+    [filterMode, selectedFrom, selectedTo],
+    "İstatistikler yüklenemedi. Lütfen tekrar deneyin.",
+  );
 
   if (loading) {
     return (
@@ -108,7 +97,7 @@ export default function IstatistikPage() {
     <div>
       <TopBar title="İstatistikler" subtitle={`${summary.total} kayıt analiz edildi`} />
       <div className="px-4 py-4">
-        {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void load()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
+        {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
           <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Geçen Ay</div><div className="font-mono text-2xl font-bold text-text mt-1">{summary.lastCount}</div></div>
