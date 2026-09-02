@@ -7,6 +7,7 @@ import LoadCards from "@/components/LoadCards";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch } from "@/lib/apiCache";
+import { usePageData } from "@/lib/usePageData";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import DashboardActionRail from "@/components/DashboardActionRail";
 import DashboardAssistant from "./_components/DashboardAssistant";
@@ -14,36 +15,31 @@ import EngineHealthDetails from "./_components/EngineHealthDetails";
 import { ENGINE_STATUS_VIEW, engineStatus, greetingPresentation, healthCardId } from "./_lib/types";
 import type { DashboardEngine, PanelResponse } from "./_lib/types";
 
+interface DashboardPanelData {
+  items: PanelItem[];
+  engines: DashboardEngine[];
+}
+
+const EMPTY_PANEL_DATA: DashboardPanelData = { items: [], engines: [] };
+
 export default function DashboardPage() {
   const { user } = useCurrentUser();
-  const [items, setItems] = useState<PanelItem[]>([]);
-  const [engines, setEngines] = useState<DashboardEngine[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedHealthEngineId, setSelectedHealthEngineId] = useState("");
-  const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
-  async function loadDashboard() {
-    setError("");
-    setRefreshing(true);
-    try {
+  const { data: panelData, loading, error, refreshing, reload } = usePageData<DashboardPanelData>(
+    async () => {
       const panel = await cachedFetch<PanelResponse>("/api/maintenance-types/panel", 15_000);
-      setItems(Array.isArray(panel.items) ? panel.items : []);
-      setEngines(Array.isArray(panel.engines) ? panel.engines : []);
-      setLoading(false);
-    } catch (loadError) {
-      console.error("Dashboard yüklenemedi:", loadError);
-      setError("Dashboard verileri yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.");
-      setLoading(false);
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadDashboard();
-  }, []);
+      return {
+        items: Array.isArray(panel.items) ? panel.items : [],
+        engines: Array.isArray(panel.engines) ? panel.engines : [],
+      };
+    },
+    EMPTY_PANEL_DATA,
+    [],
+    "Dashboard verileri yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+  );
+  const { items, engines } = panelData;
 
   useEffect(() => {
     const requestedEngine = new URLSearchParams(window.location.search).get("engine")?.trim();
@@ -109,7 +105,7 @@ export default function DashboardPage() {
         {error && (
           <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3.5 text-[12px] text-red" role="alert">
             <div className="font-bold">{error}</div>
-            <button onClick={() => void loadDashboard()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={refreshing}>
+            <button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={refreshing}>
               {refreshing ? "Yenileniyor..." : "Tekrar dene"}
             </button>
           </div>
@@ -119,7 +115,7 @@ export default function DashboardPage() {
           <div className="text-[11px] text-muted">Bakım durumu ve motor özetleri</div>
           <button
             type="button"
-            onClick={() => void loadDashboard()}
+            onClick={() => void reload()}
             disabled={refreshing}
             className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted transition hover:border-borderlt hover:text-text disabled:opacity-50"
           >

@@ -4,7 +4,6 @@ import type { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb, getMongoClient } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { writeAuditLog } from "@/lib/audit";
 import { refreshUserMaintenanceNotificationsBestEffort } from "@/lib/notifications";
 import { buildEngineStateUpdate, recomputeLastMaintenance } from "@/lib/maintenance";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
@@ -22,6 +21,8 @@ import { MAX_RECORD_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLim
 import { canModify, parseRecordId } from "./recordDetailHelpers";
 import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
+import { writeRecordPatchAudit } from "./recordPatchAudit";
+import { updateEngineHoursIfAdvanced } from "./recordPatchEngineHours";
 
 
 export async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -308,31 +309,21 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
 
     await recordsCol.updateOne({ _id: record._id }, { $set: setFields, ...(unset ? { $unset: unset } : {}) }, options);
     if (groupFilter) await recordsCol.updateMany(groupFilter, sharedUpdate, options);
-    await writeAuditLog(db, {
+    await writeRecordPatchAudit({
+      db,
       user,
-      action: "update",
-      entity: "maintenance_record",
-      entityId: id,
-      summary: `${record.engine_name} · ${record.type_label} bakım kaydı güncellendi${engineChangeRequested ? `; motor ${record.engine_name} → ${effectiveEngineName} taşındı` : ""}`,
-      before: record,
-      after: { ...update, ...(engineChangeRequested ? { engine_id: effectiveEngineId, engine_name: effectiveEngineName, moved_record_ids: engineReassignment?.movedRecordIds || [id] } : {}) },
+      id,
+      record,
+      update,
+      engineChangeRequested,
+      effectiveEngineId,
+      effectiveEngineName,
+      movedRecordIds: engineReassignment?.movedRecordIds || [id],
       session,
     });
 
     if (typeof hour_at_completion === "number" && (engineChangeRequested || hour_at_completion !== record.hour_at_completion)) {
-      const enginesCol = enginesCollection(db);
-      const engine = await enginesCol.findOne({ _id: effectiveEngineId }, options);
-      if (engine && hour_at_completion > Number(engine.hours || 0)) {
-        const stamp = new Date();
-        const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
-        await enginesCol.updateOne(
-          { _id: effectiveEngineId },
-          Array.isArray(engine.history)
-            ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
-            : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
-          options,
-        );
-      }
+      await updateEngineHoursIfAdvanced(db, effectiveEngineId, hour_at_completion, session);
     }
 
     // Bu kaydı düzenlerken birlikte tamamlanan ama daha önce hiç kaydedilmemiş başka bakımlar da ekleniyorsa,
