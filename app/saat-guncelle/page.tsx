@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -8,7 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import { usePageData } from "@/lib/usePageData";
 import { engineSortKey } from "@/lib/status";
 import type { Engine } from "@/lib/types";
 
@@ -18,37 +18,25 @@ type EngineEditValue = { hours?: string; load_kw?: string };
 export default function SaatGuncellePage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const { signal } = useAbortableFetch();
-  const [engines, setEngines] = useState<EngineRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, EngineEditValue>>({});
   const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const {
+    data: engines,
+    loading,
+    error: loadError,
+    reload,
+  } = usePageData<EngineRow[]>(async (signal) => {
+    const res = await fetch("/api/engines", { cache: "no-store", signal });
+    if (res.status === 401) {
+      router.push("/login");
+      return [];
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(data)) throw new Error(data?.error || "Motor listesi yüklenemedi.");
+    return data as EngineRow[];
+  }, [], [router], "Motor listesi yüklenemedi. Lütfen tekrar deneyin.");
 
   const canEdit = user?.role === "yonetici";
-
-  async function load() {
-    try {
-      const res = await fetch("/api/engines", { cache: "no-store", signal });
-      if (res.status === 401) { router.push("/login"); return; }
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !Array.isArray(data)) {
-        setEngines([]);
-        setLoadError(data?.error || "Motor listesi yüklenemedi.");
-        return;
-      }
-      setLoadError("");
-      setEngines(data as EngineRow[]);
-    } catch (loadError) {
-      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      setEngines([]);
-      setLoadError("Motor listesi yüklenemedi. Lütfen tekrar deneyin.");
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }
-
-  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(
     () => [...engines].sort((a: EngineRow, b: EngineRow) => engineSortKey(a.name) - engineSortKey(b.name)),
@@ -94,7 +82,7 @@ export default function SaatGuncellePage() {
         toast.success(`${data.changed} motor güncellendi! 🕒`);
         window.dispatchEvent(new Event("notifications:refresh"));
         setValues({});
-        load();
+        void reload();
       } else {
         const data = await res.json();
         toast.dismiss(loadingToast);
@@ -131,7 +119,7 @@ export default function SaatGuncellePage() {
           <div className="rounded-card border border-red/30 bg-panel p-6">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <button onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
