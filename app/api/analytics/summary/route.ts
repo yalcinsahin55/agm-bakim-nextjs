@@ -33,8 +33,22 @@ type TechnicianAggregateRow = {
 
 type AnalyticsCacheEntry = { expiresAt: number; value: Record<string, unknown> };
 const ANALYTICS_CACHE_TTL_MS = 10_000;
+const ANALYTICS_CACHE_MAX_ENTRIES = 64;
 const VALID_ENGINE_PERIODS = new Set(["all", "month", "3months", "year"]);
 const analyticsCache = new Map<string, AnalyticsCacheEntry>();
+
+function setAnalyticsCache(key: string, value: Record<string, unknown>): void {
+  const now = Date.now();
+  for (const [cachedKey, entry] of analyticsCache) {
+    if (entry.expiresAt <= now) analyticsCache.delete(cachedKey);
+  }
+  if (analyticsCache.size >= ANALYTICS_CACHE_MAX_ENTRIES && !analyticsCache.has(key)) {
+    const oldestKey = analyticsCache.keys().next().value;
+    if (typeof oldestKey === "string") analyticsCache.delete(oldestKey);
+  }
+  analyticsCache.delete(key);
+  analyticsCache.set(key, { expiresAt: now + ANALYTICS_CACHE_TTL_MS, value });
+}
 
 async function getAnalyticsSummary(req: NextRequest) {
   const db = await getDb();
@@ -276,7 +290,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     workPeriod,
     periodBreakdown: periodBreakdown.map((row) => ({ month: row._id?.month || "", week: row._id?.iso_week_year && row._id?.iso_week ? `${row._id.iso_week_year}-W${String(row._id.iso_week).padStart(2, "0")}` : "", count: row.count || 0, total_duration_minutes: row.total_duration_minutes || 0 })),
   };
-  analyticsCache.set(cacheKey, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, value: payload });
+  setAnalyticsCache(cacheKey, payload);
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "MISS" } });
 }
 
