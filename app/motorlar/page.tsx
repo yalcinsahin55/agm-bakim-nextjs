@@ -8,7 +8,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import { usePageData } from "@/lib/usePageData";
 import { engineSortKey } from "@/lib/status";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 import EngineAddForm from "./_components/EngineAddForm";
@@ -20,10 +20,7 @@ export default function MotorlarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useCurrentUser();
-  const { signal } = useAbortableFetch();
-  const [engines, setEngines] = useState<MotorEngine[]>([]);
   const [recordsByEngine, setRecordsByEngine] = useState<Record<string, MotorMaintenanceRecord[]>>({});
-  const [loading, setLoading] = useState(true);
   const [loadingEngineId, setLoadingEngineId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [qrEngine, setQrEngine] = useState<MotorEngine | null>(null);
@@ -38,16 +35,16 @@ export default function MotorlarPage() {
 
   const canAdd = user?.role === "yonetici";
 
-  async function load() {
-    const engRes = await fetch("/api/engines?include_maintenance_counts=true", { signal });
-    if (engRes.status === 401) { router.push("/login"); return; }
-    if (!engRes.ok) throw new Error("Motorlar yüklenemedi");
-    const data = await engRes.json() as unknown;
-    setEngines(Array.isArray(data) ? data as MotorEngine[] : []);
-    setLoading(false);
-  }
-
-  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: engines, loading, reload } = usePageData<MotorEngine[]>(async (signal) => {
+    const response = await fetch("/api/engines?include_maintenance_counts=true", { signal });
+    if (response.status === 401) {
+      router.push("/login");
+      return [];
+    }
+    if (!response.ok) throw new Error("Motorlar yüklenemedi");
+    const data = await response.json() as unknown;
+    return Array.isArray(data) ? data as MotorEngine[] : [];
+  }, [], [router], "Motorlar yüklenemedi. Lütfen tekrar deneyin.");
 
   useEffect(() => {
     const requestedId = searchParams.get("engine_id");
@@ -60,7 +57,7 @@ export default function MotorlarPage() {
     setOpenId(engine._id);
     if (recordsByEngine[engine._id]) return;
     setLoadingEngineId(engine._id);
-    fetch(`/api/records?engine_id=${encodeURIComponent(engine._id)}&page=1&page_size=20`, { signal })
+    fetch(`/api/records?engine_id=${encodeURIComponent(engine._id)}&page=1&page_size=20`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Bakım geçmişi yüklenemedi");
         const data = await response.json() as unknown;
@@ -154,7 +151,7 @@ export default function MotorlarPage() {
         toast.success(`${data.name} eklendi! ⚙️`);
         setShowAdd(false);
         setNewName(""); setNewHours(""); setNewLoad("");
-        load();
+        void reload();
       } else {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Motor eklenemedi.");

@@ -119,10 +119,15 @@ test("useAbortableFetch hook exists and exports signal", async () => {
   assert.match(hook, /signal/, "hook must expose signal");
 });
 
-test("motorlar page uses abortable fetch", async () => {
+test("migrated data pages use usePageData with abortable loaders", async () => {
   const page = await source("app/motorlar/page.tsx");
-  assert.match(page, /useAbortableFetch/, "motorlar page must use abortable fetch");
-  assert.match(page, /signal/, "motorlar page must pass signal to fetch");
+  assert.match(page, /usePageData/, "motorlar page must use usePageData");
+  assert.match(page, /fetch[\s\S]*signal/, "motorlar page must pass signal to fetch");
+  for (const file of ["app/motor-bilgi/page.tsx", "app/karter-basinci/page.tsx"]) {
+    const migratedPage = await source(file);
+    assert.match(migratedPage, /usePageData/, `${file} must use usePageData`);
+    assert.match(migratedPage, /fetch[\s\S]*signal/, `${file} must pass signal to fetch`);
+  }
 });
 
 test("bildirimler page uses abortable fetch", async () => {

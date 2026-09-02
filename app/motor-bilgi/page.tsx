@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import { usePageData } from "@/lib/usePageData";
 import { engineSortKey } from "@/lib/status";
 import EquipmentInfoAddForm from "./_components/EquipmentInfoAddForm";
 import EquipmentInfoCard from "./_components/EquipmentInfoCard";
@@ -19,10 +19,20 @@ import { fileToBase64 } from "./_lib/fileToBase64";
 export default function MotorBilgiPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const { signal } = useAbortableFetch();
-  const [items, setItems] = useState<EquipmentInfo[]>([]);
-  const [engines, setEngines] = useState<EquipmentEngine[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: pageData, loading, reload } = usePageData<{ items: EquipmentInfo[]; engines: EquipmentEngine[] }>(async (signal) => {
+    const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info", { signal }), fetch("/api/engines", { signal })]);
+    if (infoRes.status === 401 || engRes.status === 401) {
+      router.push("/login");
+      return { items: [], engines: [] };
+    }
+    if (!infoRes.ok || !engRes.ok) throw new Error("Motor bilgi verileri yüklenemedi");
+    const [infoData, engData] = await Promise.all([infoRes.json().catch(() => []) as Promise<unknown>, engRes.json().catch(() => []) as Promise<unknown>]);
+    return {
+      items: Array.isArray(infoData) ? infoData as EquipmentInfo[] : [],
+      engines: Array.isArray(engData) ? engData as EquipmentEngine[] : [],
+    };
+  }, { items: [], engines: [] }, [router], "Motor bilgi verileri yüklenemedi. Lütfen tekrar deneyin.");
+  const { items, engines } = pageData;
   const [query, setQuery] = useState("");
 
   const [showImport, setShowImport] = useState(false);
@@ -38,23 +48,6 @@ export default function MotorBilgiPage() {
   const [editFields, setEditFields] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    try {
-      const [infoRes, engRes] = await Promise.all([fetch("/api/equipment-info", { signal }), fetch("/api/engines", { signal })]);
-      if (infoRes.status === 401) { router.push("/login"); return; }
-      const infoData = await infoRes.json().catch(() => []) as unknown;
-      const engData = await engRes.json().catch(() => []) as unknown;
-      setItems(Array.isArray(infoData) ? infoData as EquipmentInfo[] : []);
-      setEngines(Array.isArray(engData) ? engData as EquipmentEngine[] : []);
-    } catch (loadError) {
-      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      toast.error("Veriler yüklenirken bir hata oluştu.");
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }
-
-  useEffect(() => { if (!signal.aborted) void load(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => {
     const safe = Array.isArray(items) ? items : [];
@@ -88,7 +81,7 @@ export default function MotorBilgiPage() {
         toast.success(`${data.updated} motor güncellendi! 📥`);
         setImportFile(null);
         setShowImport(false);
-        load();
+        void reload();
       } else {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Dosya okunamadı.");
@@ -119,7 +112,7 @@ export default function MotorBilgiPage() {
         toast.dismiss(loadingToast);
         toast.success("Motor bilgisi güncellendi! ✅");
         setEditingId(null);
-        load();
+        void reload();
       } else {
         const d = await res.json();
         toast.dismiss(loadingToast);
@@ -149,7 +142,7 @@ export default function MotorBilgiPage() {
         toast.dismiss(loadingToast);
         toast.success("Motor bilgisi eklendi! 🛠️");
         setNewEngineName(""); setNewFields(emptyForm()); setShowAdd(false);
-        load();
+        void reload();
       } else {
         const d = await res.json();
         toast.dismiss(loadingToast);
