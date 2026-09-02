@@ -11,7 +11,7 @@ export interface UsePageDataResult<T> {
 }
 
 export function usePageData<T>(
-  loader: () => Promise<T>,
+  loader: (signal: AbortSignal) => Promise<T>,
   initialValue: T,
   deps: DependencyList,
   errorMessage = "Veriler yüklenemedi. Lütfen tekrar deneyin.",
@@ -21,6 +21,7 @@ export function usePageData<T>(
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const aliveRef = useRef(true);
+  const controllerRef = useRef<AbortController | null>(null);
   const loaderRef = useRef(loader);
   const errorMessageRef = useRef(errorMessage);
   const dependencyKey = deps.map((dependency) => String(dependency)).join("\u001f");
@@ -34,21 +35,27 @@ export function usePageData<T>(
     aliveRef.current = true;
     return () => {
       aliveRef.current = false;
+      controllerRef.current?.abort();
+      controllerRef.current = null;
     };
   }, []);
 
   const reload = useCallback(async () => {
     void dependencyKey;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setError("");
     setRefreshing(true);
     try {
-      const result = await loaderRef.current();
+      const result = await loaderRef.current(controller.signal);
       if (aliveRef.current) setData(result);
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       console.error(errorMessageRef.current, loadError);
       if (aliveRef.current) setError(errorMessageRef.current);
     } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
       if (aliveRef.current) {
         setLoading(false);
         setRefreshing(false);
