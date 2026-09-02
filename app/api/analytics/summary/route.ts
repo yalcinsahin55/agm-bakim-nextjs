@@ -11,6 +11,7 @@ import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { withApiTiming } from "@/lib/performance";
 import { maintenanceDateCandidateMatch } from "@/lib/maintenanceDateQuery";
 import { sortTechnicianSummary } from "@/lib/technicianSummary";
+import { analyticsWorkRange } from "@/lib/analyticsPeriods";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ async function getAnalyticsSummary(req: NextRequest) {
   const requestedPeriod = searchParams.get("period") || "all";
   const enginePeriod = VALID_ENGINE_PERIODS.has(requestedPeriod) ? requestedPeriod : "all";
   const requestedWorkPeriod = searchParams.get("workPeriod") || "total";
-  const workPeriod = new Set(["week", "month", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total";
+  const workPeriod = (new Set(["week", "month", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total") as "week" | "month" | "total";
   const cached = analyticsCache.get(`${enginePeriod}:${workPeriod}`);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.value, { headers: { "Cache-Control": "no-store", "X-Analytics-Cache": "HIT" } });
@@ -78,12 +79,8 @@ async function getAnalyticsSummary(req: NextRequest) {
       ...(from || to ? [{ $match: { maintenance_date: { ...(from ? { $gte: from } : {}), ...(to ? { $lte: to } : {}) } } }] : []),
     ];
   };
-  const workSince = workPeriod === "week"
-    ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7) - 7 * 11))
-    : workPeriod === "month"
-      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1))
-      : null;
-  const dateMatch = workSince ? dateRangeStages(workSince) : [];
+  const workRange = analyticsWorkRange(now, workPeriod);
+  const dateMatch = workRange ? dateRangeStages(workRange.from, workRange.to) : [];
   const monthlyDateMatch = dateRangeStages(since);
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
