@@ -108,3 +108,19 @@ test("assistant policy keeps tool allow-list and redacted projection stable", ()
   assert.match(assistantSystemBoundary(), new RegExp(`Policy ${ASSISTANT_POLICY_VERSION}`));
   assert.match(assistantSystemBoundary(), /read-only maintenance reporting assistant/iu);
 });
+test("assistant policy parses a month-year engine maintenance request", () => {
+  const result = evaluateAssistantQuestion("AGM 1 motorunun Ağustos 2026 bakım raporunu göster");
+  assert.equal(result.ok, true);
+  assert.equal(result.query?.intent, "engine_history");
+  assert.equal(result.query?.engineQuery, "AGM 1");
+  assert.deepEqual(result.query?.dateRange, { from: "2026-08-01", to: "2026-08-31" });
+});
+
+test("assistant policy preserves an all-history engine maintenance request", () => {
+  const result = evaluateAssistantQuestion("AGM 1 motorunun tüm bakım geçmişini göster");
+  assert.equal(result.ok, true);
+  assert.equal(result.query?.intent, "engine_history");
+  assert.equal(result.query?.engineQuery, "AGM 1");
+  assert.equal(result.query?.dateRange, undefined);
+  assert.equal(result.query?.showAll, true);
+});

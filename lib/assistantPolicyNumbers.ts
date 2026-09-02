@@ -27,5 +27,5 @@ export function extractMaintenancePeriodHours(question: string): number | undefi
   const match = question.match(/(?<![\d.,])(\d[\d.,]*)\s*(?:saat(?:lik)?\s*)?bakım(?:ı|ını|ları|larını)?\b/iu);
   if (!match) return undefined;
   const value = parseNumber(match[1]);
-  return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : undefined;
+  return Number.isInteger(value) && value >= 100 && value <= 100000 && (value < 1900 || value > 2100) ? value : undefined;
 }
