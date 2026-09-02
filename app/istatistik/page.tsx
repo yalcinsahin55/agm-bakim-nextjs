@@ -7,7 +7,7 @@ import Skeleton from "@/components/Skeleton";
 import { cachedFetch } from "@/lib/apiCache";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
-type WorkPeriod = "week" | "month" | "total";
+type FilterMode = "all" | "date";
 
 interface BarItem {
   label: string;
@@ -21,7 +21,7 @@ interface AnalyticsSummary {
   byType: Array<{ type: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
   byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; responsible_duration_minutes?: number; support_duration_minutes?: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
-  workPeriod?: WorkPeriod;
+  workPeriod?: "week" | "month" | "total";
   periodBreakdown?: Array<{ month: string; week: string; count: number; total_duration_minutes: number }>;
 }
 
@@ -51,12 +51,17 @@ export default function IstatistikPage() {
   const [summary, setSummary] = useState<AnalyticsSummary>(EMPTY_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [workPeriod, setWorkPeriod] = useState<WorkPeriod>("total");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [selectedFrom, setSelectedFrom] = useState("");
+  const [selectedTo, setSelectedTo] = useState("");
 
   async function load() {
     setError("");
     try {
-      const data = await cachedFetch<AnalyticsSummary>(`/api/analytics/summary?workPeriod=${workPeriod}`, 30_000);
+      const params = new URLSearchParams({ workPeriod: "total" });
+      if (filterMode === "date" && selectedFrom) params.set("from", selectedFrom);
+      if (filterMode === "date" && selectedTo) params.set("to", selectedTo);
+      const data = await cachedFetch<AnalyticsSummary>(`/api/analytics/summary?${params.toString()}`, 30_000);
       setSummary({
         total: Number(data.total || 0),
         thisCount: Number(data.thisCount || 0),
@@ -76,7 +81,7 @@ export default function IstatistikPage() {
     }
   }
 
-  useEffect(() => { if (!signal.aborted) void load(); }, [signal, workPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!signal.aborted) void load(); }, [signal, filterMode, selectedFrom, selectedTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -97,16 +102,7 @@ export default function IstatistikPage() {
   const topEngines: BarItem[] = summary.byEngine.slice(0, 6).map((item) => ({ label: item.engine, count: item.count }));
   const topTechnicians = summary.byTechnician.slice(0, 12);
   const maxTechnicianDuration = Math.max(...topTechnicians.map((item) => Number(item.total_duration_minutes || 0)), 1);
-  const periodGroups = (() => {
-    const groups = new Map<string, Array<{ week: string; count: number; total_duration_minutes: number }>>();
-    (summary.periodBreakdown || []).forEach((item) => {
-      const weeks = groups.get(item.month) || [];
-      weeks.push({ week: item.week, count: item.count, total_duration_minutes: item.total_duration_minutes });
-      groups.set(item.month, weeks);
-    });
-    return [...groups.entries()].reverse();
-  })();
-  const periodLabels: Record<WorkPeriod, string> = { week: "Haftalık", month: "Aylık", total: "Toplam" };
+  const selectedRangeLabel = filterMode === "date" && (selectedFrom || selectedTo) ? `${selectedFrom || "başlangıç"} – ${selectedTo || "bugün"}` : "Tüm kayıtlar";
 
   return (
     <div>
@@ -120,17 +116,11 @@ export default function IstatistikPage() {
           <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Toplam</div><div className="font-mono text-2xl font-bold text-teal mt-1">{summary.total}</div></div>
         </div>
         <div className="mb-4 rounded-card border border-border bg-panel p-3">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">Çalışma dönemi</div>
-          <div className="grid grid-cols-3 gap-2">{(["week", "month", "total"] as WorkPeriod[]).map((period) => <button key={period} type="button" onClick={() => setWorkPeriod(period)} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${workPeriod === period ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>{periodLabels[period]}</button>)}</div>
-          <p className="mt-2 text-[10px] text-faint">Bakım türleri, motorlar ve teknisyen özeti seçilen dönemin gerçek kayıtlarına göre hesaplanır.</p>
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">İstatistik filtresi</div>
+          <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setFilterMode("all"); setSelectedFrom(""); setSelectedTo(""); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "all" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tümü</button><button type="button" onClick={() => setFilterMode("date")} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "date" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tarih Bazlı</button></div>
+          {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
+          <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
         </div>
-        {workPeriod === "month" && periodGroups.length > 0 && <div className="mb-4 rounded-card border border-border bg-panel p-4">
-          <h2 className="mb-3 font-display text-[13px] font-bold uppercase tracking-wide">Aylık ve haftalık çalışma dağılımı</h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{periodGroups.map(([month, weeks]) => <div key={month} className="border-b border-border pb-2 last:border-0">
-            <div className="mb-1 flex justify-between text-[11px] font-bold text-text"><span>{month}</span><span>{weeks.reduce((sum, item) => sum + item.count, 0)} bakım</span></div>
-            <div className="flex flex-wrap gap-2 text-[9.5px] text-faint">{weeks.map((item) => <span key={item.week} className="rounded bg-panel2 px-2 py-1">{item.week}: {item.count} · {Math.floor(item.total_duration_minutes / 60)} sa {item.total_duration_minutes % 60} dk</span>)}</div>
-          </div>)}</div>
-        </div>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">🔧 En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
           <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">⚙️ En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
