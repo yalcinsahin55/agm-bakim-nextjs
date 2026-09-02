@@ -8,31 +8,52 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 
 ## İçindekiler
 
-- [Öne çıkan özellikler](#öne-çıkan-özellikler)
-- [Kullanıcı rolleri](#kullanıcı-rolleri)
+- [Öne çıkan özellikler](#%C3%B6ne-%C3%A7%C4%B1kan-%C3%B6zellikler)
+
+- [Kullanıcı rolleri](#kullan%C4%B1c%C4%B1-rolleri)
+
 - [Teknisyen yetkilendirme](#teknisyen-yetkilendirme)
-- [Bakım kaydı iş akışı](#bakım-kaydı-iş-akışı)
-- [Tarih-saat ve süre takibi](#tarih-saat-ve-süre-takibi)
-- [Ekip teknisyenleri ve dış hizmet bakımları](#ekip-teknisyenleri-ve-dış-hizmet-bakımları)
-- [QR kod ile hızlı bakım başlatma](#qr-kod-ile-hızlı-bakım-başlatma)
-- [Raporlama ve dışa aktarma](#raporlama-ve-dışa-aktarma)
-- [Çevrimdışı çalışma](#çevrimdışı-çalışma)
+
+- [Bakım kaydı iş akışı](#bak%C4%B1m-kayd%C4%B1-i%C5%9F-ak%C4%B1%C5%9F%C4%B1)
+
+- [Tarih-saat ve süre takibi](#tarih-saat-ve-s%C3%BCre-takibi)
+
+- [Ekip teknisyenleri ve dış hizmet bakımları](#ekip-teknisyenleri-ve-d%C4%B1%C5%9F-hizmet-bak%C4%B1mlar%C4%B1)
+
+- [QR kod ile hızlı bakım başlatma](#qr-kod-ile-h%C4%B1zl%C4%B1-bak%C4%B1m-ba%C5%9Flatma)
+
+- [Raporlama ve dışa aktarma](#raporlama-ve-d%C4%B1%C5%9Fa-aktarma)
+
+- [Çevrimdışı çalışma](#%C3%A7evrimd%C4%B1%C5%9F%C4%B1-%C3%A7al%C4%B1%C5%9Fma)
+
 - [Medya depolama](#medya-depolama)
-- [Teknoloji ve proje yapısı](#teknoloji-ve-proje-yapısı)
+
+- [Teknoloji ve proje yapısı](#teknoloji-ve-proje-yap%C4%B1s%C4%B1)
+
+- [Performans ve veri yükleme yaklaşımı](#performans-ve-veri-y%C3%BCkleme-yakla%C5%9F%C4%B1m%C4%B1)
+
 - [Yerel kurulum](#yerel-kurulum)
-- [Environment değişkenleri](#environment-değişkenleri)
+
+- [Environment değişkenleri](#environment-de%C4%9Fi%C5%9Fkenleri)
+
 - [Vercel deployment](#vercel-deployment)
+
 - [Bildirimler ve otomatik yenileme](#bildirimler-ve-otomatik-yenileme)
-- [Yedekleme ve veri güvenliği](#yedekleme-ve-veri-güvenliği)
-- [Legacy medya migration’ı](#legacy-medya-migrationı)
-- [Geliştirme ve doğrulama komutları](#geliştirme-ve-doğrulama-komutları)
-- [Bakım Asistanı sesli giriş ve hızlı dışa aktarma](#bakım-asistanı-sesli-giriş-ve-hızlı-dışa-aktarma)
+
+- [Yedekleme ve veri güvenliği](#yedekleme-ve-veri-g%C3%BCvenli%C4%9Fi)
+
+- [Legacy medya migration’ı](#legacy-medya-migration%C4%B1)
+
+- [Geliştirme ve doğrulama komutları](#geli%C5%9Ftirme-ve-do%C4%9Frulama-komutlar%C4%B1)
+
+- [Bakım Asistanı sesli giriş ve hızlı dışa aktarma](#bak%C4%B1m-asistan%C4%B1-sesli-giri%C5%9F-ve-h%C4%B1zl%C4%B1-d%C4%B1%C5%9Fa-aktarma)
+
 - [Lisans](#lisans)
 
 ## Öne çıkan özellikler
 
 | Alan | Özellikler |
-|---|---|
+| --- | --- |
 | Motor yönetimi | Motor listesi, çalışma saati, yük bilgisi, saat geçmişi ve motor bazlı bakım durumu |
 | Bakım kayıtları | Bakım türü, motor saati, not, kontrol listesi, fotoğraf/video kanıtı, PDF/Excel/Word rapor ekleri, yönetici teyidi ve bakım geçmişi |
 | Zaman takibi | Başlangıç ve bitiş için tam tarih+saat, çok günlü/haftalık bakım desteği ve otomatik toplam süre hesabı |
@@ -51,7 +72,7 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur ve onaylar. Kullanıcı hesabı aktif ve onaylı değilse uygulamanın korumalı bölümlerine erişemez.
 
 | Rol | Yetki özeti |
-|---|---|
+| --- | --- |
 | `yonetici` | Tüm modüllere erişir; kullanıcı ekler/onaylar, motor ve bakım türlerini yönetir, bakım tamamlarken sorumlu/yetkili bakımcıyı seçer, tüm kayıtları düzenler/siler, sorumlu teknisyeni değiştirir, yanlış motora kaydedilen bakım kaydını doğru motora taşır, dış hizmet kaydı girer ve audit kayıtlarını inceler. |
 | `teknisyen` | Yalnızca Bakım Tamamlama ve Bakım Kayıtları ekranlarını kullanır. Mobil ve masaüstü alt menüsünde yalnızca **Bakım Tamamla**, **Bakım Kayıtları** ve **Çıkış** bulunur. Düzenleme ve silme yetkisi yalnızca birincil/sorumlu teknisyen olarak kendisinin oluşturduğu kayıtlar içindir. Yardımcı teknisyen olmak tek başına düzenleme yetkisi vermez. |
 | `goruntuleyici` | Dashboard, motorlar, bakım kayıtları, analiz ve takip, bilgi/rapor, bakım türleri ve tahmin modüllerini görüntüler; kayıt üzerinde değişiklik yapamaz. |
@@ -76,16 +97,26 @@ Dağıtık rate limit için production’da `UPSTASH_REDIS_REST_URL`, `UPSTASH_R
 ## Bakım kaydı iş akışı
 
 1. Kullanıcı motoru ve bakım türünü seçer. QR bağlantısı kullanılmışsa bu seçimlerden biri veya ikisi otomatik doldurulabilir.
-2. Motor çalışma saati girilir. Birincil bakım türünün yanı sıra aynı işlemde tamamlanan ek bakım türleri seçilebilir.
-3. Yeni kayıtlarda bakım tarihi ayrıca seçilmez; bakım başlangıç ve bitiş tarih+saatleri tek tarih kaynağıdır. Bitiş zamanı başlangıçtan önce olamaz.
-4. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtlarından en az biri eklenir.
-5. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur. Yönetici bakım tamamlıyorsa sorumlu/yetkili bakımcıyı ayrıca seçebilir; bu alan teknisyenlere açılmaz.
-6. Kayıt çevrimiçiyse API’ye gönderilir; bağlantı yoksa IndexedDB kuyruğuna alınır ve bağlantı geri geldiğinde senkronize edilir.
-7. Sunucu tarafı motoru, bakım türünü, kanıtları, teknisyenleri ve zaman alanlarını doğrular; bakım süresini kendisi hesaplayarak kaydeder.
-8. Kaydı oluşturan kullanıcı yönetici değilse kayıt `manager_confirmation_status: pending` olarak açılır ve Bakım Kayıtları ekranında **Teyit bekliyor** görünür. Yönetici tarafından oluşturulan kayıtlar sunucu tarafında otomatik olarak teyitli açılır.
-9. Yönetici, Bakım Kayıtları ekranında kaydı ve kanıtlarını inceledikten sonra yalnızca kendisine gösterilen **Teyit et** düğmesini kullanır. Teyit API’de ayrıca korunur; istemciden gönderilen sahte teyit alanları kabul edilmez.
-10. Aynı işlemde seçilen ek bakım türleri `group_id` ile birlikte teyit edilir. Teyit işlemi audit log’a yazılır; sorumlu veya yardımcı teknisyen bu düğmeyi göremez ve API’den de kullanamaz.
-11. Yönetici teyit penceresinde yanlış motora kaydedilmiş bir kaydı doğru motora taşıyabilir. Grouped bakım olayındaki kardeş kayıtlar birlikte taşınır; motor adı veritabanından doğrulanır, eski motorun bakım takip state’i kalan kayıtlar üzerinden, yeni motorun state’i taşınan kayıtlar üzerinden yeniden hesaplanır. Motor değişikliği yalnızca yöneticiye açıktır ve kayıt güncellemesi, tracking düzeltmesi ile audit kaydı transaction içinde tamamlanır.
+
+1. Motor çalışma saati girilir. Birincil bakım türünün yanı sıra aynı işlemde tamamlanan ek bakım türleri seçilebilir.
+
+1. Yeni kayıtlarda bakım tarihi ayrıca seçilmez; bakım başlangıç ve bitiş tarih+saatleri tek tarih kaynağıdır. Bitiş zamanı başlangıçtan önce olamaz.
+
+1. Kontrol listesindeki tüm maddeler tamamlanır. Yeni bakım kaydının geçerli olması için not, fotoğraf/video veya PDF/Excel/Word rapor eki kanıtlarından en az biri eklenir.
+
+1. Bakımda çalışan diğer teknisyenler seçilir. Bu kişiler sorumlu teknisyenden ayrı tutulur. Yönetici bakım tamamlıyorsa sorumlu/yetkili bakımcıyı ayrıca seçebilir; bu alan teknisyenlere açılmaz.
+
+1. Kayıt çevrimiçiyse API’ye gönderilir; bağlantı yoksa IndexedDB kuyruğuna alınır ve bağlantı geri geldiğinde senkronize edilir.
+
+1. Sunucu tarafı motoru, bakım türünü, kanıtları, teknisyenleri ve zaman alanlarını doğrular; bakım süresini kendisi hesaplayarak kaydeder.
+
+1. Kaydı oluşturan kullanıcı yönetici değilse kayıt `manager_confirmation_status: pending` olarak açılır ve Bakım Kayıtları ekranında **Teyit bekliyor** görünür. Yönetici tarafından oluşturulan kayıtlar sunucu tarafında otomatik olarak teyitli açılır.
+
+1. Yönetici, Bakım Kayıtları ekranında kaydı ve kanıtlarını inceledikten sonra yalnızca kendisine gösterilen **Teyit et** düğmesini kullanır. Teyit API’de ayrıca korunur; istemciden gönderilen sahte teyit alanları kabul edilmez.
+
+1. Aynı işlemde seçilen ek bakım türleri `group_id` ile birlikte teyit edilir. Teyit işlemi audit log’a yazılır; sorumlu veya yardımcı teknisyen bu düğmeyi göremez ve API’den de kullanamaz.
+
+1. Yönetici teyit penceresinde yanlış motora kaydedilmiş bir kaydı doğru motora taşıyabilir. Grouped bakım olayındaki kardeş kayıtlar birlikte taşınır; motor adı veritabanından doğrulanır, eski motorun bakım takip state’i kalan kayıtlar üzerinden, yeni motorun state’i taşınan kayıtlar üzerinden yeniden hesaplanır. Motor değişikliği yalnızca yöneticiye açıktır ve kayıt güncellemesi, tracking düzeltmesi ile audit kaydı transaction içinde tamamlanır.
 
 Eski kayıtlar ve eski çevrimdışı payload’lar geriye dönük uyumluluk için korunur. Yeni kullanıcı arayüzü `time_tracking_version: 2` gönderdiği için yeni kayıtlar tam tarih+saat zorunluluğuna tabidir.
 
@@ -94,8 +125,11 @@ Eski kayıtlar ve eski çevrimdışı payload’lar geriye dönük uyumluluk iç
 Bakım süresi yalnızca saat olarak değil, tam tarih+saat aralığı olarak tutulur. Bu nedenle gece yarısını aşan, birkaç gün süren veya haftalık bakımlar desteklenir.
 
 - `maintenance_start_at`: Bakım başlangıç zamanı.
+
 - `maintenance_end_at`: Bakım bitiş zamanı.
+
 - `maintenance_duration_minutes`: API tarafından başlangıç ve bitiş arasından hesaplanan toplam dakika.
+
 - `record_date`: Eski istemcilerle geriye dönük uyumluluk için korunur; yeni kullanıcı arayüzünde ayrıca seçilmez. Geriye dönük kayıt işareti başlangıç tarih-saatinden türetilir.
 
 Tarih+saat değerleri API ve veritabanı katmanında UTC tabanlı saklanır; kullanıcı arayüzünde cihazın yerel saat dilimine çevrilerek gösterilir. Böylece telefon ve bilgisayar arasında saat kayması azaltılır.
@@ -111,9 +145,13 @@ Garanti kapsamındaki motor bakımları veya santral dışından gelen servisler
 Dış hizmet kaydı:
 
 - Kayıtlı bir teknisyen hesabına bağlanmaz.
+
 - Kayıtlı yardımcı teknisyen listesiyle birlikte tutulmaz.
+
 - Teknisyen performans, görev ve katkı süresi metriklerine dahil edilmez.
+
 - Bakım geçmişinde, motor raporlarında ve bakım türü/motor dağılımlarında görünmeye devam eder.
+
 - Yalnızca yönetici tarafından oluşturulabilir veya düzenlenebilir.
 
 Bu ayrım, dış servis tarafından yapılan gerçek bakımların kaybolmasını engellerken kayıtlı teknisyenlerin performans ölçümlerinin yanlış yükselmesini önler.
@@ -125,7 +163,7 @@ QR etiketleri telefonun yerleşik kamerasıyla okutulduğunda uygulamanın bakı
 `QR Etiketleri` ekranında aşağıdaki seçenekler hazırlanabilir:
 
 | QR türü | Tarama sonrası davranış |
-|---|---|
+| --- | --- |
 | Motor QR’ı | Motor otomatik seçilir; teknisyen bakım türünü seçer. |
 | Bakım türü QR’ı | Bakım türü otomatik seçilir; motor seçimi açık kalır. |
 | Motor + bakım türü QR’ı | Hem motor hem bakım türü otomatik seçilir. |
@@ -145,11 +183,17 @@ Mevcut motor QR bağlantıları korunur. Yeni bağlantılar örneğin `/tamamla?
 `/teknisyen-raporu` ekranı seçilen döneme göre aşağıdaki metrikleri sunar:
 
 - Bu ay, son 3 ay, bu yıl ve tüm kayıtlar filtreleri.
+
 - Toplam bakım kaydı ve teknisyen görevi.
+
 - Sorumlu ve destek görevleri.
+
 - Toplam teknisyen katkı süresi ve görev başına ortalama süre.
+
 - Mekanik ve elektromekanik teknisyen türü bazında kişi, sorumlu, destek, görev ve toplam süre özetleri.
+
 - Teknisyen bazında bakım türü ve motor dağılımları.
+
 - Süre bilgisi bulunmayan eski kayıtlar için uyumluluk uyarısı.
 
 Ekip bakımında bir işin süresi katılımcı teknisyenlerin katkısına ayrı ayrı yazılır. Dış hizmet kayıtları bu rapora dahil edilmez.
@@ -177,8 +221,11 @@ Bakım tamamlama formu bağlantı olmadığında kaydı tarayıcıdaki IndexedDB
 Çevrimdışı senkronizasyon sırasında:
 
 - Mevcut kayıtlar silinmez.
+
 - Eski payload biçimleri desteklenir.
+
 - Yeni v2 kayıtlarında başlangıç ve bitiş tarih+saatleri korunur.
+
 - Medya veya PDF/Excel/Word rapor eki yükleme başarısızsa kayıt ve dosya kuyruğu kullanıcıya bildirilmeye devam eder.
 
 ## Medya depolama
@@ -193,20 +240,29 @@ Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOK
 
 ### Teknoloji yığını
 
-- **Next.js 15.5.21 App Router**
-- **React 18** ve **TypeScript**
+- **Next.js 16.3.3 App Router**
+
+- **React 19.2.8** ve **TypeScript**
+
 - **MongoDB Atlas**
+
 - **Tailwind CSS 3**
+
 - **Vercel** ve Vercel Blob Storage
+
 - **Web Push** bildirimleri
+
 - **PDFKit** ile PDF, **ExcelJS** ile Excel içe/dışa aktarma
+
 - **QRCode** ile QR görseli üretimi
+
 - **Zod** ile API payload doğrulaması
+
 - **JOSE** ve JWT tabanlı oturum güvenliği
 
 ### Klasör yapısı
 
-```text
+```
 app/
 ├── api/                         # Auth, motor, kayıt, rapor, bildirim, asistan ve dışa aktarma API'leri
 ├── dashboard/                   # Ana kontrol paneli ve asistan hızlı soruları
@@ -247,13 +303,26 @@ vercel.json                      # Cron zamanlaması
 .env.example                    # Environment değişkeni örneği
 ```
 
+## Performans ve veri yükleme yaklaşımı
+
+Sayfa tabanlı istemci ekranları ortak `lib/usePageData.ts` yardımcısını kullanır. Bu yardımcı ilk yükleme ile yenileme durumlarını ayrı gösterir, yeni istek başlatılmadan önce önceki isteği `AbortController` ile iptal eder ve bileşen unmount olduktan sonra state güncellemesi yapmaz. Böylece hızlı ekran geçişlerinde eski yanıtların yeni ekran verisinin üzerine yazması ve gereksiz ağ trafiği azaltılır. `lib/useAbortableFetch.ts` ise aynı iptal edilebilir istek davranışını doğrudan fetch kullanan akışlarda paylaşır.
+
+Analitik özeti, aynı runtime içindeki aynı filtre kombinasyonları için en fazla 10 saniye yaşayan ve en fazla 64 anahtar tutan sınırlı bir cache kullanır. Motor dönemi, ekip çalışma dönemi, ay, hafta ve özel tarih aralığı cache anahtarına dahil edilir; süresi dolan veya kapasiteyi aşan girdiler temizlenir. Bu katman doğrulama, rol kontrolü, rate limit ve MongoDB index hazırlığının yerine geçmez; yalnızca aynı rapor sorgusunun kısa aralıkta tekrarlanmasını azaltır.
+
+Excel ile karter fark basıncı içe aktarılırken motor sorgusu yalnızca `_id` ve `name` alanlarını projekte eder. Bakım kaydı oluşturma ve birlikte tamamlanan bakım türlerinin ek kayıtları ortak insert yardımcısından geçer; grouped kayıtlar aynı transaction bağlamı içinde yazılır ve motor bakım takip durumu aynı işlem akışında yeniden hesaplanır. Bakım Asistanı’nın teknisyen dizini ve dış hizmet sorguları da ayrı salt-okunur araçlar olarak modülerleştirilmiştir. Bu optimizasyonlar mevcut API yanıt sözleşmesini ve kullanıcı akışını değiştirmeden veri transferini, tekrar eden kodu ve yarış koşullarını sınırlar.
+
+Performans ölçümü yalnızca izole staging ortamında yapılmalıdır. Kayıt arama yük ölçümü için [`docs/staging-performance-measurement.md`](docs/staging-performance-measurement.md), index ve cron gözlemlenebilirliği için [`docs/observability-runbook.md`](docs/observability-runbook.md) kullanılmalıdır.
+
 ## Yerel kurulum
 
 ### Gereksinimler
 
-- Node.js 18.18 veya üzeri; geliştirme için Node.js 20 LTS önerilir.
+- Node.js 20.9 veya üzeri; geliştirme ve deployment için Node.js 22 LTS önerilir. Next.js 16 bu minimum sürümü gerektirir.
+
 - MongoDB Atlas veya erişilebilir bir MongoDB sunucusu.
+
 - Fotoğraf/video üretim ortamı için Vercel Blob bağlantısı.
+
 - Web Push kullanılacaksa VAPID anahtarları.
 
 ### Kurulum adımları
@@ -278,7 +347,7 @@ Uygulama varsayılan olarak [http://localhost:3000](http://localhost:3000) adres
 `.env.example` dosyası güvenli bir başlangıç şablonudur. Gerçek değerleri `.env.local` dosyasında veya Vercel **Settings → Environment Variables** bölümünde tanımlayın.
 
 | Değişken | Gerekli kullanım | Açıklama |
-|---|---|---|
+| --- | --- | --- |
 | `MONGO_URI` | Evet | MongoDB bağlantı adresi. Kullanıcı adı ve şifreyi içerdiği için gizli tutulmalıdır. |
 | `MONGO_DB_NAME` | Evet | Uygulamanın kullanacağı veritabanı adı. |
 | `JWT_SECRET` | Evet | Oturum imzalama için uzun ve rastgele gizli değer. |
@@ -311,12 +380,18 @@ npx web-push generate-vapid-keys
 ## Vercel deployment
 
 1. GitHub deposunu Vercel projesine bağlayın.
-2. `MONGO_URI`, `MONGO_DB_NAME` ve `JWT_SECRET` değişkenlerini en az Production ortamında tanımlayın.
-3. Medya kullanılacaksa Vercel Storage üzerinden bir Blob store oluşturun ve Blob değişkenlerini projeye bağlayın.
-4. Web Push kullanılacaksa üç VAPID değişkenini, otomatik bakım bildirimleri kullanılacaksa `CRON_SECRET` değerini ekleyin.
-5. Production’da `/api/seed` endpointi varsayılan olarak kapalıdır; yalnızca kontrollü bir operasyon gerekiyorsa `SEED_ENDPOINT_ENABLED=true` açıkça tanımlanmalıdır. CI/Preview seed scripti (`E2E_SEED=1`) bu endpointten bağımsızdır.
-6. GitHub’ın `main` dalına yapılan push’larda otomatik deployment başlatılır.
-7. Deployment tamamlandıktan sonra Vercel’de durumun **Ready** olduğunu, Production domain’in doğru olduğunu ve login sayfasının açıldığını kontrol edin.
+
+1. `MONGO_URI`, `MONGO_DB_NAME` ve `JWT_SECRET` değişkenlerini en az Production ortamında tanımlayın.
+
+1. Medya kullanılacaksa Vercel Storage üzerinden bir Blob store oluşturun ve Blob değişkenlerini projeye bağlayın.
+
+1. Web Push kullanılacaksa üç VAPID değişkenini, otomatik bakım bildirimleri kullanılacaksa `CRON_SECRET` değerini ekleyin.
+
+1. Production’da `/api/seed` endpointi varsayılan olarak kapalıdır; yalnızca kontrollü bir operasyon gerekiyorsa `SEED_ENDPOINT_ENABLED=true` açıkça tanımlanmalıdır. CI/Preview seed scripti (`E2E_SEED=1`) bu endpointten bağımsızdır.
+
+1. GitHub’ın `main` dalına yapılan push’larda otomatik deployment başlatılır.
+
+1. Deployment tamamlandıktan sonra Vercel’de durumun **Ready** olduğunu, Production domain’in doğru olduğunu ve login sayfasının açıldığını kontrol edin.
 
 Vercel’de Preview, Production ve gerekiyorsa Development ortamlarına farklı veritabanı veya Blob değerleri tanımlanması önerilir. `PDF_ALLOWED_HOSTS` ve `PUSH_ALLOWED_HOSTS` yalnızca gerçekten kullanılan, güvenilir HTTPS hostları için doldurulmalıdır; bu allowlist’ler SSRF riskini azaltmak amacıyla sunucu tarafında doğrulanır. Yerel build sırasında üretim veritabanına yazmamak için ayrı bir test veritabanı kullanın.
 
@@ -366,10 +441,15 @@ Uygulama içindeki yedekleme/arsiv ekranı kullanılabilse de MongoDB Atlas tara
 Önerilen uygulamalar:
 
 - Üretim veritabanı için düzenli MongoDB Atlas snapshot veya uygun yedekleme planı kullanın.
+
 - Uygulama dışa aktarımlarını erişimi kısıtlı bir depolama alanında saklayın.
+
 - Geri yükleme yapmadan önce mevcut veritabanı ve medya referanslarının yedeğini alın.
+
 - `JWT_SECRET`, `MONGO_URI`, Blob token’ları, VAPID private key ve `CRON_SECRET` değerlerini paylaşmayın.
+
 - Audit log kayıtlarını silmeden önce operasyonel ve denetim ihtiyaçlarını kontrol edin.
+
 - Üretim verisine karşı migration veya toplu düzeltme yapmadan önce dry-run/önizleme yaklaşımı kullanın.
 
 ## Eski teknisyen kayıtlarını standardize etme
@@ -385,7 +465,7 @@ node --experimental-strip-types scripts/migrate-technician-source.mts --report=m
 Araç şu sınıflandırmayı yapar:
 
 | Durum | Migration davranışı |
-|---|---|
+| --- | --- |
 | Geçerli teknisyen ID’si aktif/onaylı kullanıcıyla eşleşir | `technician_source: "internal"` ve güncel kullanıcı adı yazılır. |
 | ID eşleşmez, normalize edilmiş ad tek bir aktif/onaylı kullanıcıyla eşleşir | Güvenli otomatik `internal` eşleşmesi yapılır. Büyük-küçük harf, Türkçe Unicode ve fazla boşluk farkları normalize edilir. |
 | Kayıt dış hizmet sentinel’i veya mevcut dış hizmet işareti taşıyor | `external_service` ve standart dış hizmet kimliği korunur; varsa servis adı korunur. |
@@ -515,12 +595,12 @@ Migration sonrasında Teknisyen Raporu’ndaki görev ve toplam çalışma süre
 
 ## TypeScript kaynak standardı
 
-Uygulamanın takip edilen uygulama, bileşen, kütüphane, test ve operasyon scripti kaynakları `.ts`, `.tsx` veya `.mts` uzantısındadır. `tsconfig.json` içinde `strict: true` ve `allowJs: false` korunur; böylece yeni JavaScript uygulama kodu eklenmesi typecheck aşamasında engellenir. `next.config.ts`, `tailwind.config.ts` ve `eslint.config.ts` typed config olarak yüklenir. Next.js 15.5’in PostCSS pipeline’ı TypeScript configini bu projede yüklemediği için `postcss.config.js` küçük bir CommonJS bridge’i olarak bilinçli biçimde korunur; bu dosya uygulama kodu değildir ve Tailwind derlemesinin çalışması için gereklidir.
+Uygulamanın takip edilen uygulama, bileşen, kütüphane, test ve operasyon scripti kaynakları `.ts`, `.tsx` veya `.mts` uzantısındadır. `tsconfig.json` içinde `strict: true` ve `allowJs: false` korunur; böylece yeni JavaScript uygulama kodu eklenmesi typecheck aşamasında engellenir. `next.config.ts`, `tailwind.config.ts` ve `eslint.config.ts` typed config olarak yüklenir. Next.js 16.3.3’ün PostCSS pipeline’ı TypeScript configini bu projede yüklemediği için `postcss.config.js` küçük bir CommonJS bridge’i olarak bilinçli biçimde korunur; bu dosya uygulama kodu değildir ve Tailwind derlemesinin çalışması için gereklidir.
 
 Service worker için tarayıcının beklediği sabit `/sw.js` URL’si korunur. Kaynak dosya `lib/serviceWorker.ts` içindedir; `predev` ve `prebuild` adımları bunu TypeScript compiler ile `public/sw.js` çıktısına dönüştürür. `public/sw.js` generated olduğu için Git tarafından izlenmez. Beş legacy MongoDB migration scripti de `.mts` olarak çalışır; heterojen eski kayıt şekilleri nedeniyle bu operasyonel dosyalarda `@ts-nocheck` sınırı bulunur, ancak uygulama runtime’ı ve test kaynakları strict typecheck kapsamındadır. Bu scriptlerde davranış değişikliği yapılmamış, yalnızca çalıştırma ve kaynak uzantısı standardı güncellenmiştir.
 
 | Kaynak grubu | Durum |
-|---|---|
+| --- | --- |
 | `app/`, `components/`, `lib/` | TypeScript/TSX ve strict typecheck kapsamı |
 | Next/Tailwind/ESLint configleri | Typed TypeScript config |
 | PostCSS config | Next.js CSS pipelineı için zorunlu küçük CommonJS bridge: `postcss.config.js` |
@@ -531,7 +611,7 @@ Service worker için tarayıcının beklediği sabit `/sw.js` URL’si korunur. 
 ## Geliştirme ve doğrulama komutları
 
 | Komut | Açıklama |
-|---|---|
+| --- | --- |
 | `npm run dev` | Geliştirme sunucusunu başlatır. |
 | `npm run build` | Next.js production derlemesini oluşturur. |
 | `npm run start` | Production derlemesini çalıştırır. |
@@ -542,6 +622,12 @@ Service worker için tarayıcının beklediği sabit `/sw.js` URL’si korunur. 
 | `npm run migrate:stable-keys` | Kullanıcı, motor ve motor bilgi kartlarında eksik stable ID’leri varsayılan dry-run ile raporlar. |
 | `npm run migrate:legacy-role` | Eski `planlamaci` hesaplarının kontrollü dry-run raporunu üretir. |
 | `npm run migrate:legacy-media` | Legacy base64 fotoğraf/video içeriklerinin Blob’a taşınmasını varsayılan dry-run ile raporlar. Apply için explicit onay, backup ve `--max-changes` zorunludur. |
+| `npm run migrate:technician-source` | Eski teknisyen adlarını ve dış hizmet sentinel’lerini güvenli kaynak alanlarına eşlemek için dry-run raporu üretir. Apply/rollback için backup, değişiklik sınırı ve explicit onay gerekir. |
+| `npm run migrate:app-indexes` | Uygulama MongoDB index’lerini kontrollü migration scriptiyle oluşturur veya doğrular. |
+| `npm run perf:staging-records` | Staging ortamında salt-okunur kayıt arama performans ölçümü yapar; üretim alan adını kabul etmez. |
+| `npm run smoke:readonly` | Yetkili staging oturumu gerektirmeyen salt-okunur smoke kontrolünü çalıştırır. |
+| `npm run e2e:seed` | İzole E2E/staging veritabanına test fixture’ları yükler; production verisiyle kullanılmamalıdır. |
+| `npm run test:e2e` | Playwright Chromium E2E testlerini çalıştırır; ayrıntılar için [`e2e/README.md`](e2e/README.md) dosyasına bakın. |
 | `git diff --check` | Boşluk ve patch kaynaklı diff sorunlarını kontrol eder. |
 | `npx tsx /home/ubuntu/agm-audit-regression.ts` | Güvenlik, soft-delete, TTL ve legacy medya sınırı için geçici regresyon kontrolü. |
 | `BASE_URL=https://staging.example node --experimental-strip-types scripts/staging-load-smoke.mts` | Yalnızca GET yapan, güvenli staging smoke/load kontrolü; varsayılan olarak auth’suz 307/401 yanıtlarını doğrular. |
@@ -576,10 +662,15 @@ Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılm
 ## İlgili resmi belgeler
 
 - [Next.js Documentation](https://nextjs.org/docs)
+
 - [MongoDB Atlas Documentation](https://www.mongodb.com/docs/atlas/)
+
 - [Vercel Blob Documentation](https://vercel.com/docs/vercel-blob)
+
 - [Vercel Cron Jobs](https://vercel.com/docs/cron-jobs)
+
 - [Web Push Protocol](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)
+
 - [Background Synchronization API](https://developer.mozilla.org/en-US/docs/Web/API/Background_Synchronization_API)
 
 ## Lisans
