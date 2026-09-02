@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import { usePageData } from "@/lib/usePageData";
 import { engineSortKey } from "@/lib/status";
 import PressureEntryForm from "./_components/PressureEntryForm";
 import PressureHistory from "./_components/PressureHistory";
@@ -18,14 +18,32 @@ import { fileToBase64 } from "./_lib/fileToBase64";
 export default function KarterBasinciPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
-  const { signal } = useAbortableFetch();
-  const [engines, setEngines] = useState<PressureEngine[]>([]);
-  const [readings, setReadings] = useState<PressureReading[]>([]);
-  const [readingsTotal, setReadingsTotal] = useState(0);
-  const [readingPage, setReadingPage] = useState(1);
-  const [hasMoreReadings, setHasMoreReadings] = useState(false);
+  const { data: pageData, loading, reload: reloadPage, error: loadError } = usePageData<{ engines: PressureEngine[]; readings: PressureReading[]; readingsTotal: number; readingPage: number; hasMoreReadings: boolean }>(async (signal) => {
+    const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store", signal }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store", signal })]);
+    if (engRes.status === 401 || readRes.status === 401) {
+      router.push("/login");
+      return { engines: [], readings: [], readingsTotal: 0, readingPage: 1, hasMoreReadings: false };
+    }
+    const engData = await engRes.json().catch(() => null) as unknown;
+    const readData = await readRes.json().catch(() => null) as unknown;
+    const responsePage = readData && typeof readData === "object" && !Array.isArray(readData) ? readData as Partial<PressurePage> : null;
+    const readingList = Array.isArray(readData) ? readData as PressureReading[] : Array.isArray(responsePage?.items) ? responsePage.items : null;
+    if (!engRes.ok || !Array.isArray(engData) || !readRes.ok || !readingList) throw new Error("Karter basıncı verileri yüklenemedi.");
+    return {
+      engines: engData as PressureEngine[],
+      readings: readingList,
+      readingsTotal: typeof responsePage?.total === "number" ? responsePage.total : readingList.length,
+      readingPage: typeof responsePage?.page === "number" ? responsePage.page : 1,
+      hasMoreReadings: responsePage?.has_more === true,
+    };
+  }, { engines: [], readings: [], readingsTotal: 0, readingPage: 1, hasMoreReadings: false }, [router], "Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
+  const { engines, readings, readingsTotal, readingPage, hasMoreReadings } = pageData;
+  const [additionalReadings, setAdditionalReadings] = useState<PressureReading[]>([]);
   const [loadingMoreReadings, setLoadingMoreReadings] = useState(false);
-  const [loading, setLoading] = useState(true);
+  async function reload() {
+    setAdditionalReadings([]);
+    await reloadPage();
+  }
   const [tab, setTab] = useState<PressureTab>("new");
 
   const [readingDate, setReadingDate] = useState(new Date().toISOString().slice(0, 10));
@@ -37,35 +55,7 @@ export default function KarterBasinciPage() {
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [loadError, setLoadError] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const [engRes, readRes] = await Promise.all([fetch("/api/engines", { cache: "no-store", signal }), fetch("/api/pressure-readings?page=1&page_size=250", { cache: "no-store", signal })]);
-      if (engRes.status === 401 || readRes.status === 401) { router.push("/login"); return; }
-      const engData = await engRes.json().catch(() => null) as unknown;
-      const readData = await readRes.json().catch(() => null) as unknown;
-      const pageData = readData && typeof readData === "object" && !Array.isArray(readData) ? readData as Partial<PressurePage> : null;
-      const readingList = Array.isArray(readData) ? readData as PressureReading[] : Array.isArray(pageData?.items) ? pageData.items : null;
-      if (!engRes.ok || !Array.isArray(engData) || !readRes.ok || !readingList) {
-        setLoadError((engData && typeof engData === "object" && "error" in engData ? String(engData.error) : null) || (readData && typeof readData === "object" && "error" in readData ? String(readData.error) : null) || "Karter basıncı verileri yüklenemedi.");
-        return;
-      }
-      setLoadError("");
-      const engineList = engData as PressureEngine[];
-      setEngines(engineList);
-      setReadings(readingList);
-      setReadingsTotal(typeof pageData?.total === "number" ? pageData.total : readingList.length);
-      setReadingPage(typeof pageData?.page === "number" ? pageData.page : 1);
-      setHasMoreReadings(pageData?.has_more === true);
-      if (engineList.length) setHistoryEngine((current) => current || engineList[0]._id);
-    } catch (loadError) {
-      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
-      setLoadError("Karter basıncı verileri yüklenemedi. Lütfen tekrar deneyin.");
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }, [router, signal]);
 
   async function loadMoreReadings() {
     if (loadingMoreReadings || !hasMoreReadings) return;
@@ -75,9 +65,7 @@ export default function KarterBasinciPage() {
       const data = await response.json().catch(() => null) as (Partial<PressurePage> & { error?: string }) | null;
       const items = Array.isArray(data?.items) ? data.items : null;
       if (!response.ok || !items) throw new Error(data?.error || "Daha fazla ölçüm yüklenemedi.");
-      setReadings((current) => [...current, ...items]);
-      setReadingPage(typeof data?.page === "number" ? data.page : readingPage + 1);
-      setHasMoreReadings(data?.has_more === true);
+      setAdditionalReadings((current) => [...current, ...items]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Daha fazla ölçüm yüklenemedi.");
     } finally {
@@ -85,7 +73,6 @@ export default function KarterBasinciPage() {
     }
   }
 
-  useEffect(() => { void load(); }, [load]);
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
 
@@ -123,7 +110,7 @@ export default function KarterBasinciPage() {
         toast.dismiss(loadingToast);
         toast.success(`${data.inserted} motor için ölçüm kaydedildi! 📊`);
         setEntries({});
-        load();
+        void reload();
       } else {
         const data = await res.json() as ImportResult;
         toast.dismiss(loadingToast);
@@ -145,7 +132,7 @@ export default function KarterBasinciPage() {
       if (!res.ok) throw new Error(data.error || "Silinemedi.");
       toast.dismiss(loadingToast);
       toast.success("Kayıt silindi! 🗑️");
-      void load();
+      void reload();
     } catch (error) {
       toast.dismiss(loadingToast);
       toast.error(error instanceof Error ? error.message : "Silinemedi.");
@@ -165,7 +152,7 @@ export default function KarterBasinciPage() {
       if (res.ok) {
         toast.dismiss(loadingToast);
         toast.success(`${data.inserted} ölçüm kaydı eklendi! 📥`);
-        load();
+        void reload();
       } else {
         toast.dismiss(loadingToast);
         toast.error(data.error || "Dosya okunamadı.");
@@ -182,7 +169,8 @@ export default function KarterBasinciPage() {
     const needle = historySearch.trim().toLocaleLowerCase("tr-TR");
     return !needle || engine.name.toLocaleLowerCase("tr-TR").includes(needle);
   });
-  const engineHistory = readings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
+  const allReadings = useMemo(() => [...readings, ...additionalReadings], [readings, additionalReadings]);
+  const engineHistory = allReadings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
   const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
   const selectedHistoryEngine = sortedEngines.find((engine) => engine._id === historyEngine);
   const canWrite = user?.role === "yonetici";
@@ -218,7 +206,7 @@ export default function KarterBasinciPage() {
           <div className="rounded-card border border-red/30 bg-panel p-6">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <button       onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -267,7 +255,7 @@ export default function KarterBasinciPage() {
             selectedHistoryEngine={selectedHistoryEngine}
             engineHistory={engineHistory}
             numericHistory={numericHistory}
-            readingsLength={readings.length}
+            readingsLength={allReadings.length}
             readingsTotal={readingsTotal}
             hasMoreReadings={hasMoreReadings}
             loadingMoreReadings={loadingMoreReadings}
