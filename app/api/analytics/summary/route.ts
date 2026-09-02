@@ -10,6 +10,7 @@ import { EXTERNAL_SERVICE_TECHNICIAN_ID, listActiveTechnicians, normalizeTechnic
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import { withApiTiming } from "@/lib/performance";
 import { maintenanceDateCandidateMatch } from "@/lib/maintenanceDateQuery";
+import { sortTechnicianSummary } from "@/lib/technicianSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -230,9 +231,7 @@ async function getAnalyticsSummary(req: NextRequest) {
   supportStaff.forEach((row) => mergeTechnicianRow(row, "support"));
   const allTechnicianRows = [...technicianMap.entries()]
     .map(([technician_id, row]) => ({ technician_id, technician: row.technician, technician_type: row.technician_type, technician_type_label: TECHNICIAN_TYPE_LABELS[row.technician_type], responsible_count: row.responsible_count, support_count: row.support_count, total_count: row.responsible_count + row.support_count, responsible_duration_minutes: row.responsible_duration_minutes, support_duration_minutes: row.support_duration_minutes, total_duration_minutes: row.responsible_duration_minutes + row.support_duration_minutes, average_duration_minutes: row.responsible_count + row.support_count ? Math.round((row.responsible_duration_minutes + row.support_duration_minutes) / (row.responsible_count + row.support_count)) : 0 }));
-  const byTechnician = [...allTechnicianRows]
-    .sort((a, b) => b.total_count - a.total_count || a.technician.localeCompare(b.technician, "tr"))
-    .slice(0, 12);
+  const byTechnician = sortTechnicianSummary(allTechnicianRows);
   const technicianTypeTotals = new Map<string, { technician_type: "mekanik" | "elektromekanik"; technician_type_label: string; technician_count: number; responsible_count: number; support_count: number; total_count: number; total_duration_minutes: number }>();
   allTechnicianRows.forEach((row) => {
     const current = technicianTypeTotals.get(row.technician_type) || { technician_type: row.technician_type, technician_type_label: TECHNICIAN_TYPE_LABELS[row.technician_type], technician_count: 0, responsible_count: 0, support_count: 0, total_count: 0, total_duration_minutes: 0 };
