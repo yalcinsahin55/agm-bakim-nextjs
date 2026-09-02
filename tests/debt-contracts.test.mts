@@ -59,13 +59,14 @@ test("legacy media and oil PDF fallback remain bounded", async () => {
 
 test("grouped maintenance creation keeps records, tracking, and engine hours in one transaction", async () => {
   const recordCreate = await source("app/api/records/_lib/recordCreate.ts");
+  const recordCreateInsert = await source("app/api/records/_lib/recordCreateInsert.ts");
   assert.match(recordCreate, /getMongoClient\(\)/);
   assert.match(recordCreate, /startSession\(\)/);
   assert.match(recordCreate, /supportsMongoTransactions\(db\)/);
   assert.match(recordCreate, /const groupedWrite = async \(\) =>/);
   assert.match(recordCreate, /session\.withTransaction\(groupedWrite\)/);
-  assert.match(recordCreate, /recordsCol\.insertOne\(rec, session \? \{ session \} : undefined\)/);
-  assert.match(recordCreate, /recomputeLastMaintenance\(db, engine_id, tKey, undefined, session\)/);
+  assert.match(recordCreateInsert, /recordsCol\.insertOne\(rec, session \? \{ session \} : undefined\)/);
+  assert.match(recordCreateInsert, /recomputeLastMaintenance\(db, engineId, typeKey, undefined, session\)/);
   assert.match(recordCreate, /typesCol\.updateOne\([\s\S]*?\{ upsert: true, session \}/);
   assert.match(recordCreate, /enginesCol\.updateOne/);
   assert.match(recordCreate, /hours: \{ \$lt: hour_at_completion \}/);
@@ -414,6 +415,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const schema = await source("lib/schemas.ts");
   const createModule = await source("app/api/records/_lib/recordCreate.ts");
   const updatePatch = await source("app/api/records/[id]/_lib/recordPatch.ts");
+  const recordCreateInsert = await source("app/api/records/_lib/recordCreateInsert.ts");
   const fileRoute = await source("app/api/records/[id]/attachments/[attachmentId]/route.ts");
   const oilFileRoute = await source("app/api/oil-analyses/[id]/file/route.ts");
   const assistantExportLogo = await source("lib/assistantExportLogo.ts");
@@ -477,9 +479,9 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(schema, /isAllowedReportAttachmentUrl/);
   assert.match(createModule, /normalizedReportAttachments/);
   assert.match(createModule, /buildExtraClientRequestId/);
-  assert.match(createModule, /client_request_id: recordClientRequestId \|\| undefined/);
+  assert.match(recordCreateInsert, /client_request_id: clientRequestId \|\| undefined/);
   assert.match(createModule, /buildExtraClientRequestId\(client_request_id, ex\.type_key\)/);
-  assert.match(createModule, /report_attachments: isPrimary/);
+  assert.match(recordCreateInsert, /report_attachments: isPrimary/);
   assert.match(updatePatch, /update\.report_attachments = normalizedReportAttachments/);
   assert.match(fileRoute, /record-attachment-read/);
   assert.match(fileRoute, /fetchStoredBlob/);
