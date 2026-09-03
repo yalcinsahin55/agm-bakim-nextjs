@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
@@ -92,6 +92,7 @@ export default function RaporPage() {
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const reportControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -112,11 +113,14 @@ export default function RaporPage() {
 
   async function loadReport(full = false) {
     if (!engineId) return;
+    reportControllerRef.current?.abort();
+    const controller = new AbortController();
+    reportControllerRef.current = controller;
     setLoadingRecords(true);
     try {
       const params = new URLSearchParams(full ? { all: "1" } : { page: "1", page_size: "50" });
       if (reportScope === "month") params.set("month", reportMonth);
-      const res = await fetch(`/api/reports/engine/${encodeURIComponent(engineId)}?${params.toString()}`);
+      const res = await fetch(`/api/reports/engine/${encodeURIComponent(engineId)}?${params.toString()}`, { signal: controller.signal });
       if (!res.ok) throw new ApiFetchError(res.status);
       const data = await res.json() as ReportResponse;
       setRecords(data.records || []);
@@ -126,17 +130,26 @@ export default function RaporPage() {
       setReportTruncated(Boolean(data.truncated));
       return data;
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       else toast.error("Motor raporu yüklenemedi.");
       throw error;
     } finally {
-      setLoadingRecords(false);
+      if (reportControllerRef.current === controller) {
+        reportControllerRef.current = null;
+        if (!controller.signal.aborted) setLoadingRecords(false);
+      }
     }
   }
 
   useEffect(() => {
     if (engineId) void loadReport(false);
   }, [engineId, reportScope, reportMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => {
+    reportControllerRef.current?.abort();
+    reportControllerRef.current = null;
+  }, []);
 
   async function printReport() {
     try {

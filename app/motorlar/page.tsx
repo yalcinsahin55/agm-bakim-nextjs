@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { usePageData } from "@/lib/usePageData";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 import EngineAddForm from "./_components/EngineAddForm";
@@ -31,6 +32,7 @@ export default function MotorlarPage() {
   const [newHours, setNewHours] = useState("");
   const [newLoad, setNewLoad] = useState("");
   const [saving, setSaving] = useState(false);
+  const { signal } = useAbortableFetch();
 
   const canAdd = user?.role === "yonetici";
 
@@ -56,18 +58,21 @@ export default function MotorlarPage() {
     setOpenId(engine._id);
     if (recordsByEngine[engine._id]) return;
     setLoadingEngineId(engine._id);
-    fetch(`/api/records?engine_id=${encodeURIComponent(engine._id)}&page=1&page_size=20`)
+    fetch(`/api/records?engine_id=${encodeURIComponent(engine._id)}&page=1&page_size=20`, { signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Bakım geçmişi yüklenemedi");
         const data = await response.json() as unknown;
         const records = Array.isArray(data) ? data as MotorMaintenanceRecord[] : (data && typeof data === "object" && Array.isArray((data as { records?: unknown }).records) ? (data as { records: MotorMaintenanceRecord[] }).records : []);
         setRecordsByEngine((current) => ({ ...current, [engine._id]: records }));
       })
-      .catch(() => toast.error("QR ile motor geçmişi yüklenemedi."))
-      .finally(() => setLoadingEngineId(null));
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        toast.error("QR ile motor geçmişi yüklenemedi.");
+      })
+      .finally(() => { if (!signal.aborted) setLoadingEngineId(null); });
     // QR bağlantısı aynı sayfa açıkken yalnızca ilgili motoru otomatik açar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engines, searchParams]);
+  }, [engines, searchParams, signal]);
 
   useEffect(() => {
     if (!qrEngine) {

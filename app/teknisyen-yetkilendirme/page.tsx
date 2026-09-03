@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { TECHNICIAN_TYPE_LABELS, WORK_DOMAIN_LABELS } from "@/lib/technicians";
 import type { TechnicianType, WorkDomain } from "@/lib/types";
 
@@ -46,20 +47,22 @@ export default function TechnicianAuthorizationPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const { signal } = useAbortableFetch();
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/users", { cache: "no-store" });
+      const response = await fetch("/api/users", { cache: "no-store", signal });
       if (response.status === 401) { router.push("/login"); return; }
       if (response.status === 403) { setLoading(false); return; }
       const data = await response.json();
       setUsers(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error("Kullanıcı yetkileri yüklenemedi.");
     } finally {
-      setLoading(false);
-    }
-  }, [router]);
+      if (!signal.aborted) setLoading(false);
+      }
+  }, [router, signal]);
 
   useEffect(() => { void load(); }, [load]);
 

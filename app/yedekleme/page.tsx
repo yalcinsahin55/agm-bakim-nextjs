@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
 interface BackupSummary {
   generated_at: string;
@@ -36,12 +37,15 @@ export default function YedeklemePage() {
   const [restoreMessage, setRestoreMessage] = useState("");
   const [summary, setSummary] = useState<BackupSummary | null>(null);
   const [archiveMonth, setArchiveMonth] = useState(new Date().toISOString().slice(0, 7));
+  const { signal } = useAbortableFetch();
 
   useEffect(() => {
-    fetch("/api/backups/summary")
+    fetch("/api/backups/summary", { signal })
       .then(async (response) => { if (response.ok) setSummary(await response.json() as BackupSummary); })
-      .catch(() => {});
-  }, []);
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      });
+  }, [signal]);
 
   const archiveFrom = `${archiveMonth}-01`;
   const archiveTo = new Date(Date.UTC(Number(archiveMonth.slice(0, 4)), Number(archiveMonth.slice(5, 7)), 0)).toISOString().slice(0, 10);

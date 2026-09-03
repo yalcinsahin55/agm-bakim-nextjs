@@ -22,6 +22,7 @@ import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technician
 import type { MaintenanceType } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { calculateMaintenanceDurationFromDates, normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 import AdditionalMaintenanceTypes from "./_components/AdditionalMaintenanceTypes";
 import { useCompletionEvidenceMedia } from "./_hooks/useCompletionEvidenceMedia";
@@ -70,6 +71,7 @@ export default function TamamlaPage() {
   const clientRequestIdRef = useRef<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
+  const { signal } = useAbortableFetch();
 
   const loadPanel = useCallback(async () => {
     try {
@@ -91,9 +93,11 @@ export default function TamamlaPage() {
 
   useEffect(() => {
     void loadPanel();
-    fetch("/api/users/technicians")
+    fetch("/api/users/technicians", { signal })
       .then(async (response) => { if (response.ok) setTechnicians(await response.json()); })
-      .catch(() => {});
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      });
     setIsOnline(navigator.onLine);
     const updateConnection = () => setIsOnline(navigator.onLine);
     const updateQueue = (event?: Event) => {
@@ -113,7 +117,7 @@ export default function TamamlaPage() {
       window.removeEventListener("offline", updateConnection);
       window.removeEventListener("offline-queue:changed", updateQueue);
     };
-  }, [loadPanel, user?.id, user?._id]);
+  }, [loadPanel, signal, user?.id, user?._id]);
 
   const engineList = useMemo(
     () => [...engines].sort((a, b) => a.name.localeCompare(b.name, "tr", { numeric: true })),
