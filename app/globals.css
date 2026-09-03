@@ -7,20 +7,20 @@
 
 :root {
   /* Atomic Design token layer — values intentionally match the current UI. */
-  --color-bg: #0f1319;
-  --color-panel: #171d25;
-  --color-panel-muted: #1f2730;
-  --color-border: #2a323c;
-  --color-border-strong: #374252;
-  --color-text: #eef1f5;
-  --color-muted: #8b96a3;
-  --color-faint: #5b6572;
-  --color-amber: #e8952f;
-  --color-teal: #3fb5c4;
-  --color-red: #ef4a52;
-  --color-orange: #f2994a;
-  --color-yellow: #f0c93d;
-  --color-green: #33c98a;
+  --color-bg: #0b1117;
+  --color-panel: #141d26;
+  --color-panel-muted: #1c2833;
+  --color-border: #334252;
+  --color-border-strong: #46576a;
+  --color-text: #f1f4f7;
+  --color-muted: #b0bbc6;
+  --color-faint: #8492a1;
+  --color-amber: #d5a05a;
+  --color-teal: #68aeb7;
+  --color-red: #e47a7f;
+  --color-orange: #d38c55;
+  --color-yellow: #d9bd67;
+  --color-green: #65bd95;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -36,11 +36,11 @@
   --radius-pill: 999px;
 
   --shadow-card: 0 6px 24px rgba(0, 0, 0, .16);
-  --shadow-focus: 0 0 0 2px rgba(63, 181, 196, .35);
+  --shadow-focus: 0 0 0 2px rgba(104, 174, 183, .35);
 }
 
 html, body {
-  background: radial-gradient(circle at 20% 0%, #141a22 0%, var(--color-bg) 55%);
+  background: radial-gradient(circle at 20% 0%, #17212b 0%, var(--color-bg) 55%);
   color: var(--color-text);
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -77,10 +77,10 @@ body > div {
   animation: fadeInUp .35s ease both;
 }
 
-/* Metin seçimi rengi (turuncu tema ile uyumlu) */
+/* Metin seçimi rengi: yüksek kontrastlı, sakin vurgu */
 ::selection {
-  background: rgba(232, 149, 47, .35);
-  color: #eef1f5;
+  background: rgba(213, 160, 90, .38);
+  color: #f1f4f7;
 }
 
 /* iPhone'larda alt menünün home çizgisine binmemesi için */
@@ -90,7 +90,7 @@ body > div {
 
 /* Kartlar için hafif parlama efekti */
 .hover-glow:hover {
-  box-shadow: 0 6px 24px rgba(232, 149, 47, .10);
+  box-shadow: 0 6px 24px rgba(213, 160, 90, .08);
 }
 
 /* Asistan sonuçları uzun motor/teknisyen adlarında yatay taşmamalı. */
@@ -119,10 +119,10 @@ body > div {
   font-size: 11px;
   font-weight: 800;
 }
-.status-pill.gecikmis { background: rgba(239,74,82,.14); color: #ef4a52; }
-.status-pill.kritik { background: rgba(242,153,74,.14); color: #f2994a; }
-.status-pill.yaklasiyor { background: rgba(240,201,61,.14); color: #f0c93d; }
-.status-pill.normal { background: rgba(51,201,138,.14); color: #33c98a; }
+.status-pill.gecikmis { background: rgba(228,122,127,.16); color: #e47a7f; }
+.status-pill.kritik { background: rgba(211,140,85,.16); color: #d38c55; }
+.status-pill.yaklasiyor { background: rgba(217,189,103,.16); color: #d9bd67; }
+.status-pill.normal { background: rgba(101,189,149,.16); color: #65bd95; }
 
 .status-pill .dot {
   width: 5px; height: 5px; border-radius: 999px; background: currentColor;
