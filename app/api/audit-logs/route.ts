@@ -8,6 +8,7 @@ import { canManageUsers } from "@/lib/permissions";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { AuditAction, AuditLogDocument } from "@/lib/dbTypes";
+import { withDbTiming } from "@/lib/performance";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +60,12 @@ export async function GET(req: NextRequest) {
   const logs = auditLogsCollection(db);
   const projection = includeDetails ? undefined : { before: 0, after: 0 };
   const [items, total] = await Promise.all([
-    logs.find(query, projection ? { projection } : undefined)
+    withDbTiming("audit_logs.list.page", () => logs.find(query, projection ? { projection } : undefined)
       .sort({ created_at: -1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
-      .toArray(),
-    logs.countDocuments(query),
+      .toArray()),
+    withDbTiming("audit_logs.list.count", () => logs.countDocuments(query)),
   ]);
 
   return NextResponse.json({ items, total, page, pageSize, totalPages: Math.max(Math.ceil(total / pageSize), 1) });

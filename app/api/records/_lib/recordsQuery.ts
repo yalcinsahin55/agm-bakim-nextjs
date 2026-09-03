@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensureAppIndexes } from "@/lib/dbIndexes";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { MaintenanceRecordDocument } from "@/lib/dbTypes";
+import { withDbTiming } from "@/lib/performance";
 import { decodeRecordCursor, encodeRecordCursor } from "./recordRouteHelpers";
 
 export async function getRecords(req: NextRequest) {
@@ -65,30 +66,30 @@ export async function getRecords(req: NextRequest) {
           { $or: [{ created_at: { [direction]: cursorDate } }, { created_at: cursorDate, _id: { [direction]: cursorId } }] },
         ],
       };
-      const cursorRows = await recordsCol.find(cursorQuery, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+      const cursorRows = await withDbTiming("records.list.cursor", () => recordsCol.find(cursorQuery, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
         .sort({ created_at: sortDirection, _id: sortDirection })
         .limit(pageSize + 1)
-        .toArray();
+        .toArray());
       const hasNextPage = cursorRows.length > pageSize;
       const records = hasNextPage ? cursorRows.slice(0, pageSize) : cursorRows;
       return NextResponse.json({ records, pageSize, pagination: "cursor", hasNextPage, nextCursor: hasNextPage ? encodeRecordCursor(records[records.length - 1]) : null });
     }
 
     if (legacyRequest) {
-      const records = await recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+      const records = await withDbTiming("records.list.legacy", () => recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
         .sort(sortSpec)
         .limit(Math.min(Math.max(parseInt(legacyLimit || "500", 10), 1), 1000))
-        .toArray();
+        .toArray());
       return NextResponse.json(records);
     }
 
     const [records, total] = await Promise.all([
-      recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
+      withDbTiming("records.list.page", () => recordsCol.find(query, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
         .sort(sortSpec)
         .skip((page - 1) * pageSize)
         .limit(pageSize)
-        .toArray(),
-      recordsCol.countDocuments(query),
+        .toArray()),
+      withDbTiming("records.list.count", () => recordsCol.countDocuments(query)),
     ]);
 
     return NextResponse.json({
