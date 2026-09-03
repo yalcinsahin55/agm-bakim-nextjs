@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui";
+
 interface CompletionWorkspaceHeaderProps {
   isOnline: boolean;
 }
@@ -10,9 +12,9 @@ export default function CompletionWorkspaceHeader({ isOnline }: CompletionWorksp
         <h1 className="text-xl font-extrabold tracking-tight text-text md:text-2xl">Bakım kaydını tamamla</h1>
         <p className="mt-1 max-w-2xl text-[11px] leading-5 text-muted">Motor, bakım zamanı, ekip katkısı ve kanıtları tek ekranda kontrol ederek kaydı güvenle tamamlayın.</p>
       </div>
-      <div className={`w-fit rounded-full border px-3 py-1.5 text-[10px] font-bold ${isOnline ? "border-green/30 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber"}`}>
+      <Badge tone={isOnline ? "success" : "warning"} className="px-3 py-1.5 text-[10px]">
         {isOnline ? "ÇEVRİMİÇİ" : "ÇEVRİMDIŞI ÇALIŞMA"}
-      </div>
+      </Badge>
     </div>
   );
 }
