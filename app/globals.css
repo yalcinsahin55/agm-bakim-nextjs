@@ -7,16 +7,16 @@
 
 :root {
   /* Atomic Design token layer — values intentionally match the current UI. */
-  --color-bg: #0b1117;
-  --color-panel: #141d26;
-  --color-panel-muted: #1c2833;
-  --color-border: #334252;
-  --color-border-strong: #46576a;
+  --color-bg: #080a0d;
+  --color-panel: #121519;
+  --color-panel-muted: #1b1f25;
+  --color-border: #343a43;
+  --color-border-strong: #4b535f;
   --color-text: #f1f4f7;
   --color-muted: #b0bbc6;
   --color-faint: #8492a1;
   --color-amber: #d5a05a;
-  --color-teal: #68aeb7;
+  --color-teal: #d5a05a;
   --color-red: #e47a7f;
   --color-orange: #d38c55;
   --color-yellow: #d9bd67;
@@ -40,7 +40,7 @@
 }
 
 html, body {
-  background: radial-gradient(circle at 20% 0%, #17212b 0%, var(--color-bg) 55%);
+  background: radial-gradient(circle at 20% 0%, #1c1811 0%, var(--color-bg) 55%);
   color: var(--color-text);
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;

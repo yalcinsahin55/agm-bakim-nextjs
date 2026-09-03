@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
+import { Button, DataTable, Input, Select, type DataTableColumn } from "@/components/ui";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -121,6 +121,15 @@ export default function AuditLogPage() {
   const passwordResetFilterActive = filters.q === PASSWORD_RESET_SEARCH
     && filters.action === "update"
     && filters.entity === "user";
+
+  const columns: DataTableColumn<AuditItem>[] = [
+    { key: "summary", header: "İşlem", accessor: (item) => item.summary, sortable: true, filterable: true, render: (item) => <span className="font-semibold">{item.summary || "İşlem kaydı"}{isPasswordResetAudit(item) && <span className="mt-1 block text-[10px] font-normal text-amber">Şifre sıfırlama · Önceki oturumlar geçersiz kılındı</span>}</span> },
+    { key: "user", header: "Kullanıcı", accessor: (item) => item.user_name, sortable: true, filterable: true, render: (item) => <span>{item.user_name || "Bilinmeyen kullanıcı"}<span className="block text-[10px] text-muted">{roleLabels[item.user_role] || item.user_role}</span></span> },
+    { key: "action", header: "İşlem türü", accessor: (item) => actionLabels[item.action] || item.action, sortable: true, filterable: true, render: (item) => <span className={`inline-flex rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${actionClass(item.action)}`}>{actionLabels[item.action] || item.action}</span> },
+    { key: "entity", header: "Kayıt", accessor: (item) => entityLabels[item.entity] || item.entity, sortable: true, filterable: true, render: (item) => <span>{entityLabels[item.entity] || item.entity}{item.entity_id ? ` · ${item.entity_id}` : ""}</span> },
+    { key: "created", header: "Tarih", accessor: (item) => new Date(item.created_at), sortable: true, render: (item) => formatDate(item.created_at) },
+    { key: "details", header: "", render: (item) => <Button type="button" variant="ghost" size="sm" onClick={() => void openDetails(item)} aria-label={`${item.summary} ayrıntılarını görüntüle`}>Ayrıntı</Button> },
+  ];
 
   async function load(nextPage = 1, nextFilters = filters, options: { silent?: boolean } = {}) {
     if (options.silent) setRefreshing(true);
@@ -308,46 +317,8 @@ export default function AuditLogPage() {
           </section>
         )}
 
-        <section className="flex flex-col gap-2">
-          {items.length === 0 ? (
-            <div className="rounded-card border border-border bg-panel p-8 text-center text-muted">
-              <div className="mb-2 text-3xl">🧾</div>
-              <div className="text-sm font-bold">Kayıt bulunamadı</div>
-              <div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div>
-            </div>
-          ) : items.map((item) => {
-            const passwordReset = isPasswordResetAudit(item);
-            return (
-            <article key={item._id} className={`rounded-card border bg-panel p-3.5 transition hover:border-borderlt ${passwordReset ? "border-amber/50 bg-amber/5" : "border-border"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="break-words text-[13px] font-bold text-text">{item.summary || "İşlem kaydı"}</div>
-                  {passwordReset && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
-                      <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-1 font-extrabold text-amber">Şifre sıfırlama</span>
-                      <span className="text-faint">Önceki oturumlar geçersiz kılındı</span>
-                    </div>
-                  )}
-                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted">
-                    <span className="font-semibold">{item.user_name || "Bilinmeyen kullanıcı"}</span>
-                    <span className="text-faint">·</span>
-                    <span>{roleLabels[item.user_role] || item.user_role}</span>
-                  </div>
-                </div>
-                <span className={`flex-shrink-0 rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${actionClass(item.action)}`}>
-                  {actionLabels[item.action] || item.action}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-faint">
-                <span>{entityLabels[item.entity] || item.entity}{item.entity_id ? ` · ${item.entity_id}` : ""}</span>
-                <span>{formatDate(item.created_at)}</span>
-              </div>
-              <Button type="button" onClick={() => openDetails(item)} className="mt-2.5 w-full rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-teal/40 hover:bg-teal/10 hover:text-teal">
-                Ayrıntıları görüntüle
-              </Button>
-            </article>
-            );
-          })}
+        <section>
+          <DataTable rows={items} columns={columns} getRowKey={(item) => item._id} pageSize={PAGE_SIZE} empty={<><div className="mb-2 text-3xl">🧾</div><div className="font-bold">Kayıt bulunamadı</div><div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div></>} />
         </section>
 
         {totalPages > 1 && (
