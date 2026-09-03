@@ -68,12 +68,20 @@ export default function DashboardPage() {
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
   const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
-  const healthRows = useMemo(() => sortedEngines.map((engine) => {
-    const engineItems = items.filter((item) => item.engine_id === engine._id);
-    const penalty = engineItems.reduce((sum, item) => sum + (item.status === "gecikmis" ? 25 : item.status === "kritik" ? 15 : item.status === "yaklasiyor" ? 5 : 0), 0);
-    const score = Math.max(0, Math.min(100, 100 - penalty));
-    return { engine, score, status: engineStatus(engineItems), attention: engineItems.filter((item) => item.status !== "normal").length };
-  }), [items, sortedEngines]);
+  const healthRows = useMemo(() => {
+    const itemsByEngine = new Map<string, PanelItem[]>();
+    items.forEach((item) => {
+      const engineItems = itemsByEngine.get(item.engine_id) || [];
+      engineItems.push(item);
+      itemsByEngine.set(item.engine_id, engineItems);
+    });
+    return sortedEngines.map((engine) => {
+      const engineItems = itemsByEngine.get(engine._id) || [];
+      const penalty = engineItems.reduce((sum, item) => sum + (item.status === "gecikmis" ? 25 : item.status === "kritik" ? 15 : item.status === "yaklasiyor" ? 5 : 0), 0);
+      const score = Math.max(0, Math.min(100, 100 - penalty));
+      return { engine, score, status: engineStatus(engineItems), attention: engineItems.filter((item) => item.status !== "normal").length };
+    });
+  }, [items, sortedEngines]);
   const todayStr = currentTime.toLocaleDateString("tr-TR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });

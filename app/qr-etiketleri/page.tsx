@@ -70,18 +70,27 @@ export default function QrEtiketleriPage() {
       return;
     }
     let active = true;
-    Promise.all(items.map(async (item) => [item.id, await QRCode.toDataURL(buildLink(item), {
-      width: 420,
-      margin: 2,
-      errorCorrectionLevel: "M",
-      color: { dark: "#0c1117", light: "#ffffff" },
-    })] as const))
-      .then((entries) => {
-        if (active) setQrImages(Object.fromEntries(entries));
-      })
-      .catch(() => {
+    setQrImages({});
+    const batchSize = 12;
+    const generate = async () => {
+      try {
+        for (let start = 0; start < items.length; start += batchSize) {
+          const batch = items.slice(start, start + batchSize);
+          const entries = await Promise.all(batch.map(async (item) => [item.id, await QRCode.toDataURL(buildLink(item), {
+            width: 420,
+            margin: 2,
+            errorCorrectionLevel: "M",
+            color: { dark: "#0c1117", light: "#ffffff" },
+          })] as const));
+          if (!active) return;
+          setQrImages((current) => ({ ...current, ...Object.fromEntries(entries) }));
+          if (start + batchSize < items.length) await new Promise((resolve) => window.setTimeout(resolve, 0));
+        }
+      } catch {
         if (active) setError("QR kodları oluşturulamadı.");
-      });
+      }
+    };
+    void generate();
     return () => { active = false; };
   }, [items]);
 
