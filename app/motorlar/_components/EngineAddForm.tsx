@@ -21,7 +21,7 @@ export default function EngineAddForm({ name, hours, load, saving, onNameChange,
           <Input type="number" placeholder="Güncel saat" value={hours} onChange={(event) => onHoursChange(event.target.value)} className="font-mono" />
           <Input type="number" placeholder="Yük (kW)" value={load} onChange={(event) => onLoadChange(event.target.value)} className="font-mono" />
         </div>
-        <Button type="submit" disabled={saving} variant="secondary" size="lg" className="border-teal/40 bg-teal text-[#06181b] hover:brightness-110">
+        <Button type="submit" disabled={saving} variant="secondary" size="lg" className="border-teal/40 bg-teal text-bg hover:brightness-110">
           {saving ? "Ekleniyor..." : "💾 Kaydet"}
         </Button>
       </div>

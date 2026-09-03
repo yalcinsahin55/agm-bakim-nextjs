@@ -137,7 +137,7 @@ export default function ExcelPage() {
             <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
+            <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-bg font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
               📥 Excel indir
             </a>
             <a href={pdfReportUrl} className="block text-center py-3 rounded-xl border border-amber/50 bg-amber/10 text-amber font-extrabold text-[13px] hover:bg-amber/20 active:scale-[.98] transition">
@@ -175,10 +175,10 @@ export default function ExcelPage() {
             <Input type="file" accept=".xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="hidden" />
           </label>
 
-          <Button onClick={doImport} disabled={importing || !importFile} className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+          <Button onClick={doImport} disabled={importing || !importFile} className="w-full py-3 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
             {importing ? (
               <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
                 İçe aktarılıyor...
               </span>
             ) : "🚀 İçe Aktar"}

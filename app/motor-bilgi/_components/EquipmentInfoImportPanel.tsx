@@ -16,10 +16,10 @@ export default function EquipmentInfoImportPanel({ importFile, importing, onFile
         <span className="flex-1 truncate">{importFile ? importFile.name : "Excel dosyası seç (.xlsx)"}</span>
         <input type="file" accept=".xlsx" onChange={(event) => onFileChange(event.target.files?.[0] || null)} className="hidden" />
       </label>
-      <button onClick={onImport} disabled={importing || !importFile} className="w-full py-2.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
+      <button onClick={onImport} disabled={importing || !importFile} className="w-full py-2.5 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
         {importing ? (
           <span className="inline-flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
             İçe aktarılıyor...
           </span>
         ) : "🚀 İçe Aktar"}

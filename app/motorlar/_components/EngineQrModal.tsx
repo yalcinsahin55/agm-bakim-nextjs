@@ -56,7 +56,7 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
           <a
             href={qrDataUrl || undefined}
             download={`${engine.name.replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-qr.png`}
-            className={`py-2.5 rounded-lg bg-amber text-[#161006] text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
+            className={`py-2.5 rounded-lg bg-amber text-bg text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
           >
             PNG indir
           </a>

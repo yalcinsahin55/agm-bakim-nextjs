@@ -231,7 +231,7 @@ export default function KarterBasinciPage() {
               key={key}
               onClick={() => setTab(key)}
               className={`flex-1 py-2 rounded-lg text-[11.5px] font-bold transition-all ${
-                visibleTab === key ? "bg-teal text-[#06181b] shadow-lg" : "text-faint hover:text-muted"
+                visibleTab === key ? "bg-teal text-bg shadow-lg" : "text-faint hover:text-muted"
               }`}
             >
               {label}
@@ -286,11 +286,11 @@ export default function KarterBasinciPage() {
             <Button
               onClick={saveReadings}
               disabled={saving}
-              className="w-full py-3.5 rounded-xl bg-teal text-[#06181b] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+              className="w-full py-3.5 rounded-xl bg-teal text-bg font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
                   Kaydediliyor...
                 </span>
               ) : (

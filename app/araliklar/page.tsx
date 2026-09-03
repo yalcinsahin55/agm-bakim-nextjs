@@ -246,7 +246,7 @@ export default function AraliklarPage() {
         <div className="truncate text-muted">{formatDateTime(entry.created_at)}{entry.technician_name ? ` · ${entry.technician_name}` : ""}</div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
           <span className="font-bold text-text">Bu bakım: {formatHours(entry.hour_at_completion)} saat</span>
-          <span className={delta === null ? "text-faint" : delta < 0 ? "font-bold text-red-300" : "font-bold text-teal"}>
+          <span className={delta === null ? "text-faint" : delta < 0 ? "font-bold text-red" : "font-bold text-teal"}>
             {delta === null ? "İlk kayıt · fark yok" : `Önceki bakıma göre: ${formatHourDelta(delta)}`}
           </span>
         </div>

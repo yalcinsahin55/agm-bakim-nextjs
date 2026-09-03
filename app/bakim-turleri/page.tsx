@@ -85,7 +85,7 @@ export default function BakimTurleriPage() {
                 size="sm"
                 className={`rounded-full px-4 ${
                   selectedKey === t.key
-                    ? "bg-amber text-[#161006] shadow-lg"
+                    ? "bg-amber text-bg shadow-lg"
                     : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
                 }`}
               >
@@ -106,7 +106,7 @@ export default function BakimTurleriPage() {
               onClick={() => setStatusFilter(o)}
               className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
                 statusFilter === o
-                  ? "bg-teal text-[#06181b] shadow-lg"
+                  ? "bg-teal text-bg shadow-lg"
                   : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >

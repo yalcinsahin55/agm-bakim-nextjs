@@ -28,10 +28,10 @@ export interface DashboardHealthRow {
 
 export const ENGINE_STATUS_PRIORITY: StatusKey[] = ["gecikmis", "kritik", "yaklasiyor", "normal"];
 export const ENGINE_STATUS_VIEW: Record<StatusKey, { label: string; dot: string; bar: string; text: string }> = {
-  gecikmis: { label: "Gecikmiş", dot: "bg-red", bar: "from-red to-[#ff7a7f]", text: "text-red" },
-  kritik: { label: "Kritik", dot: "bg-orange", bar: "from-orange to-[#ffc078]", text: "text-orange" },
-  yaklasiyor: { label: "Yaklaşıyor", dot: "bg-amber", bar: "from-amber to-[#ffe08a]", text: "text-amber" },
-  normal: { label: "Normal", dot: "bg-green", bar: "from-green to-[#79e7b5]", text: "text-green" },
+  gecikmis: { label: "Gecikmiş", dot: "bg-red", bar: "from-red to-red", text: "text-red" },
+  kritik: { label: "Kritik", dot: "bg-orange", bar: "from-orange to-orange", text: "text-orange" },
+  yaklasiyor: { label: "Yaklaşıyor", dot: "bg-amber", bar: "from-amber to-amber", text: "text-amber" },
+  normal: { label: "Normal", dot: "bg-green", bar: "from-green to-green", text: "text-green" },
 };
 
 export const DASHBOARD_ASSISTANT_QUICK_QUESTIONS = [

@@ -54,7 +54,7 @@ export default function PressureHistory({
               y: reading.pressure_bar,
               label: new Date(reading.reading_date).toLocaleDateString("tr-TR"),
             }))}
-            color="#e8952f"
+            color="var(--color-amber)"
             label="Fark Basıncı (bar)"
           />
         </div>

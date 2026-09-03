@@ -72,7 +72,7 @@ export default function MaintenanceTypeCard({
         <button onClick={() => onStartEdit(type)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition">✏️ Düzenle</button>
         {confirmDelete ? (
           <>
-            <button onClick={onConfirmDelete} className="text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition">⚠️ Emin misiniz?</button>
+            <button onClick={onConfirmDelete} className="text-[11px] font-bold text-bg bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition">⚠️ Emin misiniz?</button>
             <button onClick={onCancelDelete} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition">Vazgeç</button>
           </>
         ) : (
@@ -122,7 +122,7 @@ export default function MaintenanceTypeCard({
           <p className="text-[10.5px] text-faint">İşareti kaldırılan motor kapsamdan çıkarılır. Boş bırakılan saat alanları mevcut değerini korur.</p>
           <div className="flex gap-2">
             <button onClick={onCancelEdit} className="flex-1 py-2 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">Vazgeç</button>
-            <button onClick={onSave} disabled={savingEdit} className="flex-1 py-2 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
+            <button onClick={onSave} disabled={savingEdit} className="flex-1 py-2 rounded-lg bg-teal text-bg font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
               {savingEdit ? "..." : "💾 Kaydet"}
             </button>
           </div>

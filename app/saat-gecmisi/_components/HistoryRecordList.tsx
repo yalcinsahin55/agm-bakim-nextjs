@@ -71,7 +71,7 @@ export default function HistoryRecordList({
                 </div>
                 <div className="flex gap-2">
                   <button onClick={onCancelEdit} className="flex-1 py-1.5 rounded-lg border border-border text-muted font-bold text-[11.5px] hover:bg-panel2 transition">Vazgeç</button>
-                  <button onClick={() => onSaveEdit(realIdx)} disabled={saving} className="flex-1 py-1.5 rounded-lg bg-teal text-[#06181b] font-bold text-[11.5px] disabled:opacity-50 hover:brightness-110 transition"> Kaydet</button>
+                  <button onClick={() => onSaveEdit(realIdx)} disabled={saving} className="flex-1 py-1.5 rounded-lg bg-teal text-bg font-bold text-[11.5px] disabled:opacity-50 hover:brightness-110 transition"> Kaydet</button>
                 </div>
               </div>
             );
@@ -88,7 +88,7 @@ export default function HistoryRecordList({
               {canEdit && (
                 confirmDeleteIdx === realIdx ? (
                   <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => onDelete(realIdx)} disabled={saving} className="text-[10px] font-bold text-[#1a1206] bg-red rounded-md px-1.5 py-1 hover:brightness-110 transition">Evet</button>
+                    <button onClick={() => onDelete(realIdx)} disabled={saving} className="text-[10px] font-bold text-bg bg-red rounded-md px-1.5 py-1 hover:brightness-110 transition">Evet</button>
                     <button onClick={onCancelDelete} className="text-[10px] font-bold text-muted border border-border rounded-md px-1.5 py-1 hover:bg-panel2 transition">Vazgeç</button>
                   </div>
                 ) : (

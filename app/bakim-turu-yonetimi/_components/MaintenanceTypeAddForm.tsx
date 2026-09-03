@@ -91,11 +91,11 @@ export default function MaintenanceTypeAddForm({
       <button
         onClick={onSave}
         disabled={saving || !label.trim()}
-        className="py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+        className="py-3 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
       >
         {saving ? (
           <span className="inline-flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
             Ekleniyor...
           </span>
         ) : " Bakım Türünü Ekle"}

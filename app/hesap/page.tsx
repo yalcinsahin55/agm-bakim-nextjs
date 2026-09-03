@@ -140,7 +140,7 @@ export default function HesapPage() {
                 className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
               />
             </label>
-            <Button type="submit" disabled={saving} className="mt-1 rounded-xl bg-teal px-3 py-3 text-[13px] font-extrabold text-[#06181b] transition hover:brightness-110 disabled:opacity-50">
+            <Button type="submit" disabled={saving} className="mt-1 rounded-xl bg-teal px-3 py-3 text-[13px] font-extrabold text-bg transition hover:brightness-110 disabled:opacity-50">
               {saving ? "Değiştiriliyor..." : "Şifremi değiştir"}
             </Button>
           </form>

@@ -1,6 +1,6 @@
 import type { ChartPoint } from "./types";
 
-export default function MiniLineChart({ points, color = "#e8952f", label = "" }: { points: ChartPoint[]; color?: string; label?: string }) {
+export default function MiniLineChart({ points, color = "var(--color-amber)", label = "" }: { points: ChartPoint[]; color?: string; label?: string }) {
   if (points.length < 2) return null;
   const w = 400, h = 140, pad = 15;
   const ys = points.map((p) => p.y);

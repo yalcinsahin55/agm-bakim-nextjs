@@ -80,7 +80,7 @@ body > div {
 /* Metin seçimi rengi: yüksek kontrastlı, sakin vurgu */
 ::selection {
   background: rgba(213, 160, 90, .38);
-  color: #f1f4f7;
+  color: var(--color-bg);
 }
 
 /* iPhone'larda alt menünün home çizgisine binmemesi için */

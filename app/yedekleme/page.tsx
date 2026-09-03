@@ -135,7 +135,7 @@ export default function YedeklemePage() {
         <section className="rounded-card border border-amber/20 bg-gradient-to-br from-amber/10 via-panel to-panel p-4">
           <div className="text-[15px] font-bold text-text">Uygulama verilerini indir</div>
           <p className="mt-1 text-[11px] leading-5 text-muted">Kullanıcılar, motorlar, bakım türleri, bakım kayıtları, bildirimler ve işlem geçmişi JSON olarak dışa aktarılır. Şifreler, VAPID private key ve büyük medya base64 alanları güvenlik ve boyut nedeniyle dışarıda bırakılır.</p>
-          <Button onClick={downloadBackup} disabled={busy} className="mt-4 w-full rounded-lg bg-amber py-2.5 text-[12px] font-extrabold text-[#161006] disabled:opacity-50">{busy ? "Yedek hazırlanıyor..." : "JSON yedeğini indir"}</Button>
+          <Button onClick={downloadBackup} disabled={busy} className="mt-4 w-full rounded-lg bg-amber py-2.5 text-[12px] font-extrabold text-bg disabled:opacity-50">{busy ? "Yedek hazırlanıyor..." : "JSON yedeğini indir"}</Button>
         </section>
         {summary && <section className="mt-4 rounded-card border border-border bg-panel p-4">
           <div className="text-[13px] font-bold text-text">Yedek kapsamı</div>
@@ -146,7 +146,7 @@ export default function YedeklemePage() {
           <div className="text-[13px] font-bold text-text">Aylık bakım arşivi</div>
           <p className="mt-1 text-[10.5px] leading-5 text-muted">Seçilen ayın bakım geçmişini Excel veya PDF olarak indirerek aylık arşiv oluşturabilirsin.</p>
           <Input type="month" value={archiveMonth} onChange={(event) => setArchiveMonth(event.target.value)} className="mt-3 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" aria-label="Arşiv ayı" />
-          <div className="mt-2 grid grid-cols-2 gap-2"><a href={`/api/export/excel${archiveQuery}`} className="rounded-lg bg-teal py-2.5 text-center text-[11.5px] font-extrabold text-[#06181b] hover:brightness-110">Excel arşivi</a><a href={`/api/export/pdf${archiveQuery}`} className="rounded-lg border border-teal/40 py-2.5 text-center text-[11.5px] font-extrabold text-teal hover:bg-teal/10">PDF arşivi</a></div>
+          <div className="mt-2 grid grid-cols-2 gap-2"><a href={`/api/export/excel${archiveQuery}`} className="rounded-lg bg-teal py-2.5 text-center text-[11.5px] font-extrabold text-bg hover:brightness-110">Excel arşivi</a><a href={`/api/export/pdf${archiveQuery}`} className="rounded-lg border border-teal/40 py-2.5 text-center text-[11.5px] font-extrabold text-teal hover:bg-teal/10">PDF arşivi</a></div>
         </section>
         <section className="mt-4 rounded-card border border-red/30 bg-red/5 p-4 text-[11px] leading-5 text-muted">
           <div className="text-[13px] font-bold text-text">Güvenli yedekten geri yükle</div>

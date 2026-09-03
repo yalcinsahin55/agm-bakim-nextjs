@@ -296,10 +296,10 @@ export default function KullanicilarPage() {
               {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </Select>}
             <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
-            <Button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+            <Button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
                   Oluşturuluyor...
                 </span>
               ) : "👤 Kullanıcı Oluştur"}
@@ -311,7 +311,7 @@ export default function KullanicilarPage() {
           {visibleUsers.map((u) => (
             <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-teal/40 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-panel to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
                   {initials(u.full_name)}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -342,7 +342,7 @@ export default function KullanicilarPage() {
                     <Input type="password" value={resetPasswordConfirmation} onChange={(event) => setResetPasswordConfirmation(event.target.value)} placeholder="Yeni şifre tekrarı" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-[#1a1206] disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</Button>
+                    <Button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-bg disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</Button>
                     <Button onClick={() => { setResetUserId(null); setResetPassword(""); setResetPasswordConfirmation(""); }} disabled={resettingPassword} className="rounded-lg border border-border px-2.5 py-2 text-[10px] font-bold text-muted">Vazgeç</Button>
                   </div>
                   <p className="mt-2 text-[9px] leading-relaxed text-faint">Yeni şifreyi kullanıcıya güvenli bir kanaldan iletin. Eski oturumlar işlem sonrasında geçersiz olur.</p>
@@ -366,7 +366,7 @@ export default function KullanicilarPage() {
                   <Button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Silinemez</Button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <Button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</Button>
+                    <Button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-bg bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</Button>
                     <Button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</Button>
                   </>
                 ) : (

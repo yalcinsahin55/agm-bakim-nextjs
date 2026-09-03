@@ -295,7 +295,7 @@ export default function AuditLogPage() {
                 <Input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
             </div>
-            <Button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-[#06181b] transition hover:brightness-110 active:scale-[.98]">
+            <Button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-bg transition hover:brightness-110 active:scale-[.98]">
               Filtreleri Uygula
             </Button>
           </div>
@@ -382,11 +382,11 @@ export default function AuditLogPage() {
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Önceki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-[#0f1319] p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
                 </div>
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Sonraki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-[#0f1319] p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
                 </div>
               </div>
               <div className="mt-3 text-[10px] text-faint">Kayıt ID: {selected._id}</div>

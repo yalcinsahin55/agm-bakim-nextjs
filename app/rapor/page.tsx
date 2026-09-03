@@ -199,7 +199,7 @@ export default function RaporPage() {
             <option value="month">Ay seç</option>
           </Select>
           {reportScope === "month" && <Input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="w-auto rounded-xl" aria-label="Rapor ayı" />}
-          <Button type="button" onClick={() => void printReport()} disabled={loadingRecords} size="lg" className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</Button>
+          <Button type="button" onClick={() => void printReport()} disabled={loadingRecords} size="lg" className="flex-shrink-0 rounded-xl bg-gradient-to-b from-amber to-amber">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</Button>
         </div>
         <p className="mt-2 text-[10.5px] text-faint">{reportScope === "month" ? `${reportMonth} ayına ait kayıtlar gösteriliyor.` : "Seçili motorun tüm bakım geçmişi gösteriliyor."} Yazdır seçildiğinde aynı kapsamın tamamı yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>
@@ -254,7 +254,7 @@ export default function RaporPage() {
               </>}
             </section>
 
-            {reportTruncated && <p className="mt-3 text-[10px] text-red-700">Bu yazdırma çıktısı en fazla 5.000 kayıtla sınırlandı; daha eski kayıtları ayrı sayfalarda görüntüleyin.</p>}
+            {reportTruncated && <p className="mt-3 text-[10px] text-red">Bu yazdırma çıktısı en fazla 5.000 kayıtla sınırlandı; daha eski kayıtları ayrı sayfalarda görüntüleyin.</p>}
             {!reportAll && reportTotal > records.length && <p className="mt-3 text-[10px] text-gray-500">Önizleme: en yeni {records.length} kayıt gösteriliyor. Tam geçmiş yazdırma sırasında yüklenir.</p>}
             <div className="mt-10 grid grid-cols-2 gap-8 text-[10px] text-gray-600"><div className="border-t border-gray-400 pt-1 text-center">Hazırlayan</div><div className="border-t border-gray-400 pt-1 text-center">Onaylayan</div></div>
           </div>
