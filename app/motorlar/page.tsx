@@ -115,6 +115,8 @@ export default function MotorlarPage() {
     if (!query) return sorted;
     return sorted.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(query));
   }, [searchTerm, sorted]);
+  const totalLoad = useMemo(() => visibleEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0), [visibleEngines]);
+  const totalHours = useMemo(() => visibleEngines.reduce((sum, engine) => sum + (engine.hours || 0), 0), [visibleEngines]);
 
   async function toggleEngine(engineId: string): Promise<void> {
     if (openId === engineId) {
@@ -203,6 +205,19 @@ export default function MotorlarPage() {
       />
 
       <div className="px-4 py-4">
+        <section className="relative mb-4 overflow-hidden rounded-card border border-teal/30 bg-gradient-to-br from-teal/10 via-panel to-panel p-4 shadow-lg shadow-black/10" aria-labelledby="engines-heading">
+          <div className="pointer-events-none absolute -right-10 -top-16 h-36 w-36 rounded-full border border-white/5 bg-white/[0.02]" aria-hidden="true" />
+          <div className="relative">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal">Ekipman envanteri</div>
+            <h1 id="engines-heading" className="mt-1 text-[23px] font-extrabold tracking-tight text-text">Motorları durumuyla izle.</h1>
+            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-muted">Çalışma saati, yük ve bakım geçmişi aynı görünümde.</p>
+          </div>
+          <div className="relative mt-4 grid grid-cols-2 gap-2 border-t border-border/70 pt-3 sm:grid-cols-3">
+            <div><div className="text-[9px] font-bold uppercase tracking-wider text-faint">İzlenen motor</div><div className="mt-1 font-mono text-lg font-extrabold text-text">{visibleEngines.length}</div></div>
+            <div><div className="text-[9px] font-bold uppercase tracking-wider text-faint">Toplam yük</div><div className="mt-1 font-mono text-lg font-extrabold text-teal">{totalLoad.toLocaleString("tr-TR")} kW</div></div>
+            <div className="col-span-2 sm:col-span-1"><div className="text-[9px] font-bold uppercase tracking-wider text-faint">Motor saati</div><div className="mt-1 font-mono text-lg font-extrabold text-text">{totalHours.toLocaleString("tr-TR")} sa</div></div>
+          </div>
+        </section>
         <div className="mb-3 flex gap-2">
           <input
             value={searchTerm}
