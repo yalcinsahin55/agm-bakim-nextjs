@@ -14,6 +14,7 @@ import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 import EngineAddForm from "./_components/EngineAddForm";
 import EngineMaintenanceCard from "./_components/EngineMaintenanceCard";
 import EngineQrModal from "./_components/EngineQrModal";
+import { Button, EmptyState, Input } from "@/components/ui";
 import type { EngineResponse, MotorEngine, MotorMaintenanceRecord } from "./_lib/types";
 
 export default function MotorlarPage() {
@@ -193,23 +194,25 @@ export default function MotorlarPage() {
         title="Motorlar"
         subtitle={`${sorted.length} motor listeleniyor`}
         right={canAdd ? (
-          <button
+          <Button
+            type="button"
             onClick={() => setShowAdd((s) => !s)}
-            className="px-3 py-2 rounded-lg bg-amber text-[#161006] text-[12px] font-extrabold shadow hover:brightness-110 active:scale-95 transition"
+            size="md"
+            className="shadow"
           >
             {showAdd ? "✕ Vazgeç" : "＋ Yeni Motor"}
-          </button>
+          </Button>
         ) : undefined}
       />
 
       <div className="px-4 py-4">
         <div className="mb-3 flex gap-2">
-          <input
+          <Input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Motor ara..."
             aria-label="Motor ara"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[12px] text-text outline-none transition placeholder:text-faint focus:border-teal"
+            className="min-w-0 flex-1 rounded-xl text-[12px]"
           />
           <div className="flex flex-shrink-0 items-center rounded-xl border border-border bg-panel2 px-2.5 text-[10px] font-bold text-muted">Sırala: Motor no</div>
         </div>
@@ -241,17 +244,10 @@ export default function MotorlarPage() {
           ))}
         </div>
         {sorted.length === 0 && (
-          <div className="text-center py-12 bg-panel border border-border rounded-card">
-            <div className="text-4xl mb-3">⚙️</div>
-            <p className="text-sm text-muted">Henüz motor eklenmemiş.</p>
-          </div>
+          <EmptyState title="Henüz motor eklenmemiş." icon="⚙️" />
         )}
         {sorted.length > 0 && visibleEngines.length === 0 && (
-          <div className="text-center py-10 bg-panel border border-border rounded-card">
-            <div className="text-3xl mb-3">🔎</div>
-            <p className="text-sm text-muted">Aramanla eşleşen motor bulunamadı.</p>
-            <button type="button" onClick={() => setSearchTerm("")} className="mt-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[11px] font-bold text-teal">Aramayı temizle</button>
-          </div>
+          <EmptyState title="Aramanla eşleşen motor bulunamadı." icon="🔎" action={<Button type="button" variant="secondary" size="sm" onClick={() => setSearchTerm("")} className="border-teal/40 bg-teal/10 text-teal">Aramayı temizle</Button>} />
         )}
       </div>
       {qrEngine && (

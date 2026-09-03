@@ -1,3 +1,5 @@
+import { Button, Input } from "@/components/ui";
+
 interface EngineAddFormProps {
   name: string;
   hours: string;
@@ -11,32 +13,17 @@ interface EngineAddFormProps {
 
 export default function EngineAddForm({ name, hours, load, saving, onNameChange, onHoursChange, onLoadChange, onSubmit }: EngineAddFormProps) {
   return (
-    <form onSubmit={onSubmit} className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
-      <div className="text-[12px] font-bold text-teal mb-2">➕ Yeni Motor Ekle</div>
+    <form onSubmit={onSubmit} className="mb-4 rounded-card border border-teal/40 bg-panel p-3.5 animate-fade-in">
+      <div className="mb-2 text-[12px] font-bold text-teal">➕ Yeni Motor Ekle</div>
       <div className="flex flex-col gap-2">
-        <input
-          required placeholder="Motor adı (örn. Motor 7)" value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-        />
+        <Input required placeholder="Motor adı (örn. Motor 7)" value={name} onChange={(event) => onNameChange(event.target.value)} className="text-sm" />
         <div className="grid grid-cols-2 gap-2">
-          <input
-            type="number" placeholder="Güncel saat" value={hours}
-            onChange={(event) => onHoursChange(event.target.value)}
-            className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
-          />
-          <input
-            type="number" placeholder="Yük (kW)" value={load}
-            onChange={(event) => onLoadChange(event.target.value)}
-            className="bg-panel2 border border-border rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
-          />
+          <Input type="number" placeholder="Güncel saat" value={hours} onChange={(event) => onHoursChange(event.target.value)} className="font-mono" />
+          <Input type="number" placeholder="Yük (kW)" value={load} onChange={(event) => onLoadChange(event.target.value)} className="font-mono" />
         </div>
-        <button
-          type="submit" disabled={saving}
-          className="py-2.5 rounded-lg bg-teal text-[#06181b] text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
-        >
+        <Button type="submit" disabled={saving} variant="secondary" size="lg" className="border-teal/40 bg-teal text-[#06181b] hover:brightness-110">
           {saving ? "Ekleniyor..." : "💾 Kaydet"}
-        </button>
+        </Button>
       </div>
     </form>
   );
