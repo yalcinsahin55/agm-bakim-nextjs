@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import QRCode from "qrcode";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
@@ -79,12 +78,16 @@ export default function MotorlarPage() {
       origin: typeof window === "undefined" ? "" : window.location.origin,
       engineId: qrEngine._id,
     });
-    QRCode.toDataURL(value, { width: 320, margin: 2, errorCorrectionLevel: "M" })
-      .then((dataUrl) => setQrDataUrl(dataUrl))
+    let active = true;
+    import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toDataURL(value, { width: 320, margin: 2, errorCorrectionLevel: "M" }))
+      .then((dataUrl) => { if (active) setQrDataUrl(dataUrl); })
       .catch(() => {
+        if (!active) return;
         setQrDataUrl("");
         toast.error("QR kod oluşturulamadı.");
       });
+    return () => { active = false; };
   }, [qrEngine]);
 
   async function copyQrLink() {

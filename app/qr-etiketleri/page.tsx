@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -74,6 +73,7 @@ export default function QrEtiketleriPage() {
     const batchSize = 12;
     const generate = async () => {
       try {
+        const { default: QRCode } = await import("qrcode");
         for (let start = 0; start < items.length; start += batchSize) {
           const batch = items.slice(start, start + batchSize);
           const entries = await Promise.all(batch.map(async (item) => [item.id, await QRCode.toDataURL(buildLink(item), {
