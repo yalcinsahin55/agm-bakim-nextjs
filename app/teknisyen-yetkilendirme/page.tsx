@@ -140,12 +140,12 @@ export default function TechnicianAuthorizationPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {filteredUsers.map((item) => {
             const type = technicianType(item.technician_type);
             const domains = domainsFor(item);
             const saving = savingId === item.id;
-            return <section key={item.id} className="rounded-card border border-border bg-panel p-3.5">
+            return <section key={item.id} className="h-full rounded-card border border-border bg-panel p-3.5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0"><div className="truncate text-[14px] font-bold text-text">{item.full_name}</div><div className="mt-0.5 text-[10.5px] text-faint">{item.phone || "Telefon yok"} · {item.role === "planlamaci" ? "Eski planlamacı" : "Teknisyen"}</div></div>
                 <div className="flex items-center gap-1.5"><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${item.active && item.approved ? "border-green/30 bg-green/10 text-green" : "border-amber/30 bg-amber/10 text-amber"}`}>{item.active && item.approved ? "Aktif" : item.approved ? "Pasif" : "Onay bekliyor"}</span>{saving && <span className="text-[10px] text-faint">Kaydediliyor...</span>}</div>

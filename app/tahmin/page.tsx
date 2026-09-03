@@ -138,7 +138,7 @@ export default function TahminPage() {
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status.value] }} aria-hidden="true" />
                 <span className="text-[10px] text-faint uppercase tracking-wide">Filtrele</span>
               </div>
-              <div className="text-2xl font-bold text-text mt-2">{counts[status.value].toLocaleString("tr-TR")}</div>
+              <div className="text-xl font-bold text-text mt-2">{counts[status.value].toLocaleString("tr-TR")}</div>
               <div className="text-xs text-muted mt-0.5">{status.label}</div>
             </button>
           ))}

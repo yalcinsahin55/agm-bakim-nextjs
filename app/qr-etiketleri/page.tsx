@@ -134,7 +134,7 @@ export default function QrEtiketleriPage() {
               <h1 className="text-base font-extrabold text-text">Motor veya bakım QR etiketleri</h1>
               <p className="mt-1 text-[11px] leading-relaxed text-muted">Motor QR’ı motoru kilitler. Bakım türü QR’ı ise bakım türünü seçer; teknisyen açılan ekranda motoru seçerek devam eder.</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={selectAll} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition hover:bg-panel2">{selected.length === items.length ? "Seçimi kaldır" : "Tümünü seç"}</button>
               <button type="button" onClick={printLabels} disabled={!selectedItems.length} className="rounded-lg bg-amber px-3 py-2 text-[11px] font-extrabold text-[#161006] transition hover:brightness-110 disabled:opacity-40">Yazdır / PDF al</button>
             </div>
@@ -151,7 +151,7 @@ export default function QrEtiketleriPage() {
         <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3" aria-label={mode === "engine" ? "Motor QR seçimi" : "Bakım türü QR seçimi"}>
           {items.map((item) => {
             const checked = selected.includes(item.id);
-            return <div key={item.id} className={`flex items-center gap-2 rounded-xl border px-3 py-3 transition ${checked ? (mode === "engine" ? "border-teal/50 bg-teal/10" : "border-amber/50 bg-amber/10") : "border-border bg-panel"}`}><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} /><span className="truncate text-sm font-bold text-text">{item.name}</span></label><button type="button" onClick={() => setQrTarget(item)} className="flex-shrink-0 rounded-lg border border-border px-2 py-1.5 text-[10px] font-bold text-muted transition hover:border-amber/50 hover:text-amber">Önizle</button></div>;
+            return <div key={item.id} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-3 transition ${checked ? (mode === "engine" ? "border-teal/50 bg-teal/10" : "border-amber/50 bg-amber/10") : "border-border bg-panel"}`}><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} /><span className="truncate text-sm font-bold text-text">{item.name}</span></label><button type="button" onClick={() => setQrTarget(item)} className="min-h-9 flex-shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-[10px] font-bold text-muted transition hover:border-amber/50 hover:text-amber">Önizle</button></div>;
           })}
         </section>
         {!items.length && <div className="py-12 text-center text-sm text-muted">Bu kategoride veri bulunmuyor.</div>}
