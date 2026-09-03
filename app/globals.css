@@ -5,9 +5,43 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Atomic Design token layer — values intentionally match the current UI. */
+  --color-bg: #0f1319;
+  --color-panel: #171d25;
+  --color-panel-muted: #1f2730;
+  --color-border: #2a323c;
+  --color-border-strong: #374252;
+  --color-text: #eef1f5;
+  --color-muted: #8b96a3;
+  --color-faint: #5b6572;
+  --color-amber: #e8952f;
+  --color-teal: #3fb5c4;
+  --color-red: #ef4a52;
+  --color-orange: #f2994a;
+  --color-yellow: #f0c93d;
+  --color-green: #33c98a;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-card: 14px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 6px 24px rgba(0, 0, 0, .16);
+  --shadow-focus: 0 0 0 2px rgba(63, 181, 196, .35);
+}
+
 html, body {
-  background: radial-gradient(circle at 20% 0%, #141a22 0%, #0f1319 55%);
-  color: #eef1f5;
+  background: radial-gradient(circle at 20% 0%, #141a22 0%, var(--color-bg) 55%);
+  color: var(--color-text);
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
