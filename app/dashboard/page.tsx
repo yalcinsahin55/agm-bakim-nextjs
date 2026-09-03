@@ -10,6 +10,7 @@ import { cachedFetch } from "@/lib/apiCache";
 import { usePageData } from "@/lib/usePageData";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import DashboardActionRail from "@/components/DashboardActionRail";
+import { Badge, Button, Card } from "@/components/ui";
 import DashboardAssistant from "./_components/DashboardAssistant";
 import EngineHealthDetails from "./_components/EngineHealthDetails";
 import { ENGINE_STATUS_VIEW, engineStatus, greetingPresentation, healthCardId } from "./_lib/types";
@@ -111,27 +112,28 @@ export default function DashboardPage() {
       <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle={todayStr} />
       <div className="px-4 py-4">
         {error && (
-          <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3.5 text-[12px] text-red" role="alert">
+          <Card className="mb-4 border-red/40 bg-red/10 p-3.5 text-[12px] text-red" role="alert">
             <div className="font-bold">{error}</div>
-            <button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={refreshing}>
+            <Button type="button" onClick={() => void reload()} variant="danger" size="sm" className="mt-2 border-red bg-red text-white" disabled={refreshing}>
               {refreshing ? "Yenileniyor..." : "Tekrar dene"}
-            </button>
-          </div>
+            </Button>
+          </Card>
         )}
 
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="text-[11px] text-muted">Bakım durumu ve motor özetleri</div>
-          <button
+          <Button
             type="button"
             onClick={() => void reload()}
             disabled={refreshing}
-            className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-muted transition hover:border-borderlt hover:text-text disabled:opacity-50"
+            variant="secondary"
+            size="sm"
           >
             {refreshing ? "Yenileniyor..." : "↻ Yenile"}
-          </button>
+          </Button>
         </div>
 
-        <div className={`mb-4 rounded-card border p-4 animate-fade-in ${greetingView.panelClass}`}>
+        <Card className={`mb-4 p-4 animate-fade-in ${greetingView.panelClass}`}>
           <div className="flex items-center gap-3">
             <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-xl ${greetingView.iconClass}`} aria-hidden="true">{greetingView.icon}</div>
             <div className="min-w-0">
@@ -142,9 +144,9 @@ export default function DashboardPage() {
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] font-semibold text-teal">
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal" aria-hidden="true" />{sortedEngines.length} motor izleniyor</span>
             <span className="text-muted">·</span>
-            <span className="text-muted">Sistem aktif</span>
+            <Badge tone="success" dot>Sistem aktif</Badge>
           </div>
-        </div>
+        </Card>
 
         <DashboardActionRail
           role={user?.role}
