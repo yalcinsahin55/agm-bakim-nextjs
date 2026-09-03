@@ -21,6 +21,7 @@ import { useRecordConfirmation } from "./_hooks/useRecordConfirmation";
 import RecordFilters from "./_components/RecordFilters";
 import RecordList from "./_components/RecordList";
 import RecordPagination from "./_components/RecordPagination";
+import { Button, EmptyState } from "@/components/ui";
 
 export default function KayitlarPage() {
   const { user } = useCurrentUser();
@@ -162,24 +163,25 @@ export default function KayitlarPage() {
         />
 
         {records.length === 0 ? (
-          <div className="text-center py-12 bg-panel border border-border rounded-card">
-            <div className="text-4xl mb-3">🔍</div>
-            <p className="text-sm text-muted">Kayıt bulunamadı.</p>
-            {(search || engineFilter !== "Tümü" || typeFilter !== "Tümü" || confirmationFilter !== "all") && (
-              <button
+          <EmptyState
+            title="Kayıt bulunamadı."
+            icon="🔍"
+            action={(search || engineFilter !== "Tümü" || typeFilter !== "Tümü" || confirmationFilter !== "all") ? (
+              <Button
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={() => {
                   setSearch("");
                   setEngineFilter("Tümü");
                   setTypeFilter("Tümü");
                   setConfirmationFilter("all");
                 }}
-                className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
               >
                 Filtreleri Temizle
-              </button>
-            )}
-          </div>
+              </Button>
+            ) : undefined}
+          />
         ) : (
           <>
             <RecordList
