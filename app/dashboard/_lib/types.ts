@@ -54,7 +54,7 @@ export function greetingPresentation(hour: number) {
     return { title: "İyi geceler", icon: "🌙", description: "Gece bakım durumunu sakin bir özetle kontrol et.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };
   }
   if (hour < 12) {
-    return { title: "Günaydın", icon: "☀️", description: "Bugünkü bakım planına hızlıca göz at.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
+    return { title: "İyi günler", icon: "☀️", description: "Bugünkü bakım planına hızlıca göz at.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
   }
   if (hour < 18) {
     return { title: "İyi günler", icon: "☀️", description: "Motor ve bakım durumlarını güncel tut.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };

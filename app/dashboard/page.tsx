@@ -131,20 +131,28 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className={`mb-4 rounded-card border p-4 animate-fade-in ${greetingView.panelClass}`}>
-          <div className="flex items-center gap-3">
-            <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-xl ${greetingView.iconClass}`} aria-hidden="true">{greetingView.icon}</div>
-            <div className="min-w-0">
-              <div className={`text-[15px] font-bold ${greetingView.titleClass}`}>{greetingView.title}{firstName ? `, ${firstName}` : ""}</div>
-              <div className="mt-0.5 text-[11px] text-muted">{greetingView.description}</div>
+        <section className={`relative mb-4 overflow-hidden rounded-card border p-4 shadow-lg shadow-black/10 animate-fade-in ${greetingView.panelClass}`} aria-label="Karşılama">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border border-white/5 bg-white/[0.02]" aria-hidden="true" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border text-xl ${greetingView.iconClass}`} aria-hidden="true">{greetingView.icon}</div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Avcıkoru Santrali</div>
+                <h1 className={`mt-1 truncate text-[21px] font-extrabold tracking-tight ${greetingView.titleClass}`}>{greetingView.title}{firstName ? `, ${firstName}` : ""}</h1>
+                <p className="mt-1 max-w-[32rem] text-[11px] leading-relaxed text-muted">{greetingView.description}</p>
+              </div>
+            </div>
+            <div className="hidden rounded-lg border border-border/70 bg-black/10 px-2.5 py-1.5 text-right sm:block">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-faint">Durum</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold text-teal"><span className="h-1.5 w-1.5 rounded-full bg-teal" aria-hidden="true" />Aktif</div>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] font-semibold text-teal">
+          <div className="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 pt-3 text-[11.5px] font-semibold text-teal">
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal" aria-hidden="true" />{sortedEngines.length} motor izleniyor</span>
             <span className="text-muted">·</span>
-            <span className="text-muted">Sistem aktif</span>
+            <span className="text-muted">{todayStr}</span>
           </div>
-        </div>
+        </section>
 
         <DashboardActionRail
           role={user?.role}
