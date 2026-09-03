@@ -116,7 +116,6 @@ export default function MotorlarPage() {
     return sorted.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(query));
   }, [searchTerm, sorted]);
   const totalLoad = useMemo(() => visibleEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0), [visibleEngines]);
-  const totalHours = useMemo(() => visibleEngines.reduce((sum, engine) => sum + (engine.hours || 0), 0), [visibleEngines]);
 
   async function toggleEngine(engineId: string): Promise<void> {
     if (openId === engineId) {
@@ -215,7 +214,6 @@ export default function MotorlarPage() {
           <div className="relative mt-4 grid grid-cols-2 gap-2 border-t border-border/70 pt-3 sm:grid-cols-3">
             <div><div className="text-[9px] font-bold uppercase tracking-wider text-faint">İzlenen motor</div><div className="mt-1 font-mono text-lg font-extrabold text-text">{visibleEngines.length}</div></div>
             <div><div className="text-[9px] font-bold uppercase tracking-wider text-faint">Toplam yük</div><div className="mt-1 font-mono text-lg font-extrabold text-teal">{totalLoad.toLocaleString("tr-TR")} kW</div></div>
-            <div className="col-span-2 sm:col-span-1"><div className="text-[9px] font-bold uppercase tracking-wider text-faint">Motor saati</div><div className="mt-1 font-mono text-lg font-extrabold text-text">{totalHours.toLocaleString("tr-TR")} sa</div></div>
           </div>
         </section>
         <div className="mb-3 flex gap-2">
