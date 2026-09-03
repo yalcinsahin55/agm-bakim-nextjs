@@ -48,7 +48,7 @@ export default function NotificationGroupCard({ group, isExpanded, showAll, onTo
 
 function NotificationRow({ notification, icon, iconClassName, isFirst, onMarkRead }: { notification: Notification; icon: string; iconClassName: string; isFirst: boolean; onMarkRead: (id: string) => void }) {
   return (
-    <div className={`flex min-h-[62px] items-center gap-2.5 px-3.5 py-2.5 ${!isFirst ? "border-t border-border/60" : ""} ${notification.read_at ? "opacity-60" : ""}`}>
+    <div className={`flex min-h-[62px] items-center gap-2.5 px-3.5 py-2.5 ${!isFirst ? "border-t border-border/60" : ""} ${notification.read_at ? "opacity-75" : ""}`}>
       <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border text-sm ${iconClassName}`} aria-hidden="true">{icon}</span>
       <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted">
         <span className="block">{notification.message}</span>
