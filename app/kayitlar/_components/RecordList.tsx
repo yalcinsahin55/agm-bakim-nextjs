@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { memo } from "react";
 import MaintenanceRecordCard from "@/components/MaintenanceRecordCard";
 import MaintenanceRecordEditForm from "./MaintenanceRecordEditForm";
 import type { Engine, MaintenanceRecord, VideoItem } from "../_types";
@@ -42,7 +43,7 @@ interface RecordListProps {
   children?: ReactNode;
 }
 
-export default function RecordList({
+export default memo(function RecordList({
   recordGroups,
   user,
   sortedEngines,
@@ -117,4 +118,4 @@ export default function RecordList({
       ))}
     </div>
   );
-}
+});

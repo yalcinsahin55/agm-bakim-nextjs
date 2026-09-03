@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -67,17 +67,17 @@ export default function KayitlarPage() {
     closeConfirmation,
   } = useRecordConfirmation({ user, setRecords, setSelectedRecord });
 
-  async function openEdit(record: MaintenanceRecord) {
+  const openEdit = useCallback(async (record: MaintenanceRecord) => {
     const detail = await loadRecordMedia(record);
     if (detail) setEditingId(detail._id);
-  }
+  }, [loadRecordMedia]);
 
-  async function openDetails(record: MaintenanceRecord) {
+  const openDetails = useCallback(async (record: MaintenanceRecord) => {
     const detail = await loadRecordMedia(record);
     if (detail) setSelectedRecord(detail);
-  }
+  }, [loadRecordMedia]);
 
-  async function doDelete(id: string) {
+  const doDelete = useCallback(async (id: string) => {
     const loadingToast = toast.loading("Kayıt siliniyor...");
     try {
       const res = await fetch(`/api/records/${id}`, { method: "DELETE" });
@@ -95,7 +95,25 @@ export default function KayitlarPage() {
       toast.dismiss(loadingToast);
       toast.error("Sunucu hatası.");
     }
-  }
+  }, [load, page]);
+
+  const handleLoadMedia = useCallback((record: MaintenanceRecord) => { void loadRecordMedia(record); }, [loadRecordMedia]);
+  const handleVideoClick = useCallback((src: string, filename: string) => setSelectedVideo({ src, filename }), []);
+  const handleOpenDetails = useCallback((record: MaintenanceRecord) => { void openDetails(record); }, [openDetails]);
+  const handleOpenConfirmation = useCallback((record: MaintenanceRecord) => openConfirmation(record), [openConfirmation]);
+  const handleToggleEdit = useCallback((record: MaintenanceRecord) => {
+    if (editingId === record._id) setEditingId(null);
+    else void openEdit(record);
+  }, [editingId, openEdit]);
+  const handleDeleteRequest = useCallback((record: MaintenanceRecord) => setConfirmDeleteId(record._id), []);
+  const handleDeleteConfirm = useCallback((record: MaintenanceRecord) => { void doDelete(record._id); }, [doDelete]);
+  const handleDeleteCancel = useCallback(() => setConfirmDeleteId(null), []);
+  const handleEditCancel = useCallback(() => setEditingId(null), []);
+  const handleEditSaved = useCallback(() => {
+    setEditingId(null);
+    void load(page);
+  }, [load, page]);
+  const handlePageChange = useCallback((nextPage: number) => { void load(nextPage); }, [load]);
 
   if (loading) {
     return (
@@ -173,24 +191,21 @@ export default function KayitlarPage() {
               editingId={editingId}
               confirmDeleteId={confirmDeleteId}
               technicianLabel={technicianLabel}
-              getPhotoSrc={(photo) => getPhotoSrc(photo)}
-              getVideoSrc={(video) => getVideoSrc(video)}
-              onLoadMedia={(record) => void loadRecordMedia(record)}
+              getPhotoSrc={getPhotoSrc}
+              getVideoSrc={getVideoSrc}
+              onLoadMedia={handleLoadMedia}
               onPhotoClick={setSelectedPhoto}
-              onVideoClick={(src, filename) => setSelectedVideo({ src, filename })}
-              onOpenDetails={(record) => void openDetails(record)}
-              onOpenConfirmation={openConfirmation}
-              onToggleEdit={(record) => editingId === record._id ? setEditingId(null) : void openEdit(record)}
-              onDeleteRequest={(record) => setConfirmDeleteId(record._id)}
-              onDeleteConfirm={(record) => void doDelete(record._id)}
-              onDeleteCancel={() => setConfirmDeleteId(null)}
-              onEditCancel={() => setEditingId(null)}
-              onEditSaved={() => {
-                setEditingId(null);
-                void load(page);
-              }}
+              onVideoClick={handleVideoClick}
+              onOpenDetails={handleOpenDetails}
+              onOpenConfirmation={handleOpenConfirmation}
+              onToggleEdit={handleToggleEdit}
+              onDeleteRequest={handleDeleteRequest}
+              onDeleteConfirm={handleDeleteConfirm}
+              onDeleteCancel={handleDeleteCancel}
+              onEditCancel={handleEditCancel}
+              onEditSaved={handleEditSaved}
             />
-            <RecordPagination page={page} totalPages={totalPages} onPageChange={(nextPage) => void load(nextPage)} />
+            <RecordPagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
           </>
         )}
       </div>
