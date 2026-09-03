@@ -161,6 +161,7 @@ export default function KayitlarPage() {
           }}
         />
 
+        <div className="sr-only" aria-live="polite">{records.length === 0 ? "Kayıt bulunamadı." : `${records.length} kayıt gösteriliyor.`}</div>
         {records.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
             <div className="text-4xl mb-3">🔍</div>

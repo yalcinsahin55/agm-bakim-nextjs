@@ -130,7 +130,7 @@ export default function NotificationsPage() {
         <PushNotificationToggle />
 
         {loading ? (
-          <div className="mt-4 flex flex-col gap-2.5">
+          <div className="mt-4 flex flex-col gap-2.5" role="status" aria-live="polite" aria-label="Bildirimler yükleniyor">
             <Skeleton className="h-32 rounded-card" />
             <Skeleton className="h-32 rounded-card" />
             <Skeleton className="h-20 rounded-card" />

@@ -214,7 +214,7 @@ export default function MotorlarPage() {
           {searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="flex-shrink-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text" aria-label="Motor aramasını temizle">Temizle</button>}
           <div className="flex flex-shrink-0 items-center rounded-xl border border-border bg-panel2 px-2.5 text-[10px] font-bold text-muted">Sırala: Motor no</div>
         </div>
-        <div className="mb-3 text-[11px] text-muted">{visibleEngines.length} / {sorted.length} motor gösteriliyor</div>
+        <div className="mb-3 text-[11px] text-muted" aria-live="polite">{visibleEngines.length} / {sorted.length} motor gösteriliyor</div>
         {showAdd && (
           <EngineAddForm
             name={newName}
