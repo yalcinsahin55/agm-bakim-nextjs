@@ -144,8 +144,8 @@ export default function QrEtiketleriPage() {
           <div className="mt-3 rounded-lg border border-amber/25 bg-amber/5 px-3 py-2 text-[10px] leading-relaxed text-muted">Hizalamanın doğru çıkması için yazdırma penceresinde <strong className="text-amber">Ölçek: %100 / Gerçek boyut</strong> ve <strong className="text-amber">Kenar boşlukları: Yok</strong> seçeneğini kullan.</div>
           <div className="mt-2 rounded-lg border border-teal/25 bg-teal/5 px-3 py-2 text-[10px] leading-relaxed text-muted"><strong className="text-teal">Saha akışı:</strong> Etiketteki QR bağlantısı uygulamaya kamera eklemez; telefonun mevcut QR okuyucusu ile açıldığında Hızlı Bakım ekranına gider. Motor etiketi motoru, bakım türü etiketi bakım türünü önseçer.</div>
           <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel2 p-1">
-            <Button type="button" onClick={() => setMode("engine")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "engine" ? "bg-teal/15 text-teal shadow-sm" : "text-muted"}`}>Motor QR etiketleri</Button>
-            <Button type="button" onClick={() => setMode("type")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "type" ? "bg-amber/15 text-amber shadow-sm" : "text-muted"}`}>Bakım türü QR etiketleri</Button>
+            <Button type="button" onClick={() => setMode("engine")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "engine" ? "bg-amber text-bg shadow-sm" : "text-muted hover:text-text"}`}>Motor QR etiketleri</Button>
+            <Button type="button" onClick={() => setMode("type")} className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${mode === "type" ? "bg-amber text-bg shadow-sm" : "text-muted hover:text-text"}`}>Bakım türü QR etiketleri</Button>
           </div>
         </section>
 
@@ -153,7 +153,7 @@ export default function QrEtiketleriPage() {
         <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3" aria-label={mode === "engine" ? "Motor QR seçimi" : "Bakım türü QR seçimi"}>
           {items.map((item) => {
             const checked = selected.includes(item.id);
-            return <div key={item.id} className={`flex items-center gap-2 rounded-xl border px-3 py-3 transition ${checked ? (mode === "engine" ? "border-teal/50 bg-teal/10" : "border-amber/50 bg-amber/10") : "border-border bg-panel"}`}><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><Input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} /><span className="truncate text-sm font-bold text-text">{item.name}</span></label><Button type="button" onClick={() => setQrTarget(item)} className="flex-shrink-0 rounded-lg border border-border px-2 py-1.5 text-[10px] font-bold text-muted transition hover:border-amber/50 hover:text-amber">Önizle</Button></div>;
+            return <div key={item.id} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-3 transition ${checked ? "border-amber bg-amber text-bg" : "border-border bg-panel"}`}><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><Input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} /><span className={`truncate text-sm font-bold ${checked ? "text-bg" : "text-text"}`}>{item.name}</span></label><Button type="button" onClick={() => setQrTarget(item)} className={`flex-shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition ${checked ? "border-bg/30 text-bg hover:bg-bg/10" : "border-border text-muted hover:border-amber/50 hover:text-amber"}`}>Önizle</Button></div>;
           })}
         </section>
         {!items.length && <div className="py-12 text-center text-sm text-muted">Bu kategoride veri bulunmuyor.</div>}

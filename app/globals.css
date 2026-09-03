@@ -12,11 +12,11 @@
   --color-panel-muted: #1b1f25;
   --color-border: #343a43;
   --color-border-strong: #4b535f;
-  --color-text: #f1f4f7;
-  --color-muted: #b0bbc6;
-  --color-faint: #8492a1;
-  --color-amber: #d5a05a;
-  --color-teal: #d5a05a;
+  --color-text: #fffaf0;
+  --color-muted: #d0d6dc;
+  --color-faint: #aeb8c2;
+  --color-amber: #f0b24f;
+  --color-teal: #f0b24f;
   --color-red: #e47a7f;
   --color-orange: #d38c55;
   --color-yellow: #d9bd67;
@@ -36,7 +36,7 @@
   --radius-pill: 999px;
 
   --shadow-card: 0 6px 24px rgba(0, 0, 0, .16);
-  --shadow-focus: 0 0 0 2px rgba(104, 174, 183, .35);
+  --shadow-focus: 0 0 0 2px rgba(240, 178, 79, .42);
 }
 
 html, body {

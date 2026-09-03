@@ -153,7 +153,7 @@ export default function TechnicianAuthorizationPage() {
           <DataTable rows={filteredUsers} columns={technicianColumns} getRowKey={(item) => item.id} pageSize={10} empty="Filtreye uygun teknisyen bulunamadı." />
         </section>
 
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {filteredUsers.map((item) => {
             const type = technicianType(item.technician_type);
             const domains = domainsFor(item);
