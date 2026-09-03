@@ -1,4 +1,5 @@
 import EngineBadge from "./EngineBadge";
+import { memo } from "react";
 interface LoadEngine {
   _id: string;
   name: string;
@@ -10,7 +11,7 @@ interface LoadCardsProps {
   engines: LoadEngine[];
 }
 
-export default function LoadCards({ engines }: LoadCardsProps) {
+export default memo(function LoadCards({ engines }: LoadCardsProps) {
   return (
     <div className="flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] md:overflow-visible">
       {engines.map((e) => (
@@ -26,4 +27,4 @@ export default function LoadCards({ engines }: LoadCardsProps) {
       ))}
     </div>
   );
-}
+});

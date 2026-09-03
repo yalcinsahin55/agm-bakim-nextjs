@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type JSX } from "react";
+import { memo, useMemo, useState, type JSX } from "react";
 import { canAccessRoute, canWriteMaintenance, normalizeRole } from "@/lib/permissions";
 import type { PanelItem, StatusKey } from "@/lib/status";
 import { STATUS_LABELS } from "@/lib/status";
@@ -116,7 +116,7 @@ function EngineRiskRow({ row }: { row: DashboardHealthRow }): JSX.Element {
   );
 }
 
-export default function DashboardActionRail(props: DashboardActionRailProps): JSX.Element {
+export default memo(function DashboardActionRail(props: DashboardActionRailProps): JSX.Element {
   const { role, enginesCount, counts, items, healthRows } = props;
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
   const presentation = rolePresentation(role);
@@ -237,6 +237,6 @@ export default function DashboardActionRail(props: DashboardActionRailProps): JS
       )}
     </section>
   );
-}
+});
 
 export type { DashboardActionRailProps };
