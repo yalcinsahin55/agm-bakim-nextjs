@@ -27,6 +27,7 @@ export interface MaintenanceRecordEditFormProps {
 
 export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, onPhotoClick, isAdmin, ownerUserId, engines }: MaintenanceRecordEditFormProps) {
   const [engineId, setEngineId] = useState(record.engine_id);
+  const [typeKey, setTypeKey] = useState(record.type_key);
   const [hours, setHours] = useState<number | string>(record.hour_at_completion);
   const [maintenanceStartAt, setMaintenanceStartAt] = useState(toLocalDateTimeInput(record.maintenance_start_at));
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
@@ -49,8 +50,8 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
     initialReportAttachments: record.report_attachments || [],
   });
   const [busy, setBusy] = useState(false);
-  const historicalTypeKeys = useMemo(() => new Set([record.type_key, ...(record.extra_types || []).map((extra) => extra.type_key), ...groupTypes.map((type) => type.type_key)]), [record.type_key, record.extra_types, groupTypes]);
-  const selectedTypeKeys = useMemo(() => new Set([...historicalTypeKeys, ...extraKeys]), [historicalTypeKeys, extraKeys]);
+  const historicalTypeKeys = useMemo(() => new Set([...(record.extra_types || []).map((extra) => extra.type_key), ...groupTypes.map((type) => type.type_key)]), [record.extra_types, groupTypes]);
+  const selectedTypeKeys = useMemo(() => new Set([typeKey, ...historicalTypeKeys, ...extraKeys]), [typeKey, historicalTypeKeys, extraKeys]);
   const selectedMaintenanceTypes = maintenanceTypes.filter((type) => selectedTypeKeys.has(type.key));
   const availableExtraTypes = maintenanceTypes.filter((type) => !historicalTypeKeys.has(type.key));
   const trackedExtraTypeKeys = useMemo(() => new Set(maintenanceTypes.filter((type) => type.engine_scope === "all" || Boolean(type.engine_states?.[engineId])).map((type) => type.key)), [maintenanceTypes, engineId]);
@@ -88,6 +89,8 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
     const payload = {
       engine_id: isAdmin ? engineId : undefined,
+      type_key: isAdmin ? typeKey : undefined,
+      type_label: isAdmin ? maintenanceTypes.find((type) => type.key === typeKey)?.label : undefined,
       hour_at_completion: Number(hours),
       time_tracking_version: TIME_TRACKING_VERSION,
       maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
@@ -141,7 +144,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
 
   return (
     <div className="mt-2 pt-2 border-t border-border flex flex-col gap-2 animate-fade-in">
-      <RecordEditEngineSection isAdmin={isAdmin} record={record} engines={engines} engineId={engineId} setEngineId={setEngineId} />
+      <RecordEditEngineSection isAdmin={isAdmin} record={record} engines={engines} engineId={engineId} setEngineId={setEngineId} maintenanceTypes={maintenanceTypes} typeKey={typeKey} setTypeKey={setTypeKey} />
       <RecordEditTechnicianSourceSection
         isAdmin={isAdmin}
         record={record}

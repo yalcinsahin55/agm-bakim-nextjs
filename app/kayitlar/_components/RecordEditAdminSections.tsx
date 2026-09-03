@@ -8,7 +8,7 @@ import {
   TECHNICIAN_TYPE_LABELS,
   type TechnicianOption,
 } from "@/lib/technicians";
-import type { Engine, MaintenanceRecord } from "../_types";
+import type { Engine, MaintenanceRecord, MaintenanceType } from "../_types";
 
 type TechnicianSource = "internal" | "external_service";
 
@@ -18,9 +18,12 @@ type EngineSectionProps = {
   engines: Engine[];
   engineId: string;
   setEngineId: Dispatch<SetStateAction<string>>;
+  maintenanceTypes: MaintenanceType[];
+  typeKey: string;
+  setTypeKey: Dispatch<SetStateAction<string>>;
 };
 
-export function RecordEditEngineSection({ isAdmin, record, engines, engineId, setEngineId }: EngineSectionProps) {
+export function RecordEditEngineSection({ isAdmin, record, engines, engineId, setEngineId, maintenanceTypes, typeKey, setTypeKey }: EngineSectionProps) {
   if (!isAdmin) return null;
   return <div className="rounded-lg border border-purple-400/30 bg-purple-400/5 p-2.5">
     <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım motoru</label>
@@ -30,6 +33,13 @@ export function RecordEditEngineSection({ isAdmin, record, engines, engineId, se
       {engines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
     </select>
     {engineId !== record.engine_id && <div className="mt-2 rounded-lg bg-purple-400/10 px-2 py-1.5 text-[10px] text-purple-100">Motor değişikliği: <b>{record.engine_name}</b> → <b>{engines.find((engine) => engine._id === engineId)?.name || "Yeni motor"}</b>. Eski motorun bakım takibi geri hesaplanacak.</div>}
+    <label className="mt-3 block text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakım türü
+      <select value={typeKey} onChange={(event) => setTypeKey(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-normal normal-case outline-none focus:border-purple-300">
+        {!maintenanceTypes.some((type) => type.key === record.type_key) && <option value={record.type_key}>{record.type_label} (mevcut)</option>}
+        {maintenanceTypes.map((type) => <option key={type.key} value={type.key}>{type.label}</option>)}
+      </select>
+    </label>
+    {typeKey !== record.type_key && <div className="mt-2 rounded-lg bg-purple-400/10 px-2 py-1.5 text-[10px] text-purple-100">Bakım türü değişikliği: <b>{record.type_label}</b> → <b>{maintenanceTypes.find((type) => type.key === typeKey)?.label || "Yeni bakım türü"}</b>. Eski bakım türünün takibi geri hesaplanacak.</div>}
   </div>;
 }
 

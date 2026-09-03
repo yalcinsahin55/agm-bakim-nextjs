@@ -59,10 +59,14 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { engine_id: requestedEngineId, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { engine_id: requestedEngineId, type_key: requestedTypeKey, type_label: requestedTypeLabel, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
   const engineChangeRequested = typeof requestedEngineId === "string" && requestedEngineId.trim() !== record.engine_id;
+  const typeChangeRequested = typeof requestedTypeKey === "string" && requestedTypeKey.trim() !== record.type_key;
   if (engineChangeRequested && user.role !== "yonetici") {
     return NextResponse.json({ error: "Bakım kaydının motorunu yalnızca yöneticiler değiştirebilir." }, { status: 403 });
+  }
+  if (typeChangeRequested && user.role !== "yonetici") {
+    return NextResponse.json({ error: "Bakım türünü yalnızca yöneticiler değiştirebilir." }, { status: 403 });
   }
   let requestedEngineName = record.engine_name;
   if (engineChangeRequested) {
@@ -124,7 +128,8 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   const requestedExtraTypeKeys = Array.isArray(extra_types)
     ? extra_types.map((item) => item.type_key).filter((key: unknown): key is string => typeof key === "string" && key.length > 0)
     : [];
-  const selectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
+  const effectiveTypeKey = typeof requestedTypeKey === "string" && requestedTypeKey.trim() ? requestedTypeKey.trim() : record.type_key;
+  const selectedTypeKeys = [...new Set([...historicalTypeKeys, effectiveTypeKey, ...requestedExtraTypeKeys])];
   const allSelectedTypeDocs = await maintenanceTypesCollection(db).find(
     { _id: { $in: selectedTypeKeys } },
     { projection: { _id: 1, label: 1, is_deleted: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 } },
@@ -133,6 +138,8 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   // Ancak yeni eklenmek istenen türler mutlaka aktif olmalıdır.
   const selectedTypeDocs = allSelectedTypeDocs.filter((type) => type.is_deleted !== true || historicalTypeKeySet.has(String(type._id)));
   if (selectedTypeDocs.length !== selectedTypeKeys.length) return NextResponse.json({ error: "Seçilen bakım türlerinden biri bulunamadı veya artık aktif değil." }, { status: 404 });
+  const effectiveTypeDoc = selectedTypeDocs.find((type) => String(type._id) === effectiveTypeKey);
+  if (!effectiveTypeDoc) return NextResponse.json({ error: "Yeni bakım türü bulunamadı." }, { status: 404 });
   let nextResponsibleId = useExternalService ? EXTERNAL_SERVICE_TECHNICIAN_ID : record.technician_id;
   let nextResponsibleName = useExternalService
     ? (externalServiceName ? `${EXTERNAL_SERVICE_TECHNICIAN_NAME} · ${externalServiceName}` : EXTERNAL_SERVICE_TECHNICIAN_NAME)
@@ -265,6 +272,10 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   }
   if (typeof nextGroupId === "string") update.group_id = nextGroupId;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
+  if (typeChangeRequested) {
+    update.type_key = effectiveTypeKey;
+    update.type_label = String(effectiveTypeDoc.label || requestedTypeLabel || effectiveTypeKey);
+  }
   if (typeof note === "string") update.note = note;
   if (typeof technician_note === "string") update.technician_note = technician_note;
   if (Array.isArray(photos_b64)) update.photos_b64 = photos_b64;
@@ -353,9 +364,17 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
         session,
       });
     }
-    const affectedTypeKeys = [...new Set([...historicalTypeKeys, ...requestedExtraTypeKeys])];
-    if (engineChangeRequested || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
-      await Promise.all(affectedTypeKeys.map((typeKey) => recomputeLastMaintenance(db, effectiveEngineId, typeKey, undefined, session)));
+    const affectedTypeKeys = [...new Set([...historicalTypeKeys, effectiveTypeKey, ...requestedExtraTypeKeys])];
+    if (engineChangeRequested || typeChangeRequested || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
+      const recomputePairs = new Set<string>();
+      const addPair = (engineId: string, typeKey: string) => recomputePairs.add(`${engineId}\u0000${typeKey}`);
+      for (const typeKey of affectedTypeKeys) addPair(record.engine_id, typeKey);
+      addPair(record.engine_id, record.type_key);
+      addPair(effectiveEngineId, effectiveTypeKey);
+      await Promise.all([...recomputePairs].map((pair) => {
+        const [engineId, typeKey] = pair.split("\u0000");
+        return recomputeLastMaintenance(db, engineId, typeKey, undefined, session);
+      }));
     }
   };
 
@@ -378,4 +397,3 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   await refreshUserMaintenanceNotificationsBestEffort(db, user);
   return NextResponse.json({ ok: true });
 }
-
