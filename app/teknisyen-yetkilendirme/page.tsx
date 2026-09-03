@@ -124,20 +124,21 @@ export default function TechnicianAuthorizationPage() {
       <TopBar title="Teknisyen Yetkilendirme" subtitle="Uzmanlık, görev ve çalışma alanlarını yönet" />
       <main className="px-4 py-4 pb-28 md:px-6 lg:px-8 md:pb-6">
         <div className="w-full">
-        <div className="mb-4 rounded-card border border-teal/30 bg-teal/5 p-3.5 text-[11px] leading-relaxed text-muted">
+        <div className="mb-4 rounded-card border border-teal/30 bg-teal/5 p-3.5 text-[11px] leading-relaxed text-muted shadow-sm">
           <b className="text-teal">Bu ekran yalnızca yöneticilere açıktır.</b> Mekanik teknisyenler genel bakım işlerinde varsayılan sorumlu kabul edilir. Elektromekanik teknisyenler elektriksel işler ve devreye alma desteği için ayrılır; sorumlu olarak seçilmeleri ayrıca açılabilir.
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <div className="rounded-card border border-teal/30 bg-teal/10 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">Mekanik teknisyen</div><div className="mt-1 font-mono text-2xl font-bold text-teal">{mechanics}</div></div>
-          <div className="rounded-card border border-purple-400/30 bg-purple-400/10 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">Elektromekanik teknisyen</div><div className="mt-1 font-mono text-2xl font-bold text-purple-200">{electromechanics}</div></div>
+        <div className="mb-4 grid grid-cols-2 gap-2 lg:gap-3">
+          <div className="rounded-card border border-teal/30 bg-teal/10 p-3.5 shadow-sm"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Mekanik teknisyen</div><span className="rounded-lg bg-teal/15 px-2 py-1 text-[10px] font-bold text-teal">Genel bakım</span></div><div className="mt-1 font-mono text-2xl font-bold text-teal">{mechanics}</div><div className="mt-0.5 text-[10px] text-muted">Yetkili ekip üyesi</div></div>
+          <div className="rounded-card border border-purple-400/30 bg-purple-400/10 p-3.5 shadow-sm"><div className="flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Elektromekanik</div><span className="rounded-lg bg-purple-400/15 px-2 py-1 text-[10px] font-bold text-purple-200">Uzmanlık</span></div><div className="mt-1 font-mono text-2xl font-bold text-purple-200">{electromechanics}</div><div className="mt-0.5 text-[10px] text-muted">Yetkili ekip üyesi</div></div>
         </div>
 
-        <div className="mb-3 rounded-card border border-border bg-panel p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Teknisyen ara..." className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" />
-            <select value={filterType} onChange={(event) => setFilterType(event.target.value as FilterType)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm türler</option>{TECHNICIAN_TYPES.map((item) => <option key={item} value={item}>{TECHNICIAN_TYPE_LABELS[item]}</option>)}</select>
-            <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as FilterStatus)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm durumlar</option><option value="active">Aktif ve onaylı</option><option value="pending">Onay bekleyen</option></select>
+        <div className="mb-3 rounded-card border border-border bg-panel p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-2"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Teknisyenleri filtrele</div><div className="text-[10px] text-faint">{filteredUsers.length} sonuç</div></div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Teknisyen adı veya telefon ara..." aria-label="Teknisyen adı veya telefon ara" className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15" />
+            <select value={filterType} onChange={(event) => setFilterType(event.target.value as FilterType)} aria-label="Teknisyen türü filtresi" className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15"><option value="all">Tüm türler</option>{TECHNICIAN_TYPES.map((item) => <option key={item} value={item}>{TECHNICIAN_TYPE_LABELS[item]}</option>)}</select>
+            <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as FilterStatus)} aria-label="Hesap durumu filtresi" className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15"><option value="all">Tüm durumlar</option><option value="active">Aktif ve onaylı</option><option value="pending">Onay bekleyen</option></select>
           </div>
         </div>
 
@@ -146,7 +147,7 @@ export default function TechnicianAuthorizationPage() {
             const type = technicianType(item.technician_type);
             const domains = domainsFor(item);
             const saving = savingId === item.id;
-            return <section key={item.id} className="h-full rounded-card border border-border bg-panel p-3.5">
+            return <section key={item.id} className="h-full rounded-card border border-border bg-panel p-4 shadow-sm transition hover:border-teal/30">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0"><div className="truncate text-[14px] font-bold text-text">{item.full_name}</div><div className="mt-0.5 text-[10.5px] text-faint">{item.phone || "Telefon yok"} · {item.role === "planlamaci" ? "Eski planlamacı" : "Teknisyen"}</div></div>
                 <div className="flex items-center gap-1.5"><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${item.active && item.approved ? "border-green/30 bg-green/10 text-green" : "border-amber/30 bg-amber/10 text-amber"}`}>{item.active && item.approved ? "Aktif" : item.approved ? "Pasif" : "Onay bekliyor"}</span>{saving && <span className="text-[10px] text-faint">Kaydediliyor...</span>}</div>
