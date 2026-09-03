@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
 interface AuditItem {
   _id: string;
@@ -99,6 +100,7 @@ function formatValue(value: unknown): string {
 
 export default function AuditLogPage() {
   const router = useRouter();
+  const { signal } = useAbortableFetch();
   const [items, setItems] = useState<AuditItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -131,7 +133,7 @@ export default function AuditLogPage() {
     if (nextFilters.to) params.set("to", nextFilters.to);
 
     try {
-      const response = await fetch(`/api/audit-logs?${params.toString()}`);
+      const response = await fetch(`/api/audit-logs?${params.toString()}`, { signal });
       if (response.status === 401) {
         router.push("/login");
         return;
@@ -147,12 +149,15 @@ export default function AuditLogPage() {
       setTotal(Number(data.total) || 0);
       setTotalPages(Number(data.totalPages) || 1);
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") return;
       const message = loadError instanceof Error ? loadError.message : "İşlem geçmişi yüklenemedi.";
       setError(message);
       if (options.silent) toast.error(message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }
 
@@ -160,16 +165,17 @@ export default function AuditLogPage() {
     load(1, filters);
     // Filtre değiştiğinde sayfa başa alınır; load intentionally uses the snapshot above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, signal]);
 
   async function openDetails(item: AuditItem) {
     try {
       const params = new URLSearchParams({ id: item._id, page: "1", page_size: "1", details: "1" });
-      const response = await fetch(`/api/audit-logs?${params.toString()}`);
+      const response = await fetch(`/api/audit-logs?${params.toString()}`, { signal });
       if (!response.ok) throw new Error("İşlem ayrıntısı yüklenemedi.");
       const data = await response.json();
       setSelected(data.items?.[0] || item);
     } catch (detailError) {
+      if (detailError instanceof DOMException && detailError.name === "AbortError") return;
       toast.error(detailError instanceof Error ? detailError.message : "İşlem ayrıntısı yüklenemedi.");
     }
   }

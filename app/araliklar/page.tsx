@@ -7,7 +7,8 @@ import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import EngineBadge from "@/components/EngineBadge";
 import { engineSortKey } from "@/lib/status";
-import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
+import { ApiFetchError } from "@/lib/apiCache";
+import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
 interface SummaryEntry {
   _id: string;
@@ -77,6 +78,7 @@ function latestDate(groups: SummaryGroup[]): string {
 
 export default function AraliklarPage() {
   const router = useRouter();
+  const { signal } = useAbortableFetch();
   const [groups, setGroups] = useState<SummaryGroup[]>([]);
   const [engines, setEngines] = useState<EngineSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,8 +91,14 @@ export default function AraliklarPage() {
 
   useEffect(() => {
     Promise.all([
-      cachedFetch<{ groups: SummaryGroup[] }>("/api/records/interval-summary", 15_000),
-      cachedFetch<EngineSummary[]>("/api/engines?include_maintenance_counts=true", 15_000),
+      fetch("/api/records/interval-summary", { signal, cache: "no-store" }).then(async (response) => {
+        if (!response.ok) throw new ApiFetchError(response.status);
+        return await response.json() as { groups: SummaryGroup[] };
+      }),
+      fetch("/api/engines?include_maintenance_counts=true", { signal, cache: "no-store" }).then(async (response) => {
+        if (!response.ok) throw new ApiFetchError(response.status);
+        return await response.json() as EngineSummary[];
+      }),
     ])
       .then(([summary, engineData]) => {
         const loadedGroups = Array.isArray(summary.groups) ? summary.groups : [];
@@ -100,10 +108,11 @@ export default function AraliklarPage() {
         setEngineFilter(loadedEngines[0]?.name || "");
       })
       .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       })
-      .finally(() => setLoading(false));
-  }, [router]);
+      .finally(() => { if (!signal.aborted) setLoading(false); });
+  }, [router, signal]);
 
   async function loadDetails(group: SummaryGroup, page = 1) {
     setDetailLoading(group.key);
@@ -115,7 +124,7 @@ export default function AraliklarPage() {
         page: String(page),
         page_size: "50",
       });
-      const res = await fetch(`/api/records?${params.toString()}`);
+      const res = await fetch(`/api/records?${params.toString()}`, { signal });
       if (!res.ok) throw new ApiFetchError(res.status);
       const data = await res.json() as { records: DetailRecord[]; total: number; page: number; totalPages: number };
       setDetails((current) => ({
@@ -128,9 +137,10 @@ export default function AraliklarPage() {
         },
       }));
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
     } finally {
-      setDetailLoading(null);
+      if (!signal.aborted) setDetailLoading(null);
     }
   }
 
