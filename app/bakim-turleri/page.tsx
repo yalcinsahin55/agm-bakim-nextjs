@@ -10,7 +10,6 @@ import type { PanelItem, StatusKey } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
-import { Button } from "@/components/ui";
 
 const STATUS_MAP: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis", "Kritik": "kritik", "Yaklaşıyor": "yaklasiyor", "Normal": "normal",
@@ -78,14 +77,12 @@ export default function BakimTurleriPage() {
           {sortedTypes.map((t) => {
             const count = items.filter((i) => i.type_key === t.key).length;
             return (
-              <Button
-                type="button"
+              <button
                 key={t.key}
                 onClick={() => setSelectedKey(t.key)}
-                size="sm"
-                className={`rounded-full px-4 ${
+                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
                   selectedKey === t.key
-                    ? "bg-amber text-bg shadow-lg"
+                    ? "bg-amber text-[#161006] shadow-lg"
                     : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
                 }`}
               >
@@ -93,7 +90,7 @@ export default function BakimTurleriPage() {
                 <span className={`ml-1.5 text-[10px] ${selectedKey === t.key ? "opacity-70" : "text-faint"}`}>
                   ({count})
                 </span>
-              </Button>
+              </button>
             );
           })}
         </div>
@@ -106,7 +103,7 @@ export default function BakimTurleriPage() {
               onClick={() => setStatusFilter(o)}
               className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
                 statusFilter === o
-                  ? "bg-teal text-bg shadow-lg"
+                  ? "bg-teal text-[#06181b] shadow-lg"
                   : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >
@@ -122,17 +119,15 @@ export default function BakimTurleriPage() {
         )}
 
         {rows.length === 0 ? (
-          <div className="animate-fade-in rounded-card border border-border bg-panel py-12 text-center">
-            <div className="mb-3 text-4xl">🔧</div>
+          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
+            <div className="text-4xl mb-3">🔧</div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
-            <Button
-              type="button"
+            <button
               onClick={() => setStatusFilter("Tümü")}
-              variant="secondary"
-              size="md"
+              className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
             >
               Filtreyi Temizle
-            </Button>
+            </button>
           </div>
         ) : (
           <div className="animate-fade-in">

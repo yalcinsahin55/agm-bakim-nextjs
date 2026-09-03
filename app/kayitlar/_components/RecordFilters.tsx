@@ -1,7 +1,6 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { Button, Card, Input, Select } from "@/components/ui";
 import type { Engine } from "../_types";
 
 interface RecordFiltersProps {
@@ -37,39 +36,47 @@ export default function RecordFilters({
 
   return (
     <>
-      <Card className="mb-3 p-3">
+      <div className="mb-3 rounded-card border border-border bg-panel p-3">
         <div className="relative">
-          <span className="absolute left-3 top-1/2 z-10 -translate-y-1/2 text-sm text-faint" aria-hidden="true">🔍</span>
-          <Input
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm" aria-hidden="true">🔍</span>
+          <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Motor, tür veya teknisyen ara..."
             aria-label="Bakım kaydı ara"
-            className="rounded-xl pl-9"
+            className="w-full min-w-0 bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
           />
         </div>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Select value={engineFilter} onChange={(event) => setEngineFilter(event.target.value)} aria-label="Motor filtresi" className="rounded-xl px-2.5 text-[12.5px]">
+          <select
+            value={engineFilter}
+            onChange={(event) => setEngineFilter(event.target.value)}
+            aria-label="Motor filtresi"
+            className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
+          >
             <option value="Tümü">Tüm Motorlar</option>
             {sortedEngines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
-          </Select>
-          <Select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Bakım türü filtresi" className="min-w-0 rounded-xl px-2.5 text-[12.5px]">
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value)}
+            aria-label="Bakım türü filtresi"
+            className="min-w-0 bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
+          >
             <option value="Tümü">Tüm Türler</option>
             {typeLabels.map((label) => <option key={label} value={label}>{label}</option>)}
-          </Select>
+          </select>
         </div>
-      </Card>
+      </div>
 
       {userRole === "yonetici" && <div className="mb-4 flex items-center gap-2">
-        <Button
+        <button
           type="button"
           onClick={() => setConfirmationFilter((current) => current === "pending" ? "all" : "pending")}
-          variant="secondary"
-          size="sm"
-          className={`rounded-xl ${confirmationFilter === "pending" ? "border-amber/60 bg-amber/15 text-amber" : "hover:border-amber/50 hover:text-amber"}`}
+          className={`rounded-xl border px-3 py-2 text-[11px] font-bold transition ${confirmationFilter === "pending" ? "border-amber/60 bg-amber/15 text-amber" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-amber"}`}
         >
           {confirmationFilter === "pending" ? "✓ Teyit kuyruğu açık" : "Teyit bekleyenleri göster"}
-        </Button>
+        </button>
         {confirmationFilter === "pending" && <span className="text-[10px] text-faint">Yalnızca yönetici incelemesi bekleyen yeni kayıtlar</span>}
       </div>}
 

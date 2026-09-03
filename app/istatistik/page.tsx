@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input, StatCard } from "@/components/ui";
-
 import { useState } from "react";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -99,17 +97,17 @@ export default function IstatistikPage() {
     <div>
       <TopBar title="İstatistikler" subtitle={`${summary.total} kayıt analiz edildi`} />
       <div className="px-4 py-4">
-        {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><Button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</Button></div>}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
-          <StatCard label="Bu Ay" value={summary.thisCount} detail={monthName} tone="accent" />
-          <StatCard label="Geçen Ay" value={summary.lastCount} />
-          <StatCard label="Değişim" value={`${diff >= 0 ? "+" : ""}${diff}`} tone={diff >= 0 ? "success" : "warning"} />
-          <StatCard label="Toplam" value={summary.total} tone="accent" />
+        {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
+          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Geçen Ay</div><div className="font-mono text-2xl font-bold text-text mt-1">{summary.lastCount}</div></div>
+          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Değişim</div><div className={`font-mono text-2xl font-bold mt-1 ${diff >= 0 ? "text-green" : "text-red"}`}>{diff >= 0 ? "+" : ""}{diff}</div></div>
+          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Toplam</div><div className="font-mono text-2xl font-bold text-teal mt-1">{summary.total}</div></div>
         </div>
         <div className="mb-4 rounded-card border border-border bg-panel p-3">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">İstatistik filtresi</div>
-          <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => { setFilterMode("all"); setSelectedFrom(""); setSelectedTo(""); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "all" ? "border-amber bg-amber text-bg" : "border-border bg-panel2 text-muted"}`}>Tümü</Button><Button type="button" onClick={() => setFilterMode("date")} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "date" ? "border-amber bg-amber text-bg" : "border-border bg-panel2 text-muted"}`}>Tarih Bazlı</Button></div>
-          {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><Input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><Input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
+          <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setFilterMode("all"); setSelectedFrom(""); setSelectedTo(""); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "all" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tümü</button><button type="button" onClick={() => setFilterMode("date")} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "date" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tarih Bazlı</button></div>
+          {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
           <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

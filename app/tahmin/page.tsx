@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
@@ -130,7 +128,7 @@ export default function TahminPage() {
 
         <section aria-label="Bakım durumu özeti" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {statusCards.map((status) => (
-            <Button
+            <button
               key={status.value}
               type="button"
               onClick={() => setStatusFilter(statusFilter === status.value ? "Tümü" : status.value)}
@@ -140,9 +138,9 @@ export default function TahminPage() {
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status.value] }} aria-hidden="true" />
                 <span className="text-[10px] text-faint uppercase tracking-wide">Filtrele</span>
               </div>
-              <div className="text-lg md:text-xl font-bold text-text mt-2">{counts[status.value].toLocaleString("tr-TR")}</div>
+              <div className="text-2xl font-bold text-text mt-2">{counts[status.value].toLocaleString("tr-TR")}</div>
               <div className="text-xs text-muted mt-0.5">{status.label}</div>
-            </Button>
+            </button>
           ))}
         </section>
 
@@ -150,7 +148,7 @@ export default function TahminPage() {
           <div className="flex flex-col lg:flex-row lg:items-end gap-3">
             <label className="flex-1 min-w-0">
               <span className="block text-[10px] uppercase tracking-[0.14em] text-faint font-bold mb-1.5">Motor ara</span>
-              <Input
+              <input
                 value={engineQuery}
                 onChange={(event) => setEngineQuery(event.target.value)}
                 placeholder="Örn. AGM 35"
@@ -159,20 +157,20 @@ export default function TahminPage() {
             </label>
             <label className="lg:w-56">
               <span className="block text-[10px] uppercase tracking-[0.14em] text-faint font-bold mb-1.5">Durum</span>
-              <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Tümü" | StatusKey)} className="w-full h-10 rounded-lg bg-panel2 border border-border px-3 text-sm text-text outline-none focus:border-amber">
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Tümü" | StatusKey)} className="w-full h-10 rounded-lg bg-panel2 border border-border px-3 text-sm text-text outline-none focus:border-amber">
                 {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </Select>
+              </select>
             </label>
             <label className="lg:w-64">
               <span className="block text-[10px] uppercase tracking-[0.14em] text-faint font-bold mb-1.5">Bakım türü</span>
-              <Select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full h-10 rounded-lg bg-panel2 border border-border px-3 text-sm text-text outline-none focus:border-amber">
+              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full h-10 rounded-lg bg-panel2 border border-border px-3 text-sm text-text outline-none focus:border-amber">
                 {typeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </Select>
+              </select>
             </label>
             {hasActiveFilter && (
-              <Button type="button" onClick={clearFilters} className="h-10 px-3 rounded-lg border border-border text-xs font-bold text-muted hover:text-text hover:border-borderlt">
+              <button type="button" onClick={clearFilters} className="h-10 px-3 rounded-lg border border-border text-xs font-bold text-muted hover:text-text hover:border-borderlt">
                 Filtreleri temizle
-              </Button>
+              </button>
             )}
           </div>
         </section>
@@ -191,7 +189,7 @@ export default function TahminPage() {
               <div className="w-12 h-12 mx-auto rounded-full bg-panel2 flex items-center justify-center text-amber font-bold text-xl" aria-hidden="true">—</div>
               <p className="text-sm text-text font-semibold mt-3">Bu filtrelerle eşleşen tahmin yok.</p>
               <p className="text-xs text-muted mt-1">Tüm bakım planlarını görmek için filtreleri temizleyebilirsin.</p>
-              {hasActiveFilter && <Button type="button" onClick={clearFilters} className="mt-4 px-4 py-2 rounded-lg bg-amber text-bg text-xs font-bold">Filtreleri temizle</Button>}
+              {hasActiveFilter && <button type="button" onClick={clearFilters} className="mt-4 px-4 py-2 rounded-lg bg-amber text-[#161006] text-xs font-bold">Filtreleri temizle</button>}
             </div>
           ) : (
             <>
@@ -208,9 +206,9 @@ export default function TahminPage() {
               }))} />
               {rows.length > INITIAL_VISIBLE_ROWS && (
                 <div className="flex justify-center mt-4">
-                  <Button type="button" onClick={() => setShowAll((current) => !current)} className="px-5 py-2.5 rounded-lg border border-border bg-panel text-sm font-bold text-text hover:border-amber">
+                  <button type="button" onClick={() => setShowAll((current) => !current)} className="px-5 py-2.5 rounded-lg border border-border bg-panel text-sm font-bold text-text hover:border-amber">
                     {showAll ? "Daha az göster" : `Kalan ${(rows.length - INITIAL_VISIBLE_ROWS).toLocaleString("tr-TR")} kaydı göster`}
-                  </Button>
+                  </button>
                 </div>
               )}
             </>

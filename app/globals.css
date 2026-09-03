@@ -5,43 +5,9 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Atomic Design token layer — values intentionally match the current UI. */
-  --color-bg: #080a0d;
-  --color-panel: #121519;
-  --color-panel-muted: #1b1f25;
-  --color-border: #343a43;
-  --color-border-strong: #4b535f;
-  --color-text: #fffaf0;
-  --color-muted: #d0d6dc;
-  --color-faint: #aeb8c2;
-  --color-amber: #f0b24f;
-  --color-teal: #f0b24f;
-  --color-red: #e47a7f;
-  --color-orange: #d38c55;
-  --color-yellow: #d9bd67;
-  --color-green: #65bd95;
-
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-card: 14px;
-  --radius-lg: 16px;
-  --radius-pill: 999px;
-
-  --shadow-card: 0 6px 24px rgba(0, 0, 0, .16);
-  --shadow-focus: 0 0 0 2px rgba(240, 178, 79, .42);
-}
-
 html, body {
-  background: radial-gradient(circle at 20% 0%, #1c1811 0%, var(--color-bg) 55%);
-  color: var(--color-text);
+  background: radial-gradient(circle at 20% 0%, #141a22 0%, #0f1319 55%);
+  color: #eef1f5;
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
@@ -77,10 +43,10 @@ body > div {
   animation: fadeInUp .35s ease both;
 }
 
-/* Metin seçimi rengi: yüksek kontrastlı, sakin vurgu */
+/* Metin seçimi rengi (turuncu tema ile uyumlu) */
 ::selection {
-  background: rgba(213, 160, 90, .38);
-  color: var(--color-bg);
+  background: rgba(232, 149, 47, .35);
+  color: #eef1f5;
 }
 
 /* iPhone'larda alt menünün home çizgisine binmemesi için */
@@ -90,7 +56,7 @@ body > div {
 
 /* Kartlar için hafif parlama efekti */
 .hover-glow:hover {
-  box-shadow: 0 6px 24px rgba(213, 160, 90, .08);
+  box-shadow: 0 6px 24px rgba(232, 149, 47, .10);
 }
 
 /* Asistan sonuçları uzun motor/teknisyen adlarında yatay taşmamalı. */
@@ -119,10 +85,10 @@ body > div {
   font-size: 11px;
   font-weight: 800;
 }
-.status-pill.gecikmis { background: rgba(228,122,127,.16); color: #e47a7f; }
-.status-pill.kritik { background: rgba(211,140,85,.16); color: #d38c55; }
-.status-pill.yaklasiyor { background: rgba(217,189,103,.16); color: #d9bd67; }
-.status-pill.normal { background: rgba(101,189,149,.16); color: #65bd95; }
+.status-pill.gecikmis { background: rgba(239,74,82,.14); color: #ef4a52; }
+.status-pill.kritik { background: rgba(242,153,74,.14); color: #f2994a; }
+.status-pill.yaklasiyor { background: rgba(240,201,61,.14); color: #f0c93d; }
+.status-pill.normal { background: rgba(51,201,138,.14); color: #33c98a; }
 
 .status-pill .dot {
   width: 5px; height: 5px; border-radius: 999px; background: currentColor;

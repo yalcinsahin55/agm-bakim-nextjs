@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, DataTable, Input, Select, type DataTableColumn } from "@/components/ui";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -120,12 +118,6 @@ export default function TechnicianAuthorizationPage() {
 
   const mechanics = users.filter((item) => (item.role === "teknisyen" || item.role === "planlamaci") && technicianType(item.technician_type) === "mekanik").length;
   const electromechanics = users.filter((item) => (item.role === "teknisyen" || item.role === "planlamaci") && technicianType(item.technician_type) === "elektromekanik").length;
-  const technicianColumns: DataTableColumn<ManagedUser>[] = [
-    { key: "name", header: "Teknisyen", accessor: (item) => item.full_name, sortable: true, filterable: true, render: (item) => <span className="font-semibold">{item.full_name}</span> },
-    { key: "type", header: "Uzmanlık", accessor: (item) => TECHNICIAN_TYPE_LABELS[technicianType(item.technician_type)], sortable: true, filterable: true, render: (item) => TECHNICIAN_TYPE_LABELS[technicianType(item.technician_type)] },
-    { key: "status", header: "Durum", accessor: (item) => item.active && item.approved ? "Aktif" : item.approved ? "Pasif" : "Onay bekliyor", sortable: true, filterable: true, render: (item) => item.active && item.approved ? "Aktif" : item.approved ? "Pasif" : "Onay bekliyor" },
-    { key: "domains", header: "Çalışma alanları", accessor: (item) => domainsFor(item).map((domain) => WORK_DOMAIN_LABELS[domain]).join(", "), filterable: true, render: (item) => domainsFor(item).map((domain) => WORK_DOMAIN_LABELS[domain]).join(", ") },
-  ];
 
   return (
     <div>
@@ -137,23 +129,18 @@ export default function TechnicianAuthorizationPage() {
 
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div className="rounded-card border border-teal/30 bg-teal/10 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">Mekanik teknisyen</div><div className="mt-1 font-mono text-2xl font-bold text-teal">{mechanics}</div></div>
-          <div className="rounded-card border border-amber/30 bg-amber/10 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">Elektromekanik teknisyen</div><div className="mt-1 font-mono text-2xl font-bold text-amber">{electromechanics}</div></div>
+          <div className="rounded-card border border-purple-400/30 bg-purple-400/10 p-3"><div className="text-[10px] font-bold uppercase tracking-wide text-faint">Elektromekanik teknisyen</div><div className="mt-1 font-mono text-2xl font-bold text-purple-200">{electromechanics}</div></div>
         </div>
 
         <div className="mb-3 rounded-card border border-border bg-panel p-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Teknisyen ara..." className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" />
-            <Select value={filterType} onChange={(event) => setFilterType(event.target.value as FilterType)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm türler</option>{TECHNICIAN_TYPES.map((item) => <option key={item} value={item}>{TECHNICIAN_TYPE_LABELS[item]}</option>)}</Select>
-            <Select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as FilterStatus)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm durumlar</option><option value="active">Aktif ve onaylı</option><option value="pending">Onay bekleyen</option></Select>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Teknisyen ara..." className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" />
+            <select value={filterType} onChange={(event) => setFilterType(event.target.value as FilterType)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm türler</option>{TECHNICIAN_TYPES.map((item) => <option key={item} value={item}>{TECHNICIAN_TYPE_LABELS[item]}</option>)}</select>
+            <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as FilterStatus)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal"><option value="all">Tüm durumlar</option><option value="active">Aktif ve onaylı</option><option value="pending">Onay bekleyen</option></select>
           </div>
         </div>
 
-        <section className="mb-4 rounded-card border border-border bg-panel p-3">
-          <div className="mb-2 text-[12px] font-bold text-text">Yetki özeti</div>
-          <DataTable rows={filteredUsers} columns={technicianColumns} getRowKey={(item) => item.id} pageSize={10} empty="Filtreye uygun teknisyen bulunamadı." />
-        </section>
-
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="flex flex-col gap-3">
           {filteredUsers.map((item) => {
             const type = technicianType(item.technician_type);
             const domains = domainsFor(item);
@@ -165,13 +152,13 @@ export default function TechnicianAuthorizationPage() {
               </div>
 
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="text-[10px] font-bold uppercase tracking-wide text-muted">Teknisyen türü<Select value={type} onChange={(event) => void updateUser(item.id, { technician_type: event.target.value }, "Teknisyen türü güncellendi.")} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-normal normal-case outline-none focus:border-teal"><option value="mekanik">Mekanik teknisyen</option><option value="elektromekanik">Elektromekanik teknisyen</option></Select></label>
-                <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">Hesap durumu</div><div className="flex flex-wrap gap-2"><Button type="button" onClick={() => void updateUser(item.id, { active: !item.active })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${item.active ? "border-green/30 text-green" : "border-border text-faint"}`}>{item.active ? "Aktif" : "Pasif"}</Button><Button type="button" onClick={() => void updateUser(item.id, { approved: !item.approved })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${item.approved ? "border-teal/30 text-teal" : "border-amber/30 text-amber"}`}>{item.approved ? "Onaylı" : "Onayla"}</Button></div></div>
+                <label className="text-[10px] font-bold uppercase tracking-wide text-muted">Teknisyen türü<select value={type} onChange={(event) => void updateUser(item.id, { technician_type: event.target.value }, "Teknisyen türü güncellendi.")} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-normal normal-case outline-none focus:border-teal"><option value="mekanik">Mekanik teknisyen</option><option value="elektromekanik">Elektromekanik teknisyen</option></select></label>
+                <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">Hesap durumu</div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void updateUser(item.id, { active: !item.active })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${item.active ? "border-green/30 text-green" : "border-border text-faint"}`}>{item.active ? "Aktif" : "Pasif"}</button><button type="button" onClick={() => void updateUser(item.id, { approved: !item.approved })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${item.approved ? "border-teal/30 text-teal" : "border-amber/30 text-amber"}`}>{item.approved ? "Onaylı" : "Onayla"}</button></div></div>
               </div>
 
-              <div className="mt-3 rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted">Görev yetkileri</div><div className="flex flex-wrap gap-2"><label className="flex items-center gap-1.5 text-[11px] text-text"><Input type="checkbox" checked={item.can_be_responsible !== false} onChange={(event) => void updateUser(item.id, { can_be_responsible: event.target.checked })} />Sorumlu teknisyen olabilir</label><label className="flex items-center gap-1.5 text-[11px] text-text"><Input type="checkbox" checked={item.can_be_support !== false} onChange={(event) => void updateUser(item.id, { can_be_support: event.target.checked })} />Yardımcı teknisyen olabilir</label></div></div>
+              <div className="mt-3 rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted">Görev yetkileri</div><div className="flex flex-wrap gap-2"><label className="flex items-center gap-1.5 text-[11px] text-text"><input type="checkbox" checked={item.can_be_responsible !== false} onChange={(event) => void updateUser(item.id, { can_be_responsible: event.target.checked })} />Sorumlu teknisyen olabilir</label><label className="flex items-center gap-1.5 text-[11px] text-text"><input type="checkbox" checked={item.can_be_support !== false} onChange={(event) => void updateUser(item.id, { can_be_support: event.target.checked })} />Yardımcı teknisyen olabilir</label></div></div>
 
-              <div className="mt-3 rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanları</div><div className="flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <Button key={domain} type="button" onClick={() => toggleDomain(item, domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold transition ${domains.includes(domain) ? "border-amber bg-amber text-bg" : "border-border text-faint hover:text-muted"}`}>{domains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</Button>)}</div><div className="mt-1.5 text-[9.5px] text-faint">Seçilen alanlar, bakım türü uyumu tanımlandığında sorumlu ve yardımcı listelerini sınırlar.</div></div>
+              <div className="mt-3 rounded-lg border border-border bg-panel2 p-2.5"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanları</div><div className="flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => toggleDomain(item, domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold transition ${domains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint hover:text-muted"}`}>{domains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div><div className="mt-1.5 text-[9.5px] text-faint">Seçilen alanlar, bakım türü uyumu tanımlandığında sorumlu ve yardımcı listelerini sınırlar.</div></div>
             </section>;
           })}
           {!filteredUsers.length && <div className="rounded-card border border-dashed border-border p-8 text-center text-[12px] text-faint">Filtreye uygun teknisyen bulunamadı.</div>}

@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -123,21 +121,21 @@ export default function ExcelPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <Select value={reportEngine} onChange={(e) => setReportEngine(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+            <select value={reportEngine} onChange={(e) => setReportEngine(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
               <option value="">Tüm motorlar</option>
               {engines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
-            </Select>
-            <Select value={reportType} onChange={(e) => setReportType(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+            </select>
+            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
               <option value="">Tüm bakım türleri</option>
               {types.map((type) => <option key={type.key || type._id} value={type.label}>{type.label}</option>)}
-            </Select>
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <Input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Başlangıç tarihi" />
-            <Input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
+            <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Başlangıç tarihi" />
+            <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-bg font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
+            <a href={reportUrl} className="block text-center py-3 rounded-xl bg-gradient-to-b from-teal to-teal/80 text-[#06181b] font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
               📥 Excel indir
             </a>
             <a href={pdfReportUrl} className="block text-center py-3 rounded-xl border border-amber/50 bg-amber/10 text-amber font-extrabold text-[13px] hover:bg-amber/20 active:scale-[.98] transition">
@@ -162,7 +160,7 @@ export default function ExcelPage() {
           </div>
 
           <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Bu verinin ait olduğu tarih</label>
-          <Input
+          <input
             type="date" value={importDate} max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => setImportDate(e.target.value)}
             className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-1 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
@@ -172,17 +170,17 @@ export default function ExcelPage() {
           <label className="flex items-center gap-2 border-2 border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer mb-3 hover:border-amber hover:bg-amber/5 transition">
             <span className="text-lg">📊</span>
             <span className="flex-1 truncate">{importFile ? importFile.name : "Excel dosyası seç (.xlsx)"}</span>
-            <Input type="file" accept=".xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="hidden" />
+            <input type="file" accept=".xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="hidden" />
           </label>
 
-          <Button onClick={doImport} disabled={importing || !importFile} className="w-full py-3 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+          <button onClick={doImport} disabled={importing || !importFile} className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
             {importing ? (
               <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
                 İçe aktarılıyor...
               </span>
             ) : "🚀 İçe Aktar"}
-          </Button>
+          </button>
           </div>
         )}
       </div>

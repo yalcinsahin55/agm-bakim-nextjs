@@ -9,7 +9,7 @@ export default function NotFound() {
         <p className="text-[12.5px] text-muted mb-5">Aradığın sayfa taşınmış veya hiç var olmamış olabilir.</p>
         <Link
           href="/dashboard"
-          className="inline-block px-5 py-3 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13.5px] shadow-lg hover:brightness-110 transition"
+          className="inline-block px-5 py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] shadow-lg hover:brightness-110 transition"
         >
           🏠 Özet Sayfasına Dön
         </Link>

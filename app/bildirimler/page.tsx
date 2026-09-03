@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
@@ -141,7 +139,7 @@ export default function NotificationsPage() {
           <div className="mt-4 rounded-card border border-red/30 bg-panel py-12 text-center">
             <div className="mb-3 text-3xl">⚠️</div>
             <p className="text-sm font-semibold text-text">{loadError}</p>
-            <Button onClick={() => { void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</Button>
+            <button onClick={() => { void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
           </div>
         ) : notifications.length === 0 ? (
           <div className="mt-4 rounded-card border border-border bg-panel py-14 text-center">

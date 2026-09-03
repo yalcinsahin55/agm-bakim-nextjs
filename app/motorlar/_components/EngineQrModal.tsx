@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { Button } from "@/components/ui";
 import type { MotorEngine } from "../_lib/types";
 
 interface EngineQrModalProps {
@@ -27,16 +26,14 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
             <div className="text-[10px] uppercase tracking-wider text-amber font-bold">Motor QR Kodu</div>
             <div className="text-base font-extrabold text-text mt-0.5">{engine.name}</div>
           </div>
-          <Button
+          <button
             type="button"
             onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 px-0"
+            className="w-8 h-8 rounded-lg border border-border text-muted hover:text-text hover:bg-panel2 transition"
             aria-label="QR penceresini kapat"
           >
             ✕
-          </Button>
+          </button>
         </div>
         <div className="bg-white rounded-xl p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
           {qrDataUrl ? <Image src={qrDataUrl} width={208} height={208} unoptimized alt={`${engine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}
@@ -45,31 +42,28 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
           Bu kod okutulduğunda uygulama doğrudan bu motorun bakım panelini açar.
         </p>
         <div className="grid grid-cols-2 gap-2 mt-3">
-          <Button
+          <button
             type="button"
             onClick={onCopy}
-            variant="secondary"
-            size="md"
+            className="py-2.5 rounded-lg border border-border text-muted text-[11px] font-bold hover:bg-panel2 transition"
           >
             Bağlantıyı kopyala
-          </Button>
+          </button>
           <a
             href={qrDataUrl || undefined}
             download={`${engine.name.replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-qr.png`}
-            className={`py-2.5 rounded-lg bg-amber text-bg text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
+            className={`py-2.5 rounded-lg bg-amber text-[#161006] text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
           >
             PNG indir
           </a>
         </div>
-        <Button
+        <button
           type="button"
           onClick={onClose}
-          variant="secondary"
-          size="md"
-          className="mt-2 w-full"
+          className="w-full mt-2 py-2.5 rounded-lg bg-panel2 border border-border text-text text-[11px] font-bold hover:bg-border transition"
         >
           Kapat
-        </Button>
+        </button>
       </div>
     </div>
   );

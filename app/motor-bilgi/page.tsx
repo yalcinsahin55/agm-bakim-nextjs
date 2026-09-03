@@ -15,7 +15,6 @@ import EquipmentInfoImportPanel from "./_components/EquipmentInfoImportPanel";
 import { FIELDS, emptyForm } from "./_lib/types";
 import type { EquipmentEngine, EquipmentInfo, EquipmentResponse } from "./_lib/types";
 import { fileToBase64 } from "./_lib/fileToBase64";
-import { Button, EmptyState, Input } from "@/components/ui";
 
 export default function MotorBilgiPage() {
   const router = useRouter();
@@ -186,12 +185,12 @@ export default function MotorBilgiPage() {
         {canEdit && (
           <>
             <div className="grid grid-cols-2 gap-2 mb-3">
-              <Button type="button" onClick={() => { setShowAdd((s) => !s); setShowImport(false); }} variant="secondary" size="md" className={`rounded-xl ${showAdd ? "text-muted hover:bg-panel2" : "border-amber/40 bg-amber/10 text-amber hover:bg-amber/20"}`}>
+              <button onClick={() => { setShowAdd((s) => !s); setShowImport(false); }} className={`py-2.5 rounded-xl font-bold text-[12px] transition-all ${showAdd ? "border border-border text-muted hover:bg-panel2" : "border border-amber/40 bg-amber/10 text-amber hover:bg-amber/20"}`}>
                 {showAdd ? "✕ Kapat" : "➕ Yeni Motor"}
-              </Button>
-              <Button type="button" onClick={() => { setShowImport((s) => !s); setShowAdd(false); }} variant="secondary" size="md" className={`rounded-xl ${showImport ? "text-muted hover:bg-panel2" : "border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
+              </button>
+              <button onClick={() => { setShowImport((s) => !s); setShowAdd(false); }} className={`py-2.5 rounded-xl font-bold text-[12px] transition-all ${showImport ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
                 {showImport ? "✕ Kapat" : "📥 Excel'den"}
-              </Button>
+              </button>
             </div>
 
             {showAdd && (
@@ -219,11 +218,19 @@ export default function MotorBilgiPage() {
 
         <div className="relative mb-3">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm">🔍</span>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara..." className="rounded-xl pl-9" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara..." className="w-full bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
         </div>
 
         {rows.length === 0 ? (
-          <EmptyState title={query ? "Arama sonucu bulunamadı." : "Henüz motor bilgisi eklenmemiş."} icon="🛠️" action={query ? <Button type="button" variant="secondary" onClick={() => setQuery("")}>Aramayı Temizle</Button> : undefined} />
+          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
+            <div className="text-4xl mb-3">🛠️</div>
+            <p className="text-sm text-muted">{query ? "Arama sonucu bulunamadı." : "Henüz motor bilgisi eklenmemiş."}</p>
+            {query && (
+              <button onClick={() => setQuery("")} className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition">
+                Aramayı Temizle
+              </button>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {rows.map((item) => (

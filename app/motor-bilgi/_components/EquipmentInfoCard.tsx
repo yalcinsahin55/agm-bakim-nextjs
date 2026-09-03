@@ -29,7 +29,7 @@ export default function EquipmentInfoCard({ item, isEditing, canEdit, editFields
           <EquipmentFieldInputs values={editFields} onChange={onFieldChange} />
           <div className="flex gap-2 mt-3">
             <button onClick={onCancelEdit} className="flex-1 py-2 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">Vazgeç</button>
-            <button onClick={onSave} disabled={saving} className="flex-1 py-2 rounded-lg bg-teal text-bg font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
+            <button onClick={onSave} disabled={saving} className="flex-1 py-2 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
               {saving ? (
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-3 h-3 border-2 border-[#06181b]/40 border-t-[#06181b] rounded-full animate-spin" />

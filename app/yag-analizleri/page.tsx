@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -194,7 +192,7 @@ export default function YagAnalizleriPage() {
           <div className="rounded-card border border-red/30 bg-panel p-6">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <Button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</Button>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -212,7 +210,7 @@ export default function YagAnalizleriPage() {
           bad={resultCounts.bad}
         />
         {canWrite && (
-          <Button
+          <button
             onClick={() => setShowForm((s) => !s)}
           className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
             showForm
@@ -221,7 +219,7 @@ export default function YagAnalizleriPage() {
           }`}
         >
             {showForm ? "✕ Kapat" : "➕ Yeni Analiz Raporu Ekle"}
-          </Button>
+          </button>
         )}
 
         {canWrite && showForm && (

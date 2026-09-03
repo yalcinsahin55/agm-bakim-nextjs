@@ -9,7 +9,6 @@ import EngineBadge from "@/components/EngineBadge";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError } from "@/lib/apiCache";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
-import { Button, Input, Select } from "@/components/ui";
 
 interface SummaryEntry {
   _id: string;
@@ -206,13 +205,13 @@ export default function AraliklarPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <label className="sr-only" htmlFor="engine-search">Motor ara</label>
-            <Input id="engine-search" value={engineSearch} onChange={(event) => setEngineSearch(event.target.value)} placeholder="Motor ara..." className="w-full rounded-lg text-[11px] sm:w-40" />
+            <input id="engine-search" value={engineSearch} onChange={(event) => setEngineSearch(event.target.value)} placeholder="Motor ara..." className="w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text outline-none focus:border-amber sm:w-40" />
             <label className="sr-only" htmlFor="type-filter">Bakım türü filtrele</label>
-            <Select id="type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="rounded-lg text-[11px]">
+            <select id="type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text outline-none focus:border-amber">
               <option value="Tümü">Bakım türü: Tümü</option>
               {typeNames.map((name) => <option key={name} value={name}>{name}</option>)}
-            </Select>
-            <Button type="button" onClick={() => { setEngineFilter(""); setTypeFilter("Tümü"); }} size="sm" className={!engineFilter && typeFilter === "Tümü" ? "" : "bg-panel2 text-muted hover:border-amber/50 hover:text-text"}>Tüm motorlar</Button>
+            </select>
+            <button type="button" onClick={() => { setEngineFilter(""); setTypeFilter("Tümü"); }} className={`rounded-lg border px-3 py-2.5 text-[11px] font-bold transition ${!engineFilter && typeFilter === "Tümü" ? "border-amber bg-amber text-[#161006]" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-text"}`}>Tüm motorlar</button>
           </div>
         </div>
 
@@ -246,7 +245,7 @@ export default function AraliklarPage() {
         <div className="truncate text-muted">{formatDateTime(entry.created_at)}{entry.technician_name ? ` · ${entry.technician_name}` : ""}</div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono">
           <span className="font-bold text-text">Bu bakım: {formatHours(entry.hour_at_completion)} saat</span>
-          <span className={delta === null ? "text-faint" : delta < 0 ? "font-bold text-red" : "font-bold text-teal"}>
+          <span className={delta === null ? "text-faint" : delta < 0 ? "font-bold text-red-300" : "font-bold text-teal"}>
             {delta === null ? "İlk kayıt · fark yok" : `Önceki bakıma göre: ${formatHourDelta(delta)}`}
           </span>
         </div>

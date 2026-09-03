@@ -11,7 +11,7 @@ export default function Error({ reset }: { reset: () => void }) {
         </p>
         <button
           onClick={reset}
-          className="w-full py-3 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13.5px] shadow-lg hover:brightness-110 active:scale-[.98] transition"
+          className="w-full py-3 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13.5px] shadow-lg hover:brightness-110 active:scale-[.98] transition"
         >
           🔄 Tekrar Dene
         </button>

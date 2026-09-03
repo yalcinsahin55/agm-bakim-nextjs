@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, DataTable, Input, Select, type DataTableColumn } from "@/components/ui";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -122,15 +120,6 @@ export default function AuditLogPage() {
     && filters.action === "update"
     && filters.entity === "user";
 
-  const columns: DataTableColumn<AuditItem>[] = [
-    { key: "summary", header: "İşlem", accessor: (item) => item.summary, sortable: true, filterable: true, render: (item) => <span className="font-semibold">{item.summary || "İşlem kaydı"}{isPasswordResetAudit(item) && <span className="mt-1 block text-[10px] font-normal text-amber">Şifre sıfırlama · Önceki oturumlar geçersiz kılındı</span>}</span> },
-    { key: "user", header: "Kullanıcı", accessor: (item) => item.user_name, sortable: true, filterable: true, render: (item) => <span>{item.user_name || "Bilinmeyen kullanıcı"}<span className="block text-[10px] text-muted">{roleLabels[item.user_role] || item.user_role}</span></span> },
-    { key: "action", header: "İşlem türü", accessor: (item) => actionLabels[item.action] || item.action, sortable: true, filterable: true, render: (item) => <span className={`inline-flex rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${actionClass(item.action)}`}>{actionLabels[item.action] || item.action}</span> },
-    { key: "entity", header: "Kayıt", accessor: (item) => entityLabels[item.entity] || item.entity, sortable: true, filterable: true, render: (item) => <span>{entityLabels[item.entity] || item.entity}{item.entity_id ? ` · ${item.entity_id}` : ""}</span> },
-    { key: "created", header: "Tarih", accessor: (item) => new Date(item.created_at), sortable: true, render: (item) => formatDate(item.created_at) },
-    { key: "details", header: "", render: (item) => <Button type="button" variant="ghost" size="sm" onClick={() => void openDetails(item)} aria-label={`${item.summary} ayrıntılarını görüntüle`}>Ayrıntı</Button> },
-  ];
-
   async function load(nextPage = 1, nextFilters = filters, options: { silent?: boolean } = {}) {
     if (options.silent) setRefreshing(true);
     else setLoading(true);
@@ -240,14 +229,14 @@ export default function AuditLogPage() {
               <div className="text-[13px] font-extrabold text-text">Denetim merkezi</div>
               <p className="mt-1 text-[10.5px] leading-relaxed text-faint">Kullanıcı ve veri değişikliklerini tarih, işlem veya kayıt türüne göre inceleyin.</p>
             </div>
-            <Button
+            <button
               type="button"
               onClick={() => load(page, filters, { silent: true })}
               disabled={refreshing}
               className="flex-shrink-0 rounded-lg border border-teal/30 px-2.5 py-2 text-[10.5px] font-bold text-teal transition hover:bg-teal/10 disabled:opacity-50"
             >
               {refreshing ? "Yenileniyor..." : "↻ Yenile"}
-            </Button>
+            </button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-border bg-panel2 px-3 py-2.5">
@@ -265,21 +254,21 @@ export default function AuditLogPage() {
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[12px] font-bold text-text">Filtrele</div>
             {activeFilterCount > 0 && (
-              <Button type="button" onClick={clearFilters} className="text-[10px] font-bold text-muted hover:text-amber">Temizle</Button>
+              <button type="button" onClick={clearFilters} className="text-[10px] font-bold text-muted hover:text-amber">Temizle</button>
             )}
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Button
+            <button
               type="button"
               onClick={applyPasswordResetFilter}
               className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${passwordResetFilterActive ? "border-amber/50 bg-amber/10 text-amber" : "border-border text-muted hover:border-amber/40 hover:text-amber"}`}
             >
               Şifre sıfırlama kayıtları
-            </Button>
+            </button>
             {passwordResetFilterActive && <span className="text-[10px] text-faint">Yönetici parola sıfırlamaları · kullanıcı güncellemesi</span>}
           </div>
           <div className="flex flex-col gap-2">
-            <Input
+            <input
               value={draftFilters.q}
               onChange={(event) => updateDraft("q", event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") applyFilters(); }}
@@ -287,45 +276,83 @@ export default function AuditLogPage() {
               className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
             />
             <div className="grid grid-cols-2 gap-2">
-              <Select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm işlemler</option>
                 {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </Select>
-              <Select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              </select>
+              <select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm kayıt türleri</option>
                 {Object.entries(entityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </Select>
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] font-bold text-faint">Başlangıç
-                <Input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
               <label className="text-[10px] font-bold text-faint">Bitiş
-                <Input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
             </div>
-            <Button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-bg transition hover:brightness-110 active:scale-[.98]">
+            <button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-[#06181b] transition hover:brightness-110 active:scale-[.98]">
               Filtreleri Uygula
-            </Button>
+            </button>
           </div>
         </section>
 
         {error && (
           <section className="mb-3 rounded-xl border border-red/30 bg-red/10 px-3 py-3 text-[11px] text-red">
             <div>{error}</div>
-            <Button type="button" onClick={() => load(page, filters, { silent: true })} className="mt-2 rounded-lg border border-red/30 px-2.5 py-1.5 font-bold">Tekrar dene</Button>
+            <button type="button" onClick={() => load(page, filters, { silent: true })} className="mt-2 rounded-lg border border-red/30 px-2.5 py-1.5 font-bold">Tekrar dene</button>
           </section>
         )}
 
-        <section>
-          <DataTable rows={items} columns={columns} getRowKey={(item) => item._id} pageSize={PAGE_SIZE} empty={<><div className="mb-2 text-3xl">🧾</div><div className="font-bold">Kayıt bulunamadı</div><div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div></>} />
+        <section className="flex flex-col gap-2">
+          {items.length === 0 ? (
+            <div className="rounded-card border border-border bg-panel p-8 text-center text-muted">
+              <div className="mb-2 text-3xl">🧾</div>
+              <div className="text-sm font-bold">Kayıt bulunamadı</div>
+              <div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div>
+            </div>
+          ) : items.map((item) => {
+            const passwordReset = isPasswordResetAudit(item);
+            return (
+            <article key={item._id} className={`rounded-card border bg-panel p-3.5 transition hover:border-borderlt ${passwordReset ? "border-amber/50 bg-amber/5" : "border-border"}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="break-words text-[13px] font-bold text-text">{item.summary || "İşlem kaydı"}</div>
+                  {passwordReset && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                      <span className="rounded-full border border-amber/40 bg-amber/10 px-2 py-1 font-extrabold text-amber">Şifre sıfırlama</span>
+                      <span className="text-faint">Önceki oturumlar geçersiz kılındı</span>
+                    </div>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted">
+                    <span className="font-semibold">{item.user_name || "Bilinmeyen kullanıcı"}</span>
+                    <span className="text-faint">·</span>
+                    <span>{roleLabels[item.user_role] || item.user_role}</span>
+                  </div>
+                </div>
+                <span className={`flex-shrink-0 rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${actionClass(item.action)}`}>
+                  {actionLabels[item.action] || item.action}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-faint">
+                <span>{entityLabels[item.entity] || item.entity}{item.entity_id ? ` · ${item.entity_id}` : ""}</span>
+                <span>{formatDate(item.created_at)}</span>
+              </div>
+              <button type="button" onClick={() => openDetails(item)} className="mt-2.5 w-full rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-teal/40 hover:bg-teal/10 hover:text-teal">
+                Ayrıntıları görüntüle
+              </button>
+            </article>
+            );
+          })}
         </section>
 
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">
-            <Button type="button" onClick={() => load(page - 1, filters)} disabled={page <= 1 || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">← Önceki</Button>
+            <button type="button" onClick={() => load(page - 1, filters)} disabled={page <= 1 || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">← Önceki</button>
             <span className="text-[11px] text-faint">{page} / {totalPages}</span>
-            <Button type="button" onClick={() => load(page + 1, filters)} disabled={page >= totalPages || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">Sonraki →</Button>
+            <button type="button" onClick={() => load(page + 1, filters)} disabled={page >= totalPages || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">Sonraki →</button>
           </div>
         )}
       </main>
@@ -338,7 +365,7 @@ export default function AuditLogPage() {
                 <div className="text-[13px] font-bold text-text">İşlem ayrıntısı</div>
                 <div className="mt-1 text-[10.5px] text-faint">{formatDate(selected.created_at)} · {entityLabels[selected.entity] || selected.entity}</div>
               </div>
-              <Button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat">✕</Button>
+              <button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat">✕</button>
             </div>
             <div className="overflow-y-auto px-4 py-3">
               <div className="rounded-xl border border-border bg-panel2 p-3">
@@ -353,11 +380,11 @@ export default function AuditLogPage() {
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Önceki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-[#0f1319] p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
                 </div>
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Sonraki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-[#0f1319] p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
                 </div>
               </div>
               <div className="mt-3 text-[10px] text-faint">Kayıt ID: {selected._id}</div>

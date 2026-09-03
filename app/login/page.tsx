@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input } from "@/components/ui";
-
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -104,7 +102,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col justify-center px-6 py-10">
       <div className="mx-auto w-full max-w-md text-center animate-fade-in">
-        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-gradient-to-br from-panel to-panel text-4xl shadow-2xl">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-gradient-to-br from-[#232d3a] to-panel text-4xl shadow-2xl">
           🔧
         </div>
         <div className="font-display text-3xl font-bold uppercase leading-tight tracking-wide">
@@ -120,7 +118,7 @@ export default function LoginPage() {
         </div>
         <form onSubmit={submit} data-login-hydrated={hydrated ? "true" : "false"} className="flex flex-col gap-3">
           <label className="text-left text-[10px] font-bold uppercase tracking-wide text-muted">Telefon numarası veya e-posta</label>
-          <Input
+          <input
             required
             autoComplete="username"
             inputMode="tel"
@@ -130,7 +128,7 @@ export default function LoginPage() {
             className="rounded-xl border border-border bg-panel2 px-4 py-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
           />
           <label className="mt-1 text-left text-[10px] font-bold uppercase tracking-wide text-muted">Şifre</label>
-          <Input
+          <input
             required
             type="password"
             autoComplete="current-password"
@@ -139,15 +137,15 @@ export default function LoginPage() {
             onChange={handleField("password")}
             className="rounded-xl border border-border bg-panel2 px-4 py-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
           />
-          <Button
+          <button
             disabled={loading || retryAfterSeconds > 0}
             type="submit"
-            className="mt-2 rounded-xl bg-gradient-to-b from-amber to-amber py-3.5 text-sm font-extrabold text-bg shadow-lg transition hover:brightness-110 active:scale-[.98] disabled:opacity-60"
+            className="mt-2 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber py-3.5 text-sm font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 active:scale-[.98] disabled:opacity-60"
           >
             {loading ? (
-              <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-bg/40 border-t-bg" /> Giriş yapılıyor...</span>
+              <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1a1206]/40 border-t-[#1a1206]" /> Giriş yapılıyor...</span>
             ) : retryAfterSeconds > 0 ? `Tekrar deneyin (${formatRetryAfter(retryAfterSeconds)})` : "Giriş Yap"}
-          </Button>
+          </button>
         </form>
         <p className="mt-4 text-center text-[10.5px] leading-relaxed text-faint">
           Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur. Hesabınız yoksa yöneticinizle iletişime geçin.

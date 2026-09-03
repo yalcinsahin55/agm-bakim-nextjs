@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui";
-
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -208,7 +206,7 @@ export default function KarterBasinciPage() {
           <div className="rounded-card border border-red/30 bg-panel p-6">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <Button       onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</Button>
+            <button       onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -227,15 +225,15 @@ export default function KarterBasinciPage() {
         {/* Modern Tab Butonları */}
         <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-xl border border-border mb-4">
           {tabs.map(([key, label]) => (
-            <Button
+            <button
               key={key}
               onClick={() => setTab(key)}
               className={`flex-1 py-2 rounded-lg text-[11.5px] font-bold transition-all ${
-                visibleTab === key ? "bg-teal text-bg shadow-lg" : "text-faint hover:text-muted"
+                visibleTab === key ? "bg-teal text-[#06181b] shadow-lg" : "text-faint hover:text-muted"
               }`}
             >
               {label}
-            </Button>
+            </button>
           ))}
         </div>
 
@@ -283,20 +281,20 @@ export default function KarterBasinciPage() {
       {canWrite && visibleTab === "new" && (
         <div className="fixed bottom-32 md:bottom-8 left-0 right-0 z-40 px-4 pointer-events-none">
           <div className="max-w-lg mx-auto pointer-events-auto">
-            <Button
+            <button
               onClick={saveReadings}
               disabled={saving}
-              className="w-full py-3.5 rounded-xl bg-teal text-bg font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+              className="w-full py-3.5 rounded-xl bg-teal text-[#06181b] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
                   Kaydediliyor...
                 </span>
               ) : (
                 "💾 Tüm Ölçümleri Kaydet"
               )}
-            </Button>
+            </button>
           </div>
         </div>
       )}

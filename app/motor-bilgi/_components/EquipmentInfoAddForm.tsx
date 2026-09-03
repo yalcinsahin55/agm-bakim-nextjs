@@ -31,10 +31,10 @@ export default function EquipmentInfoAddForm({ engineNamesWithoutCard, engineNam
         />
       )}
       <EquipmentFieldInputs values={fields} onChange={onFieldChange} />
-      <button onClick={onSave} disabled={adding} className="w-full mt-3 py-2.5 rounded-xl bg-gradient-to-b from-amber to-amber text-bg font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
+      <button onClick={onSave} disabled={adding} className="w-full mt-3 py-2.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
         {adding ? (
           <span className="inline-flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
             Ekleniyor...
           </span>
         ) : "💾 Motor Bilgisini Kaydet"}

@@ -68,11 +68,11 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-bg/95 backdrop-blur-xl border-r border-border flex-col z-40">
+    <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-[#0f1319]/95 backdrop-blur-xl border-r border-border flex-col z-40">
       {/* Logo */}
       <div className="px-5 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-panel to-panel border border-border flex items-center justify-center text-xl shadow-lg">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-xl shadow-lg">
             🔧
           </div>
           <div>

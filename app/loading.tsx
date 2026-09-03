@@ -1,7 +1,7 @@
 export default function Loading() {
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="sticky top-0 z-20 bg-bg/95 backdrop-blur-md border-b border-border px-4 pt-4 pb-3">
+      <div className="sticky top-0 z-20 bg-[#0f1319]/95 backdrop-blur-md border-b border-border px-4 pt-4 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-panel border border-border animate-pulse" />
           <div className="flex-1">

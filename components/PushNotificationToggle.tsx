@@ -88,7 +88,7 @@ export default function PushNotificationToggle() {
           <div className="text-[12.5px] font-bold text-text">Tarayıcı bildirimi</div>
           <div className="mt-0.5 text-[10.5px] text-faint">Tarayıcı kapalıyken de bakım uyarısı al.</div>
         </div>
-        <button onClick={toggle} disabled={busy} className={`flex-shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold transition ${enabled ? "border border-red/30 bg-red/10 text-red" : "bg-amber text-bg hover:brightness-110"}`}>
+        <button onClick={toggle} disabled={busy} className={`flex-shrink-0 rounded-lg px-3 py-2 text-[11px] font-bold transition ${enabled ? "border border-red/30 bg-red/10 text-red" : "bg-amber text-[#1a1206] hover:brightness-110"}`}>
           {busy ? "Kontrol ediliyor..." : enabled ? "Kapat" : "Aç"}
         </button>
       </div>

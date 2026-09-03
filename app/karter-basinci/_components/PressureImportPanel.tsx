@@ -28,11 +28,11 @@ export default function PressureImportPanel({ importFile, importing, onFileChang
       <button
         onClick={onImport}
         disabled={importing || !importFile}
-        className="w-full py-3 rounded-xl bg-teal text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+        className="w-full py-3 rounded-xl bg-teal text-[#06181b] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
       >
         {importing ? (
           <span className="inline-flex items-center gap-2">
-            <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
             İçe aktarılıyor...
           </span>
         ) : (

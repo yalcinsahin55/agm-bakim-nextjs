@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input } from "@/components/ui";
-
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -103,7 +101,7 @@ export default function HesapPage() {
           <form onSubmit={changePassword} className="mt-4 flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-[11px] font-bold text-muted">
               Mevcut şifre
-              <Input
+              <input
                 type="password"
                 value={form.current_password}
                 onChange={(event) => setForm((current) => ({ ...current, current_password: event.target.value }))}
@@ -116,7 +114,7 @@ export default function HesapPage() {
             </label>
             <label className="flex flex-col gap-1 text-[11px] font-bold text-muted">
               Yeni şifre
-              <Input
+              <input
                 type="password"
                 value={form.new_password}
                 onChange={(event) => setForm((current) => ({ ...current, new_password: event.target.value }))}
@@ -129,7 +127,7 @@ export default function HesapPage() {
             </label>
             <label className="flex flex-col gap-1 text-[11px] font-bold text-muted">
               Yeni şifre tekrarı
-              <Input
+              <input
                 type="password"
                 value={form.confirm_password}
                 onChange={(event) => setForm((current) => ({ ...current, confirm_password: event.target.value }))}
@@ -140,9 +138,9 @@ export default function HesapPage() {
                 className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
               />
             </label>
-            <Button type="submit" disabled={saving} className="mt-1 rounded-xl bg-teal px-3 py-3 text-[13px] font-extrabold text-bg transition hover:brightness-110 disabled:opacity-50">
+            <button type="submit" disabled={saving} className="mt-1 rounded-xl bg-teal px-3 py-3 text-[13px] font-extrabold text-[#06181b] transition hover:brightness-110 disabled:opacity-50">
               {saving ? "Değiştiriliyor..." : "Şifremi değiştir"}
-            </Button>
+            </button>
           </form>
         </section>
       </div>

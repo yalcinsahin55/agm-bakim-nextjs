@@ -1,7 +1,5 @@
 "use client";
 
-import { Button, Input, Select } from "@/components/ui";
-
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -220,7 +218,7 @@ export default function KullanicilarPage() {
           <div className="text-center py-12 bg-panel border border-red/30 rounded-card">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <Button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</Button>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -264,46 +262,46 @@ export default function KullanicilarPage() {
           <div className="rounded-xl border border-teal/30 bg-teal/10 px-2.5 py-2.5"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Teknisyen</div><div className="mt-1 font-mono text-lg font-bold text-teal">{technicianCount}</div></div>
         </div>
         <div className="mb-3 rounded-card border border-border bg-panel p-3">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kullanıcı ara..." aria-label="Kullanıcı ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kullanıcı ara..." aria-label="Kullanıcı ara" className="w-full min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20" />
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)} aria-label="Kullanıcı durum filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)} aria-label="Kullanıcı durum filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
               <option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option>
-            </Select>
-            <Select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value === "all" ? "all" : event.target.value as RoleKey)} aria-label="Kullanıcı rol filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
+            </select>
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value === "all" ? "all" : event.target.value as RoleKey)} aria-label="Kullanıcı rol filtresi" className="min-w-0 rounded-xl border border-border bg-panel2 px-2.5 py-2 text-[11px] font-bold text-text outline-none focus:border-teal">
               <option value="all">Tüm roller</option>{ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-            </Select>
+            </select>
             <span className="col-span-2 self-center text-[10px] text-faint sm:col-span-1 sm:text-right">{visibleUsers.length} kayıt gösteriliyor</span>
           </div>
         </div>
-        <Button
+        <button
           onClick={() => setShowForm((s) => !s)}
           className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
             showForm ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"
           }`}
         >
           {showForm ? "✕ Kapat" : "➕ Yeni Kullanıcı Ekle"}
-        </Button>
+        </button>
 
         {showForm && (
           <div className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 flex flex-col gap-2 animate-fade-in">
-            <Input placeholder="👤 Adı Soyadı" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-            <Input type="tel" inputMode="tel" placeholder="📱 Telefon (05xx xxx xx xx)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-            <Input type="password" placeholder="🔒 Şifre" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
-            <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as RoleKey })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+            <input placeholder="👤 Adı Soyadı" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+            <input type="tel" inputMode="tel" placeholder="📱 Telefon (05xx xxx xx xx)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+            <input type="password" placeholder="🔒 Şifre" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as RoleKey })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-            </Select>
-            {form.role === "teknisyen" && <Select value={form.technician_type} onChange={(e) => setForm({ ...form, technician_type: e.target.value as TechnicianType })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
+            </select>
+            {form.role === "teknisyen" && <select value={form.technician_type} onChange={(e) => setForm({ ...form, technician_type: e.target.value as TechnicianType })} className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal transition">
               {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </Select>}
+            </select>}
             <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
-            <Button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-bg font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+            <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-bg/40 border-t-bg rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
                   Oluşturuluyor...
                 </span>
               ) : "👤 Kullanıcı Oluştur"}
-            </Button>
+            </button>
           </div>
         )}
 
@@ -311,7 +309,7 @@ export default function KullanicilarPage() {
           {visibleUsers.map((u) => (
             <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-teal/40 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-panel to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
                   {initials(u.full_name)}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -326,51 +324,51 @@ export default function KullanicilarPage() {
                 <span className={`rounded-full border px-2 py-1 text-[9.5px] font-extrabold ${u.approved ? "border-green/30 bg-green/10 text-green" : "border-amber/30 bg-amber/10 text-amber"}`}>
                   {u.approved ? "Onaylı erişim" : "Onay bekliyor"}
                 </span>
-                <Button onClick={() => updateUser(u.id, { approved: !u.approved })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${u.approved ? "border-border text-muted hover:bg-panel2" : "border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
+                <button onClick={() => updateUser(u.id, { approved: !u.approved })} className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${u.approved ? "border-border text-muted hover:bg-panel2" : "border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
                   {u.approved ? "Onayı kaldır" : "Onayla"}
-                </Button>
+                </button>
               </div>
               <div className="mb-2 flex min-w-0 items-center gap-2">
-                <Input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current ? current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item) : current)} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
-                <Button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="shrink-0 whitespace-nowrap rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</Button>
+                <input type="tel" inputMode="tel" value={u.phone || ""} onChange={(e) => setUsers((current) => current ? current.map((item) => item.id === u.id ? { ...item, phone: e.target.value } : item) : current)} placeholder="Telefon" className="min-w-0 flex-1 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition" />
+                <button onClick={() => updateUser(u.id, { phone: u.phone || "" })} className="shrink-0 whitespace-nowrap rounded-lg border border-teal/30 px-2.5 py-2 text-[10px] font-bold text-teal hover:bg-teal/10 transition">Kaydet</button>
               </div>
               {resetUserId === u.id ? (
                 <div className="mb-2 rounded-lg border border-amber/30 bg-amber/5 p-2.5">
                   <div className="mb-2 text-[10px] font-bold text-amber">{u.full_name} için yeni şifre belirle</div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <Input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Yeni şifre" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
-                    <Input type="password" value={resetPasswordConfirmation} onChange={(event) => setResetPasswordConfirmation(event.target.value)} placeholder="Yeni şifre tekrarı" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
+                    <input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} placeholder="Yeni şifre" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
+                    <input type="password" value={resetPasswordConfirmation} onChange={(event) => setResetPasswordConfirmation(event.target.value)} placeholder="Yeni şifre tekrarı" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <Button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-bg disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</Button>
-                    <Button onClick={() => { setResetUserId(null); setResetPassword(""); setResetPasswordConfirmation(""); }} disabled={resettingPassword} className="rounded-lg border border-border px-2.5 py-2 text-[10px] font-bold text-muted">Vazgeç</Button>
+                    <button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-[#1a1206] disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</button>
+                    <button onClick={() => { setResetUserId(null); setResetPassword(""); setResetPasswordConfirmation(""); }} disabled={resettingPassword} className="rounded-lg border border-border px-2.5 py-2 text-[10px] font-bold text-muted">Vazgeç</button>
                   </div>
                   <p className="mt-2 text-[9px] leading-relaxed text-faint">Yeni şifreyi kullanıcıya güvenli bir kanaldan iletin. Eski oturumlar işlem sonrasında geçersiz olur.</p>
                 </div>
               ) : (
-                <Button onClick={() => { setResetUserId(u.id); setResetPassword(""); setResetPasswordConfirmation(""); }} className="mb-2 w-full rounded-lg border border-amber/30 px-2.5 py-2 text-[10px] font-bold text-amber hover:bg-amber/10 transition">Şifreyi sıfırla</Button>
+                <button onClick={() => { setResetUserId(u.id); setResetPassword(""); setResetPasswordConfirmation(""); }} className="mb-2 w-full rounded-lg border border-amber/30 px-2.5 py-2 text-[10px] font-bold text-amber hover:bg-amber/10 transition">Şifreyi sıfırla</button>
               )}
               <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                <Select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value as RoleKey })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
+                <select value={u.role} onChange={(e) => updateUser(u.id, { role: e.target.value as RoleKey })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[12px] outline-none focus:border-teal transition sm:min-w-[150px] sm:flex-1">
                   {u.role === "planlamaci" && <option value="planlamaci">{ROLE_LABELS.planlamaci}</option>}
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                </Select>
-                {(u.role === "teknisyen" || u.role === "planlamaci") && <Select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value as TechnicianType })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition sm:min-w-[180px] sm:flex-1" aria-label={`${u.full_name} teknisyen türü`}>
+                </select>
+                {(u.role === "teknisyen" || u.role === "planlamaci") && <select value={u.technician_type || "mekanik"} onChange={(e) => updateUser(u.id, { technician_type: e.target.value as TechnicianType })} className="w-full min-w-0 bg-panel2 border border-border rounded-lg px-2 py-2 text-[11px] outline-none focus:border-teal transition sm:min-w-[180px] sm:flex-1" aria-label={`${u.full_name} teknisyen türü`}>
                   {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </Select>}
+                </select>}
                 <label className="flex min-h-10 items-center gap-1.5 text-[11px] text-muted cursor-pointer sm:shrink-0">
-                  <Input type="checkbox" checked={u.active} onChange={(e) => updateUser(u.id, { active: e.target.checked })} />
+                  <input type="checkbox" checked={u.active} onChange={(e) => updateUser(u.id, { active: e.target.checked })} />
                   Aktif
                 </label>
                 {u.id === currentUser?.id ? (
-                  <Button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Silinemez</Button>
+                  <button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Silinemez</button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <Button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-bg bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</Button>
-                    <Button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</Button>
+                    <button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</button>
+                    <button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</button>
                   </>
                 ) : (
-                  <Button onClick={() => setConfirmDeleteId(u.id)} title="Bu kullanıcıyı kalıcı olarak sil" className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition sm:w-auto">Kalıcı sil</Button>
+                  <button onClick={() => setConfirmDeleteId(u.id)} title="Bu kullanıcıyı kalıcı olarak sil" className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 hover:bg-red/10 transition sm:w-auto">Kalıcı sil</button>
                 )}
               </div>
             </div>
