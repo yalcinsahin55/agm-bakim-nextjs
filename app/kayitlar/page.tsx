@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
@@ -141,6 +141,20 @@ export default function KayitlarPage() {
     <div>
       <TopBar title="Bakım Kayıtları" subtitle={`${total.toLocaleString("tr-TR")} kayıt bulundu · Sayfa ${page}/${totalPages}`} />
       <div className="px-4 py-4">
+        <section className="relative mb-4 overflow-hidden rounded-card border border-amber/30 bg-gradient-to-br from-amber/10 via-panel to-panel p-4 shadow-lg shadow-black/10" aria-labelledby="records-heading">
+          <div className="pointer-events-none absolute -right-10 -top-16 h-36 w-36 rounded-full border border-white/5 bg-white/[0.02]" aria-hidden="true" />
+          <div className="relative">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Operasyon merkezi</div>
+            <h1 id="records-heading" className="mt-1 text-[23px] font-extrabold tracking-tight text-text">Sıradaki işleri yönet.</h1>
+            <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-muted">Bakım kayıtlarını filtrele, önceliklendir ve ilgili aksiyona doğrudan geç.</p>
+          </div>
+          <div className="relative mt-4 flex flex-wrap gap-2 border-t border-border/70 pt-3" aria-label="Kayıt durum özeti">
+            <span className="rounded-full border border-border bg-panel2 px-2.5 py-1 text-[10px] font-bold text-muted"><b className="mr-1 font-mono text-text">{total.toLocaleString("tr-TR")}</b> toplam</span>
+            <span className="rounded-full border border-amber/30 bg-amber/10 px-2.5 py-1 text-[10px] font-bold text-amber"><b className="mr-1 font-mono">{page} / {totalPages}</b> sayfa</span>
+            <span className="rounded-full border border-teal/30 bg-teal/10 px-2.5 py-1 text-[10px] font-bold text-teal"><b className="mr-1 font-mono">{records.length}</b> görünür kayıt</span>
+          </div>
+        </section>
+
         <RecordFilters
           userRole={user?.role}
           search={search}

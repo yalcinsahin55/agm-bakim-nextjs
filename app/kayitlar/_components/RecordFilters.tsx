@@ -36,7 +36,7 @@ export default function RecordFilters({
 
   return (
     <>
-      <div className="mb-3 rounded-card border border-border bg-panel p-3">
+      <div className="mb-4 rounded-card border border-border bg-panel p-3 shadow-sm shadow-black/10">
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm" aria-hidden="true">🔍</span>
           <input
@@ -44,10 +44,10 @@ export default function RecordFilters({
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Motor, tür veya teknisyen ara..."
             aria-label="Bakım kaydı ara"
-            className="w-full min-w-0 bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+            className="w-full min-w-0 bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-[12px] outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
           />
         </div>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto]">
           <select
             value={engineFilter}
             onChange={(event) => setEngineFilter(event.target.value)}
