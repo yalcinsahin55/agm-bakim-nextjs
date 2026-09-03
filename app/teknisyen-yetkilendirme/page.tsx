@@ -122,7 +122,7 @@ export default function TechnicianAuthorizationPage() {
   return (
     <div>
       <TopBar title="Teknisyen Yetkilendirme" subtitle="Uzmanlık, görev ve çalışma alanlarını yönet" />
-      <main className="px-4 py-4 pb-28 md:ml-64 md:pb-6">
+      <main className="px-4 py-4 pb-28 md:ml-64 md:px-8 lg:px-12 md:pb-6">
         <div className="mb-4 rounded-card border border-teal/30 bg-teal/5 p-3.5 text-[11px] leading-relaxed text-muted">
           <b className="text-teal">Bu ekran yalnızca yöneticilere açıktır.</b> Mekanik teknisyenler genel bakım işlerinde varsayılan sorumlu kabul edilir. Elektromekanik teknisyenler elektriksel işler ve devreye alma desteği için ayrılır; sorumlu olarak seçilmeleri ayrıca açılabilir.
         </div>
