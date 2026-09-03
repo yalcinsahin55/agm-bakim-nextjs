@@ -9,7 +9,7 @@ import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, DataTable, Input, Select, type DataTableColumn } from "@/components/ui";
 
 const INFO_FIELDS = [
   ["kaver_tipi", "Kaver Tipi"],
@@ -175,6 +175,14 @@ export default function RaporPage() {
     sortedDesc: records,
   }), [records, reportSummary.avg_days, reportTotal]);
 
+  const reportColumns: DataTableColumn<ReportRecord>[] = [
+    { key: "date", header: "Tarih", accessor: (record) => getMaintenanceRecordDate(record.maintenance_start_at, record.created_at), sortable: true, render: (record) => formatRecordDate(record) },
+    { key: "type", header: "Bakım türü", accessor: (record) => record.type_label, sortable: true, filterable: true, render: (record) => <span className="font-semibold">{record.type_label || "Belirtilmemiş"}</span> },
+    { key: "hours", header: "Motor saati", accessor: (record) => record.hour_at_completion, sortable: true, render: (record) => <span className="font-mono">{record.hour_at_completion.toLocaleString("tr-TR")} sa</span> },
+    { key: "duration", header: "Süre", accessor: (record) => record.maintenance_duration_minutes, sortable: true, render: (record) => formatMaintenanceDuration(record.maintenance_duration_minutes) },
+    { key: "technician", header: "Sorumlu teknisyen", accessor: (record) => record.technician_name, sortable: true, filterable: true, render: (record) => record.technician_name || "—" },
+  ];
+
   if (loading) {
     return (
       <div>
@@ -206,6 +214,11 @@ export default function RaporPage() {
 
       <div className="px-4 pb-28 md:pb-8">
         {loadingRecords ? <div className="py-16 text-center text-sm text-muted">Kayıtlar yükleniyor...</div> : (
+          <>
+          <section className="print-hide mb-4 rounded-card border border-border bg-panel p-3">
+            <div className="mb-2 text-[12px] font-bold text-text">Rapor kayıtlarını incele</div>
+            <DataTable rows={records} columns={reportColumns} getRowKey={(record) => record._id} pageSize={10} empty="Bu kapsamda kayıt bulunamadı." />
+          </section>
           <div id="rapor" className="rounded-xl border border-gray-300 bg-white p-4 text-gray-900 shadow-xl sm:p-6 md:p-8">
             <div className="mb-5 border-b-2 border-gray-800 pb-4 text-center"><div className="text-[18px] font-extrabold uppercase tracking-wide">Avcıkoru Santrali Bakım Merkezi</div><div className="mt-1 text-[12px] text-gray-600">Motor Bakım Raporu</div><div className="mt-1 text-[10px] text-gray-500">Rapor Tarihi: {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</div></div>
 
@@ -258,6 +271,7 @@ export default function RaporPage() {
             {!reportAll && reportTotal > records.length && <p className="mt-3 text-[10px] text-gray-500">Önizleme: en yeni {records.length} kayıt gösteriliyor. Tam geçmiş yazdırma sırasında yüklenir.</p>}
             <div className="mt-10 grid grid-cols-2 gap-8 text-[10px] text-gray-600"><div className="border-t border-gray-400 pt-1 text-center">Hazırlayan</div><div className="border-t border-gray-400 pt-1 text-center">Onaylayan</div></div>
           </div>
+          </>
         )}
       </div>
       <div className="print-hide"><BottomNav /></div>
