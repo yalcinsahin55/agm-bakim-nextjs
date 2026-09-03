@@ -16,6 +16,11 @@ html, body {
   box-sizing: border-box;
 }
 
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #e8952f;
+  outline-offset: 2px;
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
