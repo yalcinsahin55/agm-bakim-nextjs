@@ -10,6 +10,7 @@ import type { PanelItem, StatusKey } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { Button } from "@/components/ui";
 
 const STATUS_MAP: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis", "Kritik": "kritik", "Yaklaşıyor": "yaklasiyor", "Normal": "normal",
@@ -77,10 +78,12 @@ export default function BakimTurleriPage() {
           {sortedTypes.map((t) => {
             const count = items.filter((i) => i.type_key === t.key).length;
             return (
-              <button
+              <Button
+                type="button"
                 key={t.key}
                 onClick={() => setSelectedKey(t.key)}
-                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
+                size="sm"
+                className={`rounded-full px-4 ${
                   selectedKey === t.key
                     ? "bg-amber text-[#161006] shadow-lg"
                     : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
@@ -90,7 +93,7 @@ export default function BakimTurleriPage() {
                 <span className={`ml-1.5 text-[10px] ${selectedKey === t.key ? "opacity-70" : "text-faint"}`}>
                   ({count})
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -119,15 +122,17 @@ export default function BakimTurleriPage() {
         )}
 
         {rows.length === 0 ? (
-          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🔧</div>
+          <div className="animate-fade-in rounded-card border border-border bg-panel py-12 text-center">
+            <div className="mb-3 text-4xl">🔧</div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
-            <button
+            <Button
+              type="button"
               onClick={() => setStatusFilter("Tümü")}
-              className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
+              variant="secondary"
+              size="md"
             >
               Filtreyi Temizle
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="animate-fade-in">

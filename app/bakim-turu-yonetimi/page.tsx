@@ -13,6 +13,7 @@ import ArchivedMaintenanceTypes from "./_components/ArchivedMaintenanceTypes";
 import MaintenanceTypeAddForm from "./_components/MaintenanceTypeAddForm";
 import MaintenanceTypeCard from "./_components/MaintenanceTypeCard";
 import type { EngineRowState } from "./_lib/types";
+import { Button, EmptyState } from "@/components/ui";
 
 function refreshNotifications() {
   if (typeof window !== "undefined") {
@@ -261,10 +262,7 @@ export default function BakimTuruYonetimiPage() {
       <div>
         <TopBar title="Bakım Türü Yönetimi" subtitle="" />
         <div className="px-4 py-4">
-          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🔒</div>
-            <p className="text-sm text-muted">Bu sayfa yalnızca yöneticiler içindir.</p>
-          </div>
+          <EmptyState title="Bu sayfa yalnızca yöneticiler içindir." icon="🔒" />
         </div>
         <BottomNav />
       </div>
@@ -275,7 +273,8 @@ export default function BakimTuruYonetimiPage() {
     <div>
       <TopBar title="Bakım Türü Yönetimi" subtitle={`${sortedTypes.length} bakım türü`} />
       <div className="px-4 py-4">
-        <button
+        <Button
+          type="button"
           onClick={() => {
             if (!showAdd) {
               const r: Record<string, EngineRowState> = {};
@@ -284,12 +283,13 @@ export default function BakimTuruYonetimiPage() {
             }
             setShowAdd((s) => !s);
           }}
-          className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
+          size="lg"
+          className={`mb-3 w-full rounded-xl ${
             showAdd ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"
           }`}
         >
           {showAdd ? "✕ Kapat" : "➕ Yeni Bakım Türü Ekle"}
-        </button>
+        </Button>
 
         {showAdd && (
           <MaintenanceTypeAddForm
@@ -313,10 +313,7 @@ export default function BakimTuruYonetimiPage() {
         )}
 
         {sortedTypes.length === 0 ? (
-          <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🧰</div>
-            <p className="text-sm text-muted">Henüz bakım türü eklenmemiş.</p>
-          </div>
+          <EmptyState title="Henüz bakım türü eklenmemiş." icon="🧰" />
         ) : (
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2 md:items-start">
             {sortedTypes.map((type) => (
