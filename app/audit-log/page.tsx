@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, Input, Select } from "@/components/ui";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -229,14 +231,14 @@ export default function AuditLogPage() {
               <div className="text-[13px] font-extrabold text-text">Denetim merkezi</div>
               <p className="mt-1 text-[10.5px] leading-relaxed text-faint">Kullanıcı ve veri değişikliklerini tarih, işlem veya kayıt türüne göre inceleyin.</p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => load(page, filters, { silent: true })}
               disabled={refreshing}
               className="flex-shrink-0 rounded-lg border border-teal/30 px-2.5 py-2 text-[10.5px] font-bold text-teal transition hover:bg-teal/10 disabled:opacity-50"
             >
               {refreshing ? "Yenileniyor..." : "↻ Yenile"}
-            </button>
+            </Button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-border bg-panel2 px-3 py-2.5">
@@ -254,21 +256,21 @@ export default function AuditLogPage() {
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[12px] font-bold text-text">Filtrele</div>
             {activeFilterCount > 0 && (
-              <button type="button" onClick={clearFilters} className="text-[10px] font-bold text-muted hover:text-amber">Temizle</button>
+              <Button type="button" onClick={clearFilters} className="text-[10px] font-bold text-muted hover:text-amber">Temizle</Button>
             )}
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={applyPasswordResetFilter}
               className={`rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition ${passwordResetFilterActive ? "border-amber/50 bg-amber/10 text-amber" : "border-border text-muted hover:border-amber/40 hover:text-amber"}`}
             >
               Şifre sıfırlama kayıtları
-            </button>
+            </Button>
             {passwordResetFilterActive && <span className="text-[10px] text-faint">Yönetici parola sıfırlamaları · kullanıcı güncellemesi</span>}
           </div>
           <div className="flex flex-col gap-2">
-            <input
+            <Input
               value={draftFilters.q}
               onChange={(event) => updateDraft("q", event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") applyFilters(); }}
@@ -276,33 +278,33 @@ export default function AuditLogPage() {
               className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
             />
             <div className="grid grid-cols-2 gap-2">
-              <select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <Select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm işlemler</option>
                 {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-              <select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              </Select>
+              <Select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm kayıt türleri</option>
                 {Object.entries(entityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] font-bold text-faint">Başlangıç
-                <input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <Input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
               <label className="text-[10px] font-bold text-faint">Bitiş
-                <input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <Input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
             </div>
-            <button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-[#06181b] transition hover:brightness-110 active:scale-[.98]">
+            <Button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-[#06181b] transition hover:brightness-110 active:scale-[.98]">
               Filtreleri Uygula
-            </button>
+            </Button>
           </div>
         </section>
 
         {error && (
           <section className="mb-3 rounded-xl border border-red/30 bg-red/10 px-3 py-3 text-[11px] text-red">
             <div>{error}</div>
-            <button type="button" onClick={() => load(page, filters, { silent: true })} className="mt-2 rounded-lg border border-red/30 px-2.5 py-1.5 font-bold">Tekrar dene</button>
+            <Button type="button" onClick={() => load(page, filters, { silent: true })} className="mt-2 rounded-lg border border-red/30 px-2.5 py-1.5 font-bold">Tekrar dene</Button>
           </section>
         )}
 
@@ -340,9 +342,9 @@ export default function AuditLogPage() {
                 <span>{entityLabels[item.entity] || item.entity}{item.entity_id ? ` · ${item.entity_id}` : ""}</span>
                 <span>{formatDate(item.created_at)}</span>
               </div>
-              <button type="button" onClick={() => openDetails(item)} className="mt-2.5 w-full rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-teal/40 hover:bg-teal/10 hover:text-teal">
+              <Button type="button" onClick={() => openDetails(item)} className="mt-2.5 w-full rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-teal/40 hover:bg-teal/10 hover:text-teal">
                 Ayrıntıları görüntüle
-              </button>
+              </Button>
             </article>
             );
           })}
@@ -350,9 +352,9 @@ export default function AuditLogPage() {
 
         {totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">
-            <button type="button" onClick={() => load(page - 1, filters)} disabled={page <= 1 || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">← Önceki</button>
+            <Button type="button" onClick={() => load(page - 1, filters)} disabled={page <= 1 || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">← Önceki</Button>
             <span className="text-[11px] text-faint">{page} / {totalPages}</span>
-            <button type="button" onClick={() => load(page + 1, filters)} disabled={page >= totalPages || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">Sonraki →</button>
+            <Button type="button" onClick={() => load(page + 1, filters)} disabled={page >= totalPages || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">Sonraki →</Button>
           </div>
         )}
       </main>
@@ -365,7 +367,7 @@ export default function AuditLogPage() {
                 <div className="text-[13px] font-bold text-text">İşlem ayrıntısı</div>
                 <div className="mt-1 text-[10.5px] text-faint">{formatDate(selected.created_at)} · {entityLabels[selected.entity] || selected.entity}</div>
               </div>
-              <button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat">✕</button>
+              <Button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat">✕</Button>
             </div>
             <div className="overflow-y-auto px-4 py-3">
               <div className="rounded-xl border border-border bg-panel2 p-3">

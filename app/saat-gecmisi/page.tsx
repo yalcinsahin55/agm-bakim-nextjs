@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui";
+
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -172,13 +174,13 @@ export default function SaatGecmisiPage() {
     <div>
       <TopBar title="Saat Geçmişi" subtitle={engine ? engine.name : ""} />
       <div className="px-4 py-4">
-        <select 
+        <Select
           value={selected} 
           onChange={(e: ChangeEvent<HTMLSelectElement>) => { setSelected(e.target.value); setHistoryPage(1); setHistory([]); setHistorySummary({ first: null, last: null, has_load: false }); setEditingIdx(null); setConfirmDeleteIdx(null); }}
           className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4 focus:border-teal focus:ring-2 focus:ring-teal/20 outline-none transition"
         >
           {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
-        </select>
+        </Select>
 
         {historyTotal < 2 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">

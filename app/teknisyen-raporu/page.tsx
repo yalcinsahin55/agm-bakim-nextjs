@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, Select } from "@/components/ui";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
@@ -124,16 +126,16 @@ export default function TeknisyenRaporuPage() {
       <section className="mb-4 rounded-card border border-border bg-panel p-3.5">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor filtreleri</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
+          <Select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
             {PERIODS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-          </select>
-          <select value={technicianTypeFilter} onChange={(event) => setTechnicianTypeFilter(event.target.value as "all" | "mekanik" | "elektromekanik")} aria-label="Teknisyen türü" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
+          </Select>
+          <Select value={technicianTypeFilter} onChange={(event) => setTechnicianTypeFilter(event.target.value as "all" | "mekanik" | "elektromekanik")} aria-label="Teknisyen türü" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
             <option value="all">Tüm teknisyen türleri</option><option value="mekanik">Mekanik teknisyen</option><option value="elektromekanik">Elektromekanik teknisyen</option>
-          </select>
+          </Select>
         </div>
       </section>
 
-      {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[11px] text-red" role="alert"><div className="font-bold">{error}</div><button type="button" onClick={() => void load()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
+      {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[11px] text-red" role="alert"><div className="font-bold">{error}</div><Button type="button" onClick={() => void load()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</Button></div>}
 
       <section className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Bakım kaydı" value={Number(summary.periodTotal || 0)} hint="Seçilen dönemde" accent="text-amber" />

@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, Input } from "@/components/ui";
+
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -118,7 +120,7 @@ export default function LoginPage() {
         </div>
         <form onSubmit={submit} data-login-hydrated={hydrated ? "true" : "false"} className="flex flex-col gap-3">
           <label className="text-left text-[10px] font-bold uppercase tracking-wide text-muted">Telefon numarası veya e-posta</label>
-          <input
+          <Input
             required
             autoComplete="username"
             inputMode="tel"
@@ -128,7 +130,7 @@ export default function LoginPage() {
             className="rounded-xl border border-border bg-panel2 px-4 py-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
           />
           <label className="mt-1 text-left text-[10px] font-bold uppercase tracking-wide text-muted">Şifre</label>
-          <input
+          <Input
             required
             type="password"
             autoComplete="current-password"
@@ -137,7 +139,7 @@ export default function LoginPage() {
             onChange={handleField("password")}
             className="rounded-xl border border-border bg-panel2 px-4 py-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
           />
-          <button
+          <Button
             disabled={loading || retryAfterSeconds > 0}
             type="submit"
             className="mt-2 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber py-3.5 text-sm font-extrabold text-[#1a1206] shadow-lg transition hover:brightness-110 active:scale-[.98] disabled:opacity-60"
@@ -145,7 +147,7 @@ export default function LoginPage() {
             {loading ? (
               <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1a1206]/40 border-t-[#1a1206]" /> Giriş yapılıyor...</span>
             ) : retryAfterSeconds > 0 ? `Tekrar deneyin (${formatRetryAfter(retryAfterSeconds)})` : "Giriş Yap"}
-          </button>
+          </Button>
         </form>
         <p className="mt-4 text-center text-[10.5px] leading-relaxed text-faint">
           Yeni kullanıcı hesaplarını yalnızca yönetici oluşturur. Hesabınız yoksa yöneticinizle iletişime geçin.

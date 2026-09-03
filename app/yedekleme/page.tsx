@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, Input } from "@/components/ui";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
@@ -133,7 +135,7 @@ export default function YedeklemePage() {
         <section className="rounded-card border border-amber/20 bg-gradient-to-br from-amber/10 via-panel to-panel p-4">
           <div className="text-[15px] font-bold text-text">Uygulama verilerini indir</div>
           <p className="mt-1 text-[11px] leading-5 text-muted">Kullanıcılar, motorlar, bakım türleri, bakım kayıtları, bildirimler ve işlem geçmişi JSON olarak dışa aktarılır. Şifreler, VAPID private key ve büyük medya base64 alanları güvenlik ve boyut nedeniyle dışarıda bırakılır.</p>
-          <button onClick={downloadBackup} disabled={busy} className="mt-4 w-full rounded-lg bg-amber py-2.5 text-[12px] font-extrabold text-[#161006] disabled:opacity-50">{busy ? "Yedek hazırlanıyor..." : "JSON yedeğini indir"}</button>
+          <Button onClick={downloadBackup} disabled={busy} className="mt-4 w-full rounded-lg bg-amber py-2.5 text-[12px] font-extrabold text-[#161006] disabled:opacity-50">{busy ? "Yedek hazırlanıyor..." : "JSON yedeğini indir"}</Button>
         </section>
         {summary && <section className="mt-4 rounded-card border border-border bg-panel p-4">
           <div className="text-[13px] font-bold text-text">Yedek kapsamı</div>
@@ -143,7 +145,7 @@ export default function YedeklemePage() {
         <section className="mt-4 rounded-card border border-teal/30 bg-teal/5 p-4">
           <div className="text-[13px] font-bold text-text">Aylık bakım arşivi</div>
           <p className="mt-1 text-[10.5px] leading-5 text-muted">Seçilen ayın bakım geçmişini Excel veya PDF olarak indirerek aylık arşiv oluşturabilirsin.</p>
-          <input type="month" value={archiveMonth} onChange={(event) => setArchiveMonth(event.target.value)} className="mt-3 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" aria-label="Arşiv ayı" />
+          <Input type="month" value={archiveMonth} onChange={(event) => setArchiveMonth(event.target.value)} className="mt-3 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-teal" aria-label="Arşiv ayı" />
           <div className="mt-2 grid grid-cols-2 gap-2"><a href={`/api/export/excel${archiveQuery}`} className="rounded-lg bg-teal py-2.5 text-center text-[11.5px] font-extrabold text-[#06181b] hover:brightness-110">Excel arşivi</a><a href={`/api/export/pdf${archiveQuery}`} className="rounded-lg border border-teal/40 py-2.5 text-center text-[11.5px] font-extrabold text-teal hover:bg-teal/10">PDF arşivi</a></div>
         </section>
         <section className="mt-4 rounded-card border border-red/30 bg-red/5 p-4 text-[11px] leading-5 text-muted">
@@ -151,12 +153,12 @@ export default function YedeklemePage() {
           <p className="mt-1">Bu işlem checksum doğrulamasından sonra yalnızca motor, bakım türü, bakım kaydı ve yağ analizi verilerini geri yükler. Production’da transaction, diğer ortamlarda kontrollü <b className="text-amber">merge</b> kullanılır. Kullanıcılar, şifreler, bildirimler ve büyük medya alanları geri yüklenmez; mevcut veriler silinmez.</p>
           <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-borderlt px-3 py-3 text-[12px] text-muted hover:border-amber">
             <span className="text-lg">📄</span><span className="flex-1 truncate">{restoreFile ? restoreFile.name : "JSON yedek dosyası seç"}</span>
-            <input type="file" accept="application/json,.json" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} className="hidden" />
+            <Input type="file" accept="application/json,.json" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} className="hidden" />
           </label>
-          <input value={restoreConfirm} onChange={(event) => setRestoreConfirm(event.target.value)} placeholder="Onay için RESTORE yazın" className="mt-2 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-red" autoComplete="off" />
+          <Input value={restoreConfirm} onChange={(event) => setRestoreConfirm(event.target.value)} placeholder="Onay için RESTORE yazın" className="mt-2 w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-red" autoComplete="off" />
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button onClick={previewRestore} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-teal/40 py-2.5 text-[11px] font-extrabold text-teal disabled:opacity-40">{restoreBusy ? "Kontrol ediliyor..." : "Dry-run kontrolü"}</button>
-            <button onClick={restoreBackup} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-red/40 py-2.5 text-[11px] font-extrabold text-red disabled:opacity-40">{restoreBusy ? "Geri yükleniyor..." : "Yedeği geri yükle"}</button>
+            <Button onClick={previewRestore} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-teal/40 py-2.5 text-[11px] font-extrabold text-teal disabled:opacity-40">{restoreBusy ? "Kontrol ediliyor..." : "Dry-run kontrolü"}</Button>
+            <Button onClick={restoreBackup} disabled={restoreBusy || !restoreFile || restoreConfirm !== "RESTORE"} className="rounded-lg border border-red/40 py-2.5 text-[11px] font-extrabold text-red disabled:opacity-40">{restoreBusy ? "Geri yükleniyor..." : "Yedeği geri yükle"}</Button>
           </div>
           {restoreMessage && <div className="mt-2 rounded-lg bg-panel2 p-2 text-[11px] text-muted" role="status">{restoreMessage}</div>}
         </section>

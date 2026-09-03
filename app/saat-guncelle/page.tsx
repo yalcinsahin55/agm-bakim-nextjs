@@ -1,5 +1,7 @@
 "use client";
 
+import { Button, Input } from "@/components/ui";
+
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -119,7 +121,7 @@ export default function SaatGuncellePage() {
           <div className="rounded-card border border-red/30 bg-panel p-6">
             <div className="text-4xl mb-3">⚠️</div>
             <p className="text-sm text-red">{loadError}</p>
-            <button onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <Button onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</Button>
           </div>
         </div>
         <BottomNav />
@@ -159,7 +161,7 @@ export default function SaatGuncellePage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[9.5px] font-bold text-faint uppercase tracking-wide">Yeni Saat</label>
-                    <input
+                    <Input
                       type="number"
                       placeholder={String(e.hours || 0)}
                       value={v.hours ?? ""}
@@ -170,7 +172,7 @@ export default function SaatGuncellePage() {
                   </div>
                   <div>
                     <label className="text-[9.5px] font-bold text-faint uppercase tracking-wide">Yeni Yük (kW)</label>
-                    <input
+                    <Input
                       type="number"
                       placeholder={String(e.load_kw || 0)}
                       value={v.load_kw ?? ""}
@@ -188,7 +190,7 @@ export default function SaatGuncellePage() {
         {canEdit && (
           <div className="fixed bottom-24 left-0 right-0 z-20 px-4 md:left-64">
             <div className="max-w-lg mx-auto">
-              <button
+              <Button
                 onClick={save}
                 disabled={saving || changedEngines.length === 0}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber text-[#1a1206] font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
@@ -203,7 +205,7 @@ export default function SaatGuncellePage() {
                 ) : (
                   "💾 Tümünü Kaydet"
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         )}
