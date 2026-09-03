@@ -9,6 +9,7 @@ import Skeleton from "@/components/Skeleton";
 import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
+import { Button, Input, Select } from "@/components/ui";
 
 const INFO_FIELDS = [
   ["kaver_tipi", "Kaver Tipi"],
@@ -190,15 +191,15 @@ export default function RaporPage() {
       <div className="print-hide"><TopBar title="Motor Bakım Raporu" subtitle="Yazdırılabilir bakım geçmişi" /></div>
       <div className="print-hide px-4 py-4">
         <div className="flex flex-wrap gap-2">
-          <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
+          <Select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 rounded-xl">
             {engines.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
-          </select>
-          <select value={reportScope} onChange={(event) => setReportScope(event.target.value as "all" | "month")} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
+          </Select>
+          <Select value={reportScope} onChange={(event) => setReportScope(event.target.value as "all" | "month")} className="rounded-xl">
             <option value="all">Tüm geçmiş</option>
             <option value="month">Ay seç</option>
-          </select>
-          {reportScope === "month" && <input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border" aria-label="Rapor ayı" />}
-          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber px-4 py-2.5 text-[13px] font-extrabold text-[#1a1206] transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
+          </Select>
+          {reportScope === "month" && <Input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="w-auto rounded-xl" aria-label="Rapor ayı" />}
+          <Button type="button" onClick={() => void printReport()} disabled={loadingRecords} size="lg" className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</Button>
         </div>
         <p className="mt-2 text-[10.5px] text-faint">{reportScope === "month" ? `${reportMonth} ayına ait kayıtlar gösteriliyor.` : "Seçili motorun tüm bakım geçmişi gösteriliyor."} Yazdır seçildiğinde aynı kapsamın tamamı yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>
