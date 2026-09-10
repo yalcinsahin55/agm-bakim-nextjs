@@ -126,6 +126,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
   const operationQueue = useMemo(() => buildOperationQueue(filteredItems, 6), [filteredItems]);
   const allOperationItems = useMemo(() => buildOperationQueue(filteredItems, filteredItems.length), [filteredItems]);
   const visibleOperationItems = showAllQueueItems ? allOperationItems : operationQueue;
+  const engineLoadById = useMemo(() => new Map(healthRows.map((row) => [row.engine._id, row.engine.load_kw])), [healthRows]);
   const riskRows = useMemo(() => [...healthRows].sort(compareHealthRows).slice(0, 5), [healthRows]);
   const visibleActions = QUICK_ACTIONS.filter((action) => canAccessRoute(props.role, action.accessPath || action.href));
 
@@ -187,7 +188,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
                   <div key={`${item.engine_id}-${item.type_key}`} className="flex flex-col gap-2 rounded-lg border border-border/80 bg-panel2 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="break-words text-[10.5px] font-bold text-text">{item.engine_name} · {item.type_label}</div>
-                      <div className="mt-0.5 text-[9px] text-faint">Motor: {item.engine_hours.toLocaleString("tr-TR")} saat · Periyot: {item.period.toLocaleString("tr-TR")} saat</div>
+                      <div className="mt-0.5 text-[9px] text-faint">Motor: {item.engine_hours.toLocaleString("tr-TR")} saat · Yük: {Number(engineLoadById.get(item.engine_id) || 0).toLocaleString("tr-TR")} kW · Periyot: {item.period.toLocaleString("tr-TR")} saat</div>
                     </div>
                     <div className="flex items-center justify-between gap-2 sm:flex-shrink-0 sm:justify-end">
                       <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${queueStatusClass(item.status)}`}>{queueStatusText(item)}</span>

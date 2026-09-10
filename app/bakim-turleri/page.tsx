@@ -9,7 +9,7 @@ import GaugeCardList from "@/components/GaugeCardList";
 import type { PanelItem, StatusKey } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
 import { ApiFetchError } from "@/lib/apiCache";
-import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { getMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
 
 const STATUS_MAP: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis", "Kritik": "kritik", "Yaklaşıyor": "yaklasiyor", "Normal": "normal",
@@ -18,18 +18,19 @@ const STATUS_MAP: Record<string, StatusKey> = {
 export default function BakimTurleriPage() {
   const router = useRouter();
   const [items, setItems] = useState<PanelItem[]>([]);
+  const [engines, setEngines] = useState<PanelEngine[]>([]);
   const [types, setTypes] = useState<MaintenanceType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedKey, setSelectedKey] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("Tümü");
 
   const load = useCallback(async () => {
     try {
       const data = await getMaintenancePanel();
       setItems(data.items);
+      setEngines(data.engines);
       setTypes(data.types);
       setLoading(false);
-      if (data.types.length) setSelectedKey([...data.types].sort((a, b) => a.label.localeCompare(b.label, "tr"))[0].key);
     } catch (error) {
       if (error instanceof ApiFetchError && error.status === 401) router.push("/login");
       else setLoading(false);
@@ -41,12 +42,29 @@ export default function BakimTurleriPage() {
   const sortedTypes = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label, "tr")), [types]);
 
   const rows = useMemo(() => {
-    let list = items.filter((i) => i.type_key === selectedKey);
+    let list = selectedKeys.length === 0 ? items : items.filter((i) => selectedKeys.includes(i.type_key));
     if (statusFilter !== "Tümü") list = list.filter((i) => i.status === STATUS_MAP[statusFilter]);
-    return [...list].sort((a, b) => a.remaining - b.remaining);
-  }, [items, selectedKey, statusFilter]);
+    return [...list].sort((a, b) => a.remaining - b.remaining || a.engine_name.localeCompare(b.engine_name, "tr", { numeric: true }));
+  }, [items, selectedKeys, statusFilter]);
 
-  const selectedType = types.find((t) => t.key === selectedKey);
+  const selectedTypes = types.filter((t) => selectedKeys.includes(t.key));
+  const engineLoadById = useMemo(() => new Map(engines.map((engine) => [engine._id, engine.load_kw])), [engines]);
+  const selectedTypeLabel = selectedKeys.length === 0
+    ? "Tüm bakım türleri"
+    : selectedTypes.length === 1
+      ? selectedTypes[0].label
+      : `${selectedTypes.length} bakım türü seçili`;
+
+  function toggleType(key: string): void {
+    setSelectedKeys((current) => {
+      if (current.length === 0) return [key];
+      if (current.includes(key)) {
+        const next = current.filter((item) => item !== key);
+        return next.length ? next : [];
+      }
+      return [...current, key];
+    });
+  }
 
   if (loading) {
     return (
@@ -70,30 +88,40 @@ export default function BakimTurleriPage() {
 
   return (
     <div>
-      <TopBar title="Bakım Türleri" subtitle={selectedType ? `${selectedType.label} · ${rows.length} motor` : ""} />
+      <TopBar title="Bakım Türleri" subtitle={`${selectedTypeLabel} · ${rows.length} motor`} />
       <div className="px-4 py-4">
         {/* Bakım türü çipleri */}
         <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setSelectedKeys([])}
+            aria-pressed={selectedKeys.length === 0}
+            className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selectedKeys.length === 0 ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
+          >
+            Tüm bakım türleri
+            <span className={`ml-1.5 text-[10px] ${selectedKeys.length === 0 ? "opacity-70" : "text-faint"}`}>({items.length})</span>
+          </button>
           {sortedTypes.map((t) => {
             const count = items.filter((i) => i.type_key === t.key).length;
+            const selected = selectedKeys.includes(t.key);
             return (
               <button
                 key={t.key}
-                onClick={() => setSelectedKey(t.key)}
-                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${
-                  selectedKey === t.key
-                    ? "bg-amber text-[#161006] shadow-lg"
-                    : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
-                }`}
+                type="button"
+                onClick={() => toggleType(t.key)}
+                aria-pressed={selected}
+                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selected ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
               >
                 {t.label}
-                <span className={`ml-1.5 text-[10px] ${selectedKey === t.key ? "opacity-70" : "text-faint"}`}>
+                <span className={`ml-1.5 text-[10px] ${selected ? "opacity-70" : "text-faint"}`}>
                   ({count})
                 </span>
               </button>
             );
           })}
         </div>
+
+        <p className="mb-3 text-[10px] text-faint">Birden fazla bakım türünü birlikte görmek için tür çiplerine tıklayabilirsin.</p>
 
         {/* Durum çipleri */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -123,7 +151,7 @@ export default function BakimTurleriPage() {
             <div className="text-4xl mb-3">🔧</div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
             <button
-              onClick={() => setStatusFilter("Tümü")}
+              onClick={() => { setSelectedKeys([]); setStatusFilter("Tümü"); }}
               className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
             >
               Filtreyi Temizle
@@ -134,7 +162,7 @@ export default function BakimTurleriPage() {
             <GaugeCardList rows={rows.map((r) => ({
               key: r.engine_id,
               title: r.engine_name,
-              subtitle: `Motor saati ${r.engine_hours.toLocaleString("tr-TR")} sa · Son bakım ${r.last_hour.toLocaleString("tr-TR")} sa · Çalışılan ${(r.engine_hours - r.last_hour).toLocaleString("tr-TR")} sa`,
+              subtitle: `Motor saati ${r.engine_hours.toLocaleString("tr-TR")} sa · Yük ${Number(engineLoadById.get(r.engine_id) || 0).toLocaleString("tr-TR")} kW · ${r.type_label} · Son bakım ${r.last_hour.toLocaleString("tr-TR")} sa`,
               status: r.status, remaining: r.remaining, period: r.period,
               valueLabel: (r.remaining <= 0 ? "+" : "") + Math.abs(Math.round(r.remaining)).toLocaleString("tr-TR"),
               unitLabel: r.remaining <= 0 ? "SAAT GECİKME" : "SAAT KALDI",
