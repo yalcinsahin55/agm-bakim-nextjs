@@ -119,10 +119,13 @@ function EngineRiskRow({ row }: { row: DashboardHealthRow }): JSX.Element {
 export default memo(function DashboardActionRail(props: DashboardActionRailProps): JSX.Element {
   const { role, enginesCount, counts, items, healthRows } = props;
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
+  const [showAllQueueItems, setShowAllQueueItems] = useState(false);
   const presentation = rolePresentation(role);
   const viewerMode = normalizeRole(role) === "goruntuleyici";
   const filteredItems = useMemo(() => filterOperationItems(items, queueFilter), [items, queueFilter]);
   const operationQueue = useMemo(() => buildOperationQueue(filteredItems, 6), [filteredItems]);
+  const allOperationItems = useMemo(() => buildOperationQueue(filteredItems, filteredItems.length), [filteredItems]);
+  const visibleOperationItems = showAllQueueItems ? allOperationItems : operationQueue;
   const riskRows = useMemo(() => [...healthRows].sort(compareHealthRows).slice(0, 5), [healthRows]);
   const visibleActions = QUICK_ACTIONS.filter((action) => canAccessRoute(props.role, action.accessPath || action.href));
 
@@ -173,12 +176,12 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
               <div className="text-[10px] font-extrabold uppercase tracking-wide text-text">Aksiyon kuyruğu</div>
               <div className="mt-0.5 text-[9px] text-faint">En acil bakım maddeleri önce gösterilir.</div>
             </div>
-            <span className="font-mono text-[9px] text-faint">{operationQueue.length}/{filteredItems.length}</span>
+            <span className="font-mono text-[9px] text-faint">{visibleOperationItems.length}/{filteredItems.length}</span>
           </div>
 
-          {operationQueue.length > 0 ? (
+          {visibleOperationItems.length > 0 ? (
             <div className="grid gap-1.5">
-              {operationQueue.map((item) => {
+              {visibleOperationItems.map((item) => {
                 const action = queueAction(role, item);
                 return (
                   <div key={`${item.engine_id}-${item.type_key}`} className="flex flex-col gap-2 rounded-lg border border-border/80 bg-panel2 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between">
@@ -199,7 +202,16 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
               {queueFilter === "all" ? "Şu anda gösterilecek bakım maddesi bulunmuyor." : `${STATUS_LABELS[queueFilter]} durumunda bakım maddesi bulunmuyor.`}
             </div>
           )}
-          {filteredItems.length > operationQueue.length && <Link href="/araliklar" className="mt-2 inline-flex text-[9.5px] font-bold text-teal hover:underline">Tüm bakım planını aç →</Link>}
+          {filteredItems.length > operationQueue.length && (
+            <button
+              type="button"
+              onClick={() => setShowAllQueueItems((current) => !current)}
+              aria-expanded={showAllQueueItems}
+              className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-teal/30 bg-teal/5 px-3 py-2 text-[9.5px] font-extrabold text-teal transition hover:border-teal/60 hover:bg-teal/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            >
+              {showAllQueueItems ? "İlk 6 maddeyi göster ↑" : `Tümünü göster · ${filteredItems.length - operationQueue.length} madde daha ↓`}
+            </button>
+          )}
         </div>
 
         <div id="dashboard-risk-summary" className="rounded-xl border border-border bg-panel p-3" aria-label="Motor risk özeti">
