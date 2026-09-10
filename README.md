@@ -675,7 +675,7 @@ Yedek geri yüklemeden önce yedek ekranındaki **Dry-run kontrolü** kullanılm
 
 ## Lisans
 
-Bu proje şirket içi kullanım için hazırlanmış özel bir yazılımdır. Tüm hakları saklıdır.
+Bu proje şirket içi kullanım için hazırlanmış özel bir yazılımdır.Tüm hakları saklıdır.
 
 ---
 
