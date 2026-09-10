@@ -21,7 +21,7 @@ export default function BakimTurleriPage() {
   const [engines, setEngines] = useState<PanelEngine[]>([]);
   const [types, setTypes] = useState<MaintenanceType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [selectedKey, setSelectedKey] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tümü");
 
   const load = useCallback(async () => {
@@ -42,29 +42,14 @@ export default function BakimTurleriPage() {
   const sortedTypes = useMemo(() => [...types].sort((a, b) => a.label.localeCompare(b.label, "tr")), [types]);
 
   const rows = useMemo(() => {
-    let list = selectedKeys.length === 0 ? items : items.filter((i) => selectedKeys.includes(i.type_key));
+    let list = selectedKey ? items.filter((i) => i.type_key === selectedKey) : items;
     if (statusFilter !== "Tümü") list = list.filter((i) => i.status === STATUS_MAP[statusFilter]);
     return [...list].sort((a, b) => a.remaining - b.remaining || a.engine_name.localeCompare(b.engine_name, "tr", { numeric: true }));
-  }, [items, selectedKeys, statusFilter]);
+  }, [items, selectedKey, statusFilter]);
 
-  const selectedTypes = types.filter((t) => selectedKeys.includes(t.key));
   const engineLoadById = useMemo(() => new Map(engines.map((engine) => [engine._id, engine.load_kw])), [engines]);
-  const selectedTypeLabel = selectedKeys.length === 0
-    ? "Tüm bakım türleri"
-    : selectedTypes.length === 1
-      ? selectedTypes[0].label
-      : `${selectedTypes.length} bakım türü seçili`;
-
-  function toggleType(key: string): void {
-    setSelectedKeys((current) => {
-      if (current.length === 0) return [key];
-      if (current.includes(key)) {
-        const next = current.filter((item) => item !== key);
-        return next.length ? next : [];
-      }
-      return [...current, key];
-    });
-  }
+  const selectedType = types.find((t) => t.key === selectedKey);
+  const selectedTypeLabel = selectedType?.label || "Tüm bakım türleri";
 
   if (loading) {
     return (
@@ -94,21 +79,21 @@ export default function BakimTurleriPage() {
         <div className="flex flex-wrap gap-2 mb-3">
           <button
             type="button"
-            onClick={() => setSelectedKeys([])}
-            aria-pressed={selectedKeys.length === 0}
-            className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selectedKeys.length === 0 ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
+            onClick={() => setSelectedKey("")}
+            aria-pressed={!selectedKey}
+            className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${!selectedKey ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
           >
             Tüm bakım türleri
-            <span className={`ml-1.5 text-[10px] ${selectedKeys.length === 0 ? "opacity-70" : "text-faint"}`}>({items.length})</span>
+            <span className={`ml-1.5 text-[10px] ${!selectedKey ? "opacity-70" : "text-faint"}`}>({items.length})</span>
           </button>
           {sortedTypes.map((t) => {
             const count = items.filter((i) => i.type_key === t.key).length;
-            const selected = selectedKeys.includes(t.key);
+            const selected = selectedKey === t.key;
             return (
               <button
                 key={t.key}
                 type="button"
-                onClick={() => toggleType(t.key)}
+                onClick={() => setSelectedKey(t.key)}
                 aria-pressed={selected}
                 className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selected ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
               >
@@ -121,7 +106,7 @@ export default function BakimTurleriPage() {
           })}
         </div>
 
-        <p className="mb-3 text-[10px] text-faint">Birden fazla bakım türünü birlikte görmek için tür çiplerine tıklayabilirsin.</p>
+        <p className="mb-3 text-[10px] text-faint">Tek bir bakım türünü seçebilir veya tüm bakım türlerini birlikte görüntüleyebilirsin.</p>
 
         {/* Durum çipleri */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -151,7 +136,7 @@ export default function BakimTurleriPage() {
             <div className="text-4xl mb-3">🔧</div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
             <button
-              onClick={() => { setSelectedKeys([]); setStatusFilter("Tümü"); }}
+              onClick={() => { setSelectedKey(""); setStatusFilter("Tümü"); }}
               className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition"
             >
               Filtreyi Temizle
