@@ -145,7 +145,7 @@ export default function BakimTurleriPage() {
         ) : (
           <div className="animate-fade-in">
             <GaugeCardList rows={rows.map((r) => ({
-              key: r.engine_id,
+              key: `${r.type_key}-${r.engine_id}`,
               title: r.engine_name,
               subtitle: `Motor saati ${r.engine_hours.toLocaleString("tr-TR")} sa · Yük ${Number(engineLoadById.get(r.engine_id) || 0).toLocaleString("tr-TR")} kW · ${r.type_label} · Son bakım ${r.last_hour.toLocaleString("tr-TR")} sa`,
               status: r.status, remaining: r.remaining, period: r.period,
