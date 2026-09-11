@@ -154,7 +154,7 @@ export default function DashboardPage() {
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal" aria-hidden="true" />{sortedEngines.length} motor izleniyor</span>
             <span className="text-muted">·</span>
             <span className="text-muted">{todayStr}</span>
-            <span className="inline-flex items-center gap-1.5 text-text"><span className="h-1.5 w-1.5 rounded-full bg-amber" aria-hidden="true" />Aktif saat {activeTimeStr}</span>
+            <span className="inline-flex items-center gap-1.5 text-text"><span className="h-1.5 w-1.5 rounded-full bg-amber" aria-hidden="true" />{activeTimeStr}</span>
           </div>
         </section>
 
