@@ -85,6 +85,9 @@ export default function DashboardPage() {
   const todayStr = currentTime.toLocaleDateString("tr-TR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
+  const activeTimeStr = currentTime.toLocaleTimeString("tr-TR", {
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
   const firstName = user?.full_name ? user.full_name.split(" ")[0] : "";
   const greetingView = greetingPresentation(currentTime.getHours());
 
@@ -151,6 +154,7 @@ export default function DashboardPage() {
             <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal" aria-hidden="true" />{sortedEngines.length} motor izleniyor</span>
             <span className="text-muted">·</span>
             <span className="text-muted">{todayStr}</span>
+            <span className="inline-flex items-center gap-1.5 text-text"><span className="h-1.5 w-1.5 rounded-full bg-amber" aria-hidden="true" />Aktif saat {activeTimeStr}</span>
           </div>
         </section>
 
