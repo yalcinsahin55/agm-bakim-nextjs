@@ -14,7 +14,7 @@ import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/reques
 
 export const dynamic = "force-dynamic";
 
-type UserUpdateFields = Partial<Pick<UserDocument, "role" | "active" | "approved" | "phone" | "phone_normalized" | "session_version" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">>;
+type UserUpdateFields = Partial<Pick<UserDocument, "full_name" | "role" | "active" | "approved" | "phone" | "phone_normalized" | "session_version" | "technician_type" | "can_be_responsible" | "can_be_support" | "allowed_work_domains">>;
 
 async function getAuthorizedAdmin(req: NextRequest) {
   const db = await getDb();
@@ -42,11 +42,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
   const patchBody = patchBodyResult.value;
-  const { role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } =
+  const { full_name, role, active, approved, phone, technician_type, can_be_responsible, can_be_support, allowed_work_domains } =
     typeof patchBody === "object" && patchBody !== null && !Array.isArray(patchBody)
       ? patchBody as Record<string, unknown>
       : {};
   const roleValue = typeof role === "string" ? role : undefined;
+  const fullNameValue = typeof full_name === "string" ? full_name.trim() : undefined;
   const activeValue = typeof active === "boolean" ? active : undefined;
   const approvedValue = typeof approved === "boolean" ? approved : undefined;
   const technicianTypeValue = typeof technician_type === "string" ? technician_type : undefined;
@@ -60,6 +61,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const update: UserUpdateFields = {};
   const unset: Record<string, ""> = {};
+  if (full_name !== undefined) {
+    if (!fullNameValue || fullNameValue.length < 2 || fullNameValue.length > 120) {
+      return NextResponse.json({ error: "Ad soyad 2-120 karakter arasında olmalıdır." }, { status: 400 });
+    }
+    update.full_name = fullNameValue;
+  }
   if (roleValue !== undefined) {
     const normalizedRole = normalizeRole(roleValue);
     if (!normalizedRole) return NextResponse.json({ error: "Geçersiz kullanıcı rolü." }, { status: 400 });

@@ -58,6 +58,8 @@ export default function KullanicilarPage() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingFullName, setEditingFullName] = useState("");
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
@@ -128,6 +130,17 @@ export default function KullanicilarPage() {
       toast.dismiss(loadingToast);
       toast.error("Sunucu hatası.");
     }
+  }
+
+  function startEditingUser(u: UserRow): void {
+    setEditingUserId(u.id);
+    setEditingFullName(u.full_name);
+  }
+
+  async function saveUserName(u: UserRow): Promise<void> {
+    await updateUser(u.id, { full_name: editingFullName });
+    setEditingUserId(null);
+    setEditingFullName("");
   }
 
   async function resetUserPassword(u: UserRow): Promise<void> {
@@ -313,7 +326,18 @@ export default function KullanicilarPage() {
                   {initials(u.full_name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold text-text truncate">{u.full_name}</div>
+                  {editingUserId === u.id ? (
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <input value={editingFullName} onChange={(event) => setEditingFullName(event.target.value)} aria-label={`${u.full_name} adını düzelt`} autoFocus className="min-w-0 flex-1 rounded-lg border border-teal/40 bg-panel2 px-2 py-1.5 text-[12px] font-bold text-text outline-none focus:border-teal" />
+                      <button type="button" onClick={() => void saveUserName(u)} className="shrink-0 rounded-lg bg-teal px-2 py-1.5 text-[10px] font-bold text-[#06181b]">Kaydet</button>
+                      <button type="button" onClick={() => { setEditingUserId(null); setEditingFullName(""); }} className="shrink-0 rounded-lg border border-border px-2 py-1.5 text-[10px] font-bold text-muted">Vazgeç</button>
+                    </div>
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <div className="min-w-0 truncate text-[13px] font-bold text-text">{u.full_name}</div>
+                      <button type="button" onClick={() => startEditingUser(u)} className="shrink-0 rounded-md border border-teal/30 px-1.5 py-1 text-[9px] font-bold text-teal hover:bg-teal/10 transition">Düzelt</button>
+                    </div>
+                  )}
                   <div className="text-[11px] text-faint truncate">{u.phone || u.email || "Telefon tanımlanmamış"}</div>
                 </div>
                 <span className={`text-[9.5px] font-extrabold px-2 py-1 rounded-full border flex-shrink-0 ${ROLE_COLORS[u.role] || ROLE_COLORS.goruntuleyici}`}>
