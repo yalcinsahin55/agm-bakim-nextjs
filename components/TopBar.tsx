@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import NotificationBell from "@/components/NotificationBell";
 import LogoutButton from "@/components/LogoutButton";
 
@@ -14,8 +15,8 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Mobilde logo göster, PC'de sidebar'da zaten var */}
-          <div className="md:hidden w-9 h-9 rounded-xl bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-base flex-shrink-0 shadow">
-            🔧
+          <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-xl border border-border shadow">
+            <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="36px" className="object-cover" priority />
           </div>
           <div className="min-w-0">
             <div className="font-display text-xl font-bold uppercase tracking-wide truncate">{title}</div>
