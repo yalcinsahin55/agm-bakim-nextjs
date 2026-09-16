@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
@@ -72,8 +73,8 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-xl shadow-lg">
-            🔧
+          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl border border-border shadow-lg">
+            <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" priority />
           </div>
           <div>
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">

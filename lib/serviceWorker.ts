@@ -86,8 +86,8 @@ workerScope.addEventListener("push", (rawEvent) => {
   event.waitUntil(
     workerScope.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/app-icon.png",
+      badge: "/app-icon.png",
       tag: data.tag,
       data: { href: data.href },
       renotify: true,
@@ -95,8 +95,8 @@ workerScope.addEventListener("push", (rawEvent) => {
   );
 });
 
-const CACHE_NAME = "agm-bakim-shell-v5";
-const SHELL_ASSETS = ["/login", "/manifest.json", "/icon.svg"];
+const CACHE_NAME = "agm-bakim-shell-v6";
+const SHELL_ASSETS = ["/login", "/manifest.json", "/app-icon.png"];
 const OFFLINE_OWNER_HEADER = "x-agm-offline-owner";
 
 function isPublicCacheRequest(request: Request, url: URL): boolean {
