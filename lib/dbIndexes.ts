@@ -92,6 +92,13 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(records, { manager_confirmation_status: 1, created_at: -1 }, { name: "records_manager_confirmation_created_at" }),
       createIndexSafely(records, { group_id: 1, manager_confirmation_status: 1 }, { name: "records_group_confirmation_status" }),
       createIndexSafely(records, { client_request_id: 1 }, { unique: true, sparse: true }),
+      // Serbest metin araması için: motor adı, bakım türü ve teknisyen adı üzerinde tek bir text index.
+      // Not: text index kelime/kelime-başı bazlı eşleşir (regex substring araması değildir).
+      createIndexSafely(
+        records,
+        { engine_name: "text", type_label: "text", technician_name: "text" } as unknown as Record<string, 1 | -1>,
+        { name: "records_search_text", default_language: "none" },
+      ),
       createIndexSafely(notifications, { user_id: 1, read_at: 1, created_at: -1 }),
       createIndexSafely(notifications, { user_id: 1, sort_at: -1, created_at: -1, _id: -1 }, { name: "notifications_user_sort_at_desc" }),
       createIndexSafely(notifications, { dedupe_key: 1 }, { unique: true, sparse: true }),
@@ -109,30 +116,4 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(pushSubscriptions, { endpoint: 1 }, { unique: true }),
       createIndexSafely(videoChunks, { upload_id: 1, index: 1 }, { name: "video_chunks_upload_index" }),
       createIndexSafely(videoChunks, { upload_id: 1, owner_id: 1, index: 1 }, { name: "video_chunks_owner_upload_index" }),
-      createIndexSafely(videoChunks, { at: 1 }, { expireAfterSeconds: 24 * 60 * 60, name: "video_chunks_at_ttl" }),
-      createIndexSafely(oilAnalyses, { engine_id: 1, analysis_date: -1, created_at: -1 }, { name: "oil_analyses_engine_date_desc" }),
-      createIndexSafely(oilAnalyses, { analysis_date: -1, created_at: -1 }, { name: "oil_analyses_date_desc" }),
-      createIndexSafely(pressureReadings, { engine_id: 1, reading_date: 1, created_at: 1 }, { name: "pressure_readings_engine_date_asc" }),
-      createIndexSafely(pressureReadings, { reading_date: 1, created_at: 1 }, { name: "pressure_readings_date_asc" }),
-    ]).then((results) => {
-      const failedIndexes = results.filter((result) => !result.ok).map((result) => result.label);
-      global._agmIndexStatus = {
-        state: failedIndexes.length > 0 ? "degraded" : "ready",
-        failed_count: failedIndexes.length,
-        failed_indexes: failedIndexes.slice(0, 20),
-        checked_at: new Date().toISOString(),
-      };
-      if (failedIndexes.length > 0) {
-        logOperationalEvent("error", "db_index_bootstrap_degraded", {
-          error_code: "DB_INDEX_BOOTSTRAP_DEGRADED",
-          failed_count: failedIndexes.length,
-          failed_indexes: failedIndexes.slice(0, 20),
-        });
-      } else {
-        logOperationalEvent("info", "db_index_bootstrap_ready", { index_count: results.length });
-      }
-    });
-  }
-
-  return global._agmIndexPromise;
-}
+      createIndexSafely(videoChunks, { at: 1 }, { expireAfterSeconds: 24 * 60 * 60, name: "video_chunks_
