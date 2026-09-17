@@ -117,3 +117,29 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(videoChunks, { upload_id: 1, index: 1 }, { name: "video_chunks_upload_index" }),
       createIndexSafely(videoChunks, { upload_id: 1, owner_id: 1, index: 1 }, { name: "video_chunks_owner_upload_index" }),
       createIndexSafely(videoChunks, { at: 1 }, { expireAfterSeconds: 24 * 60 * 60, name: "video_chunks_at_ttl" }),
+      createIndexSafely(oilAnalyses, { engine_id: 1, analysis_date: -1, created_at: -1 }, { name: "oil_analyses_engine_date_desc" }),
+      createIndexSafely(oilAnalyses, { analysis_date: -1, created_at: -1 }, { name: "oil_analyses_date_desc" }),
+      createIndexSafely(pressureReadings, { engine_id: 1, reading_date: 1, created_at: 1 }, { name: "pressure_readings_engine_date_asc" }),
+      createIndexSafely(pressureReadings, { reading_date: 1, created_at: 1 }, { name: "pressure_readings_date_asc" }),
+    ]).then((results) => {
+      const failedIndexes = results.filter((result) => !result.ok).map((result) => result.label);
+      global._agmIndexStatus = {
+        state: failedIndexes.length > 0 ? "degraded" : "ready",
+        failed_count: failedIndexes.length,
+        failed_indexes: failedIndexes.slice(0, 20),
+        checked_at: new Date().toISOString(),
+      };
+      if (failedIndexes.length > 0) {
+        logOperationalEvent("error", "db_index_bootstrap_degraded", {
+          error_code: "DB_INDEX_BOOTSTRAP_DEGRADED",
+          failed_count: failedIndexes.length,
+          failed_indexes: failedIndexes.slice(0, 20),
+        });
+      } else {
+        logOperationalEvent("info", "db_index_bootstrap_ready", { index_count: results.length });
+      }
+    });
+  }
+
+  return global._agmIndexPromise;
+}
