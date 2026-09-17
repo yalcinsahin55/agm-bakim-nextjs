@@ -79,7 +79,8 @@ export default function DashboardPage() {
       const engineItems = itemsByEngine.get(engine._id) || [];
       const penalty = engineItems.reduce((sum, item) => sum + (item.status === "gecikmis" ? 25 : item.status === "kritik" ? 15 : item.status === "yaklasiyor" ? 5 : 0), 0);
       const score = Math.max(0, Math.min(100, 100 - penalty));
-      return { engine, score, status: engineStatus(engineItems), attention: engineItems.filter((item) => item.status !== "normal").length };
+      // engineItems burada saklanıyor; render sırasında items.filter(...) ile tekrar hesaplamaya gerek kalmıyor.
+      return { engine, score, status: engineStatus(engineItems), attention: engineItems.filter((item) => item.status !== "normal").length, items: engineItems };
     });
   }, [items, sortedEngines]);
   const todayStr = currentTime.toLocaleDateString("tr-TR", {
@@ -178,10 +179,9 @@ export default function DashboardPage() {
           <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Bakım Durumu</h2>
           <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
-          {healthRows.map(({ engine, score, status, attention }) => {
+          {healthRows.map(({ engine, score, status, attention, items: engineItems }) => {
             const statusView = ENGINE_STATUS_VIEW[status];
             const selected = selectedHealthEngineId === engine._id;
-            const engineItems = items.filter((item) => item.engine_id === engine._id);
             return <div id={healthCardId(engine._id)} key={engine._id} className="flex scroll-mt-24 flex-col gap-2">
               <button type="button" onClick={() => setSelectedHealthEngineId(selected ? "" : engine._id)} aria-expanded={selected} className={`rounded-xl border bg-panel p-3 text-left transition hover:border-amber/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber shadow-lg shadow-amber/10" : "border-border"}`}>
                 <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-bold text-text"><span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusView.dot}`} aria-hidden="true" />{engine.name}</span><span className={`font-mono text-lg font-extrabold ${statusView.text}`}>%{score}</span></div>
