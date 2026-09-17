@@ -48,6 +48,11 @@ export default function BakimTurleriPage() {
   }, [items, selectedKey, statusFilter]);
 
   const engineLoadById = useMemo(() => new Map(engines.map((engine) => [engine._id, engine.load_kw])), [engines]);
+  const countByType = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((i) => map.set(i.type_key, (map.get(i.type_key) || 0) + 1));
+    return map;
+  }, [items]);
   const selectedType = types.find((t) => t.key === selectedKey);
   const selectedTypeLabel = selectedType?.label || "Tüm bakım türleri";
 
@@ -87,7 +92,7 @@ export default function BakimTurleriPage() {
             <span className={`ml-1.5 text-[10px] ${!selectedKey ? "opacity-70" : "text-faint"}`}>({items.length})</span>
           </button>
           {sortedTypes.map((t) => {
-            const count = items.filter((i) => i.type_key === t.key).length;
+            const count = countByType.get(t.key) || 0;
             const selected = selectedKey === t.key;
             return (
               <button
