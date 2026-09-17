@@ -165,14 +165,20 @@ export default function KarterBasinciPage() {
     }
   }
 
-  const historyEngines = sortedEngines.filter((engine) => {
+  const historyEngines = useMemo(() => {
     const needle = historySearch.trim().toLocaleLowerCase("tr-TR");
-    return !needle || engine.name.toLocaleLowerCase("tr-TR").includes(needle);
-  });
+    return sortedEngines.filter((engine) => !needle || engine.name.toLocaleLowerCase("tr-TR").includes(needle));
+  }, [sortedEngines, historySearch]);
   const allReadings = useMemo(() => [...readings, ...additionalReadings], [readings, additionalReadings]);
-  const engineHistory = allReadings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime());
-  const numericHistory = engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number");
-  const selectedHistoryEngine = sortedEngines.find((engine) => engine._id === historyEngine);
+  const engineHistory = useMemo(
+    () => allReadings.filter((r) => r.engine_id === historyEngine).sort((a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()),
+    [allReadings, historyEngine],
+  );
+  const numericHistory = useMemo(
+    () => engineHistory.filter((r): r is PressureReading & { pressure_bar: number } => typeof r.pressure_bar === "number"),
+    [engineHistory],
+  );
+  const selectedHistoryEngine = useMemo(() => sortedEngines.find((engine) => engine._id === historyEngine), [sortedEngines, historyEngine]);
   const canWrite = user?.role === "yonetici";
   const visibleTab = canWrite ? tab : "history";
   const tabs: Array<[PressureTab, string]> = canWrite
