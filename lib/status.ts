@@ -71,12 +71,20 @@ function finiteNumber(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function engineStateFor(states: Record<string, unknown>, engine: Engine): unknown {
+function buildStateLookup(states: Record<string, unknown>): Map<string, unknown> {
+  const map = new Map<string, unknown>();
+  for (const key of Object.keys(states)) map.set(normalizeEngineLookupKey(key), states[key]);
+  return map;
+}
+
+function resolveEngineState(
+  states: Record<string, unknown>,
+  normalizedLookup: Map<string, unknown>,
+  engine: Engine,
+): unknown {
   const direct = states[engine._id] ?? states[engine.name];
   if (direct && typeof direct === "object" && !Array.isArray(direct)) return direct;
-  const target = normalizeEngineLookupKey(engine.name);
-  const matchingKey = Object.keys(states).find((key) => normalizeEngineLookupKey(key) === target);
-  const matched = matchingKey ? states[matchingKey] : undefined;
+  const matched = normalizedLookup.get(normalizeEngineLookupKey(engine.name));
   return matched && typeof matched === "object" && !Array.isArray(matched) ? matched : undefined;
 }
 
@@ -88,9 +96,13 @@ export function buildItems(engines: Engine[], types: MaintenanceType[]): PanelIt
     const rawStates = t.engine_states;
     const states: Record<string, unknown> = rawStates && !Array.isArray(rawStates) && typeof rawStates === "object" ? rawStates as Record<string, unknown> : {};
     const explicitScope = t.engine_scope === "explicit" || (t.engine_scope === undefined && Object.keys(states).length > 0);
-    const applicableEngines = explicitScope ? engines.filter((engine) => engineStateFor(states, engine) !== undefined) : engines;
-    applicableEngines.forEach((engine) => {
-      const rawState = engineStateFor(states, engine);
+    // Normalize edilmiş lookup tip başına BİR KEZ kuruluyor (önceden motor başına tekrar tekrar taranıyordu).
+    const normalizedLookup = buildStateLookup(states);
+
+    engines.forEach((engine) => {
+      const rawState = resolveEngineState(states, normalizedLookup, engine);
+      if (explicitScope && rawState === undefined) return; // bu motor bu bakım türü kapsamında değil
+
       const state: Partial<EngineState> = rawState && typeof rawState === "object" && !Array.isArray(rawState) ? rawState as Partial<EngineState> : {};
       const engineHours = finiteNumber(engine.hours, 0);
       const lastHour = finiteNumber(state.last_maintenance_hour, 0);
