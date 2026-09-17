@@ -47,12 +47,9 @@ export async function getRecords(req: NextRequest) {
       query.manager_confirmation_status = confirmationStatus;
     }
     if (search) {
-      const escaped = search.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
-      query.$or = [
-        { engine_name: { $regex: escaped, $options: "i" } },
-        { type_label: { $regex: escaped, $options: "i" } },
-        { technician_name: { $regex: escaped, $options: "i" } },
-      ];
+      // Text index kelime/kelime-başı bazlı eşleşir; motor/tür zaten açılır listeden seçildiği için
+      // serbest metin araması burada sadece teknisyen adı gibi alanlarda ek bir filtre olarak kullanılıyor.
+      query.$text = { $search: search };
     }
 
     const recordsCol = recordsCollection(db);
