@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import NotificationBell from "@/components/NotificationBell";
 import LogoutButton from "@/components/LogoutButton";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface TopBarProps {
   title: string;
@@ -11,7 +12,7 @@ interface TopBarProps {
 
 export default function TopBar({ title, subtitle, right }: TopBarProps) {
   return (
-    <div className="sticky top-0 z-20 bg-[#0f1319]/95 backdrop-blur-md border-b border-border px-4 pt-4 pb-3">
+    <div className="sticky top-0 z-20 bg-bg/95 backdrop-blur-md border-b border-border px-4 pt-4 pb-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Mobilde logo göster, PC'de sidebar'da zaten var */}
@@ -24,6 +25,7 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <NotificationBell />
           {right}
           <LogoutButton />

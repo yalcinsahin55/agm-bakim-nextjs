@@ -5,9 +5,45 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+  --color-bg: #0f1319;
+  --color-panel: #171d25;
+  --color-panel2: #1f2730;
+  --color-border: #2a323c;
+  --color-borderlt: #374252;
+  --color-text: #eef1f5;
+  --color-muted: #b3bdc8;
+  --color-faint: #8f9ba8;
+  --color-amber: #e8952f;
+  --color-teal: #3fb5c4;
+  --color-red: #ef4a52;
+  --color-orange: #f2994a;
+  --color-yellow: #f0c93d;
+  --color-green: #33c98a;
+}
+
+:root.light {
+  color-scheme: light;
+  --color-bg: #f3f6f8;
+  --color-panel: #ffffff;
+  --color-panel2: #e8eef2;
+  --color-border: #cbd5dc;
+  --color-borderlt: #aebdc7;
+  --color-text: #17212b;
+  --color-muted: #52616d;
+  --color-faint: #6d7b86;
+  --color-amber: #b96812;
+  --color-teal: #087f8d;
+  --color-red: #c9353d;
+  --color-orange: #c66d20;
+  --color-yellow: #a87800;
+  --color-green: #168557;
+}
+
 html, body {
-  background: radial-gradient(circle at 20% 0%, #141a22 0%, #0f1319 55%);
-  color: #eef1f5;
+  background: radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--color-panel2) 80%, var(--color-bg)) 0%, var(--color-bg) 55%);
+  color: var(--color-text);
   font-family: 'Inter', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
@@ -22,7 +58,7 @@ html, body {
 }
 
 ::placeholder {
-  color: #8f9ba8;
+  color: var(--color-faint);
   opacity: 1;
 }
 
