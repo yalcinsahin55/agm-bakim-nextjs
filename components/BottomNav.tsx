@@ -66,7 +66,7 @@ export default function BottomNav() {
     <>
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
-        <div className="mx-auto flex w-full max-w-lg min-w-0 bg-[#0f1319]/95 px-1 pb-4 pt-2 backdrop-blur-xl border-t border-border">
+        <div className="mx-auto flex w-full max-w-lg min-w-0 bg-bg/95 px-1 pb-4 pt-2 backdrop-blur-xl border-t border-border shadow-[0_-8px_28px_rgba(15,19,25,0.12)]">
           {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
