@@ -95,7 +95,7 @@ workerScope.addEventListener("push", (rawEvent) => {
   );
 });
 
-const CACHE_NAME = "agm-bakim-shell-v6";
+const CACHE_NAME = "agm-bakim-shell-v7";
 const SHELL_ASSETS = ["/login", "/manifest.json", "/app-icon.png"];
 const OFFLINE_OWNER_HEADER = "x-agm-offline-owner";
 

@@ -737,7 +737,7 @@ test("service worker updates bypass stale script caches", async () => {
   const serviceWorker = await source("lib/serviceWorker.ts");
   const pwaRegister = await source("components/PwaRegister.tsx");
   const pushToggle = await source("components/PushNotificationToggle.tsx");
-  assert.match(serviceWorker, /agm-bakim-shell-v6/);
+  assert.match(serviceWorker, /agm-bakim-shell-v7/);
   assert.match(serviceWorker, /caches\.delete/);
   assert.match(pwaRegister, /updateViaCache: "none"/);
   assert.match(pwaRegister, /registration.update()/);
