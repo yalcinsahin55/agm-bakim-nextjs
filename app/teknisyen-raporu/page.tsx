@@ -14,6 +14,7 @@ const PERIODS = [
   { key: "3months", label: "Son 3 ay" },
   { key: "year", label: "Bu yıl" },
   { key: "all", label: "Tümü" },
+  { key: "custom", label: "Özel tarih aralığı" },
 ] as const;
 
 type PeriodKey = (typeof PERIODS)[number]["key"];
@@ -67,15 +68,22 @@ export default function TeknisyenRaporuPage() {
   const router = useRouter();
   const { signal } = useAbortableFetch();
   const [period, setPeriod] = useState<PeriodKey>("month");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [summary, setSummary] = useState<AnalyticsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load(selectedPeriod: PeriodKey = period) {
+  async function load(selectedPeriod: PeriodKey = period, from = customFrom, to = customTo) {
     setError("");
     setLoading(true);
     try {
-      const data = await cachedFetch<AnalyticsResponse>(`/api/analytics/summary?period=${selectedPeriod}&scope=technician-report`, 30_000);
+      const params = new URLSearchParams({ period: selectedPeriod === "custom" ? "all" : selectedPeriod, scope: "technician-report" });
+      if (selectedPeriod === "custom" && from && to) {
+        params.set("from", from);
+        params.set("to", to);
+      }
+      const data = await cachedFetch<AnalyticsResponse>(`/api/analytics/summary?${params.toString()}`, 30_000);
       setSummary({
         ...EMPTY,
         ...data,
@@ -123,9 +131,14 @@ export default function TeknisyenRaporuPage() {
       <section className="mb-4 rounded-card border border-border bg-panel p-3.5">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor filtreleri</div>
         <div className="grid grid-cols-1 gap-2">
-          <select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
+          <select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); if (nextPeriod !== "custom") void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
             {PERIODS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
           </select>
+          {period === "custom" && <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label className="text-[10px] font-bold uppercase tracking-wide text-faint">Başlangıç tarihi<input type="date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} className="mt-1 block w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal" /></label>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-faint">Bitiş tarihi<input type="date" value={customTo} min={customFrom || undefined} onChange={(event) => setCustomTo(event.target.value)} className="mt-1 block w-full rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal" /></label>
+            <button type="button" disabled={!customFrom || !customTo || customFrom > customTo || loading} onClick={() => void load("custom", customFrom, customTo)} className="rounded-xl bg-teal px-4 py-2.5 text-[11px] font-extrabold text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Uygula</button>
+          </div>}
         </div>
       </section>
 
