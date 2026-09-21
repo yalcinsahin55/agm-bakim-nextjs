@@ -32,6 +32,7 @@ import { buildCompletionPayload } from "./_lib/completionPayload";
 import { getCompletionValidationError } from "./_lib/completionValidation";
 import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
+import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -247,6 +248,19 @@ export default function TamamlaPage() {
   async function submit() {
     const selectedSupportIds = otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
     const selectedSupportDurations = selectedSupportIds.map((id) => normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 0));
+    const selectedEngine = engines.find((engine) => engine._id === engineId);
+    const hourValidationError = selectedEngine
+      ? getCompletionHourValidationError(
+        hours,
+        selectedEngine.hours,
+        selectedEngine.latest_excel_snapshot ? [{ ...selectedEngine.latest_excel_snapshot, load_kw: 0, source: "excel" }] : undefined,
+        maintenanceStartAt,
+      )
+      : null;
+    if (hourValidationError) {
+      toast.error(hourValidationError);
+      return;
+    }
     const validationError = getCompletionValidationError({
       chosenTypePresent: Boolean(chosenType),
       checklistComplete,

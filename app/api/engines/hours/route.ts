@@ -90,7 +90,7 @@ export async function PATCH(req: NextRequest) {
       const nextHours = hoursChanged && typeof u.hours === "number" ? u.hours : existing.hours;
       const nextLoadKw = loadChanged && typeof u.load_kw === "number" ? u.load_kw : (existing.load_kw || 0);
       if (hoursChanged || loadChanged) {
-        updateOp.$push = { history: { date: stamp.toISOString(), hours: nextHours, load_kw: nextLoadKw } };
+        updateOp.$push = { history: { date: stamp.toISOString(), hours: nextHours, load_kw: nextLoadKw, source: "manual" } };
       }
       changes.push({ engine_id: engineId, engine: String(existing.name || engineId), before: { hours: Number(existing.hours || 0), load_kw: Number(existing.load_kw || 0) }, after: { hours: Number(nextHours || 0), load_kw: Number(nextLoadKw || 0) } });
       operations.push({ updateOne: { filter: { _id: engineId }, update: updateOp } });
@@ -102,6 +102,7 @@ export async function PATCH(req: NextRequest) {
             date: stamp.toISOString(),
             hours: typeof setFields.hours === "number" ? setFields.hours : existing.hours,
             load_kw: typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
+            source: "manual",
           }],
         } : {}),
       });

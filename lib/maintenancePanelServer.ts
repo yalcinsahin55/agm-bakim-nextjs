@@ -2,12 +2,14 @@ import type { Db } from "mongodb";
 import { enginesCollection, maintenanceTypesCollection } from "@/lib/dbCollections";
 import { buildItems, type PanelItem } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
+import { latestExcelHourSnapshot } from "@/lib/engineHoursRules";
 
 export type ServerPanelEngine = {
   _id: string;
   name: string;
   hours: number;
   load_kw?: number;
+  latest_excel_snapshot?: { date: string; hours: number } | null;
 };
 
 export interface ServerPanelPayload {
@@ -47,13 +49,20 @@ export async function getOrBuildMaintenancePanelServerPayload(db: Db, now = Date
 
   const [engines, types] = await Promise.all([
     enginesCollection(db).find({}, {
-      projection: { _id: 1, name: 1, hours: 1, load_kw: 1 },
+      projection: { _id: 1, name: 1, hours: 1, load_kw: 1, history: 1 },
     }).toArray(),
     maintenanceTypesCollection(db).find({ is_deleted: { $ne: true } }, {
       projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 },
     }).toArray(),
   ]);
-  const payload: ServerPanelPayload = { items: buildItems(engines, types), engines, types };
+  const panelEngines = engines.map((engine) => ({
+    _id: String(engine._id),
+    name: engine.name,
+    hours: engine.hours,
+    load_kw: engine.load_kw,
+    latest_excel_snapshot: latestExcelHourSnapshot(engine.history),
+  }));
+  const payload: ServerPanelPayload = { items: buildItems(engines, types), engines: panelEngines, types };
   setMaintenancePanelServerCache(payload, now);
   return payload;
 }

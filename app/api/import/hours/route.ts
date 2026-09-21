@@ -98,6 +98,12 @@ async function postImportHours(req: NextRequest) {
     const existing = workingEngines.get(name);
     if (!existing) continue;
 
+    if (hours < Number(existing.hours || 0)) {
+      return NextResponse.json({
+        error: `${String(existing.name || name)} için Excel saati geriye çekilemez. Önceki değer: ${Number(existing.hours || 0).toLocaleString("tr-TR")} saat, girilen değer: ${hours.toLocaleString("tr-TR")} saat.`,
+      }, { status: 400 });
+    }
+
     const setFields: Partial<Pick<EngineDocument, "hours" | "load_kw" | "updated_at">> = { updated_at: stamp };
     let hoursChanged = false;
     let loadChanged = false;
@@ -115,6 +121,7 @@ async function postImportHours(req: NextRequest) {
           date: stamp.toISOString(),
           hours: hoursChanged ? hours : existing.hours,
           load_kw: nextLoadKw,
+          source: "excel",
         },
       };
     }
@@ -124,11 +131,12 @@ async function postImportHours(req: NextRequest) {
       ...existing,
       ...setFields,
       ...(hoursChanged || loadChanged ? {
-        history: [...(Array.isArray(existing.history) ? existing.history : []), {
-          date: stamp.toISOString(),
-          hours: typeof setFields.hours === "number" ? setFields.hours : existing.hours,
-          load_kw: typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
-        }],
+          history: [...(Array.isArray(existing.history) ? existing.history : []), {
+            date: stamp.toISOString(),
+            hours: typeof setFields.hours === "number" ? setFields.hours : existing.hours,
+            load_kw: typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
+            source: "excel",
+          }],
       } : {}),
     });
     updated++;

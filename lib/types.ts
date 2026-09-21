@@ -34,6 +34,7 @@ export interface EngineHistoryEntry {
   date: string;
   hours: number;
   load_kw: number;
+  source?: "excel" | "manual" | "record";
 }
 
 export interface Engine {

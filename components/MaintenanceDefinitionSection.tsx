@@ -66,7 +66,7 @@ export default function MaintenanceDefinitionSection({
       <label className="mt-4 block text-[10.5px] font-bold uppercase tracking-wide text-muted">O anki motor çalışma saati
         <input type="number" value={hours} onChange={(event) => onHoursChange(Number(event.target.value) || 0)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-base font-bold text-amber outline-none focus:border-amber" />
       </label>
-      <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu kayda yazılır.</p>
+      <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu kayda yazılır. Excel ölçümünden sonra geçen süreyi aşan değerler kabul edilmez.</p>
     </section>
   );
 }

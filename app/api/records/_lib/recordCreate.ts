@@ -24,6 +24,7 @@ import type { TechnicianOption } from "@/lib/technicians";
 import { buildExtraClientRequestId, parseDateOnly } from "./recordRouteHelpers";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 import { insertCreatedMaintenanceRecord } from "./recordCreateInsert";
+import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 
 export async function postRecord(req: NextRequest) {
   let operationStep = "initialize";
@@ -118,6 +119,8 @@ export async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
     const engineName = engine.name;
+    const hourValidationError = getCompletionHourValidationError(hour_at_completion, engine.hours, engine.history, maintenanceStartAt);
+    if (hourValidationError) return NextResponse.json({ error: hourValidationError }, { status: 400 });
 
     const useExternalService = technician_source === "external_service";
     if (useExternalService && user.role !== "yonetici") {
@@ -315,7 +318,7 @@ export async function postRecord(req: NextRequest) {
         if (hour_at_completion > engine.hours) {
           operationStep = "update_engine_hours";
           const stamp = new Date();
-          const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0 };
+          const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0, source: "record" as const };
           await enginesCol.updateOne(
             { _id: engine_id, hours: { $lt: hour_at_completion } },
             Array.isArray(engine.history)

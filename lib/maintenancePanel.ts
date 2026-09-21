@@ -2,7 +2,9 @@ import type { Engine, MaintenanceType } from "@/lib/types";
 import { cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 import type { PanelItem } from "@/lib/status";
 
-export type PanelEngine = Pick<Engine, "_id" | "name" | "hours" | "load_kw">;
+export type PanelEngine = Pick<Engine, "_id" | "name" | "hours" | "load_kw"> & {
+  latest_excel_snapshot?: { date: string; hours: number } | null;
+};
 
 export interface MaintenancePanelResponse {
   items: PanelItem[];

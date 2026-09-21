@@ -38,12 +38,17 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function localDateTimeValue(date = new Date()): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 export default function ExcelPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
   const canImport = user?.role === "yonetici";
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
+  const [importDate, setImportDate] = useState(localDateTimeValue());
   const [importing, setImporting] = useState(false);
   const [engines, setEngines] = useState<ExcelEngine[]>([]);
   const [types, setTypes] = useState<ExcelMaintenanceType[]>([]);
@@ -84,7 +89,7 @@ export default function ExcelPage() {
       const file_b64 = await fileToBase64(importFile);
       const res = await fetch("/api/import/hours", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_b64, import_date: importDate }),
+        body: JSON.stringify({ file_b64, import_date: new Date(importDate).toISOString() }),
       });
       const data = await res.json() as ImportResult;
       if (res.ok) {
@@ -159,13 +164,13 @@ export default function ExcelPage() {
             </div>
           </div>
 
-          <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Bu verinin ait olduğu tarih</label>
+          <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Bu verinin ait olduğu tarih ve saat</label>
           <input
-            type="date" value={importDate} max={new Date().toISOString().slice(0, 10)}
+            type="datetime-local" value={importDate} max={localDateTimeValue()}
             onChange={(e) => setImportDate(e.target.value)}
             className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-1 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
           />
-          <p className="text-[10.5px] text-faint mb-3">Saat geçmişine bu tarihle kaydedilir — geçmiş bir Excel dosyası yüklüyorsanız o tarihi seçin.</p>
+          <p className="text-[10.5px] text-faint mb-3">Excel saati bu tarih ve saatle geçmişe kaydedilir. Bir motorun saati önceki Excel değerinden düşükse dosya güvenlik nedeniyle reddedilir.</p>
 
           <label className="flex items-center gap-2 border-2 border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer mb-3 hover:border-amber hover:bg-amber/5 transition">
             <span className="text-lg">📊</span>
