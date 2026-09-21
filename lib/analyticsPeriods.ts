@@ -1,4 +1,4 @@
-export type AnalyticsWorkPeriod = "week" | "month" | "total";
+export type AnalyticsWorkPeriod = "week" | "month" | "3months" | "year" | "total";
 
 type DateRangeOptions = {
   month?: string | null;
@@ -32,6 +32,12 @@ export function analyticsWorkRange(now: Date, period: AnalyticsWorkPeriod, optio
     to.setUTCMilliseconds(-1);
     return { from, to };
   }
+  if (period === "3months") {
+    return { from: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1)), to: now };
+  }
+  if (period === "year") {
+    return { from: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), to: now };
+  }
   if (options.month && /^\d{4}-\d{2}$/.test(options.month)) {
     const [year, month] = options.month.split("-").map(Number);
     if (!Number.isInteger(year) || month < 1 || month > 12) return null;
@@ -43,7 +49,7 @@ export function analyticsWorkRange(now: Date, period: AnalyticsWorkPeriod, optio
 }
 
 export function analyticsWorkRangeLabel(period: AnalyticsWorkPeriod): string {
-  return period === "week" ? "mevcut hafta" : period === "month" ? "seçilen ay / son 12 ay" : "tüm dönem";
+  return period === "week" ? "mevcut hafta" : period === "month" ? "seçilen ay / son 12 ay" : period === "3months" ? "son 3 ay" : period === "year" ? "bu yıl" : "tüm dönem";
 }
 
 export function groupPeriodLabel(month: string, week: string): string {

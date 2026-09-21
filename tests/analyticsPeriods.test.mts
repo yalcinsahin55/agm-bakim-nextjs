@@ -39,3 +39,13 @@ test("total analytics range has no date restriction", () => {
   assert.equal(analyticsWorkRange(new Date("2026-09-02T12:00:00.000Z"), "total"), null);
   assert.equal(groupPeriodLabel("2026-09", "2026-W36"), "2026-09 · 2026-W36");
 });
+
+test("technician report periods use their own work ranges", () => {
+  const now = new Date("2026-09-21T12:00:00.000Z");
+  const month = analyticsWorkRange(now, "month");
+  const threeMonths = analyticsWorkRange(now, "3months");
+  const year = analyticsWorkRange(now, "year");
+  assert.equal(month?.from.toISOString(), "2025-10-01T00:00:00.000Z");
+  assert.equal(threeMonths?.from.toISOString(), "2026-07-01T00:00:00.000Z");
+  assert.equal(year?.from.toISOString(), "2026-01-01T00:00:00.000Z");
+});

@@ -62,8 +62,9 @@ async function getAnalyticsSummary(req: NextRequest) {
   const searchParams = new URL(req.url).searchParams;
   const requestedPeriod = searchParams.get("period") || "all";
   const enginePeriod = VALID_ENGINE_PERIODS.has(requestedPeriod) ? requestedPeriod : "all";
-  const requestedWorkPeriod = searchParams.get("workPeriod") || "total";
-  const workPeriod = (new Set(["week", "month", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total") as "week" | "month" | "total";
+  const explicitWorkPeriod = searchParams.get("workPeriod");
+  const requestedWorkPeriod = explicitWorkPeriod || (requestedPeriod === "month" || requestedPeriod === "3months" || requestedPeriod === "year" ? requestedPeriod : "total");
+  const workPeriod = (new Set(["week", "month", "3months", "year", "total"]).has(requestedWorkPeriod) ? requestedWorkPeriod : "total") as "week" | "month" | "3months" | "year" | "total";
   const selectedMonth = searchParams.get("month");
   const selectedWeekStart = searchParams.get("weekStart");
   const selectedFrom = searchParams.get("from");
@@ -240,7 +241,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     return {
       key: canonical?.id || id || normalizeTechnicianName(row?.technician) || "unknown",
       name: canonical?.full_name || (typeof row?.technician === "string" && row.technician.trim() ? row.technician.trim() : "Bilinmeyen"),
-      technician_type: row?.technician_type === "elektromekanik" || row?.technician_type === "mekanik" ? row.technician_type : canonical?.technician_type || normalizeTechnicianType(row?.technician_type),
+      technician_type: canonical?.technician_type || (row?.technician_type === "elektromekanik" || row?.technician_type === "mekanik" ? row.technician_type : normalizeTechnicianType(row?.technician_type)),
     };
   }
   function mergeTechnicianRow(row: TechnicianAggregateRow, kind: "responsible" | "support") {
