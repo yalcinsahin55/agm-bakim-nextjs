@@ -67,7 +67,6 @@ export default function TeknisyenRaporuPage() {
   const router = useRouter();
   const { signal } = useAbortableFetch();
   const [period, setPeriod] = useState<PeriodKey>("month");
-  const [technicianTypeFilter, setTechnicianTypeFilter] = useState<"all" | "mekanik" | "elektromekanik">("all");
   const [summary, setSummary] = useState<AnalyticsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -76,7 +75,7 @@ export default function TeknisyenRaporuPage() {
     setError("");
     setLoading(true);
     try {
-      const data = await cachedFetch<AnalyticsResponse>(`/api/analytics/summary?period=${selectedPeriod}`, 30_000);
+      const data = await cachedFetch<AnalyticsResponse>(`/api/analytics/summary?period=${selectedPeriod}&scope=technician-report`, 30_000);
       setSummary({
         ...EMPTY,
         ...data,
@@ -102,15 +101,10 @@ export default function TeknisyenRaporuPage() {
 
   useEffect(() => { if (!signal.aborted) void load("month"); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleTechnicians = summary.byTechnician.filter((item) => technicianTypeFilter === "all" || item.technician_type === technicianTypeFilter);
-  const totalDuration = technicianTypeFilter === "all"
-    ? Number(summary.periodTechnicianDurationMinutes ?? summary.periodDurationMinutes ?? 0)
-    : visibleTechnicians.reduce((total, item) => total + Number(item.total_duration_minutes || 0), 0);
-  const totalTechnicianTasks = technicianTypeFilter === "all"
-    ? Number(summary.periodTechnicianTasks || 0)
-    : visibleTechnicians.reduce((total, item) => total + Number(item.total_count || 0), 0);
+  const visibleTechnicians = summary.byTechnician;
+  const totalDuration = Number(summary.periodTechnicianDurationMinutes ?? summary.periodDurationMinutes ?? 0);
+  const totalTechnicianTasks = Number(summary.periodTechnicianTasks || 0);
   const averageDuration = totalTechnicianTasks ? Math.round(totalDuration / totalTechnicianTasks) : 0;
-  const visibleTechnicianTypes = summary.byTechnicianType.filter((item) => technicianTypeFilter === "all" || item.technician_type === technicianTypeFilter);
   const maxWork = Math.max(...visibleTechnicians.map((item) => Number(item.total_count || 0)), 1);
   const maxType = Math.max(...summary.byType.map((item) => Number(item.count || 0)), 1);
   const maxEngine = Math.max(...summary.byEngine.map((item) => Number(item.count || 0)), 1);
@@ -128,12 +122,9 @@ export default function TeknisyenRaporuPage() {
       </section>
       <section className="mb-4 rounded-card border border-border bg-panel p-3.5">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Rapor filtreleri</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2">
           <select value={period} onChange={(event) => { const nextPeriod = event.target.value as PeriodKey; setPeriod(nextPeriod); void load(nextPeriod); }} aria-label="Rapor dönemi" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
             {PERIODS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-          </select>
-          <select value={technicianTypeFilter} onChange={(event) => setTechnicianTypeFilter(event.target.value as "all" | "mekanik" | "elektromekanik")} aria-label="Teknisyen türü" className="min-w-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-text outline-none focus:border-teal">
-            <option value="all">Tüm teknisyen türleri</option><option value="mekanik">Mekanik teknisyen</option><option value="elektromekanik">Elektromekanik teknisyen</option>
           </select>
         </div>
       </section>
@@ -152,7 +143,7 @@ export default function TeknisyenRaporuPage() {
       {summary.byTechnicianType.length > 0 && <section className="mb-4 rounded-card border border-border bg-panel p-4">
         <div className="mb-1 flex items-center justify-between gap-2"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide">Teknisyen türü özeti</h2><span className="text-[10px] text-faint">Uzmanlık türüne göre</span></div>
         <p className="mb-3 text-[10.5px] text-faint">Mekanik ve elektromekanik ekiplerin görev sayısı ile kayıtlı süreleri ayrı tutulur. Elektromekanik çalışanlar destek olarak seçildiğinde katkıları kendi kategorilerinde görünür.</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{visibleTechnicianTypes.map((item) => <div key={item.technician_type} className="rounded-xl border border-border bg-panel2 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[11.5px] font-bold text-text">{item.technician_type_label}</span><span className="text-[10px] text-faint">{item.technician_count} kişi</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px]"><div><div className="text-faint">Görev</div><div className="font-mono font-bold text-teal">{item.total_count}</div></div><div><div className="text-faint">Sorumlu</div><div className="font-mono font-bold text-amber">{item.responsible_count}</div></div><div><div className="text-faint">Destek</div><div className="font-mono font-bold text-purple-300">{item.support_count}</div></div></div><div className="mt-2 text-[10px] text-muted">Toplam süre: <b className="text-green">{formatMaintenanceDuration(item.total_duration_minutes)}</b> · Görev başına: <b>{formatMaintenanceDuration(item.total_count ? Math.round(item.total_duration_minutes / item.total_count) : 0)}</b></div></div>)}</div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{summary.byTechnicianType.map((item) => <div key={item.technician_type} className="rounded-xl border border-border bg-panel2 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[11.5px] font-bold text-text">{item.technician_type_label}</span><span className="text-[10px] text-faint">{item.technician_count} kişi</span></div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px]"><div><div className="text-faint">Görev</div><div className="font-mono font-bold text-teal">{item.total_count}</div></div><div><div className="text-faint">Sorumlu</div><div className="font-mono font-bold text-amber">{item.responsible_count}</div></div><div><div className="text-faint">Destek</div><div className="font-mono font-bold text-purple-300">{item.support_count}</div></div></div><div className="mt-2 text-[10px] text-muted">Toplam süre: <b className="text-green">{formatMaintenanceDuration(item.total_duration_minutes)}</b> · Görev başına: <b>{formatMaintenanceDuration(item.total_count ? Math.round(item.total_duration_minutes / item.total_count) : 0)}</b></div></div>)}</div>
       </section>}
 
       <section className="mb-4 rounded-card border border-border bg-panel p-4">
