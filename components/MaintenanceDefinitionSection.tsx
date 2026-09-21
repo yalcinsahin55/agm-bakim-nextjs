@@ -66,7 +66,11 @@ export default function MaintenanceDefinitionSection({
       <label className="mt-4 block text-[10.5px] font-bold uppercase tracking-wide text-muted">O anki motor çalışma saati
         <input type="number" value={hours} onChange={(event) => onHoursChange(Number(event.target.value) || 0)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-base font-bold text-amber outline-none focus:border-amber" />
       </label>
-      <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyükse motorun güncel saatini de günceller; küçük veya eşitse yalnızca bu kayda yazılır. Excel ölçümünden sonra geçen süreyi aşan değerler kabul edilmez.</p>
+      <div className="mt-2 rounded-xl border border-amber/35 bg-amber/10 px-3 py-2.5 text-[10.5px] leading-4 text-amber" role="note" aria-label="Motor saati kuralı">
+        <div className="font-extrabold">Saat girişi kuralı</div>
+        <div className="mt-0.5">Bakım başlangıcındaki motor saati, son Excel ölçümünden o ana kadar geçen çalışma süresini aşamaz. Ayrıca mevcut motor saatinden en fazla <b>24 saat düşük</b> olabilir. Uygunsuz değer girersen kayıt oluşturulmaz.</div>
+      </div>
+      <p className="mt-2 text-[10px] leading-4 text-faint">Motorun güncel saatinden büyük bir değer girersen motorun güncel saati de güncellenir; küçük veya eşit değer yalnızca bu bakım kaydına yazılır.</p>
     </section>
   );
 }
