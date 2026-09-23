@@ -43,6 +43,10 @@ function localDateTimeValue(date = new Date()): string {
   return local.toISOString().slice(0, 16);
 }
 
+function localDateValue(date = new Date()): string {
+  return localDateTimeValue(date).slice(0, 10);
+}
+
 export default function ExcelPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
@@ -56,6 +60,10 @@ export default function ExcelPage() {
   const [reportType, setReportType] = useState("");
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
+  const importDatePart = importDate.slice(0, 10);
+  const importTimePart = importDate.slice(11, 16);
+  const todayDate = localDateValue();
+  const currentTime = localDateTimeValue().slice(11, 16);
 
   useEffect(() => {
     Promise.all([fetch("/api/engines"), fetch("/api/maintenance-types")]).then(async ([engineResponse, typeResponse]) => {
@@ -165,11 +173,20 @@ export default function ExcelPage() {
           </div>
 
           <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Bu verinin ait olduğu tarih ve saat</label>
-          <input
-            type="datetime-local" value={importDate} max={localDateTimeValue()}
-            onChange={(e) => setImportDate(e.target.value)}
-            className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-1 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
-          />
+          <div className="grid grid-cols-2 gap-2 mb-1">
+            <label className="text-[10px] font-semibold text-faint">Tarih<input
+              type="date" value={importDatePart} max={todayDate}
+              onChange={(e) => setImportDate(`${e.target.value}T${importTimePart}`)}
+              className="mt-1 w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+              aria-label="Excel verisi tarihi"
+            /></label>
+            <label className="text-[10px] font-semibold text-faint">Saat<input
+              type="time" value={importTimePart} max={importDatePart === todayDate ? currentTime : undefined}
+              onChange={(e) => setImportDate(`${importDatePart}T${e.target.value}`)}
+              className="mt-1 w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+              aria-label="Excel verisi saati"
+            /></label>
+          </div>
           <p className="text-[10.5px] text-faint mb-3">Excel saati bu tarih ve saatle geçmişe kaydedilir. Bir motorun saati önceki Excel değerinden düşükse dosya güvenlik nedeniyle reddedilir.</p>
 
           <label className="flex items-center gap-2 border-2 border-dashed border-borderlt rounded-xl px-3 py-3 text-[12px] text-muted cursor-pointer mb-3 hover:border-amber hover:bg-amber/5 transition">
