@@ -20,9 +20,10 @@ export const dynamic = "force-dynamic";
 
 const REPORT_UPLOAD_PREFIX = "report-attachments/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
-const REPORT_UPLOAD_TOKEN = process.env.VERCEL
-  ? undefined
-  : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
+// İstemci upload akışı, handleUpload için açıkça bir read-write token ister.
+// Server-side put() akışındaki OIDC davranışından farklı olarak bu endpoint
+// Vercel üzerinde de bağlı Blob mağazasının token'ını kullanmalıdır.
+const REPORT_UPLOAD_TOKEN = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 
 function isSafeReportUploadPath(pathname: string): boolean {
   if (!pathname.startsWith(REPORT_UPLOAD_PREFIX) || pathname.includes("..")) return false;
