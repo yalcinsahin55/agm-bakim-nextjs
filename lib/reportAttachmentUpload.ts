@@ -1,11 +1,10 @@
-import { uploadFileThroughServer } from "@/lib/mediaUpload";
+import { upload } from "@vercel/blob/client";
 import {
   REPORT_ATTACHMENT_MAX_BYTES,
   resolveReportAttachmentMime,
+  sanitizeReportAttachmentFilename,
   type ReportAttachmentMime,
 } from "@/lib/reportAttachments";
-
-const REPORT_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface UploadedReportAttachment {
   url: string;
@@ -15,6 +14,12 @@ export interface UploadedReportAttachment {
 
 export interface ReportAttachmentUploadOptions {
   idempotencyKey?: string;
+}
+
+function safeUploadName(file: File, idempotencyKey?: string): string {
+  const filename = sanitizeReportAttachmentFilename(file.name);
+  const key = idempotencyKey?.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 72);
+  return key ? `offline-${key}-${filename}` : filename;
 }
 
 export async function uploadReportAttachment(
@@ -27,20 +32,20 @@ export async function uploadReportAttachment(
     throw new Error("Rapor eki 20 MB’tan küçük olmalıdır.");
   }
 
-  const uploaded = await uploadFileThroughServer(
-    file,
-    "report-attachments",
-    REPORT_UPLOAD_TIMEOUT_MS,
-    options,
-  );
+  const uploadFile = file.type === mime ? file : new File([file], file.name, { type: mime });
+  const uploaded = await upload(safeUploadName(file, options.idempotencyKey), uploadFile, {
+    access: "public",
+    handleUploadUrl: "/api/blob/upload-client",
+    clientPayload: "maintenance-report",
+  });
 
   return {
     url: uploaded.url,
-    mime: resolveReportAttachmentMime(uploaded.mime, file.name) || mime,
-    size: uploaded.size || file.size,
+    mime,
+    size: file.size,
   };
 }
 
 export const reportAttachmentUploadConfig = {
-  timeoutMs: REPORT_UPLOAD_TIMEOUT_MS,
+  clientUpload: true,
 } as const;
