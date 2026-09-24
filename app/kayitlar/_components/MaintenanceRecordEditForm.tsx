@@ -15,6 +15,7 @@ import { useRecordEditReferenceData } from "../_hooks/useRecordEditReferenceData
 import { useRecordEditMedia } from "../_hooks/useRecordEditMedia";
 import RecordEditScheduleSection from "./RecordEditScheduleSection";
 import ComponentTransferSection from "@/components/ComponentTransferSection";
+import { componentForMaintenanceType } from "@/lib/componentTransfers";
 import type { ComponentTransferDraft } from "@/lib/componentTransfers";
 
 export interface MaintenanceRecordEditFormProps {
@@ -187,7 +188,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
         pressure={pressure}
         setPressure={setPressure}
       />
-      <ComponentTransferSection engines={engines} transfers={componentTransfers} setTransfers={setComponentTransfers} disabled={busy} />
+      <ComponentTransferSection engines={engines} componentName={componentForMaintenanceType(typeKey, maintenanceTypes.find((type) => type.key === typeKey)?.label)} transfers={componentTransfers} setTransfers={setComponentTransfers} disabled={busy} />
       <RecordEditCollaborationSections
         record={record}
         isAdmin={isAdmin}

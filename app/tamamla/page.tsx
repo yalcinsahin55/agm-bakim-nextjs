@@ -36,6 +36,7 @@ import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 import ComponentTransferSection from "@/components/ComponentTransferSection";
 import type { ComponentTransfer } from "@/lib/types";
 import type { ComponentTransferDraft } from "@/lib/componentTransfers";
+import { componentForMaintenanceType } from "@/lib/componentTransfers";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -461,6 +462,7 @@ export default function TamamlaPage() {
 
           <ComponentTransferSection
             engines={engines}
+            componentName={componentForMaintenanceType(typeKey, chosenType?.label)}
             transfers={componentTransfers}
             setTransfers={setComponentTransfers}
             disabled={submitting}

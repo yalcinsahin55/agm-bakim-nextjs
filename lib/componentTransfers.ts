@@ -6,6 +6,20 @@ export const COMPONENT_TRANSFER_MAX_NOTE_LENGTH = 500;
 export const COMPONENT_OPTIONS = ["intercooler", "turbocharger", "alternatör", "yağ eşanjörü", "vibrasyon damperi"] as const;
 export type ComponentName = typeof COMPONENT_OPTIONS[number];
 
+function normalizedComponentText(value: string): string {
+  return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/gu, "").replace(/ı/g, "i");
+}
+
+export function componentForMaintenanceType(typeKey?: string, typeLabel?: string): ComponentName | null {
+  const text = normalizedComponentText(`${typeKey || ""} ${typeLabel || ""}`);
+  if (text.includes("intercool")) return "intercooler";
+  if (text.includes("turbo")) return "turbocharger";
+  if (text.includes("alternat")) return "alternatör";
+  if (text.includes("esanj") || text.includes("esanjor") || text.includes("yag esanjor")) return "yağ eşanjörü";
+  if (text.includes("vibrasyon") || text.includes("damper")) return "vibrasyon damperi";
+  return null;
+}
+
 export interface ComponentTransferDraft {
   id: string;
   component_name: string;
