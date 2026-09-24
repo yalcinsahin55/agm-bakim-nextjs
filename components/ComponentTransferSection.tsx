@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ComponentName, ComponentTransferDraft } from "@/lib/componentTransfers";
 import { COMPONENT_TRANSFER_MAX_COUNT, createComponentTransferDraft } from "@/lib/componentTransfers";
@@ -8,15 +8,13 @@ import { COMPONENT_TRANSFER_MAX_COUNT, createComponentTransferDraft } from "@/li
 export interface ComponentTransferEngineOption { _id: string; name: string; }
 
 type Props = {
-  engines: ComponentTransferEngineOption[];
   componentName: ComponentName | null;
   transfers: ComponentTransferDraft[];
   setTransfers: Dispatch<SetStateAction<ComponentTransferDraft[]>>;
   disabled?: boolean;
 };
 
-export default function ComponentTransferSection({ engines, componentName, transfers, setTransfers, disabled = false }: Props) {
-  const destinationName = useMemo(() => engines.length ? "seçilen motora" : "bu motora", [engines.length]);
+export default function ComponentTransferSection({ componentName, transfers, setTransfers, disabled = false }: Props) {
   const [enabled, setEnabled] = useState(transfers.length > 0);
 
   useEffect(() => {
@@ -49,7 +47,7 @@ export default function ComponentTransferSection({ engines, componentName, trans
           <button type="button" disabled={disabled || transfers.length >= COMPONENT_TRANSFER_MAX_COUNT} onClick={() => setTransfers((current) => [...current, { ...createComponentTransferDraft(), component_name: selectedComponent }])} className="shrink-0 rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2.5 py-2 text-[10px] font-bold text-cyan-200 disabled:opacity-40">+ Parça ekle</button>
         </div>
         <div className="mt-3 flex flex-col gap-3">
-          {transfers.map((transfer, index) => <div key={transfer.id} className="rounded-lg border border-border bg-panel2 p-3"><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-cyan-200">{componentName} {index + 1}</span>{transfers.length > 1 && <button type="button" disabled={disabled} onClick={() => setTransfers((current) => current.filter((item) => item.id !== transfer.id))} className="text-[10px] font-bold text-red-300 hover:text-red-200">Kaldır</button>}</div><div className="grid gap-2 sm:grid-cols-2"><label className="text-[10px] font-bold text-muted">Parça durumu<select disabled={disabled} value={transfer.condition} onChange={(event) => update(transfer.id, { condition: event.target.value as "new" | "used", ...(event.target.value === "new" ? { source_hours: "" } : {}) })} className="mt-1 w-full rounded-lg border border-border bg-panel px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300"><option value="new">Yeni parça</option><option value="used">Çıkma / daha önce çalışmış</option></select></label>{transfer.condition === "used" ? <label className="text-[10px] font-bold text-muted">Önceki toplam çalışma saati<input disabled={disabled} required type="number" min="0" step="0.1" value={transfer.source_hours} onChange={(event) => update(transfer.id, { source_hours: event.target.value })} placeholder="Örn. 2000" className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono text-text outline-none focus:border-cyan-300" /></label> : <div className="rounded-lg bg-green/10 px-2.5 py-2 text-[10px] text-green">Yeni parça: başlangıç saati otomatik 0.</div>}<label className="text-[10px] font-bold text-muted sm:col-span-2">{destinationName} takıldığı saat<input disabled={disabled} required type="number" min="0" step="0.1" value={transfer.installed_hours} onChange={(event) => update(transfer.id, { installed_hours: event.target.value })} placeholder="Örn. 8500" className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono text-text outline-none focus:border-cyan-300" /></label><label className="text-[10px] font-bold text-muted sm:col-span-2">Açıklama (isteğe bağlı)<input disabled={disabled} value={transfer.note} onChange={(event) => update(transfer.id, { note: event.target.value })} placeholder="Sökülen parçanın yerine takıldı..." className="mt-1 w-full rounded-lg border border-border bg-panel px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300" maxLength={500} /></label></div></div>)}
+          {transfers.map((transfer, index) => <div key={transfer.id} className="rounded-lg border border-border bg-panel2 p-3"><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-cyan-200">{componentName} {index + 1}</span>{transfers.length > 1 && <button type="button" disabled={disabled} onClick={() => setTransfers((current) => current.filter((item) => item.id !== transfer.id))} className="text-[10px] font-bold text-red-300 hover:text-red-200">Kaldır</button>}</div><div className="grid gap-2"><label className="text-[10px] font-bold text-muted">Parçanın önceki toplam çalışma saati<input disabled={disabled} required type="number" min="0" step="0.1" value={transfer.source_hours} onChange={(event) => update(transfer.id, { source_hours: event.target.value, condition: "used" })} placeholder="Örn. 2000" className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono text-text outline-none focus:border-cyan-300" /></label><div className="rounded-lg bg-cyan-400/10 px-2.5 py-2 text-[10px] text-cyan-100">Takıldığı motor saati, yukarıdaki motor çalışma saati alanından otomatik alınır.</div><label className="text-[10px] font-bold text-muted">Açıklama (isteğe bağlı)<input disabled={disabled} value={transfer.note} onChange={(event) => update(transfer.id, { note: event.target.value })} placeholder="Sökülen parçanın yerine takıldı..." className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300" maxLength={500} /></label></div></div>)}
         </div>
       </div>}
     </section>
