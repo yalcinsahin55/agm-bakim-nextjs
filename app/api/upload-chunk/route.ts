@@ -97,9 +97,19 @@ async function postUploadChunk(req: NextRequest) {
     for await (const chunk of cursor) yield Buffer.from((chunk as ValidatedChunk).chunk_b64, "base64");
   })());
 
-  const blob = await put(`${isReport ? "report-attachments" : "videos"}/${safeName}`, stream, { access: "public", multipart: true, contentType: mime, ...(token ? { token } : {}) });
-  await col.deleteMany({ upload_id, owner_id: user._id });
-  return NextResponse.json({ ok: true, url: blob.url });
+  try {
+    const blob = await put(`${isReport ? "report-attachments" : "videos"}/${safeName}`, stream, {
+      access: isReport ? "private" : "public",
+      multipart: true,
+      contentType: mime,
+      ...(token ? { token } : {}),
+    });
+    await col.deleteMany({ upload_id, owner_id: user._id });
+    return NextResponse.json({ ok: true, url: blob.url });
+  } catch (error) {
+    console.error("Chunk Blob finalize hatası:", error instanceof Error ? error.message : "UnknownError");
+    return NextResponse.json({ error: "Dosya Blob depolamasında birleştirilemedi. Lütfen tekrar deneyin." }, { status: 502 });
+  }
 }
 
 export async function POST(req: NextRequest) {

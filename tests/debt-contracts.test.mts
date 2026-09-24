@@ -427,6 +427,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   const mediaUrls = await source("lib/mediaUrls.ts");
   const mediaRoute = await source("app/api/media/file/route.ts");
   const chunkUpload = await source("lib/chunkUpload.ts");
+  const chunkRoute = await source("app/api/upload-chunk/route.ts");
   const queue = await source("lib/offlineQueue.ts");
   const complete = await source("app/tamamla/page.tsx");
   const completeEvidence = await source("app/tamamla/_components/CompletionEvidenceSection.tsx");
@@ -473,6 +474,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(chunkUpload, /kind: "report"/);
   assert.match(chunkUpload, /REPORT_TIMEOUT_MS/);
   assert.match(chunkUpload, /REPORT_ATTACHMENT_MAX_BYTES/);
+  assert.match(chunkRoute, /access: isReport \? "private" : "public"/);
+  assert.match(chunkRoute, /Chunk Blob finalize hatası/);
   assert.match(presignedUpload, /isReportUpload/);
   assert.match(mediaUpload, /report-attachments/);
   assert.match(mediaUpload, /idempotencyKey/);
