@@ -95,12 +95,12 @@ async function postUpload(request: NextRequest) {
     const uploadPath = usePrivatePilot
       ? buildPrivateBlobPilotPath(folder, pathname.slice(`${folder}/`.length))
       : pathname;
-    // Production Blob mağazası bu projede MEDIA_READ_WRITE_TOKEN ile bağlıdır.
-    // Tokenı Vercel’de OIDC varsayımıyla atlamamak gerekir; aksi halde put()
-    // "No read-write token found" ile başarısız olur.
-    const token = usePrivatePilot
+    // Rapor ekleri MEDIA mağazası/tokenını kullanır. Fotoğraf/video/yağ analizi
+    // akışı ise Vercel’de bağlı public Blob mağazasının OIDC akışını kullanır;
+    // bu ayrımı kaldırmak fotoğraf ve videoları yanlış mağazaya yönlendirir.
+    const token = usePrivatePilot || isReportAttachmentFolder(folderValue)
       ? (process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN)
-      : (process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN);
+      : (process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN));
     const storeId = usePrivatePilot
       ? getPrivateBlobPilotStoreId()
       : process.env.VERCEL ? undefined : (process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID || undefined);
