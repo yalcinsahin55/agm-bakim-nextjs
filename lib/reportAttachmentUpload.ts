@@ -36,7 +36,7 @@ export async function uploadReportAttachment(
   const uploadFile = file.type === mime ? file : new File([file], file.name, { type: mime });
   let uploaded: { url: string };
   try {
-    uploaded = await upload(safeUploadName(file, options.idempotencyKey), uploadFile, {
+    uploaded = await upload(`report-attachments/${safeUploadName(file, options.idempotencyKey)}`, uploadFile, {
       access: "public",
       handleUploadUrl: "/api/blob/upload-client",
       clientPayload: "maintenance-report",
