@@ -171,12 +171,14 @@ async function postPresignedUpload(request: NextRequest): Promise<Response> {
       return NextResponse.json({ error: "Geçersiz dosya yolu veya upload amacı." }, { status: 400 });
     }
 
-    const token = process.env.VERCEL
+    const isReportUpload = clientPayload === REPORT_UPLOAD_CLIENT_PAYLOAD
+      || clientPayload === OFFLINE_REPORT_UPLOAD_CLIENT_PAYLOAD;
+    const token = isReportUpload
+      ? (process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN)
+      : (process.env.VERCEL ? undefined : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN);
+    const storeId = isReportUpload
       ? undefined
-      : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
-    const storeId = process.env.VERCEL
-      ? undefined
-      : process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID;
+      : (process.env.VERCEL ? undefined : process.env.BLOB_STORE_ID || process.env.MEDIA_STORE_ID);
     if (!token && !storeId) {
       console.error("Presigned Blob upload credential hatası: BLOB_CREDENTIALS_UNAVAILABLE");
       return NextResponse.json({ error: "Dosya depolama bağlantısı yapılandırılmamış.", code: "BLOB_CREDENTIALS_UNAVAILABLE" }, { status: 503 });

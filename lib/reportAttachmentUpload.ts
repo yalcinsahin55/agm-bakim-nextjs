@@ -1,4 +1,4 @@
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import {
   REPORT_ATTACHMENT_MAX_BYTES,
   resolveReportAttachmentMime,
@@ -40,9 +40,9 @@ export async function uploadReportAttachment(
   const timeoutId = window.setTimeout(() => controller.abort(), REPORT_ATTACHMENT_UPLOAD_TIMEOUT_MS);
   let uploaded: { url: string };
   try {
-    uploaded = await upload(`report-attachments/${safeUploadName(file, options.idempotencyKey)}`, uploadFile, {
+    uploaded = await uploadPresigned(`report-attachments/${safeUploadName(file, options.idempotencyKey)}`, uploadFile, {
       access: "public",
-      handleUploadUrl: "/api/blob/upload-client",
+      handleUploadUrl: "/api/blob/upload-presigned",
       clientPayload: "maintenance-report",
       multipart: uploadFile.size >= 5 * 1024 * 1024,
       abortSignal: controller.signal,
