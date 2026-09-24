@@ -20,13 +20,10 @@ export const dynamic = "force-dynamic";
 
 const REPORT_UPLOAD_PREFIX = "report-attachments/";
 const REPORT_UPLOAD_CLIENT_PAYLOAD = "maintenance-report";
-// Vercel üretim/preview ortamlarında bağlı Blob mağazası OIDC ile otomatik
-// yetkilendirilir. Yerel çalıştırmada ise read-write token gerekir. Üretimde
-// başka bir Blob mağazasına ait MEDIA token'ı zorla geçirmek, istemci tokenının
-// alınmasını "Failed to retrieve the client token" hatasıyla bozabilir.
-const REPORT_UPLOAD_TOKEN = process.env.VERCEL
-  ? undefined
-  : process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN;
+// Bu projenin bağlı Blob mağazası production’da MEDIA_READ_WRITE_TOKEN adıyla
+// tanımlı. Tokenı Vercel’de OIDC varsayımıyla atlamak, SDK’nın istemci tokenı
+// üretememesine ve "No read-write token found" hatasına yol açar.
+const REPORT_UPLOAD_TOKEN = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 
 function isSafeReportUploadPath(pathname: string): boolean {
   if (!pathname.startsWith(REPORT_UPLOAD_PREFIX) || pathname.includes("..")) return false;
