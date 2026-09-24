@@ -476,6 +476,7 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(chunkUpload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(chunkRoute, /access: isReport \? "private" : "public"/);
   assert.match(chunkRoute, /Chunk Blob finalize hatası/);
+  assert.match(chunkRoute, /upload_id\.slice\(-12\)/);
   assert.match(presignedUpload, /isReportUpload/);
   assert.match(mediaUpload, /report-attachments/);
   assert.match(mediaUpload, /idempotencyKey/);

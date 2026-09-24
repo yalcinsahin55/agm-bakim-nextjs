@@ -91,7 +91,9 @@ async function postUploadChunk(req: NextRequest) {
   if (validation.totalBytes > maxBytes) return NextResponse.json({ error: isReport ? "Rapor eki 20 MB’tan küçük olmalıdır." : "Video 100 MB’tan küçük olmalıdır." }, { status: 413 });
 
   const token = isReport ? (process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN) : (process.env.VERCEL ? undefined : (process.env.BLOB_READ_WRITE_TOKEN || process.env.MEDIA_READ_WRITE_TOKEN));
-  const safeName = isReport ? sanitizeReportAttachmentFilename(filename) : `${Date.now()}-${String(filename || "video.mp4").replace(/[^\w.\-]+/g, "_")}`;
+  const safeName = isReport
+    ? `${Date.now()}-${upload_id.slice(-12)}-${sanitizeReportAttachmentFilename(filename)}`
+    : `${Date.now()}-${String(filename || "video.mp4").replace(/[^\w.\-]+/g, "_")}`;
   const stream = Readable.from((async function* (): AsyncGenerator<Buffer> {
     const cursor = col.find({ upload_id, owner_id: user._id }).sort({ index: 1 });
     for await (const chunk of cursor) yield Buffer.from((chunk as ValidatedChunk).chunk_b64, "base64");
