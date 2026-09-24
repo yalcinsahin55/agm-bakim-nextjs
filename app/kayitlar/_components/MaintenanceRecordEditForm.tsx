@@ -35,7 +35,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
-  const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>(() => (record.component_transfers || []).map((transfer) => ({ id: transfer.id, component_name: transfer.component_name, source_engine_id: transfer.source_engine_id, source_hours: transfer.source_hours, installed_hours: transfer.installed_hours, note: transfer.note || "" })));
+  const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>(() => (record.component_transfers || []).map((transfer) => ({ id: transfer.id, component_name: transfer.component_name, condition: transfer.condition || "used", source_engine_id: transfer.source_engine_id || "", source_hours: transfer.source_hours, installed_hours: transfer.installed_hours, note: transfer.note || "" })));
   const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
@@ -89,11 +89,10 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       return;
     }
     const normalizedComponentTransfers = componentTransfers.flatMap((transfer) => {
-      const sourceEngine = engines.find((engine) => engine._id === transfer.source_engine_id);
       const sourceHours = Number(transfer.source_hours);
       const installedHours = Number(transfer.installed_hours);
-      if (!sourceEngine || sourceEngine._id === engineId || !transfer.component_name.trim() || !Number.isFinite(sourceHours) || sourceHours < 0 || !Number.isFinite(installedHours) || installedHours < 0) return [];
-      return [{ id: transfer.id, component_name: transfer.component_name.trim(), source_engine_id: sourceEngine._id, source_engine_name: sourceEngine.name, source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
+      if (!transfer.component_name.trim() || (transfer.condition === "used" && (!Number.isFinite(sourceHours) || sourceHours < 0)) || !Number.isFinite(installedHours) || installedHours < 0) return [];
+      return [{ id: transfer.id, component_name: transfer.component_name.trim(), condition: transfer.condition, source_hours: transfer.condition === "new" ? 0 : sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
     });
     if (normalizedComponentTransfers.length !== componentTransfers.length) {
       toast.error("Parça transferlerinde parça adı, farklı bir kaynak motor ve geçerli saat bilgileri girin.");

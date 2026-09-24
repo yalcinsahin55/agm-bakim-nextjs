@@ -120,15 +120,10 @@ export async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
     const engineName = engine.name;
-    const transferSourceIds = [...new Set((component_transfers || []).map((transfer) => transfer.source_engine_id))];
-    const transferSourceEngines = transferSourceIds.length ? await enginesCol.find({ _id: { $in: transferSourceIds } }, { projection: { _id: 1, name: 1 } }).toArray() : [];
-    const transferSourceNames = new Map(transferSourceEngines.map((source) => [String(source._id), String(source.name)]));
-    if ((component_transfers || []).some((transfer) => transfer.source_engine_id === engine_id || !transferSourceNames.has(transfer.source_engine_id))) {
-      return NextResponse.json({ error: "Parça transferlerinden birinin kaynak motoru bulunamadı." }, { status: 400 });
-    }
     const normalizedComponentTransfers: ComponentTransfer[] = (component_transfers || []).map((transfer) => ({
       ...transfer,
-      source_engine_name: transferSourceNames.get(transfer.source_engine_id) || transfer.source_engine_name,
+      condition: transfer.condition || "used",
+      source_hours: transfer.condition === "new" ? 0 : transfer.source_hours,
       ...(transfer.note ? { note: transfer.note.trim() } : {}),
     }));
     const hourValidationError = getCompletionHourValidationError(hour_at_completion, engine.hours, engine.history, maintenanceStartAt);

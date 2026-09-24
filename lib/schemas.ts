@@ -136,9 +136,10 @@ export const recordSchema = z.object({
   component_transfers: z.array(z.object({
     id: z.string().min(8).max(100),
     component_name: z.string().trim().min(1).max(120),
-    source_engine_id: z.string().min(1).max(100),
-    source_engine_name: z.string().trim().min(1).max(120),
-    source_hours: z.number().nonnegative().max(5000000),
+    condition: z.enum(["new", "used"]).default("used"),
+    source_engine_id: z.string().min(1).max(100).optional(),
+    source_engine_name: z.string().trim().min(1).max(120).optional(),
+    source_hours: z.number().nonnegative().max(5000000).default(0),
     installed_hours: z.number().nonnegative().max(5000000),
     note: z.string().trim().max(500, "Parça açıklaması çok uzun.").optional().or(z.literal("")),
   })).max(20, "En fazla 20 parça transferi eklenebilir.").optional(),

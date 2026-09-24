@@ -96,8 +96,9 @@ export interface ReportAttachment {
 export interface ComponentTransfer {
   id: string;
   component_name: string;
-  source_engine_id: string;
-  source_engine_name: string;
+  condition: "new" | "used";
+  source_engine_id?: string;
+  source_engine_name?: string;
   source_hours: number;
   installed_hours: number;
   note?: string;

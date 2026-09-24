@@ -284,13 +284,10 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   if (Array.isArray(videos)) update.videos = videos;
   if (Array.isArray(normalizedReportAttachments)) update.report_attachments = normalizedReportAttachments;
   if (Array.isArray(component_transfers)) {
-    const sourceIds = [...new Set(component_transfers.map((transfer) => transfer.source_engine_id))];
-    const sourceEngines = sourceIds.length ? await enginesCollection(db).find({ _id: { $in: sourceIds } }, { projection: { _id: 1, name: 1 } }).toArray() : [];
-    const sourceNames = new Map(sourceEngines.map((source) => [String(source._id), String(source.name)]));
-    if (component_transfers.some((transfer) => transfer.source_engine_id === effectiveEngineId || !sourceNames.has(transfer.source_engine_id))) return NextResponse.json({ error: "Parça transferlerinden birinin kaynak motoru geçersiz veya hedef motorla aynı." }, { status: 400 });
     update.component_transfers = component_transfers.map((transfer) => ({
       ...transfer,
-      source_engine_name: sourceNames.get(transfer.source_engine_id) || transfer.source_engine_name,
+      condition: transfer.condition || "used",
+      source_hours: transfer.condition === "new" ? 0 : transfer.source_hours,
       ...(transfer.note ? { note: transfer.note.trim() } : {}),
     })) as ComponentTransfer[];
   }

@@ -293,11 +293,10 @@ export default function TamamlaPage() {
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
     const normalizedComponentTransfers: ComponentTransfer[] = componentTransfers.flatMap((transfer) => {
-      const sourceEngine = engines.find((engine) => engine._id === transfer.source_engine_id);
       const sourceHours = Number(transfer.source_hours);
       const installedHours = Number(transfer.installed_hours);
-      if (!sourceEngine || sourceEngine._id === engineId || !transfer.component_name.trim() || !Number.isFinite(sourceHours) || sourceHours < 0 || !Number.isFinite(installedHours) || installedHours < 0) return [];
-      return [{ id: transfer.id, component_name: transfer.component_name.trim(), source_engine_id: sourceEngine._id, source_engine_name: sourceEngine.name, source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
+      if (!transfer.component_name.trim() || (transfer.condition === "used" && (!Number.isFinite(sourceHours) || sourceHours < 0)) || !Number.isFinite(installedHours) || installedHours < 0) return [];
+      return [{ id: transfer.id, component_name: transfer.component_name.trim(), condition: transfer.condition, source_hours: transfer.condition === "new" ? 0 : sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
     });
     if (normalizedComponentTransfers.length !== componentTransfers.length) {
       toast.error("Parça transferlerinde parça adı, farklı bir kaynak motor ve geçerli saat bilgileri girin.");
