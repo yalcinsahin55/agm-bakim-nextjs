@@ -7,6 +7,8 @@ import {
 } from "@/lib/reportAttachments";
 import { uploadFileThroughServer } from "@/lib/mediaUpload";
 
+const REPORT_ATTACHMENT_UPLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+
 export interface UploadedReportAttachment {
   url: string;
   mime: ReportAttachmentMime;
@@ -34,19 +36,23 @@ export async function uploadReportAttachment(
   }
 
   const uploadFile = file.type === mime ? file : new File([file], file.name, { type: mime });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REPORT_ATTACHMENT_UPLOAD_TIMEOUT_MS);
   let uploaded: { url: string };
   try {
     uploaded = await upload(`report-attachments/${safeUploadName(file, options.idempotencyKey)}`, uploadFile, {
       access: "public",
       handleUploadUrl: "/api/blob/upload-client",
       clientPayload: "maintenance-report",
+      multipart: uploadFile.size >= 5 * 1024 * 1024,
+      abortSignal: controller.signal,
     });
   } catch (clientUploadError) {
     // Vercel production can temporarily fail to issue a client token when the
     // Blob store/OIDC binding is stale. Keep the upload usable through the
     // existing server-side OIDC path instead of losing the selected file.
     const message = clientUploadError instanceof Error ? clientUploadError.message : "";
-    if (!/client token|blob token|retrieve.*token|token/i.test(message)) throw clientUploadError;
+    if (!controller.signal.aborted && !/client token|blob token|retrieve.*token|token/i.test(message)) throw clientUploadError;
     const serverUploaded = await uploadFileThroughServer(
       uploadFile,
       "report-attachments",
@@ -54,6 +60,8 @@ export async function uploadReportAttachment(
       options,
     );
     uploaded = { url: serverUploaded.url };
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   return {
