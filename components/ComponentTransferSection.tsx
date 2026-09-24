@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ComponentTransferDraft } from "@/lib/componentTransfers";
-import { COMPONENT_TRANSFER_MAX_COUNT, createComponentTransferDraft } from "@/lib/componentTransfers";
+import { COMPONENT_OPTIONS, COMPONENT_TRANSFER_MAX_COUNT, createComponentTransferDraft } from "@/lib/componentTransfers";
 
 export interface ComponentTransferEngineOption { _id: string; name: string; }
 
@@ -34,8 +34,8 @@ export default function ComponentTransferSection({ engines, transfers, setTransf
             <div key={transfer.id} className="rounded-lg border border-border bg-panel2 p-3">
               <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-cyan-200">Parça {index + 1}</span><button type="button" disabled={disabled} onClick={() => setTransfers((current) => current.filter((item) => item.id !== transfer.id))} className="text-[10px] font-bold text-red-300 hover:text-red-200">Kaldır</button></div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="text-[10px] font-bold text-muted sm:col-span-2">Parça adı
-                  <input disabled={disabled} value={transfer.component_name} onChange={(event) => update(transfer.id, { component_name: event.target.value })} placeholder="Örn. Intercooler, turbo" className="mt-1 w-full rounded-lg border border-border bg-panel px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300" maxLength={120} />
+                <label className="text-[10px] font-bold text-muted sm:col-span-2">Değişen parça
+                  <select disabled={disabled} required value={transfer.component_name} onChange={(event) => update(transfer.id, { component_name: event.target.value })} className="mt-1 w-full rounded-lg border border-border bg-panel px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300"><option value="">Parça seçin</option>{COMPONENT_OPTIONS.map((component) => <option key={component} value={component}>{component[0].toLocaleUpperCase("tr-TR")}{component.slice(1)}</option>)}</select>
                 </label>
                 <label className="text-[10px] font-bold text-muted">Parça durumu
                   <select disabled={disabled} value={transfer.condition} onChange={(event) => update(transfer.id, { condition: event.target.value as "new" | "used", ...(event.target.value === "new" ? { source_hours: "" } : {}) })} className="mt-1 w-full rounded-lg border border-border bg-panel px-2.5 py-2 text-sm text-text outline-none focus:border-cyan-300"><option value="new">Yeni parça</option><option value="used">Çıkma / daha önce çalışmış</option></select>

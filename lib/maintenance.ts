@@ -85,6 +85,24 @@ export function snapshotTrackingState(state: unknown): TrackingState | undefined
   return normalized?.tracking_source === "record" ? undefined : normalized || undefined;
 }
 
+function normalizedText(value: string): string {
+  return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/gu, "").replace(/ı/g, "i");
+}
+
+function componentAffectsMaintenanceType(componentName: string, typeKey: string, typeLabel: string): boolean {
+  const component = normalizedText(componentName);
+  const typeText = normalizedText(`${typeKey} ${typeLabel}`);
+  const aliases: Record<string, string[]> = {
+    intercooler: ["intercool"],
+    turbocharger: ["turbo"],
+    alternator: ["alternat"],
+    "yag esanjor": ["esanj", "esanjor", "yag esanj", "yag esanjor"],
+    "vibrasyon damperi": ["vibrasyon", "damper"],
+  };
+  const key = Object.keys(aliases).find((candidate) => component.includes(candidate));
+  return Boolean(key && aliases[key].some((alias) => typeText.includes(alias)));
+}
+
 export async function recomputeLastMaintenance(
   db: Db,
   engineId: string,
@@ -115,7 +133,7 @@ export async function recomputeLastMaintenance(
     );
     const type = await typesCol.findOne(
       { _id: typeKey },
-      { projection: { engine_states: 1 }, ...(session ? { session } : {}) },
+      { projection: { engine_states: 1, key: 1, label: 1 }, ...(session ? { session } : {}) },
     );
     const currentState = type?.engine_states?.[engineId];
 
@@ -154,7 +172,8 @@ export async function recomputeLastMaintenance(
     const componentTransfers = Array.isArray((latest as { component_transfers?: Array<{ condition?: string; source_hours?: number }> }).component_transfers)
       ? (latest as { component_transfers?: Array<{ condition?: string; source_hours?: number }> }).component_transfers || []
       : [];
-    const previousComponentHours = componentTransfers.reduce((max, transfer) => transfer.condition === "used" && typeof transfer.source_hours === "number" && Number.isFinite(transfer.source_hours) ? Math.max(max, transfer.source_hours) : max, 0);
+    const typeLabel = typeof (type as { label?: unknown } | null)?.label === "string" ? String((type as { label?: unknown }).label) : "";
+    const previousComponentHours = componentTransfers.reduce((max, transfer) => transfer.condition === "used" && componentAffectsMaintenanceType(String((transfer as { component_name?: unknown }).component_name || ""), typeKey, typeLabel) && typeof transfer.source_hours === "number" && Number.isFinite(transfer.source_hours) ? Math.max(max, transfer.source_hours) : max, 0);
     const effectiveMaintenanceHour = Math.max(0, maxHour - previousComponentHours);
     const updated = await typesCol.updateOne(
       { _id: typeKey, ...revisionFilter(currentState) },

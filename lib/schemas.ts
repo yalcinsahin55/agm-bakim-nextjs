@@ -135,7 +135,7 @@ export const recordSchema = z.object({
 
   component_transfers: z.array(z.object({
     id: z.string().min(8).max(100),
-    component_name: z.string().trim().min(1).max(120),
+    component_name: z.enum(["intercooler", "turbocharger", "alternatör", "yağ eşanjörü", "vibrasyon damperi"]),
     condition: z.enum(["new", "used"]).default("used"),
     source_engine_id: z.string().min(1).max(100).optional(),
     source_engine_name: z.string().trim().min(1).max(120).optional(),

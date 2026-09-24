@@ -3,6 +3,8 @@ import type { ComponentTransfer, Engine } from "@/lib/types";
 export const COMPONENT_TRANSFER_MAX_COUNT = 20;
 export const COMPONENT_TRANSFER_MAX_NAME_LENGTH = 120;
 export const COMPONENT_TRANSFER_MAX_NOTE_LENGTH = 500;
+export const COMPONENT_OPTIONS = ["intercooler", "turbocharger", "alternatör", "yağ eşanjörü", "vibrasyon damperi"] as const;
+export type ComponentName = typeof COMPONENT_OPTIONS[number];
 
 export interface ComponentTransferDraft {
   id: string;
@@ -31,7 +33,7 @@ export function normalizeComponentTransfers(input: unknown): ComponentTransfer[]
   return input.slice(0, COMPONENT_TRANSFER_MAX_COUNT).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const value = item as Record<string, unknown>;
-    const componentName = typeof value.component_name === "string" ? value.component_name.trim().slice(0, COMPONENT_TRANSFER_MAX_NAME_LENGTH) : "";
+    const componentName = typeof value.component_name === "string" && COMPONENT_OPTIONS.includes(value.component_name.trim() as ComponentName) ? value.component_name.trim() : "";
     const condition = value.condition === "new" ? "new" : "used";
     const sourceEngineId = typeof value.source_engine_id === "string" ? value.source_engine_id.trim().slice(0, 100) : "";
     const sourceEngineName = typeof value.source_engine_name === "string" ? value.source_engine_name.trim().slice(0, 120) : "";
