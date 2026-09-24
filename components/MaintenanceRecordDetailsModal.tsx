@@ -2,6 +2,7 @@
 
 import NextImage from "next/image";
 import type { ReportAttachment, TechnicianType, VideoRef } from "@/lib/types";
+import type { ComponentTransfer } from "@/lib/types";
 import { formatReportAttachmentSize } from "@/lib/reportAttachments";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
@@ -36,6 +37,7 @@ export interface MaintenanceDetailRecord {
   manager_confirmed_at?: string | Date;
   manager_confirmed_by_name?: string;
   report_attachments?: ReportAttachment[];
+  component_transfers?: ComponentTransfer[];
   photos?: string[];
   photos_b64?: string[];
   videos?: DetailVideo[];
@@ -98,6 +100,7 @@ export default function MaintenanceRecordDetailsModal({
 </div> : <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] text-faint"><b>Eski kayıt:</b> Bu kayıt yönetici teyit akışından önce oluşturulmuş.</div>}
         {record.checklist?.length ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b>Bakım kanıtı:</b> Kontrol listesi tamamlandı{record.completion_confirmed_at ? ` · ${new Date(record.completion_confirmed_at).toLocaleString("tr-TR")}` : ""}<div className="mt-1 flex flex-col gap-0.5 text-[10px]">{record.checklist.map((item) => <span key={item.label}>✓ {item.label}</span>)}</div></div> : null}
         {record.pressure_reading != null && <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal">Fark basıncı: <b>{record.pressure_reading} bar</b></div>}
+        {record.component_transfers?.length ? <div className="mt-2 rounded-lg border border-cyan-300/30 bg-cyan-300/5 p-3 text-[11px] text-cyan-100"><b>Başka motordan takılan parçalar:</b><div className="mt-2 flex flex-col gap-2">{record.component_transfers.map((transfer) => <div key={transfer.id} className="rounded-lg border border-border bg-panel2 p-2"><div className="font-bold text-text">{transfer.component_name}</div><div className="mt-0.5 text-[10px] text-muted">Kaynak: {transfer.source_engine_name} · Kaynak motor saati: <b>{transfer.source_hours.toLocaleString("tr-TR")} sa</b> · Takıldığı motor saati: <b>{transfer.installed_hours.toLocaleString("tr-TR")} sa</b></div>{transfer.note && <div className="mt-1 text-[10px] text-faint">{transfer.note}</div>}</div>)}</div></div> : null}
         {record.technician_note && <div className="mt-2 rounded-lg border border-border bg-panel2 p-2 text-[11px] leading-relaxed text-muted"><b className="text-text">Not:</b> {record.technician_note}</div>}
         {record.report_attachments?.length ? <div className="mt-4 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3"><div className="mb-2 text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div><div className="flex flex-col gap-1.5">{record.report_attachments.map((attachment) => { const label = <><span className="min-w-0 truncate font-bold">{attachment.filename}</span><span className="flex-shrink-0 text-[9px] text-faint">{attachment.mime === "application/pdf" ? "PDF · Uygulama içinde aç" : attachment.mime.includes("spreadsheet") || attachment.mime.includes("excel") ? "Excel · İndir" : "Word · İndir"} · {formatReportAttachmentSize(attachment.size)} {attachment.mime === "application/pdf" ? "›" : "↓"}</span></>; return attachment.mime === "application/pdf" ? <button key={attachment.id} type="button" onClick={() => onReportAttachment(attachment)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} PDF önizlemesini aç`}>{label}</button> : <a key={attachment.id} href={reportAttachmentUrl(attachment.id, true)} download={attachment.filename} className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-panel2 px-2.5 py-2 text-left text-[10.5px] text-text hover:border-purple-300" aria-label={`${attachment.filename} dosyasını indir`}>{label}</a>; })}</div></div> : null}
         {(photos.length > 0 || videos.length > 0) && (

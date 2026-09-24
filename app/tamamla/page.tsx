@@ -33,6 +33,9 @@ import { getCompletionValidationError } from "./_lib/completionValidation";
 import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
+import ComponentTransferSection from "@/components/ComponentTransferSection";
+import type { ComponentTransfer } from "@/lib/types";
+import type { ComponentTransferDraft } from "@/lib/componentTransfers";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -64,6 +67,7 @@ export default function TamamlaPage() {
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+  const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>([]);
 
   const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, photoBusy, videoBusy, reportAttachmentBusy, setReportAttachments, setReportAttachmentBusy, handlePhotos, handleVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useCompletionEvidenceMedia();
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -288,6 +292,18 @@ export default function TamamlaPage() {
 
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
+    const normalizedComponentTransfers: ComponentTransfer[] = componentTransfers.flatMap((transfer) => {
+      const sourceEngine = engines.find((engine) => engine._id === transfer.source_engine_id);
+      const sourceHours = Number(transfer.source_hours);
+      const installedHours = Number(transfer.installed_hours);
+      if (!sourceEngine || sourceEngine._id === engineId || !transfer.component_name.trim() || !Number.isFinite(sourceHours) || sourceHours < 0 || !Number.isFinite(installedHours) || installedHours < 0) return [];
+      return [{ id: transfer.id, component_name: transfer.component_name.trim(), source_engine_id: sourceEngine._id, source_engine_name: sourceEngine.name, source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
+    });
+    if (normalizedComponentTransfers.length !== componentTransfers.length) {
+      toast.error("Parça transferlerinde parça adı, farklı bir kaynak motor ve geçerli saat bilgileri girin.");
+      toast.dismiss(loadingToast);
+      return;
+    }
     const payload = buildCompletionPayload({
       clientRequestId: clientRequestId,
       engineId,
@@ -317,6 +333,7 @@ export default function TamamlaPage() {
       maintenanceDurationMinutes,
       checklistItems,
       checklist,
+      componentTransfers: normalizedComponentTransfers,
     });
 
     try {
@@ -442,6 +459,13 @@ export default function TamamlaPage() {
               onPressureChange={setPressure}
             />
           </div>
+
+          <ComponentTransferSection
+            engines={engines}
+            transfers={componentTransfers}
+            setTransfers={setComponentTransfers}
+            disabled={submitting}
+          />
 
           <CompletionTechnicianSection
             isManager={user?.role === "yonetici"}

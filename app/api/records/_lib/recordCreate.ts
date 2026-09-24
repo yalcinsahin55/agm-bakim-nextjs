@@ -25,6 +25,7 @@ import { buildExtraClientRequestId, parseDateOnly } from "./recordRouteHelpers";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 import { insertCreatedMaintenanceRecord } from "./recordCreateInsert";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
+import type { ComponentTransfer } from "@/lib/types";
 
 export async function postRecord(req: NextRequest) {
   let operationStep = "initialize";
@@ -64,7 +65,7 @@ export async function postRecord(req: NextRequest) {
     const {
       client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
       photos_b64, photos, videos, report_attachments, pressure_reading, backdated, record_date, period, extra_types,
-      other_technician_ids, other_technician_durations, checklist, completion_confirmation, time_tracking_version,
+      other_technician_ids, other_technician_durations, checklist, completion_confirmation, component_transfers, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
     } = parsed.data as RecordInput;
     const normalizedExtraTypes = extra_types?.length
@@ -119,6 +120,17 @@ export async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
     const engineName = engine.name;
+    const transferSourceIds = [...new Set((component_transfers || []).map((transfer) => transfer.source_engine_id))];
+    const transferSourceEngines = transferSourceIds.length ? await enginesCol.find({ _id: { $in: transferSourceIds } }, { projection: { _id: 1, name: 1 } }).toArray() : [];
+    const transferSourceNames = new Map(transferSourceEngines.map((source) => [String(source._id), String(source.name)]));
+    if ((component_transfers || []).some((transfer) => transfer.source_engine_id === engine_id || !transferSourceNames.has(transfer.source_engine_id))) {
+      return NextResponse.json({ error: "Parça transferlerinden birinin kaynak motoru bulunamadı." }, { status: 400 });
+    }
+    const normalizedComponentTransfers: ComponentTransfer[] = (component_transfers || []).map((transfer) => ({
+      ...transfer,
+      source_engine_name: transferSourceNames.get(transfer.source_engine_id) || transfer.source_engine_name,
+      ...(transfer.note ? { note: transfer.note.trim() } : {}),
+    }));
     const hourValidationError = getCompletionHourValidationError(hour_at_completion, engine.hours, engine.history, maintenanceStartAt);
     if (hourValidationError) return NextResponse.json({ error: hourValidationError }, { status: 400 });
 
@@ -236,6 +248,7 @@ export async function postRecord(req: NextRequest) {
         photos,
         videos,
         reportAttachments: normalizedReportAttachments,
+        componentTransfers: normalizedComponentTransfers,
         checklist: normalizedChecklist,
         completionConfirmation: completion_confirmation === true,
         managerConfirmationStatus,

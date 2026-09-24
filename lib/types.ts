@@ -93,6 +93,16 @@ export interface ReportAttachment {
   uploaded_by_id?: string;
 }
 
+export interface ComponentTransfer {
+  id: string;
+  component_name: string;
+  source_engine_id: string;
+  source_engine_name: string;
+  source_hours: number;
+  installed_hours: number;
+  note?: string;
+}
+
 export interface MaintenanceRecord {
   _id: string;
   engine_id: string;
@@ -110,6 +120,7 @@ export interface MaintenanceRecord {
   photos?: string[];
   videos?: (VideoRef | string)[];
   report_attachments?: ReportAttachment[];
+  component_transfers?: ComponentTransfer[];
   pressure_reading?: number;
   technician_id: string;
   technician_name: string;

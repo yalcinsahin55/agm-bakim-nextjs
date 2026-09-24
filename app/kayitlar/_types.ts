@@ -1,4 +1,4 @@
-import type { ReportAttachment } from "@/lib/types";
+import type { ComponentTransfer, ReportAttachment } from "@/lib/types";
 
 export interface Engine {
   _id: string;
@@ -63,6 +63,7 @@ export interface MaintenanceRecord {
   group_id?: string | null;
   group_types?: Array<{ type_key: string; type_label: string }>;
   report_attachments?: ReportAttachment[];
+  component_transfers?: ComponentTransfer[];
 }
 
 export interface ConfirmationContributionRow {

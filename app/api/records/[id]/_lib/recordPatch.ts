@@ -24,6 +24,7 @@ import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueu
 import { writeRecordPatchAudit } from "./recordPatchAudit";
 import { updateEngineHoursIfAdvanced } from "./recordPatchEngineHours";
 import { createGroupedExtraRecords } from "./recordPatchGrouped";
+import type { ComponentTransfer } from "@/lib/types";
 
 
 export async function patchRecord(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -59,7 +60,7 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { engine_id: requestedEngineId, type_key: requestedTypeKey, type_label: requestedTypeLabel, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { engine_id: requestedEngineId, type_key: requestedTypeKey, type_label: requestedTypeLabel, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, component_transfers, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
   const engineChangeRequested = typeof requestedEngineId === "string" && requestedEngineId.trim() !== record.engine_id;
   const typeChangeRequested = typeof requestedTypeKey === "string" && requestedTypeKey.trim() !== record.type_key;
   if (engineChangeRequested && user.role !== "yonetici") {
@@ -282,6 +283,17 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   if (Array.isArray(photos)) update.photos = photos;
   if (Array.isArray(videos)) update.videos = videos;
   if (Array.isArray(normalizedReportAttachments)) update.report_attachments = normalizedReportAttachments;
+  if (Array.isArray(component_transfers)) {
+    const sourceIds = [...new Set(component_transfers.map((transfer) => transfer.source_engine_id))];
+    const sourceEngines = sourceIds.length ? await enginesCollection(db).find({ _id: { $in: sourceIds } }, { projection: { _id: 1, name: 1 } }).toArray() : [];
+    const sourceNames = new Map(sourceEngines.map((source) => [String(source._id), String(source.name)]));
+    if (component_transfers.some((transfer) => transfer.source_engine_id === effectiveEngineId || !sourceNames.has(transfer.source_engine_id))) return NextResponse.json({ error: "Parça transferlerinden birinin kaynak motoru geçersiz veya hedef motorla aynı." }, { status: 400 });
+    update.component_transfers = component_transfers.map((transfer) => ({
+      ...transfer,
+      source_engine_name: sourceNames.get(transfer.source_engine_id) || transfer.source_engine_name,
+      ...(transfer.note ? { note: transfer.note.trim() } : {}),
+    })) as ComponentTransfer[];
+  }
   if (typeof pressure_reading === "number") update.pressure_reading = pressure_reading;
 
   const { $unset: unset, ...setFields } = update;

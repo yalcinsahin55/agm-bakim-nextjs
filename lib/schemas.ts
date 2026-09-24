@@ -133,6 +133,16 @@ export const recordSchema = z.object({
     uploaded_by_id: z.string().min(1).max(100).optional(),
   })).max(REPORT_ATTACHMENT_MAX_COUNT, `En fazla ${REPORT_ATTACHMENT_MAX_COUNT} rapor eki.`).optional(),
 
+  component_transfers: z.array(z.object({
+    id: z.string().min(8).max(100),
+    component_name: z.string().trim().min(1).max(120),
+    source_engine_id: z.string().min(1).max(100),
+    source_engine_name: z.string().trim().min(1).max(120),
+    source_hours: z.number().nonnegative().max(5000000),
+    installed_hours: z.number().nonnegative().max(5000000),
+    note: z.string().trim().max(500, "Parça açıklaması çok uzun.").optional().or(z.literal("")),
+  })).max(20, "En fazla 20 parça transferi eklenebilir.").optional(),
+
   pressure_reading: z
     .number({ invalid_type_error: "Basınç bir sayı olmalıdır." })
     .min(0, "Basınç negatif olamaz.")

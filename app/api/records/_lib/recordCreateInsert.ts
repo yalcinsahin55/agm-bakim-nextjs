@@ -23,6 +23,7 @@ export async function insertCreatedMaintenanceRecord(params: {
   photos?: string[];
   videos?: MaintenanceRecordDocument["videos"];
   reportAttachments: MaintenanceRecordDocument["report_attachments"];
+  componentTransfers?: MaintenanceRecordDocument["component_transfers"];
   checklist: ChecklistItem[];
   completionConfirmation: boolean;
   managerConfirmationStatus: "pending" | "confirmed";
@@ -63,6 +64,7 @@ export async function insertCreatedMaintenanceRecord(params: {
     photos,
     videos,
     reportAttachments,
+    componentTransfers,
     checklist,
     completionConfirmation,
     managerConfirmationStatus,
@@ -108,6 +110,7 @@ export async function insertCreatedMaintenanceRecord(params: {
     photos: isPrimary ? photos || [] : [],
     videos: isPrimary ? videos || [] : [],
     report_attachments: isPrimary ? reportAttachments : [],
+    ...(isPrimary && componentTransfers?.length ? { component_transfers: componentTransfers } : {}),
     checklist: isPrimary ? checklist : [],
     ...(isPrimary && completionConfirmation ? { completion_confirmed_at: new Date() } : {}),
     manager_confirmation_status: managerConfirmationStatus,

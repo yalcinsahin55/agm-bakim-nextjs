@@ -1,4 +1,4 @@
-import type { MaintenanceType, ReportAttachment, VideoRef } from "@/lib/types";
+import type { ComponentTransfer, MaintenanceType, ReportAttachment, VideoRef } from "@/lib/types";
 import { normalizeTechnicianContributionDuration } from "@/lib/maintenanceTime";
 
 export interface CompletionPayloadInput {
@@ -30,6 +30,7 @@ export interface CompletionPayloadInput {
   maintenanceDurationMinutes: number | null;
   checklistItems: string[];
   checklist: Record<string, boolean>;
+  componentTransfers: ComponentTransfer[];
 }
 
 export interface CompletionPayload extends Record<string, unknown> {
@@ -57,6 +58,7 @@ export interface CompletionPayload extends Record<string, unknown> {
   other_technician_durations: Record<string, number>;
   checklist: Array<{ label: string; completed: boolean }>;
   completion_confirmation: true;
+  component_transfers: ComponentTransfer[];
 }
 
 export function buildCompletionPayload(input: CompletionPayloadInput): CompletionPayload {
@@ -97,5 +99,6 @@ export function buildCompletionPayload(input: CompletionPayloadInput): Completio
     ),
     checklist: input.checklistItems.map((label) => ({ label, completed: input.checklist[label] === true })),
     completion_confirmation: true,
+    component_transfers: input.componentTransfers,
   };
 }
