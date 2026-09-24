@@ -1,13 +1,10 @@
-import { uploadPresigned } from "@vercel/blob/client";
 import {
   REPORT_ATTACHMENT_MAX_BYTES,
   resolveReportAttachmentMime,
   sanitizeReportAttachmentFilename,
   type ReportAttachmentMime,
 } from "@/lib/reportAttachments";
-import { uploadFileThroughServer } from "@/lib/mediaUpload";
-
-const REPORT_ATTACHMENT_UPLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+import { uploadReportAttachmentChunked } from "@/lib/chunkUpload";
 
 export interface UploadedReportAttachment {
   url: string;
@@ -17,12 +14,6 @@ export interface UploadedReportAttachment {
 
 export interface ReportAttachmentUploadOptions {
   idempotencyKey?: string;
-}
-
-function safeUploadName(file: File, idempotencyKey?: string): string {
-  const filename = sanitizeReportAttachmentFilename(file.name);
-  const key = idempotencyKey?.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 72);
-  return key ? `offline-${key}-${filename}` : filename;
 }
 
 export async function uploadReportAttachment(
@@ -35,35 +26,7 @@ export async function uploadReportAttachment(
     throw new Error("Rapor eki 20 MB’tan küçük olmalıdır.");
   }
 
-  const uploadFile = file.type === mime ? file : new File([file], file.name, { type: mime });
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), REPORT_ATTACHMENT_UPLOAD_TIMEOUT_MS);
-  let uploaded: { url: string };
-  try {
-    uploaded = await uploadPresigned(`report-attachments/${safeUploadName(file, options.idempotencyKey)}`, uploadFile, {
-      access: "public",
-      handleUploadUrl: "/api/blob/upload-presigned",
-      clientPayload: "maintenance-report",
-      multipart: uploadFile.size >= 5 * 1024 * 1024,
-      abortSignal: controller.signal,
-    });
-  } catch (clientUploadError) {
-    // Vercel production can temporarily fail to issue a client token when the
-    // Blob store/OIDC binding is stale. Keep the upload usable through the
-    // existing server-side OIDC path instead of losing the selected file.
-    const message = clientUploadError instanceof Error ? clientUploadError.message : "";
-    if (!controller.signal.aborted && !/client token|blob token|retrieve.*token|token/i.test(message)) throw clientUploadError;
-    const serverUploaded = await uploadFileThroughServer(
-      uploadFile,
-      "report-attachments",
-      5 * 60 * 1000,
-      options,
-    );
-    uploaded = { url: serverUploaded.url };
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-
+  const uploaded = await uploadReportAttachmentChunked(file, options);
   return {
     url: uploaded.url,
     mime,
@@ -72,5 +35,8 @@ export async function uploadReportAttachment(
 }
 
 export const reportAttachmentUploadConfig = {
-  clientUpload: true,
+  clientUpload: false,
+  chunkedUpload: true,
 } as const;
+
+export { sanitizeReportAttachmentFilename };

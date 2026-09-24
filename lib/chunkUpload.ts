@@ -1,10 +1,12 @@
 import type { MaintenanceMediaUploadOptions } from "@/lib/mediaUpload";
+import { REPORT_ATTACHMENT_MAX_BYTES, resolveReportAttachmentMime, type ReportAttachmentMime } from "@/lib/reportAttachments";
 
 const UPLOAD_ENDPOINT = "/api/upload-chunk";
 const CHUNK_BYTES = 2 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const MAX_CHUNKS = 50;
 const VIDEO_TIMEOUT_MS = 10 * 60 * 1000;
+const REPORT_TIMEOUT_MS = 10 * 60 * 1000;
 
 interface ChunkResponse {
   ok?: unknown;
@@ -88,6 +90,33 @@ export async function uploadVideoChunked(
     if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
       throw new Error("Video yükleme zaman aşımına uğradı. Daha küçük bir dosya veya daha iyi bir bağlantı deneyin.");
     }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+export async function uploadReportAttachmentChunked(
+  file: File,
+  options: MaintenanceMediaUploadOptions = {},
+): Promise<{ url: string; mime: ReportAttachmentMime }> {
+  const mime = resolveReportAttachmentMime(file.type, file.name);
+  if (!mime) throw new Error("Yalnızca PDF, Excel veya Word dosyaları yüklenebilir.");
+  if (file.size <= 0 || file.size > REPORT_ATTACHMENT_MAX_BYTES) throw new Error("Rapor eki 20 MB’tan küçük olmalıdır.");
+  const total = Math.ceil(file.size / CHUNK_BYTES);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
+  const uploadId = createUploadId(options.idempotencyKey);
+  try {
+    for (let index = 0; index < total; index += 1) {
+      const chunk = await file.slice(index * CHUNK_BYTES, Math.min((index + 1) * CHUNK_BYTES, file.size)).arrayBuffer();
+      await postChunk({ upload_id: uploadId, index, chunk_b64: arrayBufferToBase64(chunk), total, kind: "report" }, controller.signal);
+    }
+    const result = await postChunk({ finalize: true, upload_id: uploadId, filename: file.name, mime, total, kind: "report" }, controller.signal);
+    if (typeof result.url !== "string" || !result.url.startsWith("https://")) throw new Error("Rapor eki yükleme yanıtı geçersiz.");
+    return { url: result.url, mime };
+  } catch (error) {
+    if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) throw new Error("Rapor eki yükleme zaman aşımına uğradı.");
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
