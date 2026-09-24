@@ -5,6 +5,7 @@ import {
   sanitizeReportAttachmentFilename,
   type ReportAttachmentMime,
 } from "@/lib/reportAttachments";
+import { uploadFileThroughServer } from "@/lib/mediaUpload";
 
 export interface UploadedReportAttachment {
   url: string;
@@ -33,11 +34,27 @@ export async function uploadReportAttachment(
   }
 
   const uploadFile = file.type === mime ? file : new File([file], file.name, { type: mime });
-  const uploaded = await upload(safeUploadName(file, options.idempotencyKey), uploadFile, {
-    access: "public",
-    handleUploadUrl: "/api/blob/upload-client",
-    clientPayload: "maintenance-report",
-  });
+  let uploaded: { url: string };
+  try {
+    uploaded = await upload(safeUploadName(file, options.idempotencyKey), uploadFile, {
+      access: "public",
+      handleUploadUrl: "/api/blob/upload-client",
+      clientPayload: "maintenance-report",
+    });
+  } catch (clientUploadError) {
+    // Vercel production can temporarily fail to issue a client token when the
+    // Blob store/OIDC binding is stale. Keep the upload usable through the
+    // existing server-side OIDC path instead of losing the selected file.
+    const message = clientUploadError instanceof Error ? clientUploadError.message : "";
+    if (!/client token|blob token|retrieve.*token|token/i.test(message)) throw clientUploadError;
+    const serverUploaded = await uploadFileThroughServer(
+      uploadFile,
+      "report-attachments",
+      5 * 60 * 1000,
+      options,
+    );
+    uploaded = { url: serverUploaded.url };
+  }
 
   return {
     url: uploaded.url,

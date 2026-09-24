@@ -468,6 +468,8 @@ test("maintenance report attachments stay bounded, authenticated, and offline-sa
   assert.match(presignedUpload, /BLOB_STORE_ID \|\| process\.env\.MEDIA_STORE_ID/);
   assert.match(presignedUpload, /REPORT_ATTACHMENT_MAX_BYTES/);
   assert.match(uploadHelper, /from "@vercel\/blob\/client"/);
+  assert.match(uploadHelper, /uploadFileThroughServer/);
+  assert.match(uploadHelper, /client token\|blob token/);
   assert.match(uploadHelper, /handleUploadUrl: "\/api\/blob\/upload-client"/);
   assert.match(uploadHelper, /clientPayload: "maintenance-report"/);
   assert.doesNotMatch(uploadHelper, /uploadPresigned/);
