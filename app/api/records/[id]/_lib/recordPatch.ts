@@ -23,7 +23,6 @@ import type { MaintenanceTechnicianContribution } from "@/lib/types";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 import { writeRecordPatchAudit } from "./recordPatchAudit";
 import { updateEngineHoursIfAdvanced } from "./recordPatchEngineHours";
-import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 import { createGroupedExtraRecords } from "./recordPatchGrouped";
 
 
@@ -267,12 +266,6 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   update.technician_contributions = technicianContributions;
   const effectiveEngineId = requestedEngineId?.trim() || record.engine_id;
   const effectiveEngineName = engineChangeRequested ? requestedEngineName : record.engine_name;
-  if (typeof hour_at_completion === "number") {
-    const effectiveEngine = await enginesCollection(db).findOne({ _id: effectiveEngineId }, { projection: { hours: 1, history: 1 } });
-    if (!effectiveEngine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
-    const hourValidationError = getCompletionHourValidationError(hour_at_completion, effectiveEngine.hours, effectiveEngine.history, nextStartAt);
-    if (hourValidationError) return NextResponse.json({ error: hourValidationError }, { status: 400 });
-  }
   if (engineChangeRequested) {
     update.engine_id = effectiveEngineId;
     update.engine_name = effectiveEngineName;

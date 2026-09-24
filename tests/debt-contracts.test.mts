@@ -658,6 +658,8 @@ test("engine reassignment stays manager-only and repairs grouped maintenance tra
   assert.match(updatePatch, /reassignMaintenanceRecordEngine/);
   assert.match(updatePatch, /session\.withTransaction/);
   assert.match(updatePatch, /effectiveEngineId/);
+  assert.doesNotMatch(updatePatch, /getCompletionHourValidationError/);
+  assert.match(updatePatch, /updateEngineHoursIfAdvanced/);
   assert.match(confirm, /user\.role !== "yonetici"/);
   assert.match(confirm, /recordConfirmationSchema/);
   assert.match(confirm, /reassignMaintenanceRecordEngine/);
