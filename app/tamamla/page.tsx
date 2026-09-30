@@ -69,7 +69,7 @@ export default function TamamlaPage() {
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
-  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string>>({});
+  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string | undefined>>({});
   const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>([]);
 
   const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, photoBusy, videoBusy, reportAttachmentBusy, setReportAttachments, setReportAttachmentBusy, handlePhotos, handleVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useCompletionEvidenceMedia();

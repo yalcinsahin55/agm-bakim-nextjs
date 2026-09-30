@@ -4,8 +4,8 @@ import type { MaintenanceType } from "@/lib/types";
 
 type Props = {
   types: MaintenanceType[];
-  values: Record<string, number | string>;
-  onChange: (key: string, value: number | string) => void;
+  values: Record<string, number | string | undefined>;
+  onChange: (key: string, value: number | string | undefined) => void;
   disabled?: boolean;
 };
 
@@ -20,12 +20,12 @@ export default function PreviousWorkingHoursSection({ types, values, onChange, d
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {types.map((type) => {
-          const value = values[type.key] ?? 0;
-          const enabled = Number(value) > 0;
+          const value = values[type.key] ?? "";
+          const enabled = values[type.key] !== undefined;
           return (
             <div key={type.key} className="rounded-lg border border-border bg-panel2 px-3 py-2.5">
               <label className="flex items-start gap-2 text-[11px] font-bold text-text">
-                <input type="checkbox" checked={enabled} disabled={disabled} onChange={(event) => onChange(type.key, event.target.checked ? (Number(value) > 0 ? value : "") : 0)} className="mt-0.5 h-4 w-4 accent-cyan-400" />
+                <input type="checkbox" checked={enabled} disabled={disabled} onChange={(event) => onChange(type.key, event.target.checked ? "" : undefined)} className="mt-0.5 h-4 w-4 accent-cyan-400" />
                 <span>{type.label}<span className="mt-0.5 block text-[9.5px] font-normal text-muted">Bu bakımın önceki motorda çalışmış süresi var</span></span>
               </label>
               {enabled && <label className="mt-2 block pl-6 text-[9.5px] font-bold uppercase tracking-wide text-muted">Önceki çalışma süresi (saat)

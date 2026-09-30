@@ -37,7 +37,9 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
-  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string>>({ [record.type_key]: record.previous_working_hours ?? 0 });
+  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string | undefined>>(
+    record.previous_working_hours && record.previous_working_hours > 0 ? { [record.type_key]: record.previous_working_hours } : {},
+  );
   const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>(() => (record.component_transfers || []).map((transfer) => ({ id: transfer.id, component_name: transfer.component_name, condition: transfer.condition || "used", source_engine_id: transfer.source_engine_id || "", source_hours: transfer.source_hours, installed_hours: transfer.installed_hours, note: transfer.note || "" })));
   const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
