@@ -34,6 +34,7 @@ import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 import PreviousWorkingHoursSection from "./_components/PreviousWorkingHoursSection";
+import { useCompletionDraft } from "./_hooks/useCompletionDraft";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -75,6 +76,10 @@ export default function TamamlaPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const { signal } = useAbortableFetch();
+  const draftKey = `${user?._id || user?.id || "anonymous"}:${quickMode ? "quick" : "standard"}`;
+  const draftValue = useMemo(() => ({ engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours }), [engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours]);
+  const { draft, markReady, clearDraft } = useCompletionDraft(draftKey, draftValue);
+  const draftRestoredRef = useRef(false);
 
   const loadPanel = useCallback(async () => {
     try {
@@ -171,6 +176,21 @@ export default function TamamlaPage() {
       setTypeKey(allTypesSorted[0].key);
     }
   }, [allTypesSorted, typeKey]);
+
+  useEffect(() => {
+    if (!draft || draftRestoredRef.current || loading || quickMode) return;
+    draftRestoredRef.current = true;
+    setEngineId(draft.engineId); setTypeKey(draft.typeKey); setHours(draft.hours);
+    setMaintenanceStartAt(draft.maintenanceStartAt); setMaintenanceEndAt(draft.maintenanceEndAt); setPressure(draft.pressure); setTechNote(draft.techNote);
+    setExtraKeys(draft.extraKeys); setExtraPeriods(draft.extraPeriods); setResponsibleTechnicianId(draft.responsibleTechnicianId); setResponsibleTechnicianDurationMinutes(draft.responsibleTechnicianDurationMinutes);
+    setOtherTechnicianIds(draft.otherTechnicianIds); setOtherTechnicianDurations(draft.otherTechnicianDurations); setTechnicianSource(draft.technicianSource); setExternalServiceName(draft.externalServiceName); setChecklist(draft.checklist); setPreviousWorkingHours(draft.previousWorkingHours);
+    markReady();
+    toast.success("Kaydedilmemiş bakım taslağı geri yüklendi.");
+  }, [draft, loading, markReady, quickMode]);
+
+  useEffect(() => {
+    if (loading || quickMode || !draft || draftRestoredRef.current) markReady();
+  }, [draft, draftRestoredRef, loading, markReady, quickMode]);
 
   const chosenItem = engItems.find((i) => i.type_key === typeKey);
   const chosenType = types.find((t) => t.key === typeKey);
@@ -346,6 +366,7 @@ export default function TamamlaPage() {
         toast.dismiss(loadingToast);
         toast.success(submitResult.shouldSync ? "Kayıt ve rapor ekleri senkronizasyon kuyruğuna alındı; gönderiliyor." : "İnternet yok. Kayıt ve rapor ekleri güvenle kuyruğa alındı.");
         clientRequestIdRef.current = null;
+        clearDraft();
         if (submitResult.shouldSync) void syncOfflineQueue(currentUserId);
         router.push("/dashboard");
         return;
@@ -357,6 +378,7 @@ export default function TamamlaPage() {
         invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         clientRequestIdRef.current = null;
+        clearDraft();
         router.push("/dashboard");
       } else {
         toast.dismiss(loadingToast);
@@ -403,6 +425,7 @@ export default function TamamlaPage() {
       />
       <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
         <CompletionWorkspaceHeader isOnline={isOnline} step={completionStep} />
+        {draft?.savedAt && <div className="mb-3 flex items-center justify-between rounded-lg border border-teal/25 bg-teal/5 px-3 py-2 text-[10px] text-teal" role="status"><span>● Taslak otomatik kaydediliyor</span><span className="text-faint">Son kayıt: {new Date(draft.savedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span></div>}
 
         {quickMode && <CompletionQuickBanner
           isOnline={isOnline}

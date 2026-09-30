@@ -41,6 +41,13 @@ export default function KayitlarPage() {
     setSearch,
     confirmationFilter,
     setConfirmationFilter,
+    technicianFilter,
+    setTechnicianFilter,
+    technicians,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
     recordGroups,
     load,
     typeLabels,
@@ -168,11 +175,21 @@ export default function KayitlarPage() {
           typeLabels={typeLabels}
           confirmationFilter={confirmationFilter}
           setConfirmationFilter={setConfirmationFilter}
+          technicianFilter={technicianFilter}
+          setTechnicianFilter={setTechnicianFilter}
+          technicians={technicians}
+          fromDate={fromDate}
+          setFromDate={setFromDate}
+          toDate={toDate}
+          setToDate={setToDate}
           onReset={() => {
             setSearch("");
             setEngineFilter("Tümü");
             setTypeFilter("Tümü");
             setConfirmationFilter("all");
+            setTechnicianFilter("Tümü");
+            setFromDate("");
+            setToDate("");
           }}
         />
 

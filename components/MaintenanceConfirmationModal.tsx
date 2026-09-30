@@ -4,6 +4,7 @@ import DurationInput from "@/components/DurationInput";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { TechnicianType } from "@/lib/types";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 export interface ConfirmationRecordSummary {
   _id: string;
@@ -60,12 +61,13 @@ export default function MaintenanceConfirmationModal({
   onCancel,
   onConfirm,
 }: MaintenanceConfirmationModalProps) {
+  const dialogRef = useDialogA11y<HTMLDivElement>(true);
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="Kişi bazlı çalışma süresi teyidi">
-      <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl md:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="confirmation-dialog-title">
+      <div ref={dialogRef} tabIndex={-1} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl md:rounded-2xl">
         <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
           <div className="min-w-0">
-            <div className="text-base font-extrabold text-text">Teyit öncesi çalışma süreleri</div>
+            <div id="confirmation-dialog-title" className="text-base font-extrabold text-text">Teyit öncesi çalışma süreleri</div>
             <div className="mt-0.5 truncate text-[11px] text-muted">{record.engine_name} · {record.type_label}</div>
           </div>
           <button type="button" onClick={onClose} className="h-8 w-8 flex-shrink-0 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Teyit penceresini kapat">✕</button>

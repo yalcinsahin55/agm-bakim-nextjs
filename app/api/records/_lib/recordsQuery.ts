@@ -26,6 +26,9 @@ export async function getRecords(req: NextRequest) {
     const typeKey = searchParams.get("type_key");
     const search = searchParams.get("search")?.trim();
     const confirmationStatus = searchParams.get("confirmation_status");
+    const technicianId = searchParams.get("technician_id");
+    const fromDate = searchParams.get("from_date");
+    const toDate = searchParams.get("to_date");
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSize = Math.min(Math.max(parseInt(searchParams.get("page_size") || "25", 10), 1), 50);
     const includeMedia = searchParams.get("include_media") === "true";
@@ -46,6 +49,15 @@ export async function getRecords(req: NextRequest) {
     if (confirmationStatus === "pending" || confirmationStatus === "confirmed") {
       query.manager_confirmation_status = confirmationStatus;
     }
+    if (technicianId) query.technician_id = technicianId;
+    const maintenanceDateQuery: { $gte?: Date; $lt?: Date } = {};
+    if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) maintenanceDateQuery.$gte = new Date(`${fromDate}T00:00:00.000Z`);
+    if (toDate && /^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+      const end = new Date(`${toDate}T00:00:00.000Z`);
+      end.setUTCDate(end.getUTCDate() + 1);
+      maintenanceDateQuery.$lt = end;
+    }
+    if (Object.keys(maintenanceDateQuery).length) query.maintenance_start_at = maintenanceDateQuery;
     if (search) {
       // Text index kelime/kelime-başı bazlı eşleşir; motor/tür zaten açılır listeden seçildiği için
       // serbest metin araması burada sadece teknisyen adı gibi alanlarda ek bir filtre olarak kullanılıyor.

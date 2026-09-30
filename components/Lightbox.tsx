@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 interface LightboxProps {
   src: string | null;
@@ -13,6 +14,7 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
   const [dragY, setDragY] = useState(0);
   const startY = useRef<number | null>(null);
   const dismissedBySwipe = useRef(false);
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(src));
   useEffect(() => {
     const closeOnEscape = () => onClose();
     window.addEventListener("app:escape", closeOnEscape);
@@ -41,8 +43,11 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fade-in"
       onClick={() => { if (!dismissedBySwipe.current) onClose(); dismissedBySwipe.current = false; }}
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
+      aria-label="Bakım fotoğrafı önizlemesi"
     >
       <button
         type="button"

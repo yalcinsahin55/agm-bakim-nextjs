@@ -24,6 +24,10 @@ const detailsModal = new URL("../components/MaintenanceRecordDetailsModal.tsx", 
 const recordFilters = new URL("../app/kayitlar/_components/RecordFilters.tsx", import.meta.url);
 const themeToggle = new URL("../components/ThemeToggle.tsx", import.meta.url);
 const completionHeader = new URL("../app/tamamla/_components/CompletionWorkspaceHeader.tsx", import.meta.url);
+const completionDraft = new URL("../app/tamamla/_hooks/useCompletionDraft.ts", import.meta.url);
+const recordsHook = new URL("../app/kayitlar/_hooks/useRecordsPageData.ts", import.meta.url);
+const recordsQuery = new URL("../app/api/records/_lib/recordsQuery.ts", import.meta.url);
+const dialogA11y = new URL("../lib/useDialogA11y.ts", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -117,4 +121,20 @@ test("desktop and cross-device refinement contracts stay present", async () => {
   assert.match(themeText, /prefers-color-scheme/);
   assert.match(headerText, /STEPS/);
   assert.match(globalsText, /report-desktop-table thead/);
+});
+
+test("drafts, advanced filters, and dialog accessibility contracts stay present", async () => {
+  const [draftText, hookText, queryText, a11yText, detailsText] = await Promise.all([
+    text(completionDraft), text(recordsHook), text(recordsQuery), text(dialogA11y), text(detailsModal),
+  ]);
+  assert.match(draftText, /localStorage/);
+  assert.match(draftText, /savedAt/);
+  assert.match(hookText, /technician_id/);
+  assert.match(hookText, /from_date/);
+  assert.match(hookText, /router.replace/);
+  assert.match(queryText, /maintenanceDateQuery/);
+  assert.match(queryText, /technicianId/);
+  assert.match(a11yText, /focusables/);
+  assert.match(a11yText, /previousFocusRef/);
+  assert.match(detailsText, /aria-labelledby="maintenance-details-title"/);
 });

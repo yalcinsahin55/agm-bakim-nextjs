@@ -7,6 +7,7 @@ import type { ComponentTransfer } from "@/lib/types";
 import { formatReportAttachmentSize } from "@/lib/reportAttachments";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 type DetailVideo = VideoRef | string;
 
@@ -77,6 +78,7 @@ export default function MaintenanceRecordDetailsModal({
 }: MaintenanceRecordDetailsModalProps) {
   const photos = record.photos || record.photos_b64 || [];
   const videos = record.videos || [];
+  const dialogRef = useDialogA11y<HTMLDivElement>(true);
 
   useEffect(() => {
     const closeOnEscape = () => onClose();
@@ -85,11 +87,11 @@ export default function MaintenanceRecordDetailsModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="Bakım kaydı detayı">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in md:ml-auto md:h-full md:max-h-none md:max-w-xl md:rounded-none md:rounded-l-2xl md:p-5">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="maintenance-details-title">
+      <div ref={dialogRef} tabIndex={-1} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in md:ml-auto md:h-full md:max-h-none md:max-w-xl md:rounded-none md:rounded-l-2xl md:p-5">
         <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
           <div>
-            <div className="text-base font-extrabold text-text">{record.type_label}</div>
+            <div id="maintenance-details-title" className="text-base font-extrabold text-text">{record.type_label}</div>
             <div className="mt-0.5 text-[11px] text-muted">{record.engine_name} · {getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "—"}</div>
           </div>
           <button type="button" onClick={onClose} className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Detayı kapat">✕</button>
