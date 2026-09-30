@@ -53,6 +53,7 @@ const GROUPS = [
       { href: "/teknisyen-yetkilendirme", icon: "🛡️", label: "Teknisyen Yetkilendirme", desc: "Uzmanlık ve görev izinlerini yönet" },
       { href: "/bakim-turu-yonetimi", icon: "⚙️", label: "Bakım Türü Yönetimi", desc: "Tür ekle, düzenle, sil" },
       { href: "/audit-log", icon: "🧾", label: "İşlem Geçmişi", desc: "Kullanıcı ve veri değişiklikleri" },
+      { href: "/veri-kalitesi", icon: "🧪", label: "Veri Kalitesi", desc: "Motor, bakım ve saat verisi kontrolleri" },
       { href: "/yedekleme", icon: "💾", label: "Yedekleme", desc: "Güvenli JSON veri dışa aktarma" },
     ],
   },

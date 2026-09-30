@@ -6,6 +6,8 @@ const globals = new URL("../app/globals.css", import.meta.url);
 const tailwind = new URL("../tailwind.config.ts", import.meta.url);
 const sidebar = new URL("../components/Sidebar.tsx", import.meta.url);
 const bottomNav = new URL("../components/BottomNav.tsx", import.meta.url);
+const otherMenus = new URL("../app/diger/page.tsx", import.meta.url);
+const dataQuality = new URL("../app/veri-kalitesi/page.tsx", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -33,4 +35,14 @@ test("primary navigation uses the shared SVG icon primitive", async () => {
   assert.match(bottomNavText, /@\/components\/ui\/AppIcon/);
   assert.doesNotMatch(sidebarText, /📊|⚙️|✅|📋|🔧|🧪|✦|🔐|☰|🚪/);
   assert.doesNotMatch(bottomNavText, /📊|⚙️|✅|📋|🔧|🧪|✦|🔐|☰|🚪/);
+});
+
+test("Data Quality lives under Other Menus and uses the shared shell once", async () => {
+  const [sidebarText, otherMenusText, dataQualityText] = await Promise.all([text(sidebar), text(otherMenus), text(dataQuality)]);
+  assert.doesNotMatch(sidebarText, /href: "\/veri-kalitesi"/);
+  assert.match(otherMenusText, /href: "\/veri-kalitesi"/);
+  assert.match(dataQualityText, /<TopBar/);
+  assert.doesNotMatch(dataQualityText, /import Sidebar/);
+  assert.doesNotMatch(dataQualityText, /<Sidebar\s*\/>/);
+  assert.match(dataQualityText, /max-w-5xl/);
 });
