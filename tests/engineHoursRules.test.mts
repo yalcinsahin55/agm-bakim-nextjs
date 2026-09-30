@@ -33,7 +33,8 @@ test("backdated completion uses the engine hour estimated for the maintenance da
   const history = [{ date: "2026-09-30T00:00:00.000Z", hours: 2_000, load_kw: 0, source: "excel" as const }];
   const rule = getCompletionHourRule(2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z");
   assert.equal(rule.minimumHours, 1_928);
-  assert.equal(rule.maximumHours, 1_952);
+  assert.equal(rule.maximumHours, 2_000);
   assert.equal(getCompletionHourValidationError(1_940, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z"), null);
+  assert.equal(getCompletionHourValidationError(1_980, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z"), null);
   assert.match(getCompletionHourValidationError(1_927, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z") || "", /En düşük değer/);
 });

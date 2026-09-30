@@ -64,7 +64,7 @@ export function getCompletionHourRule(
       const estimatedHoursAtStart = Math.max(0, Number(currentEngineHours || 0) - elapsedHours);
       return {
         minimumHours: Math.max(0, estimatedHoursAtStart - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
-        maximumHours: estimatedHoursAtStart,
+        maximumHours: Math.max(0, Number(currentEngineHours || 0)),
         reference,
         elapsedHours,
       };
