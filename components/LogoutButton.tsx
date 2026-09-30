@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { invalidateCachedFetch } from "@/lib/apiCache";
 import { notifyAuthChanged } from "@/lib/authClient";
+import AppIcon from "@/components/ui/AppIcon";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function LogoutButton() {
       title="Çıkış Yap"
       className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-red/30 hover:bg-red/10 hover:text-red disabled:opacity-50"
     >
-      <span aria-hidden="true">🚪</span>
+      <AppIcon name="logout" size={15} />
       <span>{loggingOut ? "Çıkılıyor..." : "Çıkış"}</span>
     </button>
   );

@@ -9,23 +9,24 @@ import { notifyAuthChanged } from "@/lib/authClient";
 import { canAccessRoute } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { MaintenancePanelResponse } from "@/lib/maintenancePanel";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 interface MenuItem {
   href: string;
   label: string;
-  icon: string;
+  icon: AppIconName;
 }
 
 const ITEMS: MenuItem[] = [
-  { href: "/dashboard", label: "Özet", icon: "📊" },
-  { href: "/motorlar", label: "Motorlar", icon: "⚙️" },
-  { href: "/tamamla", label: "Tamamla", icon: "✅" },
-  { href: "/diger", label: "Diğer", icon: "☰" },
+  { href: "/dashboard", label: "Özet", icon: "dashboard" },
+  { href: "/motorlar", label: "Motorlar", icon: "engine" },
+  { href: "/tamamla", label: "Tamamla", icon: "check" },
+  { href: "/diger", label: "Diğer", icon: "menu" },
 ];
 
 const TECHNICIAN_ITEMS: MenuItem[] = [
-  { href: "/tamamla", label: "Tamamla", icon: "✅" },
-  { href: "/kayitlar", label: "Kayıtlar", icon: "📋" },
-  { href: "/hesap", label: "Şifre", icon: "🔐" },
+  { href: "/tamamla", label: "Tamamla", icon: "check" },
+  { href: "/kayitlar", label: "Kayıtlar", icon: "records" },
+  { href: "/hesap", label: "Şifre", icon: "lock" },
 ];
 
 export default function BottomNav() {
@@ -74,8 +75,8 @@ export default function BottomNav() {
                 key={item.href} href={item.href}
                 className={`relative min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
               >
-                <span className="relative text-lg leading-none">
-                  {item.icon}
+                <span className="relative flex h-6 items-center justify-center leading-none">
+                  <AppIcon name={item.icon} size={20} />
                   {item.href === "/dashboard" && gecikmis > 0 && (
                     <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-red text-white text-[9px] font-bold flex items-center justify-center shadow">
                       {gecikmis}
@@ -92,7 +93,7 @@ export default function BottomNav() {
             onClick={handleLogout}
             className="min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
           >
-            <span className="text-lg leading-none">🚪</span>
+            <span className="flex h-6 items-center justify-center"><AppIcon name="logout" size={20} /></span>
             <span className="max-w-full truncate text-[9.5px] font-bold">Çıkış</span>
           </button>
         </div>

@@ -225,11 +225,11 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
         <button
           onClick={save}
           disabled={busy || mediaBusy || reportAttachmentBusy}
-          className="flex-1 py-2.5 rounded-lg bg-teal text-[#06181b] font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition"
+          className="flex-1 py-2.5 rounded-lg bg-teal text-on-teal font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition"
         >
           {busy ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="w-3 h-3 border-2 border-[#06181b]/40 border-t-[#06181b] rounded-full animate-spin" />
+              <span className="w-3 h-3 border-2 border-on-teal/40 border-t-on-teal rounded-full animate-spin" />
               Kaydediliyor...
             </span>
           ) : (

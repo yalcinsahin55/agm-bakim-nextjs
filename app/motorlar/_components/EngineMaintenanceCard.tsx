@@ -41,7 +41,7 @@ export default function EngineMaintenanceCard({ engine, records, open, recordsLo
       </button>
 
       {open && (
-        <div className="border-t border-border bg-[#12161d] p-4 animate-fade-in">
+        <div className="border-t border-border bg-panel-deep p-4 animate-fade-in">
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="bg-panel2 rounded-lg p-2 text-center">
               <div className="text-[9px] text-faint uppercase font-bold">Yük</div>

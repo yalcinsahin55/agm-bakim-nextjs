@@ -94,7 +94,7 @@ export default function MaintenanceConfirmationModal({
         {!isExternalService && <div className="mt-3 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-[10.5px] text-teal">Toplam kişi katkısı: <b>{formatMaintenanceDuration(totalMinutes)}</b> · Mesai ve farklı günlerdeki çalışma bu toplamda birlikte tutulur.</div>}
         <div className="mt-4 flex gap-2">
           <button type="button" onClick={onCancel} className="flex-1 rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
-          <button type="button" onClick={onConfirm} disabled={confirming} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-[#071a12] disabled:opacity-50">{confirming ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
+          <button type="button" onClick={onConfirm} disabled={confirming} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-on-green disabled:opacity-50">{confirming ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
         </div>
       </div>
     </div>

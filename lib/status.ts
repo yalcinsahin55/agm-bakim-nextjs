@@ -13,10 +13,10 @@ export const STATUS_LABELS: Record<StatusKey, string> = {
 };
 
 export const STATUS_COLORS: Record<StatusKey, string> = {
-  gecikmis: "#ef4a52",
-  kritik: "#f2994a",
-  yaklasiyor: "#f0c93d",
-  normal: "#33c98a",
+  gecikmis: "var(--color-red)",
+  kritik: "var(--color-orange)",
+  yaklasiyor: "var(--color-yellow)",
+  normal: "var(--color-green)",
 };
 
 export type RoleKey = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";

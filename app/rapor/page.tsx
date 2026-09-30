@@ -198,7 +198,7 @@ export default function RaporPage() {
             <option value="month">Ay seç</option>
           </select>
           {reportScope === "month" && <input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border" aria-label="Rapor ayı" />}
-          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-[#f0a23f] to-amber px-4 py-2.5 text-[13px] font-extrabold text-[#1a1206] transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
+          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-amber-bright to-amber px-4 py-2.5 text-[13px] font-extrabold text-on-amber transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
         </div>
         <p className="mt-2 text-[10.5px] text-faint">{reportScope === "month" ? `${reportMonth} ayına ait kayıtlar gösteriliyor.` : "Seçili motorun tüm bakım geçmişi gösteriliyor."} Yazdır seçildiğinde aynı kapsamın tamamı yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>

@@ -10,29 +10,30 @@ import { notifyAuthChanged } from "@/lib/authClient";
 import { canAccessRoute } from "@/lib/permissions";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import type { MaintenancePanelResponse } from "@/lib/maintenancePanel";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 
 interface MenuItem {
   href: string;
   label: string;
-  icon: string;
+  icon: AppIconName;
 }
 
 const ADMIN_VIEWER_ITEMS: MenuItem[] = [
-  { href: "/dashboard", label: "Özet", icon: "📊" },
-  { href: "/tamamla", label: "Bakım Tamamlama", icon: "✅" },
-  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "📋" },
-  { href: "/motorlar", label: "Motorlar", icon: "⚙️" },
-  { href: "/bakim-turleri", label: "Bakım Türleri", icon: "🔧" },
-  { href: "/istatistik", label: "İstatistikler", icon: "📈" },
-  { href: "/veri-kalitesi", label: "Veri Kalitesi", icon: "🧪" },
-  { href: "/asistan", label: "Bakım Asistanı", icon: "✦" },
-  { href: "/diger", label: "Diğer Menüler", icon: "☰" },
+  { href: "/dashboard", label: "Özet", icon: "dashboard" },
+  { href: "/tamamla", label: "Bakım Tamamlama", icon: "check" },
+  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "records" },
+  { href: "/motorlar", label: "Motorlar", icon: "engine" },
+  { href: "/bakim-turleri", label: "Bakım Türleri", icon: "tool" },
+  { href: "/istatistik", label: "İstatistikler", icon: "chart" },
+  { href: "/veri-kalitesi", label: "Veri Kalitesi", icon: "flask" },
+  { href: "/asistan", label: "Bakım Asistanı", icon: "assistant" },
+  { href: "/diger", label: "Diğer Menüler", icon: "menu" },
 ];
 
 const TECHNICIAN_ITEMS: MenuItem[] = [
-  { href: "/tamamla", label: "Bakım Tamamla", icon: "✅" },
-  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "📋" },
-  { href: "/hesap", label: "Hesap ve Şifre", icon: "🔐" },
+  { href: "/tamamla", label: "Bakım Tamamla", icon: "check" },
+  { href: "/kayitlar", label: "Bakım Kayıtları", icon: "records" },
+  { href: "/hesap", label: "Hesap ve Şifre", icon: "lock" },
 ];
 
 export default function Sidebar() {
@@ -107,7 +108,7 @@ export default function Sidebar() {
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  <span className="flex-shrink-0 text-base">{item.icon}</span>
+                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center"><AppIcon name={item.icon} size={17} /></span>
                   <span className="truncate">{item.label}</span>
                   <span className="ml-auto flex items-center gap-2">
                     {item.href === "/dashboard" && gecikmis > 0 && (
@@ -135,7 +136,7 @@ export default function Sidebar() {
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-[12px] font-semibold text-muted hover:text-red hover:bg-red/10 border border-border hover:border-red/30 transition-all"
         >
-          <span>🚪</span>
+              <AppIcon name="logout" size={16} />
           Çıkış Yap
         </button>
       </div>

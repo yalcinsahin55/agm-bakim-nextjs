@@ -33,7 +33,7 @@ export default function EngineAddForm({ name, hours, load, saving, onNameChange,
         </div>
         <button
           type="submit" disabled={saving}
-          className="py-2.5 rounded-lg bg-teal text-[#06181b] text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
+          className="py-2.5 rounded-lg bg-teal text-on-teal text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
         >
           {saving ? "Ekleniyor..." : "💾 Kaydet"}
         </button>

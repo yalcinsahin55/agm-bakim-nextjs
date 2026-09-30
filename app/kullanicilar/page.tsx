@@ -307,10 +307,10 @@ export default function KullanicilarPage() {
               {TECHNICIAN_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>}
             <p className="text-[10px] leading-relaxed text-faint">Kullanıcı oluşturulduğunda erişimi kapalı olur. Kartındaki <b>Onayla</b> düğmesiyle hesabı kullanıma açabilirsiniz. Teknisyen türü performans raporlarında ayrı izlenir.</p>
-            <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-[#1a1206] font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+            <button onClick={addUser} disabled={saving} className="py-3 rounded-xl bg-amber text-on-amber font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-[#1a1206]/40 border-t-[#1a1206] rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-on-amber/40 border-t-on-amber rounded-full animate-spin" />
                   Oluşturuluyor...
                 </span>
               ) : "👤 Kullanıcı Oluştur"}
@@ -322,14 +322,14 @@ export default function KullanicilarPage() {
           {visibleUsers.map((u) => (
             <div key={u.id} className="bg-panel border border-border rounded-card p-3.5 hover:border-teal/40 transition-all">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#232d3a] to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-panel-deep to-panel border border-border flex items-center justify-center text-[12px] font-extrabold text-teal flex-shrink-0">
                   {initials(u.full_name)}
                 </div>
                 <div className="min-w-0 flex-1">
                   {editingUserId === u.id ? (
                     <div className="flex min-w-0 items-center gap-1.5">
                       <input value={editingFullName} onChange={(event) => setEditingFullName(event.target.value)} aria-label={`${u.full_name} adını düzelt`} autoFocus className="min-w-0 flex-1 rounded-lg border border-teal/40 bg-panel2 px-2 py-1.5 text-[12px] font-bold text-text outline-none focus:border-teal" />
-                      <button type="button" onClick={() => void saveUserName(u)} className="shrink-0 rounded-lg bg-teal px-2 py-1.5 text-[10px] font-bold text-[#06181b]">Kaydet</button>
+                      <button type="button" onClick={() => void saveUserName(u)} className="shrink-0 rounded-lg bg-teal px-2 py-1.5 text-[10px] font-bold text-on-teal">Kaydet</button>
                       <button type="button" onClick={() => { setEditingUserId(null); setEditingFullName(""); }} className="shrink-0 rounded-lg border border-border px-2 py-1.5 text-[10px] font-bold text-muted">Vazgeç</button>
                     </div>
                   ) : (
@@ -364,7 +364,7 @@ export default function KullanicilarPage() {
                     <input type="password" value={resetPasswordConfirmation} onChange={(event) => setResetPasswordConfirmation(event.target.value)} placeholder="Yeni şifre tekrarı" autoComplete="new-password" minLength={6} maxLength={128} className="min-w-0 rounded-lg border border-border bg-panel2 px-2 py-2 text-[11px] outline-none focus:border-amber" />
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-[#1a1206] disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</button>
+                    <button onClick={() => void resetUserPassword(u)} disabled={resettingPassword || resetPassword.length < 6 || resetPasswordConfirmation.length < 6} className="flex-1 rounded-lg bg-amber px-2.5 py-2 text-[10px] font-extrabold text-on-amber disabled:opacity-50">{resettingPassword ? "Sıfırlanıyor..." : "Şifreyi sıfırla"}</button>
                     <button onClick={() => { setResetUserId(null); setResetPassword(""); setResetPasswordConfirmation(""); }} disabled={resettingPassword} className="rounded-lg border border-border px-2.5 py-2 text-[10px] font-bold text-muted">Vazgeç</button>
                   </div>
                   <p className="mt-2 text-[9px] leading-relaxed text-faint">Yeni şifreyi kullanıcıya güvenli bir kanaldan iletin. Eski oturumlar işlem sonrasında geçersiz olur.</p>
@@ -388,7 +388,7 @@ export default function KullanicilarPage() {
                   <button disabled className="w-full whitespace-nowrap text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-2 opacity-40 cursor-not-allowed sm:w-auto">Silinemez</button>
                 ) : confirmDeleteId === u.id ? (
                   <>
-                    <button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-[#1a1206] bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</button>
+                    <button onClick={() => deleteUser(u)} className="w-full whitespace-nowrap text-[11px] font-bold text-on-amber bg-red rounded-lg px-2.5 py-2 hover:brightness-110 transition sm:w-auto">Evet, sil</button>
                     <button onClick={() => setConfirmDeleteId(null)} className="w-full whitespace-nowrap text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-2 hover:bg-panel2 transition sm:w-auto">Vazgeç</button>
                   </>
                 ) : (

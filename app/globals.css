@@ -10,17 +10,24 @@
   --color-bg: #0f1319;
   --color-panel: #171d25;
   --color-panel2: #1f2730;
+  --color-panel-deep: #12161d;
   --color-border: #2a323c;
   --color-borderlt: #374252;
   --color-text: #eef1f5;
   --color-muted: #b3bdc8;
   --color-faint: #8f9ba8;
   --color-amber: #e8952f;
+  --color-amber-bright: #f0a23f;
+  --color-on-amber: #1a1206;
   --color-teal: #3fb5c4;
+  --color-on-teal: #06181b;
   --color-red: #ef4a52;
+  --color-on-red: #1a1206;
   --color-orange: #f2994a;
   --color-yellow: #f0c93d;
   --color-green: #33c98a;
+  --color-on-green: #071a12;
+  --space-page: 16px;
 }
 
 :root.light {
@@ -28,23 +35,30 @@
   --color-bg: #f3f6f8;
   --color-panel: #ffffff;
   --color-panel2: #e8eef2;
+  --color-panel-deep: #dfe7ec;
   --color-border: #cbd5dc;
   --color-borderlt: #aebdc7;
   --color-text: #17212b;
   --color-muted: #52616d;
   --color-faint: #6d7b86;
   --color-amber: #b96812;
+  --color-amber-bright: #d58625;
+  --color-on-amber: #ffffff;
   --color-teal: #087f8d;
+  --color-on-teal: #ffffff;
   --color-red: #c9353d;
+  --color-on-red: #ffffff;
   --color-orange: #c66d20;
   --color-yellow: #a87800;
   --color-green: #168557;
+  --color-on-green: #ffffff;
+  --space-page: 16px;
 }
 
 html, body {
   background: radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--color-panel2) 80%, var(--color-bg)) 0%, var(--color-bg) 55%);
   color: var(--color-text);
-  font-family: 'Inter', sans-serif;
+  font-family: Inter, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -53,7 +67,7 @@ html, body {
 }
 
 :where(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid #e8952f;
+  outline: 2px solid var(--color-amber);
   outline-offset: 2px;
 }
 
@@ -95,8 +109,8 @@ body > div {
 
 /* Metin seçimi rengi (turuncu tema ile uyumlu) */
 ::selection {
-  background: rgba(232, 149, 47, .35);
-  color: #eef1f5;
+  background: color-mix(in srgb, var(--color-amber) 35%, transparent);
+  color: var(--color-text);
 }
 
 /* iPhone'larda alt menünün home çizgisine binmemesi için */
@@ -106,7 +120,43 @@ body > div {
 
 /* Kartlar için hafif parlama efekti */
 .hover-glow:hover {
-  box-shadow: 0 6px 24px rgba(232, 149, 47, .10);
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--color-amber) 10%, transparent);
+}
+
+@layer components {
+  .ui-card { @apply rounded-card border border-border bg-panel; }
+  .ui-control { @apply rounded-control border border-border bg-panel2 text-text outline-none transition; }
+  .ui-control:focus-visible {
+    @apply border-teal;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-teal) 20%, transparent);
+  }
+  .ui-button { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50; }
+  .ui-button-primary { @apply bg-gradient-to-b from-amber-bright to-amber text-on-amber shadow-lg hover:brightness-110 active:scale-[.98]; }
+  .ui-button-secondary {
+    @apply border bg-transparent text-teal;
+    border-color: color-mix(in srgb, var(--color-teal) 40%, transparent);
+  }
+  .ui-button-secondary:hover { background: color-mix(in srgb, var(--color-teal) 10%, transparent); }
+  .ui-button-danger {
+    @apply border text-red;
+    background: color-mix(in srgb, var(--color-red) 10%, transparent);
+    border-color: color-mix(in srgb, var(--color-red) 40%, transparent);
+  }
+  .ui-button-danger:hover { background: color-mix(in srgb, var(--color-red) 20%, transparent); }
+  .ui-caption { @apply text-[11px] leading-relaxed text-muted; }
+}
+
+@media (min-width: 768px) {
+  :root, :root.light { --space-page: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 /* Asistan sonuçları uzun motor/teknisyen adlarında yatay taşmamalı. */
@@ -135,10 +185,10 @@ body > div {
   font-size: 11px;
   font-weight: 800;
 }
-.status-pill.gecikmis { background: rgba(239,74,82,.14); color: #ef4a52; }
-.status-pill.kritik { background: rgba(242,153,74,.14); color: #f2994a; }
-.status-pill.yaklasiyor { background: rgba(240,201,61,.14); color: #f0c93d; }
-.status-pill.normal { background: rgba(51,201,138,.14); color: #33c98a; }
+.status-pill.gecikmis { background: color-mix(in srgb, var(--color-red) 14%, transparent); color: var(--color-red); }
+.status-pill.kritik { background: color-mix(in srgb, var(--color-orange) 14%, transparent); color: var(--color-orange); }
+.status-pill.yaklasiyor { background: color-mix(in srgb, var(--color-yellow) 14%, transparent); color: var(--color-yellow); }
+.status-pill.normal { background: color-mix(in srgb, var(--color-green) 14%, transparent); color: var(--color-green); }
 
 .status-pill .dot {
   width: 5px; height: 5px; border-radius: 999px; background: currentColor;

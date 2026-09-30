@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppIcon from "@/components/ui/AppIcon";
 
 const STORAGE_KEY = "agm-theme";
 
@@ -31,7 +32,7 @@ export default function ThemeToggle() {
       title={theme === "dark" ? "Gündüz modu" : "Gece modu"}
       className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-panel2 text-base transition hover:border-amber/50 hover:bg-panel"
     >
-      {theme === "dark" ? "☀️" : "🌙"}
+      <AppIcon name={theme === "dark" ? "sun" : "moon"} size={17} />
     </button>
   );
 }

@@ -121,7 +121,7 @@ export default function BakimTurleriPage() {
               onClick={() => setStatusFilter(o)}
               className={`px-3.5 py-1.5 rounded-full text-[11.5px] font-bold transition-all ${
                 statusFilter === o
-                  ? "bg-teal text-[#06181b] shadow-lg"
+                  ? "bg-teal text-on-teal shadow-lg"
                   : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"
               }`}
             >

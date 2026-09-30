@@ -1,12 +1,13 @@
 "use client";
 
 import { STATUS_LABELS, STATUS_COLORS, type StatusKey } from "@/lib/status";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 
-const ICONS: Record<StatusKey, string> = {
-  gecikmis: "⏰",
-  kritik: "⚠️",
-  yaklasiyor: "⏳",
-  normal: "✅",
+const ICONS: Record<StatusKey, AppIconName> = {
+  gecikmis: "clock",
+  kritik: "warning",
+  yaklasiyor: "hourglass",
+  normal: "check",
 };
 
 interface StatCardsProps {
@@ -25,7 +26,7 @@ export default function StatCards({ counts }: StatCardsProps) {
           <div className="absolute left-0 top-0 w-[3px] h-full" style={{ background: STATUS_COLORS[key] }} />
           <div className="flex items-center justify-between">
             <div className="text-[10.5px] font-bold tracking-wide text-muted uppercase">{STATUS_LABELS[key]}</div>
-            <span className="text-sm">{ICONS[key]}</span>
+            <span className="text-muted"><AppIcon name={ICONS[key]} size={16} /></span>
           </div>
           <div className="font-mono text-2xl md:text-3xl font-bold mt-1" style={{ color: STATUS_COLORS[key] }}>
             {counts[key]}

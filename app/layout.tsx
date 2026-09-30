@@ -1,8 +1,8 @@
 import "@/app/globals.css";
-import { Toaster } from "sonner";
 import type { ReactNode } from "react";
 import AppShell from "@/components/AppShell";
 import PwaRegister from "@/components/PwaRegister";
+import AppToaster from "@/components/AppToaster";
 
 export const metadata = {
   title: "Avcıkoru Santrali Motor Bakım Merkezi",
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="antialiased">
         <AppShell>{children}</AppShell>
         <PwaRegister />
-        <Toaster position="top-center" theme="dark" richColors closeButton />
+        <AppToaster />
       </body>
     </html>
   );
