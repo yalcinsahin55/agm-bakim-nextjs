@@ -10,6 +10,7 @@ import { cachedFetch } from "@/lib/apiCache";
 import { usePageData } from "@/lib/usePageData";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import DashboardActionRail from "@/components/DashboardActionRail";
+import StatCards from "@/components/StatCards";
 import DashboardAssistant from "./_components/DashboardAssistant";
 import EngineHealthDetails from "./_components/EngineHealthDetails";
 import { ENGINE_STATUS_VIEW, engineStatus, greetingPresentation, healthCardId } from "./_lib/types";
@@ -156,6 +157,16 @@ export default function DashboardPage() {
             <span className="text-muted">·</span>
             <span className="text-muted">{todayStr}</span>
             <span className="inline-flex items-center gap-1.5 text-text"><span className="h-1.5 w-1.5 rounded-full bg-amber" aria-hidden="true" />{activeTimeStr}</span>
+          </div>
+        </section>
+
+        <section className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.7fr)]" aria-label="Operasyon özeti">
+          <StatCards counts={counts} />
+          <div className={`rounded-card border p-3 shadow-sm ${counts.gecikmis > 0 ? "border-red/35 bg-red/5" : counts.kritik > 0 ? "border-amber/35 bg-amber/5" : "border-teal/30 bg-teal/5"}`}>
+            <div className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-faint">Bugünün odağı</div>
+            <div className="mt-1 text-base font-extrabold text-text">{counts.gecikmis > 0 ? `${counts.gecikmis} gecikmiş bakım` : counts.kritik > 0 ? `${counts.kritik} kritik bakım` : "Tüm bakımlar kontrol altında"}</div>
+            <p className="mt-1 text-[10px] leading-4 text-muted">{counts.gecikmis > 0 ? "Önceliği gecikmiş maddelere vererek operasyon riskini azaltın." : "Öncelikli bir madde yok. Motor durumlarını düzenli kontrol etmeye devam edin."}</p>
+            <a href="#dashboard-actions-heading" className="mt-2 inline-flex text-[10px] font-extrabold text-amber hover:underline">Aksiyon kuyruğuna git →</a>
           </div>
         </section>
 

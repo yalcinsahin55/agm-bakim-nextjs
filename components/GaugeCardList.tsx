@@ -4,6 +4,7 @@ import GaugeRing from "./GaugeRing";
 import EngineBadge from "./EngineBadge";
 import StatusPill from "./StatusPill";
 import { STATUS_COLORS, type StatusKey } from "@/lib/status";
+import EmptyState from "@/components/EmptyState";
 
 export interface GaugeCardRow {
   key?: string;
@@ -25,9 +26,7 @@ interface GaugeCardListProps {
 export default function GaugeCardList({ rows, onCardClick }: GaugeCardListProps) {
   if (!rows || rows.length === 0) {
     return (
-      <div className="text-center text-muted text-sm py-10 bg-panel border border-border rounded-card">
-        Kayıt bulunamadı.
-      </div>
+      <EmptyState icon="engine" title="Gösterilecek veri yok" description="Bu motor grubu için henüz bakım durumu oluşmadı." />
     );
   }
 

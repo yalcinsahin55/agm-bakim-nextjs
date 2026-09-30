@@ -189,6 +189,7 @@ export default function TamamlaPage() {
   const isManagerInternalRecord = user?.role === "yonetici" && technicianSource !== "external_service";
   const responsibleDurationMinutes = isManagerInternalRecord ? responsibleTechnicianDurationMinutes : null;
   const evidenceReady = techNote.trim().length > 0 || photos.length > 0 || videos.length > 0 || reportAttachments.length > 0;
+  const completionStep = !engineId || !typeKey ? 1 : !timeTrackingReady ? 2 : !checklistComplete ? 3 : !evidenceReady ? 4 : 5;
 
   function toggleExtra(key: string, checked: boolean) {
     setExtraKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
@@ -401,7 +402,7 @@ export default function TamamlaPage() {
         subtitle={engineId ? `${engines.find((e) => e._id === engineId)?.name || ""} için yeni kayıt` : ""}
       />
       <main className="mx-auto max-w-7xl px-4 py-5 md:px-6">
-        <CompletionWorkspaceHeader isOnline={isOnline} />
+        <CompletionWorkspaceHeader isOnline={isOnline} step={completionStep} />
 
         {quickMode && <CompletionQuickBanner
           isOnline={isOnline}

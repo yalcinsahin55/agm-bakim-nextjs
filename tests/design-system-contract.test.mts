@@ -18,6 +18,12 @@ const globalsSource = new URL("../app/globals.css", import.meta.url);
 const lightbox = new URL("../components/Lightbox.tsx", import.meta.url);
 const keyboardHook = new URL("../lib/useKeyboardOpen.ts", import.meta.url);
 const scrollToTop = new URL("../components/ScrollToTop.tsx", import.meta.url);
+const dashboardPage = new URL("../app/dashboard/page.tsx", import.meta.url);
+const appShell = new URL("../components/AppShell.tsx", import.meta.url);
+const detailsModal = new URL("../components/MaintenanceRecordDetailsModal.tsx", import.meta.url);
+const recordFilters = new URL("../app/kayitlar/_components/RecordFilters.tsx", import.meta.url);
+const themeToggle = new URL("../components/ThemeToggle.tsx", import.meta.url);
+const completionHeader = new URL("../app/tamamla/_components/CompletionWorkspaceHeader.tsx", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -93,4 +99,22 @@ test("mobile interactions provide reduced-motion-safe touch feedback and keyboar
   assert.match(keyboardText, /visualViewport/);
   assert.match(scrollText, /Sayfanın başına git/);
   assert.match(cardText, /İşlemler/);
+});
+
+test("desktop and cross-device refinement contracts stay present", async () => {
+  const [dashboardText, shellText, sidebarText, modalText, filtersText, themeText, headerText, globalsText] = await Promise.all([
+    text(dashboardPage), text(appShell), text(sidebar), text(detailsModal), text(recordFilters), text(themeToggle), text(completionHeader), text(globals),
+  ]);
+  assert.match(dashboardText, /Bugünün odağı/);
+  assert.match(dashboardText, /StatCards/);
+  assert.match(shellText, /md:ml-\[76px\]/);
+  assert.match(sidebarText, /Kenar çubuğunu daralt/);
+  assert.match(sidebarText, /data-collapsed/);
+  assert.match(modalText, /md:ml-auto/);
+  assert.match(modalText, /app:escape/);
+  assert.match(filtersText, /Filtreleri/);
+  assert.match(filtersText, /activeFilterCount/);
+  assert.match(themeText, /prefers-color-scheme/);
+  assert.match(headerText, /STEPS/);
+  assert.match(globalsText, /report-desktop-table thead/);
 });

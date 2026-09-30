@@ -1,6 +1,7 @@
 "use client";
 
 import NextImage from "next/image";
+import { useEffect } from "react";
 import type { ReportAttachment, TechnicianType, VideoRef } from "@/lib/types";
 import type { ComponentTransfer } from "@/lib/types";
 import { formatReportAttachmentSize } from "@/lib/reportAttachments";
@@ -77,9 +78,15 @@ export default function MaintenanceRecordDetailsModal({
   const photos = record.photos || record.photos_b64 || [];
   const videos = record.videos || [];
 
+  useEffect(() => {
+    const closeOnEscape = () => onClose();
+    window.addEventListener("app:escape", closeOnEscape);
+    return () => window.removeEventListener("app:escape", closeOnEscape);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="Bakım kaydı detayı">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in md:rounded-2xl">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl animate-fade-in md:ml-auto md:h-full md:max-h-none md:max-w-xl md:rounded-none md:rounded-l-2xl md:p-5">
         <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-3">
           <div>
             <div className="text-base font-extrabold text-text">{record.type_label}</div>

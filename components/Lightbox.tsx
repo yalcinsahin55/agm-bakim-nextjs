@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 interface LightboxProps {
   src: string | null;
@@ -13,6 +13,11 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
   const [dragY, setDragY] = useState(0);
   const startY = useRef<number | null>(null);
   const dismissedBySwipe = useRef(false);
+  useEffect(() => {
+    const closeOnEscape = () => onClose();
+    window.addEventListener("app:escape", closeOnEscape);
+    return () => window.removeEventListener("app:escape", closeOnEscape);
+  }, [onClose]);
   if (!src) return null;
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
