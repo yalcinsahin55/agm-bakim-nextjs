@@ -28,10 +28,25 @@ export function latestExcelHourSnapshot(history: readonly EngineHistoryEntry[] |
     .at(-1) || null;
 }
 
+export function excelHourSnapshotAtOrBefore(
+  history: readonly EngineHistoryEntry[] | undefined,
+  targetDate: Date | string,
+): ExcelHourSnapshot | null {
+  const target = validDate(targetDate);
+  if (!target || !Array.isArray(history)) return null;
+  return history
+    .filter((entry) => entry.source === "excel" && Number.isFinite(Number(entry.hours)) && validDate(entry.date))
+    .map((entry) => ({ date: String(entry.date), hours: Number(entry.hours) }))
+    .filter((entry) => new Date(entry.date).getTime() <= target.getTime())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .at(-1) || null;
+}
+
 export function getCompletionHourRule(
   currentEngineHours: number,
   history: readonly EngineHistoryEntry[] | undefined,
   maintenanceStartAt?: Date | string,
+  now: Date | string = new Date(),
 ): CompletionHourRule {
   const reference = latestExcelHourSnapshot(history);
   const minimumHours = Math.max(0, Number(currentEngineHours || 0) - MAX_COMPLETION_HOURS_BEHIND_CURRENT);
@@ -41,12 +56,30 @@ export function getCompletionHourRule(
   const referenceDate = validDate(reference.date);
   if (!start || !referenceDate) return { minimumHours, reference };
 
+  const historicalReference = excelHourSnapshotAtOrBefore(history, start);
+  if (!historicalReference) {
+    const nowDate = validDate(now);
+    if (nowDate && start.getTime() < nowDate.getTime()) {
+      const elapsedHours = (nowDate.getTime() - start.getTime()) / 3_600_000;
+      const estimatedHoursAtStart = Math.max(0, Number(currentEngineHours || 0) - elapsedHours);
+      return {
+        minimumHours: Math.max(0, estimatedHoursAtStart - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
+        maximumHours: estimatedHoursAtStart,
+        reference,
+        elapsedHours,
+      };
+    }
+  }
+
   const elapsedHours = Math.max(0, (start.getTime() - referenceDate.getTime()) / 3_600_000);
+  const effectiveReference = historicalReference || reference;
+  const effectiveReferenceDate = validDate(effectiveReference.date) || referenceDate;
+  const effectiveElapsedHours = Math.max(0, (start.getTime() - effectiveReferenceDate.getTime()) / 3_600_000);
   return {
-    minimumHours: Math.max(minimumHours, reference.hours - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
-    maximumHours: reference.hours + elapsedHours,
-    reference,
-    elapsedHours,
+    minimumHours: Math.max(minimumHours, effectiveReference.hours - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
+    maximumHours: effectiveReference.hours + effectiveElapsedHours,
+    reference: effectiveReference,
+    elapsedHours: historicalReference ? effectiveElapsedHours : elapsedHours,
   };
 }
 
@@ -55,12 +88,13 @@ export function getCompletionHourValidationError(
   currentEngineHours: number,
   history: readonly EngineHistoryEntry[] | undefined,
   maintenanceStartAt?: Date | string,
+  now: Date | string = new Date(),
 ): string | null {
-  const rule = getCompletionHourRule(currentEngineHours, history, maintenanceStartAt);
+  const rule = getCompletionHourRule(currentEngineHours, history, maintenanceStartAt, now);
   const entered = Number(enteredHours);
   if (!Number.isFinite(entered) || entered < 0) return "Motor çalışma saati geçerli, negatif olmayan bir sayı olmalıdır.";
   if (entered < rule.minimumHours) {
-    return `Bakım saati mevcut motor saatinden en fazla ${MAX_COMPLETION_HOURS_BEHIND_CURRENT} saat düşük olabilir. En düşük değer: ${rule.minimumHours.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} saat.`;
+    return `Bakım başlangıç tarihindeki motor saati, tahmini değerden en fazla ${MAX_COMPLETION_HOURS_BEHIND_CURRENT} saat düşük olabilir. En düşük değer: ${rule.minimumHours.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} saat.`;
   }
   if (typeof rule.maximumHours === "number" && entered > rule.maximumHours + 1e-9) {
     const referenceText = rule.reference ? new Date(rule.reference.date).toLocaleString("tr-TR") : "son Excel ölçümünden";

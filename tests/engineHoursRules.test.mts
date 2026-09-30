@@ -28,3 +28,12 @@ test("completion hour cannot be more than 24 hours below current engine hours", 
   assert.match(error || "", /en fazla 24 saat düşük/);
   assert.equal(getCompletionHourValidationError(96, 120, undefined, "2026-09-21T10:00:00.000Z"), null);
 });
+
+test("backdated completion uses the engine hour estimated for the maintenance date", () => {
+  const history = [{ date: "2026-09-30T00:00:00.000Z", hours: 2_000, load_kw: 0, source: "excel" as const }];
+  const rule = getCompletionHourRule(2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z");
+  assert.equal(rule.minimumHours, 1_928);
+  assert.equal(rule.maximumHours, 1_952);
+  assert.equal(getCompletionHourValidationError(1_940, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z"), null);
+  assert.match(getCompletionHourValidationError(1_927, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z") || "", /En düşük değer/);
+});
