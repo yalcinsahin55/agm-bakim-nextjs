@@ -15,9 +15,6 @@ import { useRecordEditReferenceData } from "../_hooks/useRecordEditReferenceData
 import { useRecordEditMedia } from "../_hooks/useRecordEditMedia";
 import RecordEditScheduleSection from "./RecordEditScheduleSection";
 import PreviousWorkingHoursSection from "@/app/tamamla/_components/PreviousWorkingHoursSection";
-import ComponentTransferSection from "@/components/ComponentTransferSection";
-import { componentForMaintenanceType } from "@/lib/componentTransfers";
-import type { ComponentTransferDraft } from "@/lib/componentTransfers";
 
 export interface MaintenanceRecordEditFormProps {
   record: MaintenanceRecord;
@@ -40,7 +37,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string | undefined>>(
     record.previous_working_hours && record.previous_working_hours > 0 ? { [record.type_key]: record.previous_working_hours } : {},
   );
-  const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>(() => (record.component_transfers || []).map((transfer) => ({ id: transfer.id, component_name: transfer.component_name, condition: transfer.condition || "used", source_engine_id: transfer.source_engine_id || "", source_hours: transfer.source_hours, installed_hours: transfer.installed_hours, note: transfer.note || "" })));
   const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
@@ -118,7 +114,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
       responsible_technician_duration: isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null ? responsibleDurationMinutes : undefined,
       extra_types: selectedExtraTypes,
-      component_transfers: componentTransfers.map((transfer) => ({ id: transfer.id, component_name: transfer.component_name.trim(), condition: "used", source_hours: Number(transfer.source_hours), installed_hours: Number(hours), ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) })),
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -184,7 +179,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
         setPressure={setPressure}
       />
       <PreviousWorkingHoursSection types={selectedMaintenanceTypes} values={previousWorkingHours} onChange={(key, value) => setPreviousWorkingHours((current) => ({ ...current, [key]: value }))} disabled={busy} />
-      <ComponentTransferSection componentName={componentForMaintenanceType(typeKey, maintenanceTypes.find((type) => type.key === typeKey)?.label)} transfers={componentTransfers} setTransfers={setComponentTransfers} disabled={busy} />
       <RecordEditCollaborationSections
         record={record}
         isAdmin={isAdmin}

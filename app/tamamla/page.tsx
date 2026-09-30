@@ -34,10 +34,6 @@ import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
 import PreviousWorkingHoursSection from "./_components/PreviousWorkingHoursSection";
-import ComponentTransferSection from "@/components/ComponentTransferSection";
-import type { ComponentTransfer } from "@/lib/types";
-import type { ComponentTransferDraft } from "@/lib/componentTransfers";
-import { componentForMaintenanceType } from "@/lib/componentTransfers";
 
 export default function TamamlaPage() {
   const router = useRouter();
@@ -70,7 +66,6 @@ export default function TamamlaPage() {
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string | undefined>>({});
-  const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>([]);
 
   const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, photoBusy, videoBusy, reportAttachmentBusy, setReportAttachments, setReportAttachmentBusy, handlePhotos, handleVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useCompletionEvidenceMedia();
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -296,17 +291,6 @@ export default function TamamlaPage() {
 
 
     const loadingToast = toast.loading("Bakım kaydı işleniyor...");
-    const normalizedComponentTransfers: ComponentTransfer[] = componentTransfers.flatMap((transfer) => {
-      const sourceHours = Number(transfer.source_hours);
-      const installedHours = Number(hours);
-      if (!transfer.component_name.trim() || !Number.isFinite(sourceHours) || sourceHours < 0 || !Number.isFinite(installedHours) || installedHours < 0) return [];
-      return [{ id: transfer.id, component_name: transfer.component_name.trim(), condition: "used", source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
-    });
-    if (normalizedComponentTransfers.length !== componentTransfers.length) {
-      toast.error("Parça transferlerinde parça adı ve geçerli saat bilgileri girin.");
-      toast.dismiss(loadingToast);
-      return;
-    }
     const payload = buildCompletionPayload({
       clientRequestId: clientRequestId,
       engineId,
@@ -337,7 +321,6 @@ export default function TamamlaPage() {
       checklistItems,
       checklist,
       previousWorkingHours: previousWorkingHoursByType,
-      componentTransfers: normalizedComponentTransfers,
     });
 
     try {
@@ -496,13 +479,6 @@ export default function TamamlaPage() {
             types={selectedMaintenanceTypes}
             values={previousWorkingHours}
             onChange={(key, value) => setPreviousWorkingHours((current) => ({ ...current, [key]: value }))}
-            disabled={submitting}
-          />
-
-          <ComponentTransferSection
-            componentName={componentForMaintenanceType(typeKey, chosenType?.label)}
-            transfers={componentTransfers}
-            setTransfers={setComponentTransfers}
             disabled={submitting}
           />
 
