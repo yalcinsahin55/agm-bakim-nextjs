@@ -1,7 +1,7 @@
-import { enginesCollection, usersCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import type { Collection } from "mongodb";
+import type { Collection, Db } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
@@ -9,6 +9,7 @@ import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { EngineDocument } from "@/lib/dbTypes";
+import { readEngineHistory, replaceEngineHistory } from "@/lib/engineHistory";
 import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ interface HistoryEntry {
   date: string;
   hours: number;
   load_kw?: number;
+  source?: "excel" | "manual" | "record";
 }
 
 function parsePageParams(req: NextRequest) {
@@ -44,20 +46,17 @@ function sortHistory(history: HistoryEntry[]): HistoryEntry[] {
   return [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-async function persistHistory(enginesCol: Collection<EngineDocument>, engine: EngineDocument, history: HistoryEntry[]) {
+async function persistHistory(enginesCol: Collection<EngineDocument>, engine: EngineDocument, history: HistoryEntry[], db: Db) {
   const sorted = sortHistory(history);
-  const storedHistory = sorted.map((entry) => ({
-    date: entry.date,
-    hours: entry.hours,
-    load_kw: typeof entry.load_kw === "number" ? entry.load_kw : engine.load_kw,
-  }));
-  const update: Partial<EngineDocument> = { history: storedHistory, updated_at: new Date() };
+  const storedHistory = sorted.map((entry) => ({ date: entry.date, hours: entry.hours, load_kw: typeof entry.load_kw === "number" ? entry.load_kw : engine.load_kw, source: entry.source }));
+  const update: Partial<EngineDocument> = { updated_at: new Date() };
   // Geçmişteki en güncel kayıt, motorun güncel çalışma saati ve yükünü de temsil eder.
   if (sorted.length > 0) {
     update.hours = storedHistory[storedHistory.length - 1].hours;
     update.load_kw = storedHistory[storedHistory.length - 1].load_kw;
   }
   await enginesCol.updateOne({ _id: engine._id }, { $set: update });
+  await replaceEngineHistory(db, String(engine._id), storedHistory);
   return update;
 }
 
@@ -75,44 +74,23 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
     const enginesCol = enginesCollection(db);
     const engine = await enginesCol.findOne(
       { _id: id },
-      { projection: { _id: 1, name: 1, hours: 1, load_kw: 1 } },
+      { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, history: 1 } },
     );
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
-    // Geçmiş gömülü tutulduğu için yalnız seçilen motor açılır; unwind/sort
-    // sıralamayı güvenceye alır ve response'a sadece istenen sayfa çıkar.
-    const [result] = await enginesCol.aggregate([
-      { $match: { _id: id } },
-      { $project: { history: { $ifNull: ["$history", []] } } },
-      { $unwind: { path: "$history", includeArrayIndex: "history_index" } },
-      { $sort: { "history.date": 1, history_index: 1 } },
-      {
-        $facet: {
-          metadata: [{ $count: "total" }],
-          summary: [
-            {
-              $group: {
-                _id: null,
-                first: { $first: "$history" },
-                last: { $last: "$history" },
-                has_load: { $max: { $cond: [{ $isNumber: "$history.load_kw" }, 1, 0] } },
-              },
-            },
-          ],
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-            { $replaceRoot: { newRoot: "$history" } },
-          ],
-        },
-      },
-    ]).toArray();
-
-    const total = Number(result?.metadata?.[0]?.total || 0);
-    const summary = result?.summary?.[0] || {};
+    const snapshotCollection = engineHourSnapshotsCollection(db);
+    const snapshotTotal = await snapshotCollection.countDocuments({ engine_id: id });
+    const fullHistory = snapshotTotal > 0 ? null : await readEngineHistory(db, id, engine.history);
+    const total = snapshotTotal > 0 ? snapshotTotal : fullHistory?.length || 0;
+    const data = snapshotTotal > 0
+      ? await snapshotCollection.find({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: 1, _id: 1 }, skip, limit }).toArray()
+      : (fullHistory || []).slice(skip, skip + limit);
+    const summary = snapshotTotal > 0
+      ? { first: await snapshotCollection.findOne({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: 1, _id: 1 } }), last: await snapshotCollection.findOne({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: -1, _id: -1 } }), has_load: true }
+      : { first: fullHistory?.[0], last: fullHistory?.at(-1), has_load: fullHistory?.some((entry) => typeof entry.load_kw === "number") || false };
     return NextResponse.json({
       engine: { _id: engine._id, name: engine.name, hours: engine.hours, load_kw: engine.load_kw },
-      history: (result?.data || []) as HistoryEntry[],
+      history: data as HistoryEntry[],
       total,
       page,
       limit,
@@ -120,7 +98,7 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
       summary: {
         first: summary.first || null,
         last: summary.last || null,
-        has_load: summary.has_load === 1,
+        has_load: summary.has_load,
       },
     });
   } catch (error) {
@@ -157,7 +135,7 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
 
     // Hedefli düzenleme/silme sırasında legacy alanları veya eski biçimleri sessizce düşürme.
-    const currentHistory = Array.isArray(engine.history) ? sortHistory(engine.history) : [];
+    const currentHistory = await readEngineHistory(db, id, engine.history);
     let nextHistory: HistoryEntry[];
 
     if (Array.isArray(body.history)) {
@@ -184,7 +162,7 @@ async function patchHistory(req: NextRequest, context: { params: Promise<{ id: s
       return NextResponse.json({ error: "Geçersiz veri." }, { status: 400 });
     }
 
-    const update = await persistHistory(enginesCol, engine, nextHistory);
+    const update = await persistHistory(enginesCol, engine, nextHistory, db);
     invalidateMaintenancePanelServerCache();
     return NextResponse.json({ ok: true, hours: update.hours ?? engine.hours });
   } catch (error) {

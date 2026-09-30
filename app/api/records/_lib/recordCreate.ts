@@ -25,6 +25,7 @@ import { buildExtraClientRequestId, parseDateOnly } from "./recordRouteHelpers";
 import { hasOfflineOwnerMismatch, OFFLINE_OWNER_HEADER } from "@/lib/offlineQueueContract";
 import { insertCreatedMaintenanceRecord } from "./recordCreateInsert";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
+import { appendEngineHistoryEntry, readEngineHistory } from "@/lib/engineHistory";
 import type { ComponentTransfer } from "@/lib/types";
 
 export async function postRecord(req: NextRequest) {
@@ -120,6 +121,7 @@ export async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
     const engineName = engine.name;
+    const engineHistory = await readEngineHistory(db, engine_id, engine.history);
     const normalizedPreviousWorkingHours = typeof previous_working_hours === "number" ? previous_working_hours : 0;
     const normalizedComponentTransfers: ComponentTransfer[] = (component_transfers || []).map((transfer) => ({
       ...transfer,
@@ -127,7 +129,7 @@ export async function postRecord(req: NextRequest) {
       source_hours: transfer.condition === "new" ? 0 : transfer.source_hours,
       ...(transfer.note ? { note: transfer.note.trim() } : {}),
     }));
-    const hourValidationError = getCompletionHourValidationError(hour_at_completion, engine.hours, engine.history, maintenanceStartAt);
+    const hourValidationError = getCompletionHourValidationError(hour_at_completion, engine.hours, engineHistory, maintenanceStartAt);
     if (hourValidationError) return NextResponse.json({ error: hourValidationError }, { status: 400 });
 
     const useExternalService = technician_source === "external_service";
@@ -333,11 +335,10 @@ export async function postRecord(req: NextRequest) {
           const historyEntry = { date: stamp.toISOString(), hours: hour_at_completion, load_kw: engine.load_kw || 0, source: "record" as const };
           await enginesCol.updateOne(
             { _id: engine_id, hours: { $lt: hour_at_completion } },
-            Array.isArray(engine.history)
-              ? { $set: { hours: hour_at_completion, updated_at: stamp }, $push: { history: historyEntry } }
-              : { $set: { hours: hour_at_completion, updated_at: stamp, history: [historyEntry] } },
+            { $set: { hours: hour_at_completion, updated_at: stamp } },
             { session },
           );
+          await appendEngineHistoryEntry(db, engine_id, historyEntry, session);
         }
       };
       if (session) {

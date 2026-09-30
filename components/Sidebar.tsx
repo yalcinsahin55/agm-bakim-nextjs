@@ -24,6 +24,7 @@ const ADMIN_VIEWER_ITEMS: MenuItem[] = [
   { href: "/motorlar", label: "Motorlar", icon: "⚙️" },
   { href: "/bakim-turleri", label: "Bakım Türleri", icon: "🔧" },
   { href: "/istatistik", label: "İstatistikler", icon: "📈" },
+  { href: "/veri-kalitesi", label: "Veri Kalitesi", icon: "🧪" },
   { href: "/asistan", label: "Bakım Asistanı", icon: "✦" },
   { href: "/diger", label: "Diğer Menüler", icon: "☰" },
 ];

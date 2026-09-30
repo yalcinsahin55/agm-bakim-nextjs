@@ -26,6 +26,7 @@ const EXPECTED_NAMED_INDEXES: Readonly<Record<string, readonly string[]>> = {
   video_chunks: ["video_chunks_upload_index", "video_chunks_owner_upload_index", "video_chunks_at_ttl"],
   oil_analyses: ["oil_analyses_engine_date_desc", "oil_analyses_date_desc"],
   pressure_readings: ["pressure_readings_engine_date_asc", "pressure_readings_date_asc"],
+  engine_hour_snapshots: ["engine_hour_snapshots_engine_date", "engine_hour_snapshots_engine_source_date"],
 };
 
 const dryRun = process.argv.includes("--dry-run") || process.env.INDEX_MIGRATION_DRY_RUN === "1";

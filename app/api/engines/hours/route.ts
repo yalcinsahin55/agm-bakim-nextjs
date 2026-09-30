@@ -1,4 +1,4 @@
-import { enginesCollection, usersCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { UpdateFilter } from "mongodb";
@@ -89,27 +89,23 @@ export async function PATCH(req: NextRequest) {
       const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
       const nextHours = hoursChanged && typeof u.hours === "number" ? u.hours : existing.hours;
       const nextLoadKw = loadChanged && typeof u.load_kw === "number" ? u.load_kw : (existing.load_kw || 0);
-      if (hoursChanged || loadChanged) {
-        updateOp.$push = { history: { date: stamp.toISOString(), hours: nextHours, load_kw: nextLoadKw, source: "manual" } };
-      }
+      const historyEntry = { date: stamp.toISOString(), hours: Number(nextHours), load_kw: Number(nextLoadKw), source: "manual" as const };
       changes.push({ engine_id: engineId, engine: String(existing.name || engineId), before: { hours: Number(existing.hours || 0), load_kw: Number(existing.load_kw || 0) }, after: { hours: Number(nextHours || 0), load_kw: Number(nextLoadKw || 0) } });
       operations.push({ updateOne: { filter: { _id: engineId }, update: updateOp } });
       workingEngines.set(engineId, {
         ...existing,
         ...setFields,
-        ...(hoursChanged || loadChanged ? {
-          history: [...(Array.isArray(existing.history) ? existing.history : []), {
-            date: stamp.toISOString(),
-            hours: typeof setFields.hours === "number" ? setFields.hours : existing.hours,
-            load_kw: typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0),
-            source: "manual",
-          }],
-        } : {}),
+        ...(hoursChanged || loadChanged ? { history: [...(Array.isArray(existing.history) ? existing.history : []), historyEntry] } : {}),
       });
       changed++;
     }
 
-    if (operations.length > 0) await enginesCol.bulkWrite(operations, { ordered: true });
+    if (operations.length > 0) {
+      await enginesCol.bulkWrite(operations, { ordered: true });
+      await engineHourSnapshotsCollection(db).insertMany(
+        changes.map((change) => ({ engine_id: change.engine_id, date: stamp.toISOString(), hours: change.after.hours, load_kw: change.after.load_kw, source: "manual" as const, created_at: stamp })),
+      );
+    }
 
     if (changed > 0) {
       await writeAuditLog(db, {

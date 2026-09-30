@@ -1,4 +1,4 @@
-import { enginesCollection, usersCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, usersCollection } from "@/lib/dbCollections";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { UpdateFilter } from "mongodb";
@@ -86,7 +86,8 @@ async function postImportHours(req: NextRequest) {
   const engineIds = [...new Set(rows.map((row) => String(row[nameCol] || "").trim()).filter(Boolean))];
   const existingEngines = await enginesCol.find({ _id: { $in: engineIds } }).toArray();
   const workingEngines = new Map(existingEngines.map((engine) => [String(engine._id), engine]));
-  const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
+    const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
+    const snapshotEntries: Array<{ engine_id: string; date: string; hours: number; load_kw: number; source: "excel"; created_at: Date }> = [];
   const changes: Array<{ engine_id: string; engine: string; before: { hours: number; load_kw: number }; after: { hours: number; load_kw: number } }> = [];
   let updated = 0;
 
@@ -115,16 +116,7 @@ async function postImportHours(req: NextRequest) {
     if (!hoursChanged && !loadChanged) continue;
     const updateOp: UpdateFilter<EngineDocument> = { $set: setFields };
     const nextLoadKw = loadChanged && typeof setFields.load_kw === "number" ? setFields.load_kw : (existing.load_kw || 0);
-    if (hoursChanged || loadChanged) {
-      updateOp.$push = {
-        history: {
-          date: stamp.toISOString(),
-          hours: hoursChanged ? hours : existing.hours,
-          load_kw: nextLoadKw,
-          source: "excel",
-        },
-      };
-    }
+      if (hoursChanged || loadChanged) snapshotEntries.push({ engine_id: name, date: stamp.toISOString(), hours: Number(hoursChanged ? hours : existing.hours), load_kw: Number(nextLoadKw), source: "excel", created_at: stamp });
     changes.push({ engine_id: name, engine: String(existing.name || name), before: { hours: Number(existing.hours || 0), load_kw: Number(existing.load_kw || 0) }, after: { hours: Number(hoursChanged ? hours : existing.hours || 0), load_kw: Number(nextLoadKw || 0) } });
     operations.push({ updateOne: { filter: { _id: name }, update: updateOp } });
     workingEngines.set(name, {
@@ -142,7 +134,10 @@ async function postImportHours(req: NextRequest) {
     updated++;
   }
 
-  if (operations.length > 0) await enginesCol.bulkWrite(operations, { ordered: true });
+  if (operations.length > 0) {
+    await enginesCol.bulkWrite(operations, { ordered: true });
+    if (snapshotEntries.length > 0) await engineHourSnapshotsCollection(db).insertMany(snapshotEntries);
+  }
 
   if (updated > 0) {
     await writeAuditLog(db, {

@@ -19,6 +19,15 @@ export type UserDocument = User;
 export type EngineDocument = Engine & {
   maintenance_count?: number;
 };
+export type EngineHourSnapshotDocument = {
+  _id?: MongoId;
+  engine_id: string;
+  date: string;
+  hours: number;
+  load_kw: number;
+  source?: "excel" | "manual" | "record";
+  created_at?: Date | string;
+};
 export type MaintenanceTypeDocument = MaintenanceType;
 
 export type MaintenanceRecordDocument = Omit<MaintenanceRecord, "_id" | "created_at"> & {

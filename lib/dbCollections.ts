@@ -2,6 +2,7 @@ import type { Collection, Db } from "mongodb";
 import type {
   AuditLogDocument,
   EngineDocument,
+  EngineHourSnapshotDocument,
   EquipmentInfoDocumentWithFields,
   MaintenanceRecordDocument,
   MaintenanceTypeDocument,
@@ -19,6 +20,10 @@ export function usersCollection(db: Db): Collection<UserDocument> {
 
 export function enginesCollection(db: Db): Collection<EngineDocument> {
   return db.collection<EngineDocument>("engines");
+}
+
+export function engineHourSnapshotsCollection(db: Db): Collection<EngineHourSnapshotDocument> {
+  return db.collection<EngineHourSnapshotDocument>("engine_hour_snapshots");
 }
 
 export function maintenanceTypesCollection(db: Db): Collection<MaintenanceTypeDocument> {

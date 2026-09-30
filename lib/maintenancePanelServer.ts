@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import { enginesCollection, maintenanceTypesCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, maintenanceTypesCollection } from "@/lib/dbCollections";
 import { buildItems, type PanelItem } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
 import { latestExcelHourSnapshot } from "@/lib/engineHoursRules";
@@ -56,13 +56,24 @@ export async function getOrBuildMaintenancePanelServerPayload(db: Db, now = Date
       projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, work_domains: 1, allow_electromechanical_support: 1, allow_electromechanical_responsible: 1, engine_states: 1 },
     }).toArray(),
   ]);
+  const engineIds = engines.map((engine) => String(engine._id));
+  const snapshots = await engineHourSnapshotsCollection(db).find(
+    { engine_id: { $in: engineIds }, source: "excel" },
+    { projection: { _id: 0, engine_id: 1, date: 1, hours: 1, source: 1 }, sort: { date: 1 } },
+  ).toArray();
+  const snapshotsByEngine = new Map<string, Array<{ date: string; hours: number }>>();
+  for (const snapshot of snapshots) {
+    const list = snapshotsByEngine.get(snapshot.engine_id) || [];
+    list.push({ date: snapshot.date, hours: Number(snapshot.hours) });
+    snapshotsByEngine.set(snapshot.engine_id, list);
+  }
   const panelEngines = engines.map((engine) => ({
     _id: String(engine._id),
     name: engine.name,
     hours: engine.hours,
     load_kw: engine.load_kw,
-    latest_excel_snapshot: latestExcelHourSnapshot(engine.history),
-    excel_snapshots: (Array.isArray(engine.history) ? engine.history : [])
+    latest_excel_snapshot: snapshotsByEngine.get(String(engine._id))?.at(-1) || latestExcelHourSnapshot(engine.history),
+    excel_snapshots: snapshotsByEngine.get(String(engine._id)) || (Array.isArray(engine.history) ? engine.history : [])
       .filter((entry) => entry.source === "excel" && Number.isFinite(Number(entry.hours)) && Number.isFinite(new Date(entry.date).getTime()))
       .map((entry) => ({ date: String(entry.date), hours: Number(entry.hours) }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),

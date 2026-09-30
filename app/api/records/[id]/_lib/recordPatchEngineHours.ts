@@ -1,6 +1,6 @@
 import type { ClientSession } from "mongodb";
 import { enginesCollection } from "@/lib/dbCollections";
-import type { EngineDocument } from "@/lib/dbTypes";
+import { appendEngineHistoryEntry } from "@/lib/engineHistory";
 
 export async function updateEngineHoursIfAdvanced(
   db: Parameters<typeof enginesCollection>[0],
@@ -16,9 +16,8 @@ export async function updateEngineHoursIfAdvanced(
   const historyEntry = { date: stamp.toISOString(), hours: completedHours, load_kw: engine.load_kw || 0 };
   await enginesCollection(db).updateOne(
     { _id: engineId },
-    Array.isArray(engine.history)
-      ? { $set: { hours: completedHours, updated_at: stamp }, $push: { history: historyEntry } }
-      : { $set: { hours: completedHours, updated_at: stamp, history: [historyEntry] } },
+    { $set: { hours: completedHours, updated_at: stamp } },
     options,
   );
+  await appendEngineHistoryEntry(db, engineId, historyEntry, session);
 }

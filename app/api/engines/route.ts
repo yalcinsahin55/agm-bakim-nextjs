@@ -1,4 +1,4 @@
-import { enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -49,6 +49,23 @@ async function getEngines(req: NextRequest) {
           ]).toArray()
         : Promise.resolve([]),
     ]);
+    if (includeHistory && engines.length > 0) {
+      const snapshots = await engineHourSnapshotsCollection(db).find(
+        { engine_id: { $in: engines.map((engine) => String(engine._id)) } },
+        { projection: { _id: 0, engine_id: 1, date: 1, hours: 1, load_kw: 1, source: 1 }, sort: { date: 1, _id: 1 } },
+      ).toArray();
+      const byEngine = new Map<string, typeof snapshots>();
+      for (const snapshot of snapshots) {
+        const key = String(snapshot.engine_id);
+        const list = byEngine.get(key) || [];
+        list.push(snapshot);
+        byEngine.set(key, list);
+      }
+      for (const engine of engines) {
+        const history = byEngine.get(String(engine._id));
+        if (history?.length) engine.history = history.map(({ engine_id: _engineId, ...entry }) => entry);
+      }
+    }
     if (includeMaintenanceCounts) {
       const countByEngine = new Map<string, number>(
         countRows.map((row) => [String(row._id), Number(row.count) || 0] as [string, number]),
@@ -118,6 +135,7 @@ async function postEngine(req: NextRequest) {
       history: [{ date: now.toISOString(), hours: parsedHours, load_kw: parsedLoadKw }],
     };
     await enginesCol.insertOne(doc);
+    await engineHourSnapshotsCollection(db).insertOne({ engine_id: normalizedName, date: now.toISOString(), hours: parsedHours, load_kw: parsedLoadKw, source: "manual", created_at: now });
     await writeAuditLog(db, {
       user,
       action: "create",

@@ -1,6 +1,7 @@
 import type { Db } from "mongodb";
 import type { AssistantQuery } from "@/lib/assistantPolicy";
 import { enginesCollection, equipmentInfoCollection, maintenanceTypesCollection } from "@/lib/dbCollections";
+import { readEngineHistory } from "@/lib/engineHistory";
 import { formatPerformanceNumber, formatUnknownDate } from "@/lib/assistantToolOutput";
 import { findEngine, historyDayKey, isDateInAssistantQuery, periodLabel, resolveMaintenanceType } from "@/lib/assistantToolQuery";
 import type { AssistantToolResponse } from "./types";
@@ -9,9 +10,10 @@ export async function getEngineData(db: Db, query: AssistantQuery): Promise<Assi
   const performanceMode = query.enginePerformance === true;
   const filter = selectedEngine ? { _id: String(selectedEngine._id) } : query.engineQuery ? { _id: "__assistant_no_matching_engine__" } : {};
   const engines = await enginesCollection(db).find(filter, { projection: { _id: 1, name: 1, hours: 1, load_kw: 1, updated_at: 1, history: 1 } }).sort({ name: 1 }).limit(100).toArray();
+  const historyByEngine = new Map(await Promise.all(engines.map(async (engine) => [String(engine._id), await readEngineHistory(db, String(engine._id), engine.history)] as const)));
   const dailyByEngine = new Map<string, { engine_id: string; engine: string; date: string; timestamp: number; hours: number; load_kw: number | null; measurements: number }>();
   const rows = engines.map((engine) => {
-    const allHistory = Array.isArray(engine.history) ? engine.history : [];
+    const allHistory = historyByEngine.get(String(engine._id)) || [];
     const filteredHistory = query.dateRange || query.period !== "all"
       ? allHistory.filter((entry) => isDateInAssistantQuery(entry.date, query)).slice(-366)
       : allHistory.slice(-30);
@@ -126,4 +128,3 @@ export async function getEquipmentInfo(db: Db, query: AssistantQuery): Promise<A
     data: { infos: infos.map((info) => ({ id: String(info._id), engine_name: info.engine_name || String(info._id), kaver_tipi: info.kaver_tipi || null, hava_filtresi: info.hava_filtresi || null, krankcase: info.krankcase || null, esanjor_tipi: info.esanjor_tipi || null, dungs: info.dungs || null, radyator_tipi: info.radyator_tipi || null, note: info.not || null })) },
   };
 }
-

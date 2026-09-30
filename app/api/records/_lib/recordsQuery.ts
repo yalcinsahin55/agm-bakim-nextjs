@@ -55,16 +55,20 @@ export async function getRecords(req: NextRequest) {
     const recordsCol = recordsCollection(db);
     if (cursorRequest && cursor) {
       const cursorDate = new Date(cursor.createdAt);
+      const cursorMaintenanceDate = cursor.maintenanceStartAt ? new Date(cursor.maintenanceStartAt) : null;
       const cursorId = new ObjectId(cursor.id);
       const direction = sortDirection === 1 ? "$gt" : "$lt";
+      const maintenanceComparison = cursorMaintenanceDate
+        ? [{ maintenance_start_at: { [direction]: cursorMaintenanceDate } }, { maintenance_start_at: cursorMaintenanceDate, created_at: { [direction]: cursorDate } }, { maintenance_start_at: cursorMaintenanceDate, created_at: cursorDate, _id: { [direction]: cursorId } }]
+        : [{ created_at: { [direction]: cursorDate } }, { created_at: cursorDate, _id: { [direction]: cursorId } }];
       const cursorQuery = {
         $and: [
           query,
-          { $or: [{ created_at: { [direction]: cursorDate } }, { created_at: cursorDate, _id: { [direction]: cursorId } }] },
+          { $or: maintenanceComparison },
         ],
       };
       const cursorRows = await withDbTiming("records.list.cursor", () => recordsCol.find(cursorQuery, { projection: includeMedia ? undefined : { photos_b64: 0, videos: 0 } })
-        .sort({ created_at: sortDirection, _id: sortDirection })
+        .sort(sortSpec)
         .limit(pageSize + 1)
         .toArray());
       const hasNextPage = cursorRows.length > pageSize;

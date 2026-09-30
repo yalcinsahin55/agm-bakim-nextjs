@@ -1,4 +1,4 @@
-import { enginesCollection, maintenanceTypesCollection, pressureReadingsCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, maintenanceTypesCollection, pressureReadingsCollection } from "@/lib/dbCollections";
 import type { Db } from "mongodb";
 import { seedData, karterHistory } from "./seed_data";
 import type { PressureReadingDocument } from "@/lib/dbTypes";
@@ -50,6 +50,13 @@ export async function seedIfEmpty(db: Db): Promise<void> {
       },
     }));
     if (ops.length) await enginesCol.bulkWrite(ops);
+    await engineHourSnapshotsCollection(db).bulkWrite(Object.entries(data.engines).map(([name, info]) => ({
+      updateOne: {
+        filter: { engine_id: name, date: now.toISOString(), source: "manual" },
+        update: { $setOnInsert: { engine_id: name, date: now.toISOString(), hours: info.hours, load_kw: info.load || 0, source: "manual", created_at: now } },
+        upsert: true,
+      },
+    })));
   }
 
   const expectedTypeCount = 1 + data.maintTypes.length; // +1 = yağ

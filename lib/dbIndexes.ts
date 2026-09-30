@@ -64,6 +64,7 @@ export function ensureAppIndexes(db: Db): Promise<void> {
     const oilAnalyses = db.collection("oil_analyses");
     const pressureReadings = db.collection("pressure_readings");
     const engines = db.collection("engines");
+    const engineHourSnapshots = db.collection("engine_hour_snapshots");
     const equipmentInfo = db.collection("equipment_info");
 
     global._agmIndexStatus = {
@@ -121,6 +122,8 @@ export function ensureAppIndexes(db: Db): Promise<void> {
       createIndexSafely(oilAnalyses, { analysis_date: -1, created_at: -1 }, { name: "oil_analyses_date_desc" }),
       createIndexSafely(pressureReadings, { engine_id: 1, reading_date: 1, created_at: 1 }, { name: "pressure_readings_engine_date_asc" }),
       createIndexSafely(pressureReadings, { reading_date: 1, created_at: 1 }, { name: "pressure_readings_date_asc" }),
+      createIndexSafely(engineHourSnapshots, { engine_id: 1, date: 1, _id: 1 }, { name: "engine_hour_snapshots_engine_date" }),
+      createIndexSafely(engineHourSnapshots, { engine_id: 1, source: 1, date: 1 }, { name: "engine_hour_snapshots_engine_source_date" }),
     ]).then((results) => {
       const failedIndexes = results.filter((result) => !result.ok).map((result) => result.label);
       global._agmIndexStatus = {
