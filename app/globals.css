@@ -123,6 +123,11 @@ body > div {
   box-shadow: 0 6px 24px color-mix(in srgb, var(--color-amber) 10%, transparent);
 }
 
+.mobile-render-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
 @layer components {
   .ui-card { @apply rounded-card border border-border bg-panel; }
   .ui-control { @apply rounded-control border border-border bg-panel2 text-text outline-none transition; }

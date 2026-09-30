@@ -29,15 +29,20 @@ export default function NotificationBell() {
 
     const handleChanged = () => { void load(true); };
     const handleRefresh = () => { void load(true); };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
     void load();
     const timer = window.setInterval(() => { void load(); }, 60_000);
     window.addEventListener("notifications:changed", handleChanged);
     window.addEventListener("notifications:refresh", handleRefresh);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       alive = false;
       window.clearInterval(timer);
       window.removeEventListener("notifications:changed", handleChanged);
       window.removeEventListener("notifications:refresh", handleRefresh);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 

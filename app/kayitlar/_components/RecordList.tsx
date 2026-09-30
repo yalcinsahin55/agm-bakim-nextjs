@@ -69,7 +69,7 @@ export default memo(function RecordList({
   return (
     <div className="flex flex-col gap-5">
       {recordGroups.map((group) => (
-        <section key={group.key}>
+        <section key={group.key} className="mobile-render-defer">
           <div className="mb-2 flex items-center justify-between gap-2 border-b border-border px-1 pb-1.5">
             <h2 className="text-[11px] font-extrabold uppercase tracking-wide text-muted">{group.label}</h2>
             <span className="text-[10px] text-faint">{group.records.length} kayıt</span>

@@ -11,6 +11,10 @@ const dataQuality = new URL("../app/veri-kalitesi/page.tsx", import.meta.url);
 const topBar = new URL("../components/TopBar.tsx", import.meta.url);
 const completionSubmitBar = new URL("../app/tamamla/_components/CompletionSubmitBar.tsx", import.meta.url);
 const recordCard = new URL("../components/MaintenanceRecordCard.tsx", import.meta.url);
+const pwaRegister = new URL("../components/PwaRegister.tsx", import.meta.url);
+const notificationBell = new URL("../components/NotificationBell.tsx", import.meta.url);
+const sidebarSource = new URL("../components/Sidebar.tsx", import.meta.url);
+const globalsSource = new URL("../app/globals.css", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -59,4 +63,13 @@ test("mobile surfaces preserve touch targets and avoid bottom navigation overlap
   assert.match(submitBarText, /ui-button-primary/);
   assert.match(recordCardText, /grid grid-cols-2 gap-2 sm:flex/);
   assert.match(recordCardText, /min-h-10/);
+});
+
+test("mobile loading avoids duplicate auth work, hidden polling, and duplicate image priority", async () => {
+  const [pwaText, notificationText, sidebarText, globalsText] = await Promise.all([text(pwaRegister), text(notificationBell), text(sidebarSource), text(globalsSource)]);
+  assert.match(pwaText, /cachedFetch<AuthMeResponse>\("\/api\/auth\/me", 5_000\)/);
+  assert.match(notificationText, /visibilitychange/);
+  assert.doesNotMatch(sidebarText, /app-icon\.png[^\n]+priority/);
+  assert.match(globalsText, /\.mobile-render-defer/);
+  assert.match(globalsText, /content-visibility: auto/);
 });

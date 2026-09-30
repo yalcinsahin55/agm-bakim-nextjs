@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { syncOfflineQueue } from "@/lib/offlineQueue";
 import { AUTH_CHANGED_EVENT } from "@/lib/authClient";
 import { initErrorReporter } from "@/lib/errorReporter";
+import { cachedFetch } from "@/lib/apiCache";
 
 interface AuthMeResponse {
   id?: unknown;
@@ -12,12 +13,7 @@ interface AuthMeResponse {
 
 async function getCurrentUserId(): Promise<string> {
   try {
-    const response = await fetch("/api/auth/me", {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    if (!response.ok) return "";
-    const data = await response.json().catch(() => ({})) as AuthMeResponse;
+    const data = await cachedFetch<AuthMeResponse>("/api/auth/me", 5_000);
     const id = typeof data.id === "string" ? data.id : data._id;
     return typeof id === "string" ? id : "";
   } catch {

@@ -75,7 +75,7 @@ export default function Sidebar() {
       <div className="px-5 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl border border-border shadow-lg">
-            <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" priority />
+            <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" loading="lazy" />
           </div>
           <div>
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">
