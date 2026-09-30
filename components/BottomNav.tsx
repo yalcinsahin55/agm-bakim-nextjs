@@ -67,13 +67,14 @@ export default function BottomNav() {
     <>
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe md:hidden">
-        <div className="mx-auto flex w-full max-w-lg min-w-0 bg-bg/95 px-1 pb-4 pt-2 backdrop-blur-xl border-t border-border shadow-[0_-8px_28px_rgba(15,19,25,0.12)]">
+        <nav aria-label="Mobil ana navigasyon" className="mx-auto flex min-h-20 w-full max-w-lg min-w-0 items-stretch border-t border-border bg-bg/98 px-1 pb-3 pt-2 shadow-[0_-8px_28px_rgba(15,19,25,0.12)] backdrop-blur-xl">
           {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (
               <Link
                 key={item.href} href={item.href}
-                className={`relative min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
               >
                 <span className="relative flex h-6 items-center justify-center leading-none">
                   <AppIcon name={item.icon} size={20} />
@@ -91,12 +92,13 @@ export default function BottomNav() {
           {/* Mobil Çıkış */}
           <button
             onClick={handleLogout}
-            className="min-w-0 flex-1 flex flex-col items-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
+            aria-label="Çıkış Yap"
+            className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
           >
             <span className="flex h-6 items-center justify-center"><AppIcon name="logout" size={20} /></span>
             <span className="max-w-full truncate text-[9.5px] font-bold">Çıkış</span>
           </button>
-        </div>
+        </nav>
       </div>
     </>
   );

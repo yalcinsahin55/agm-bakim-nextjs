@@ -8,6 +8,9 @@ const sidebar = new URL("../components/Sidebar.tsx", import.meta.url);
 const bottomNav = new URL("../components/BottomNav.tsx", import.meta.url);
 const otherMenus = new URL("../app/diger/page.tsx", import.meta.url);
 const dataQuality = new URL("../app/veri-kalitesi/page.tsx", import.meta.url);
+const topBar = new URL("../components/TopBar.tsx", import.meta.url);
+const completionSubmitBar = new URL("../app/tamamla/_components/CompletionSubmitBar.tsx", import.meta.url);
+const recordCard = new URL("../components/MaintenanceRecordCard.tsx", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -45,4 +48,15 @@ test("Data Quality lives under Other Menus and uses the shared shell once", asyn
   assert.doesNotMatch(dataQualityText, /import Sidebar/);
   assert.doesNotMatch(dataQualityText, /<Sidebar\s*\/>/);
   assert.match(dataQualityText, /max-w-5xl/);
+});
+
+test("mobile surfaces preserve touch targets and avoid bottom navigation overlap", async () => {
+  const [topBarText, bottomNavText, submitBarText, recordCardText] = await Promise.all([text(topBar), text(bottomNav), text(completionSubmitBar), text(recordCard)]);
+  assert.match(topBarText, /max-w-\[48vw\]/);
+  assert.match(bottomNavText, /min-h-20/);
+  assert.match(bottomNavText, /aria-label="Mobil ana navigasyon"/);
+  assert.match(submitBarText, /sticky bottom-24/);
+  assert.match(submitBarText, /ui-button-primary/);
+  assert.match(recordCardText, /grid grid-cols-2 gap-2 sm:flex/);
+  assert.match(recordCardText, /min-h-10/);
 });

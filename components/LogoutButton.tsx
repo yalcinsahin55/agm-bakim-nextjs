@@ -34,10 +34,10 @@ export default function LogoutButton() {
       disabled={loggingOut}
       aria-label="Çıkış Yap"
       title="Çıkış Yap"
-      className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[10.5px] font-bold text-muted transition hover:border-red/30 hover:bg-red/10 hover:text-red disabled:opacity-50"
+      className="inline-flex min-h-9 flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 py-2 text-[10.5px] font-bold text-muted transition hover:border-red/30 hover:bg-red/10 hover:text-red disabled:opacity-50 sm:px-2.5"
     >
       <AppIcon name="logout" size={15} />
-      <span>{loggingOut ? "Çıkılıyor..." : "Çıkış"}</span>
+      <span className="hidden sm:inline">{loggingOut ? "Çıkılıyor..." : "Çıkış"}</span>
     </button>
   );
 }

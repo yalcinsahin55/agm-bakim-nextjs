@@ -44,7 +44,7 @@ export default function RecordFilters({
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Motor, tür veya teknisyen ara..."
             aria-label="Bakım kaydı ara"
-            className="w-full min-w-0 bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-[12px] outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+            className="ui-control min-h-11 w-full min-w-0 pl-9 pr-3 text-[12px]"
           />
         </div>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto]">
@@ -52,7 +52,7 @@ export default function RecordFilters({
             value={engineFilter}
             onChange={(event) => setEngineFilter(event.target.value)}
             aria-label="Motor filtresi"
-            className="bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
+            className="ui-control min-h-11 px-2.5 text-[12.5px]"
           >
             <option value="Tümü">Tüm Motorlar</option>
             {sortedEngines.map((engine) => <option key={engine._id} value={engine._id}>{engine.name}</option>)}
@@ -61,7 +61,7 @@ export default function RecordFilters({
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
             aria-label="Bakım türü filtresi"
-            className="min-w-0 bg-panel2 border border-border rounded-xl px-2.5 py-2.5 text-[12.5px] outline-none focus:border-teal transition"
+            className="ui-control min-h-11 min-w-0 px-2.5 text-[12.5px]"
           >
             <option value="Tümü">Tüm Türler</option>
             {typeLabels.map((label) => <option key={label} value={label}>{label}</option>)}
