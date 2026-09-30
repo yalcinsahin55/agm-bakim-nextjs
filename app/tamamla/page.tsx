@@ -19,7 +19,7 @@ import CompletionSubmitBar from "./_components/CompletionSubmitBar";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, invalidateMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
 import { canTechnicianWorkOnType, type TechnicianOption } from "@/lib/technicians";
-import type { MaintenanceType } from "@/lib/types";
+import type { EngineHistoryEntry, MaintenanceType } from "@/lib/types";
 import type { PanelItem } from "@/lib/status";
 import { useCurrentUser } from "@/lib/useCurrentUser";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
@@ -252,11 +252,16 @@ export default function TamamlaPage() {
     const selectedSupportIds = otherTechnicianIds.filter((id) => selectableTechnicians.some((technician) => technician.id === id));
     const selectedSupportDurations = selectedSupportIds.map((id) => normalizeTechnicianContributionDuration(otherTechnicianDurations[id], maintenanceDurationMinutes ?? 0));
     const selectedEngine = engines.find((engine) => engine._id === engineId);
+    const excelHistory: EngineHistoryEntry[] | undefined = selectedEngine?.excel_snapshots?.length
+      ? selectedEngine.excel_snapshots.map((snapshot) => ({ ...snapshot, load_kw: 0, source: "excel" as const }))
+      : selectedEngine?.latest_excel_snapshot
+        ? [{ ...selectedEngine.latest_excel_snapshot, load_kw: 0, source: "excel" as const }]
+        : undefined;
     const hourValidationError = selectedEngine
       ? getCompletionHourValidationError(
         hours,
         selectedEngine.hours,
-        selectedEngine.latest_excel_snapshot ? [{ ...selectedEngine.latest_excel_snapshot, load_kw: 0, source: "excel" }] : undefined,
+        excelHistory,
         maintenanceStartAt,
       )
       : null;

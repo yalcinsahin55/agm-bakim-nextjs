@@ -10,6 +10,7 @@ export type ServerPanelEngine = {
   hours: number;
   load_kw?: number;
   latest_excel_snapshot?: { date: string; hours: number } | null;
+  excel_snapshots?: Array<{ date: string; hours: number }>;
 };
 
 export interface ServerPanelPayload {
@@ -61,6 +62,10 @@ export async function getOrBuildMaintenancePanelServerPayload(db: Db, now = Date
     hours: engine.hours,
     load_kw: engine.load_kw,
     latest_excel_snapshot: latestExcelHourSnapshot(engine.history),
+    excel_snapshots: (Array.isArray(engine.history) ? engine.history : [])
+      .filter((entry) => entry.source === "excel" && Number.isFinite(Number(entry.hours)) && Number.isFinite(new Date(entry.date).getTime()))
+      .map((entry) => ({ date: String(entry.date), hours: Number(entry.hours) }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
   }));
   const payload: ServerPanelPayload = { items: buildItems(engines, types), engines: panelEngines, types };
   setMaintenancePanelServerCache(payload, now);

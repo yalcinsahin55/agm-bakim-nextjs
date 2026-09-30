@@ -4,6 +4,7 @@ import type { PanelItem } from "@/lib/status";
 
 export type PanelEngine = Pick<Engine, "_id" | "name" | "hours" | "load_kw"> & {
   latest_excel_snapshot?: { date: string; hours: number } | null;
+  excel_snapshots?: Array<{ date: string; hours: number }>;
 };
 
 export interface MaintenancePanelResponse {
