@@ -30,6 +30,7 @@ export interface CompletionPayloadInput {
   maintenanceDurationMinutes: number | null;
   checklistItems: string[];
   checklist: Record<string, boolean>;
+  previousWorkingHours: Record<string, number>;
   componentTransfers: ComponentTransfer[];
 }
 
@@ -58,6 +59,7 @@ export interface CompletionPayload extends Record<string, unknown> {
   other_technician_durations: Record<string, number>;
   checklist: Array<{ label: string; completed: boolean }>;
   completion_confirmation: true;
+  previous_working_hours?: number;
   component_transfers: ComponentTransfer[];
 }
 
@@ -69,6 +71,7 @@ export function buildCompletionPayload(input: CompletionPayloadInput): Completio
       type_key: key,
       type_label: type.label,
       period: input.trackedKeys.has(key) ? undefined : Number(input.extraPeriods[key]),
+      previous_working_hours: Math.max(0, Number(input.previousWorkingHours[key] || 0)),
     }];
   });
 
@@ -77,6 +80,7 @@ export function buildCompletionPayload(input: CompletionPayloadInput): Completio
     engine_id: input.engineId,
     type_key: input.chosenType.key,
     type_label: input.chosenType.label,
+    previous_working_hours: Math.max(0, Number(input.previousWorkingHours[input.chosenType.key] || 0)),
     technician_source: input.technicianSource,
     ...(input.isManagerInternalRecord && input.responsibleTechnicianId ? { responsible_technician_id: input.responsibleTechnicianId } : {}),
     ...(input.isManagerInternalRecord && input.responsibleDurationMinutes !== null ? { responsible_technician_duration: input.responsibleDurationMinutes } : {}),

@@ -60,7 +60,7 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   }
   const safeBody = parsedBody.data;
   const clientRequestId = safeBody.client_request_id;
-  const { engine_id: requestedEngineId, type_key: requestedTypeKey, type_label: requestedTypeLabel, hour_at_completion, note, technician_note, photos_b64, photos, videos, report_attachments, component_transfers, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
+  const { engine_id: requestedEngineId, type_key: requestedTypeKey, type_label: requestedTypeLabel, hour_at_completion, previous_working_hours, note, technician_note, photos_b64, photos, videos, report_attachments, component_transfers, pressure_reading, extra_types, other_technician_ids, other_technician_durations, responsible_technician_id, responsible_technician_duration, technician_source, external_service_name, time_tracking_version, maintenance_start_at, maintenance_end_at } = safeBody;
   const engineChangeRequested = typeof requestedEngineId === "string" && requestedEngineId.trim() !== record.engine_id;
   const typeChangeRequested = typeof requestedTypeKey === "string" && requestedTypeKey.trim() !== record.type_key;
   if (engineChangeRequested && user.role !== "yonetici") {
@@ -273,6 +273,10 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
   }
   if (typeof nextGroupId === "string") update.group_id = nextGroupId;
   if (typeof hour_at_completion === "number") update.hour_at_completion = hour_at_completion;
+  if (typeof previous_working_hours === "number") {
+    if (previous_working_hours > 0) update.previous_working_hours = previous_working_hours;
+    else update.$unset = { ...(update.$unset || {}), previous_working_hours: "" };
+  }
   if (typeChangeRequested) {
     update.type_key = effectiveTypeKey;
     update.type_label = String(effectiveTypeDoc.label || requestedTypeLabel || effectiveTypeKey);
@@ -374,7 +378,7 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
       });
     }
     const affectedTypeKeys = [...new Set([...historicalTypeKeys, effectiveTypeKey, ...requestedExtraTypeKeys])];
-    if (engineChangeRequested || typeChangeRequested || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
+    if (engineChangeRequested || typeChangeRequested || typeof previous_working_hours === "number" || (typeof hour_at_completion === "number" && hour_at_completion !== record.hour_at_completion) || (Array.isArray(extra_types) && extra_types.length > 0)) {
       const recomputePairs = new Set<string>();
       const addPair = (engineId: string, typeKey: string) => recomputePairs.add(`${engineId}\u0000${typeKey}`);
       for (const typeKey of affectedTypeKeys) addPair(record.engine_id, typeKey);

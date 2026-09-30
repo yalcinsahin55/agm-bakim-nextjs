@@ -14,6 +14,7 @@ export async function insertCreatedMaintenanceRecord(params: {
   engineId: string;
   engineName: string;
   hourAtCompletion: number;
+  previousWorkedHours: number;
   maintenanceStartAt?: Date;
   maintenanceEndAt?: Date;
   maintenanceDurationMinutes: number | null;
@@ -55,6 +56,7 @@ export async function insertCreatedMaintenanceRecord(params: {
     engineId,
     engineName,
     hourAtCompletion,
+    previousWorkedHours,
     maintenanceStartAt,
     maintenanceEndAt,
     maintenanceDurationMinutes,
@@ -96,6 +98,7 @@ export async function insertCreatedMaintenanceRecord(params: {
     type_key: typeKey,
     type_label: typeLabel,
     hour_at_completion: hourAtCompletion,
+    ...(previousWorkedHours > 0 ? { previous_working_hours: previousWorkedHours } : {}),
     ...(maintenanceStartAt && maintenanceEndAt && maintenanceDurationMinutes
       ? {
           time_tracking_version: 2,

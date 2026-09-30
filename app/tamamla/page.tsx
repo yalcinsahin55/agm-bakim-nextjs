@@ -33,6 +33,7 @@ import { getCompletionValidationError } from "./_lib/completionValidation";
 import { submitCompletion } from "./_lib/completionSubmit";
 import { makeOfflineId } from "./_lib/offlineHelpers";
 import { getCompletionHourValidationError } from "@/lib/engineHoursRules";
+import PreviousWorkingHoursSection from "./_components/PreviousWorkingHoursSection";
 import ComponentTransferSection from "@/components/ComponentTransferSection";
 import type { ComponentTransfer } from "@/lib/types";
 import type { ComponentTransferDraft } from "@/lib/componentTransfers";
@@ -68,6 +69,7 @@ export default function TamamlaPage() {
   const [technicianSource, setTechnicianSource] = useState<"internal" | "external_service">("internal");
   const [externalServiceName, setExternalServiceName] = useState("");
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string>>({});
   const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>([]);
 
   const { photos, videos, reportAttachments, offlineMedia, offlinePreviews, photoBusy, videoBusy, reportAttachmentBusy, setReportAttachments, setReportAttachmentBusy, handlePhotos, handleVideos, removePhoto, removeVideo, handleOfflineReportFile, removeReportAttachment } = useCompletionEvidenceMedia();
@@ -233,6 +235,7 @@ export default function TamamlaPage() {
     () => technicians.filter((technician) => technician.id !== effectiveResponsibleTechnicianId && selectedMaintenanceTypes.every((type) => canTechnicianWorkOnType(technician, type, "support"))),
     [effectiveResponsibleTechnicianId, selectedMaintenanceTypes, technicians],
   );
+  const previousWorkingHoursByType = useMemo(() => Object.fromEntries(selectedMaintenanceTypes.map((type) => [type.key, Math.max(0, Number(previousWorkingHours[type.key] || 0))])), [previousWorkingHours, selectedMaintenanceTypes]);
 
   useEffect(() => {
     if (isManagerInternalRecord && maintenanceDurationMinutes !== null && responsibleTechnicianDurationMinutes === null) {
@@ -300,7 +303,7 @@ export default function TamamlaPage() {
       return [{ id: transfer.id, component_name: transfer.component_name.trim(), condition: "used", source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
     });
     if (normalizedComponentTransfers.length !== componentTransfers.length) {
-      toast.error("Parça transferlerinde parça adı, farklı bir kaynak motor ve geçerli saat bilgileri girin.");
+      toast.error("Parça transferlerinde parça adı ve geçerli saat bilgileri girin.");
       toast.dismiss(loadingToast);
       return;
     }
@@ -333,6 +336,7 @@ export default function TamamlaPage() {
       maintenanceDurationMinutes,
       checklistItems,
       checklist,
+      previousWorkingHours: previousWorkingHoursByType,
       componentTransfers: normalizedComponentTransfers,
     });
 
@@ -460,13 +464,6 @@ export default function TamamlaPage() {
             />
           </div>
 
-          <ComponentTransferSection
-            componentName={componentForMaintenanceType(typeKey, chosenType?.label)}
-            transfers={componentTransfers}
-            setTransfers={setComponentTransfers}
-            disabled={submitting}
-          />
-
           <CompletionTechnicianSection
             isManager={user?.role === "yonetici"}
             technicianSource={technicianSource}
@@ -493,6 +490,20 @@ export default function TamamlaPage() {
             extraPeriods={extraPeriods}
             onToggle={toggleExtra}
             onPeriodChange={(key, value) => setExtraPeriods((current) => ({ ...current, [key]: value }))}
+          />
+
+          <PreviousWorkingHoursSection
+            types={selectedMaintenanceTypes}
+            values={previousWorkingHours}
+            onChange={(key, value) => setPreviousWorkingHours((current) => ({ ...current, [key]: value }))}
+            disabled={submitting}
+          />
+
+          <ComponentTransferSection
+            componentName={componentForMaintenanceType(typeKey, chosenType?.label)}
+            transfers={componentTransfers}
+            setTransfers={setComponentTransfers}
+            disabled={submitting}
           />
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

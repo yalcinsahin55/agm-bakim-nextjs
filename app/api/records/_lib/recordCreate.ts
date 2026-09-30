@@ -63,7 +63,7 @@ export async function postRecord(req: NextRequest) {
     }
 
     const {
-      client_request_id, engine_id, type_key, type_label, hour_at_completion, note, technician_note,
+      client_request_id, engine_id, type_key, type_label, hour_at_completion, previous_working_hours, note, technician_note,
       photos_b64, photos, videos, report_attachments, pressure_reading, backdated, record_date, period, extra_types,
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, component_transfers, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
@@ -120,6 +120,7 @@ export async function postRecord(req: NextRequest) {
     const engine = await enginesCol.findOne({ _id: engine_id });
     if (!engine) return NextResponse.json({ error: "Motor bulunamadı." }, { status: 404 });
     const engineName = engine.name;
+    const normalizedPreviousWorkingHours = typeof previous_working_hours === "number" ? previous_working_hours : 0;
     const normalizedComponentTransfers: ComponentTransfer[] = (component_transfers || []).map((transfer) => ({
       ...transfer,
       condition: transfer.condition || "used",
@@ -222,6 +223,7 @@ export async function postRecord(req: NextRequest) {
     const insertOneRecord = async (
       tKey: string,
       tLabel: string,
+      previousWorkedHours: number,
       isPrimary: boolean,
       trackingAutoCreated = false,
       previousTrackingState?: unknown,
@@ -234,6 +236,7 @@ export async function postRecord(req: NextRequest) {
         engineId: engine_id,
         engineName,
         hourAtCompletion: hour_at_completion,
+        previousWorkedHours,
         maintenanceStartAt: maintenanceStartAt,
         maintenanceEndAt: maintenanceEndAt,
         maintenanceDurationMinutes,
@@ -291,7 +294,7 @@ export async function postRecord(req: NextRequest) {
         }
 
         operationStep = "insert_primary_record";
-        await insertOneRecord(type_key, type_label, true, primaryTrackingAutoCreated, primaryPreviousTrackingState, client_request_id, session);
+        await insertOneRecord(type_key, type_label, normalizedPreviousWorkingHours, true, primaryTrackingAutoCreated, primaryPreviousTrackingState, client_request_id, session);
 
         if (normalizedExtraTypes.length > 0) {
           for (const ex of normalizedExtraTypes) {
@@ -313,6 +316,7 @@ export async function postRecord(req: NextRequest) {
             await insertOneRecord(
               ex.type_key,
               ex.type_label,
+              ex.previous_working_hours || 0,
               false,
               extraTrackingAutoCreated,
               extraPreviousTrackingState,

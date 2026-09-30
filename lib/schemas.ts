@@ -90,6 +90,8 @@ export const recordSchema = z.object({
     .nonnegative("Saat negatif olamaz.")
     .max(5000000, "Saat değeri mantık dışı büyük."),
 
+  previous_working_hours: z.number().nonnegative("Önceki çalışma saati negatif olamaz.").max(5000000, "Önceki çalışma saati mantık dışı büyük.").optional(),
+
   // Yeni bakım formları için UTC ISO tarih-saatleri. Eski offline kayıtlar bu alanlar olmadan da kabul edilir.
   time_tracking_version: z.literal(2).optional(),
   maintenance_start_at: z.string().datetime({ offset: true }).optional(),
@@ -168,6 +170,7 @@ export const recordSchema = z.object({
         type_key: z.string().min(1),
         type_label: z.string().min(1),
         period: z.number().positive("Periyot pozitif olmalıdır.").max(500000).optional(),
+        previous_working_hours: z.number().nonnegative("Önceki çalışma saati negatif olamaz.").max(5000000, "Önceki çalışma saati mantık dışı büyük.").optional(),
       })
     )
     .max(20, "Çok fazla ek bakım türü.")

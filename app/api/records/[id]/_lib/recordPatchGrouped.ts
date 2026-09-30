@@ -9,6 +9,7 @@ type ExtraType = {
   type_key: string;
   type_label?: string;
   period?: number;
+  previous_working_hours?: number;
 };
 
 type RecordsCollection = ReturnType<typeof import("@/lib/dbCollections").recordsCollection>;
@@ -103,6 +104,7 @@ export async function createGroupedExtraRecords(params: {
       type_key: ex.type_key,
       type_label: extraType?.label || ex.type_label || ex.type_key,
       hour_at_completion: finalHour,
+      ...(typeof ex.previous_working_hours === "number" && ex.previous_working_hours > 0 ? { previous_working_hours: ex.previous_working_hours } : {}),
       ...(nextStartAt && nextEndAt && nextDurationMinutes
         ? {
             time_tracking_version: 2,

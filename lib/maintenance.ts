@@ -126,7 +126,7 @@ export async function recomputeLastMaintenance(
     const latest = await recordsCol.findOne(
       recordFilter,
       {
-        projection: { _id: 1, hour_at_completion: 1, component_transfers: 1 },
+        projection: { _id: 1, hour_at_completion: 1, previous_working_hours: 1, component_transfers: 1 },
         sort: { hour_at_completion: -1, maintenance_start_at: -1, created_at: -1 },
         ...(session ? { session } : {}),
       },
@@ -169,12 +169,15 @@ export async function recomputeLastMaintenance(
     }
 
     const maxHour = typeof latest.hour_at_completion === "number" ? latest.hour_at_completion : 0;
+    const previousWorkingHours = typeof (latest as { previous_working_hours?: unknown }).previous_working_hours === "number"
+      ? Math.max(0, Number((latest as { previous_working_hours?: number }).previous_working_hours))
+      : 0;
     const componentTransfers = Array.isArray((latest as { component_transfers?: Array<{ condition?: string; source_hours?: number }> }).component_transfers)
       ? (latest as { component_transfers?: Array<{ condition?: string; source_hours?: number }> }).component_transfers || []
       : [];
     const typeLabel = typeof (type as { label?: unknown } | null)?.label === "string" ? String((type as { label?: unknown }).label) : "";
     const previousComponentHours = componentTransfers.reduce((max, transfer) => transfer.condition === "used" && componentAffectsMaintenanceType(String((transfer as { component_name?: unknown }).component_name || ""), typeKey, typeLabel) && typeof transfer.source_hours === "number" && Number.isFinite(transfer.source_hours) ? Math.max(max, transfer.source_hours) : max, 0);
-    const effectiveMaintenanceHour = Math.max(0, maxHour - previousComponentHours);
+    const effectiveMaintenanceHour = Math.max(0, maxHour - (previousWorkingHours || previousComponentHours));
     const updated = await typesCol.updateOne(
       { _id: typeKey, ...revisionFilter(currentState) },
       { $set: buildEngineStateUpdate(type?.engine_states, engineId, { last_maintenance_hour: effectiveMaintenanceHour, tracking_revision: (currentState?.tracking_revision || 0) + 1 }) },

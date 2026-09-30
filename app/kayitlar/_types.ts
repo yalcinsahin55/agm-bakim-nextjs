@@ -33,6 +33,7 @@ export interface MaintenanceRecord {
   type_key: string;
   type_label: string;
   hour_at_completion: number;
+  previous_working_hours?: number;
   time_tracking_version?: 2;
   maintenance_start_at?: string | Date;
   maintenance_end_at?: string | Date;

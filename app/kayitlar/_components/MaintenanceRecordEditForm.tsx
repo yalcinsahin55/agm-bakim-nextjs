@@ -14,6 +14,7 @@ import RecordEditMediaSection from "./RecordEditMediaSection";
 import { useRecordEditReferenceData } from "../_hooks/useRecordEditReferenceData";
 import { useRecordEditMedia } from "../_hooks/useRecordEditMedia";
 import RecordEditScheduleSection from "./RecordEditScheduleSection";
+import PreviousWorkingHoursSection from "@/app/tamamla/_components/PreviousWorkingHoursSection";
 import ComponentTransferSection from "@/components/ComponentTransferSection";
 import { componentForMaintenanceType } from "@/lib/componentTransfers";
 import type { ComponentTransferDraft } from "@/lib/componentTransfers";
@@ -36,6 +37,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
   const [maintenanceEndAt, setMaintenanceEndAt] = useState(toLocalDateTimeInput(record.maintenance_end_at));
   const [techNote, setTechNote] = useState(record.technician_note || "");
   const [pressure, setPressure] = useState<number | string>(record.pressure_reading ?? "");
+  const [previousWorkingHours, setPreviousWorkingHours] = useState<Record<string, number | string>>({ [record.type_key]: record.previous_working_hours ?? 0 });
   const [componentTransfers, setComponentTransfers] = useState<ComponentTransferDraft[]>(() => (record.component_transfers || []).map((transfer) => ({ id: transfer.id, component_name: transfer.component_name, condition: transfer.condition || "used", source_engine_id: transfer.source_engine_id || "", source_hours: transfer.source_hours, installed_hours: transfer.installed_hours, note: transfer.note || "" })));
   const { technicians, maintenanceTypes, groupTypes } = useRecordEditReferenceData(record._id, record.extra_types || []);
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
@@ -74,7 +76,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       if (!type) return [];
       const tracked = trackedExtraTypeKeys.has(key);
       const period = tracked ? undefined : Number(extraPeriods[key]);
-      return [{ type_key: key, type_label: type.label, ...(period !== undefined ? { period } : {}) }];
+      return [{ type_key: key, type_label: type.label, ...(period !== undefined ? { period } : {}), previous_working_hours: Math.max(0, Number(previousWorkingHours[key] || 0)) }];
     });
     if (selectedExtraTypes.some((type) => type.period !== undefined && (!Number.isFinite(type.period) || type.period <= 0))) {
       toast.error("Motor için henüz tanımlı olmayan ek bakım türlerine geçerli bir periyot saati girin.");
@@ -89,16 +91,6 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       toast.error("Sorumlu teknisyen süresi toplam bakım süresini aşamaz.");
       return;
     }
-    const normalizedComponentTransfers = componentTransfers.flatMap((transfer) => {
-      const sourceHours = Number(transfer.source_hours);
-      const installedHours = Number(hours);
-      if (!transfer.component_name.trim() || !Number.isFinite(sourceHours) || sourceHours < 0 || !Number.isFinite(installedHours) || installedHours < 0) return [];
-      return [{ id: transfer.id, component_name: transfer.component_name.trim(), condition: "used", source_hours: sourceHours, installed_hours: installedHours, ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) }];
-    });
-    if (normalizedComponentTransfers.length !== componentTransfers.length) {
-      toast.error("Parça transferlerinde parça adı, farklı bir kaynak motor ve geçerli saat bilgileri girin.");
-      return;
-    }
     setBusy(true);
     const loadingToast = toast.loading("Kayıt güncelleniyor...");
     const payload = {
@@ -106,6 +98,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       type_key: isAdmin ? typeKey : undefined,
       type_label: isAdmin ? maintenanceTypes.find((type) => type.key === typeKey)?.label : undefined,
       hour_at_completion: Number(hours),
+      previous_working_hours: Math.max(0, Number(previousWorkingHours[typeKey] || 0)),
       time_tracking_version: TIME_TRACKING_VERSION,
       maintenance_start_at: new Date(maintenanceStartAt).toISOString(),
       maintenance_end_at: new Date(maintenanceEndAt).toISOString(),
@@ -123,7 +116,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       responsible_technician_id: isAdmin && technicianSource !== "external_service" ? responsibleTechnicianId : undefined,
       responsible_technician_duration: isAdmin && technicianSource !== "external_service" && responsibleDurationMinutes !== null ? responsibleDurationMinutes : undefined,
       extra_types: selectedExtraTypes,
-      component_transfers: normalizedComponentTransfers,
+      component_transfers: componentTransfers.map((transfer) => ({ id: transfer.id, component_name: transfer.component_name.trim(), condition: "used", source_hours: Number(transfer.source_hours), installed_hours: Number(hours), ...(transfer.note.trim() ? { note: transfer.note.trim() } : {}) })),
     };
     try {
       if (!navigator.onLine || offlineMedia.length > 0) {
@@ -188,6 +181,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
         pressure={pressure}
         setPressure={setPressure}
       />
+      <PreviousWorkingHoursSection types={selectedMaintenanceTypes} values={previousWorkingHours} onChange={(key, value) => setPreviousWorkingHours((current) => ({ ...current, [key]: value }))} disabled={busy} />
       <ComponentTransferSection componentName={componentForMaintenanceType(typeKey, maintenanceTypes.find((type) => type.key === typeKey)?.label)} transfers={componentTransfers} setTransfers={setComponentTransfers} disabled={busy} />
       <RecordEditCollaborationSections
         record={record}
