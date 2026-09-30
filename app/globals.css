@@ -71,6 +71,11 @@ html, body {
   outline-offset: 2px;
 }
 
+:where(button, a, [role="button"]) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
 ::placeholder {
   color: var(--color-faint);
   opacity: 1;
@@ -128,6 +133,35 @@ body > div {
   contain-intrinsic-size: auto 220px;
 }
 
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-muted) 16%, transparent);
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-text) 12%, transparent), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+.mobile-nav-hidden {
+  transform: translateY(110%);
+}
+
+@media (hover: none) {
+  :where(button, a):active {
+    transform: scale(.98);
+  }
+}
+
 @layer components {
   .ui-card { @apply rounded-card border border-border bg-panel; }
   .ui-control { @apply rounded-control border border-border bg-panel2 text-text outline-none transition; }
@@ -136,12 +170,15 @@ body > div {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-teal) 20%, transparent);
   }
   .ui-button { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50; }
-  .ui-button-primary { @apply bg-gradient-to-b from-amber-bright to-amber text-on-amber shadow-lg hover:brightness-110 active:scale-[.98]; }
+  .ui-button-primary { @apply bg-gradient-to-b from-amber-bright to-amber text-on-amber shadow-lg transition-transform duration-150 hover:brightness-110 active:scale-[.97]; }
   .ui-button-secondary {
     @apply border bg-transparent text-teal;
     border-color: color-mix(in srgb, var(--color-teal) 40%, transparent);
   }
   .ui-button-secondary:hover { background: color-mix(in srgb, var(--color-teal) 10%, transparent); }
+  .ui-button-secondary:active,
+  .ui-button-danger:active,
+  .ui-control:active { transform: scale(.98); }
   .ui-button-danger {
     @apply border text-red;
     background: color-mix(in srgb, var(--color-red) 10%, transparent);
@@ -162,6 +199,7 @@ body > div {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
   }
+  .skeleton-shimmer::after { animation: none; }
 }
 
 /* Asistan sonuçları uzun motor/teknisyen adlarında yatay taşmamalı. */

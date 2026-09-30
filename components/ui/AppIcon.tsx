@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "clock" | "warning" | "hourglass";
+export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass";
 
 const PATHS: Record<AppIconName, string> = {
   dashboard: "M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z",
@@ -17,6 +17,7 @@ const PATHS: Record<AppIconName, string> = {
   sun: "M12 3v2m0 14v2M5.6 5.6 7 7m10 10 1.4 1.4M3 12h2m14 0h2M5.6 18.4 7 17m10-10 1.4-1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
   moon: "M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z",
   bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12h6",
+  arrowUp: "M12 19V5m-6 6 6-6 6 6",
   clock: "M12 7v5l3 2m-3 5a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
   warning: "M12 4 3 20h18L12 4Zm0 6v4m0 3h.01",
   hourglass: "M6 3h12M6 21h12M8 3v4c0 2 4 3 4 5s-4 3-4 5v4m8-18v4c0 2-4 3-4 5s4 3 4 5v4",

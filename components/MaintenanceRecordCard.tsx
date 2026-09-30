@@ -1,10 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import NextImage from "next/image";
 import type { ReportAttachment, VideoRef } from "@/lib/types";
 import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
 import type { TechnicianType } from "@/lib/types";
+import { triggerHaptic } from "@/lib/haptics";
 
 export type RecordCardVideo = VideoRef | string;
 
@@ -80,6 +81,9 @@ export default function MaintenanceRecordCard({
   const photos = record.photos || record.photos_b64 || [];
   const videos = record.videos || [];
   const showMedia = !record.group_id || photos.length > 0 || videos.length > 0;
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
+
+  const closeActionMenu = () => setActionMenuOpen(false);
 
   return (
     <div className="rounded-card border border-border bg-panel p-4 transition-all hover:border-borderlt sm:p-3.5">
@@ -96,12 +100,24 @@ export default function MaintenanceRecordCard({
       {record.technician_note && <div className="mt-1 text-[11.5px] text-muted">🗒️ {record.technician_note}</div>}
       {record.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted">👥 Ekip: {record.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
       {record.report_attachments?.length ? <div className="mt-1 text-[11px] text-purple-200">📄 {record.report_attachments.length} detaylı rapor eki</div> : null}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <button type="button" onClick={onOpenDetails} className="min-h-10 rounded-lg border border-amber/40 px-2.5 py-2 text-[11px] font-bold text-amber transition hover:bg-amber/10">🔎 Detay</button>
-        {isManager && record.manager_confirmation_status === "pending" && <button type="button" onClick={onOpenConfirmation} disabled={isConfirming} className="min-h-10 rounded-lg bg-green px-2.5 py-2 text-[11px] font-bold text-on-green transition hover:brightness-110 disabled:opacity-50">{isConfirming ? "Teyit ediliyor..." : "✓ Teyit et"}</button>}
-        {canEdit && <>
-          <button type="button" onClick={onToggleEdit} className="min-h-10 rounded-lg border border-teal/40 px-2.5 py-2 text-[11px] font-bold text-teal transition hover:bg-teal/10">✏️ Düzenle</button>
-          {deletePending ? <><button type="button" onClick={onDeleteConfirm} className="min-h-10 rounded-lg bg-red px-2.5 py-2 text-[11px] font-bold text-on-amber transition hover:brightness-110">Evet, Sil</button><button type="button" onClick={onDeleteCancel} className="min-h-10 rounded-lg border border-border px-2.5 py-2 text-[11px] font-bold text-muted transition hover:bg-panel2">Vazgeç</button></> : <button type="button" onClick={onDeleteRequest} className="min-h-10 rounded-lg border border-red/40 px-2.5 py-2 text-[11px] font-bold text-red transition hover:bg-red/10">🗑️ Sil</button>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => { triggerHaptic("light"); onOpenDetails(); }} className="ui-button min-h-10 flex-1 border border-amber/40 px-2.5 py-2 text-[11px] text-amber hover:bg-amber/10 sm:flex-none">🔎 Detay</button>
+        {(isManager && record.manager_confirmation_status === "pending" || canEdit) && <>
+          <button type="button" onPointerDown={() => triggerHaptic("light")} onClick={() => setActionMenuOpen((open) => !open)} aria-expanded={actionMenuOpen} className="ui-button min-h-10 flex-1 border border-border bg-panel2 px-2.5 py-2 text-[11px] text-muted hover:border-amber/40 hover:text-amber sm:hidden">⋯ İşlemler</button>
+          <div className="hidden flex-wrap gap-2 sm:flex">
+            {isManager && record.manager_confirmation_status === "pending" && <button type="button" onClick={() => { triggerHaptic("success"); onOpenConfirmation(); }} disabled={isConfirming} className="ui-button min-h-10 bg-green px-2.5 py-2 text-[11px] text-on-green hover:brightness-110 disabled:opacity-50">{isConfirming ? "Teyit ediliyor..." : "✓ Teyit et"}</button>}
+            {canEdit && <>
+              <button type="button" onClick={onToggleEdit} className="ui-button min-h-10 border border-teal/40 px-2.5 py-2 text-[11px] text-teal hover:bg-teal/10">✏️ Düzenle</button>
+              {deletePending ? <><button type="button" onClick={onDeleteConfirm} className="ui-button min-h-10 bg-red px-2.5 py-2 text-[11px] text-on-amber hover:brightness-110">Evet, Sil</button><button type="button" onClick={onDeleteCancel} className="ui-button min-h-10 border border-border px-2.5 py-2 text-[11px] text-muted hover:bg-panel2">Vazgeç</button></> : <button type="button" onClick={onDeleteRequest} className="ui-button min-h-10 border border-red/40 px-2.5 py-2 text-[11px] text-red hover:bg-red/10">🗑️ Sil</button>}
+            </>}
+          </div>
+          {actionMenuOpen && <div className="relative basis-full sm:hidden">
+            <div className="flex flex-col gap-1 rounded-xl border border-border bg-panel2 p-1.5 shadow-xl">
+              {isManager && record.manager_confirmation_status === "pending" && <button type="button" onClick={() => { triggerHaptic("success"); closeActionMenu(); onOpenConfirmation(); }} disabled={isConfirming} className="min-h-11 rounded-lg px-3 py-2 text-left text-[11px] font-bold text-green hover:bg-green/10 disabled:opacity-50">{isConfirming ? "Teyit ediliyor..." : "✓ Teyit et"}</button>}
+              {canEdit && <button type="button" onClick={() => { closeActionMenu(); onToggleEdit(); }} className="min-h-11 rounded-lg px-3 py-2 text-left text-[11px] font-bold text-teal hover:bg-teal/10">✏️ Düzenle</button>}
+              {canEdit && (deletePending ? <div className="grid grid-cols-2 gap-1"><button type="button" onClick={() => { closeActionMenu(); onDeleteConfirm(); }} className="min-h-11 rounded-lg bg-red px-3 py-2 text-[11px] font-bold text-on-amber">Evet, Sil</button><button type="button" onClick={() => { closeActionMenu(); onDeleteCancel(); }} className="min-h-11 rounded-lg px-3 py-2 text-left text-[11px] font-bold text-muted hover:bg-panel">Vazgeç</button></div> : <button type="button" onClick={() => { closeActionMenu(); onDeleteRequest(); }} className="min-h-11 rounded-lg px-3 py-2 text-left text-[11px] font-bold text-red hover:bg-red/10">🗑️ Sil</button>)}
+            </div>
+          </div>}
         </>}
       </div>
       {isEditing ? editForm : null}

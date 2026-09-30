@@ -15,6 +15,9 @@ const pwaRegister = new URL("../components/PwaRegister.tsx", import.meta.url);
 const notificationBell = new URL("../components/NotificationBell.tsx", import.meta.url);
 const sidebarSource = new URL("../components/Sidebar.tsx", import.meta.url);
 const globalsSource = new URL("../app/globals.css", import.meta.url);
+const lightbox = new URL("../components/Lightbox.tsx", import.meta.url);
+const keyboardHook = new URL("../lib/useKeyboardOpen.ts", import.meta.url);
+const scrollToTop = new URL("../components/ScrollToTop.tsx", import.meta.url);
 
 async function text(url: URL): Promise<string> {
   return readFile(url, "utf8");
@@ -59,9 +62,9 @@ test("mobile surfaces preserve touch targets and avoid bottom navigation overlap
   assert.match(topBarText, /max-w-\[48vw\]/);
   assert.match(bottomNavText, /min-h-20/);
   assert.match(bottomNavText, /aria-label="Mobil ana navigasyon"/);
-  assert.match(submitBarText, /sticky bottom-24/);
+  assert.match(submitBarText, /bottom-24/);
   assert.match(submitBarText, /ui-button-primary/);
-  assert.match(recordCardText, /grid grid-cols-2 gap-2 sm:flex/);
+  assert.match(recordCardText, /ui-button min-h-10/);
   assert.match(recordCardText, /min-h-10/);
 });
 
@@ -72,4 +75,22 @@ test("mobile loading avoids duplicate auth work, hidden polling, and duplicate i
   assert.doesNotMatch(sidebarText, /app-icon\.png[^\n]+priority/);
   assert.match(globalsText, /\.mobile-render-defer/);
   assert.match(globalsText, /content-visibility: auto/);
+});
+
+test("mobile interactions provide reduced-motion-safe touch feedback and keyboard affordances", async () => {
+  const [globalsText, bottomNavText, submitBarText, lightboxText, keyboardText, scrollText, cardText] = await Promise.all([
+    text(globals), text(bottomNav), text(completionSubmitBar), text(lightbox), text(keyboardHook), text(scrollToTop), text(recordCard),
+  ]);
+  assert.match(globalsText, /touch-action: manipulation/);
+  assert.match(globalsText, /skeleton-shimmer/);
+  assert.match(globalsText, /mobile-nav-hidden/);
+  assert.match(bottomNavText, /requestAnimationFrame/);
+  assert.match(bottomNavText, /useKeyboardOpen/);
+  assert.match(submitBarText, /keyboardOpen \? "bottom-0" : "bottom-24"/);
+  assert.match(submitBarText, /triggerHaptic/);
+  assert.match(lightboxText, /onPointerMove/);
+  assert.match(lightboxText, /dragY > 80/);
+  assert.match(keyboardText, /visualViewport/);
+  assert.match(scrollText, /Sayfanın başına git/);
+  assert.match(cardText, /İşlemler/);
 });
