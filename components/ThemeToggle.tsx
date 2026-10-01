@@ -8,7 +8,10 @@ type Theme = "dark" | "light" | "system";
 
 function applyTheme(theme: Theme) {
   const systemLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-  document.documentElement.classList.toggle("light", theme === "light" || (theme === "system" && systemLight));
+  const root = document.documentElement;
+  root.classList.add("theme-switching");
+  root.classList.toggle("light", theme === "light" || (theme === "system" && systemLight));
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => root.classList.remove("theme-switching")));
 }
 
 export default function ThemeToggle() {

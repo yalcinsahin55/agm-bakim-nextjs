@@ -11,6 +11,8 @@ export interface CompletionDraft {
   maintenanceEndAt: string;
   pressure: string;
   techNote: string;
+  delayReason: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other" | "";
+  delayNote: string;
   extraKeys: string[];
   extraPeriods: Record<string, number>;
   responsibleTechnicianId: string;

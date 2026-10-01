@@ -83,6 +83,12 @@ export default function TamamlaPage() {
   const { draft, markReady, clearDraft } = useCompletionDraft(draftKey, draftValue);
   const draftRestoredRef = useRef(false);
 
+  const handleCancel = useCallback(() => {
+    clearDraft();
+    clientRequestIdRef.current = null;
+    router.replace("/dashboard");
+  }, [clearDraft, router]);
+
   const loadPanel = useCallback(async () => {
     try {
       const data = await getMaintenancePanel();
@@ -183,7 +189,7 @@ export default function TamamlaPage() {
     if (!draft || draftRestoredRef.current || loading || quickMode) return;
     draftRestoredRef.current = true;
     setEngineId(draft.engineId); setTypeKey(draft.typeKey); setHours(draft.hours);
-    setMaintenanceStartAt(draft.maintenanceStartAt); setMaintenanceEndAt(draft.maintenanceEndAt); setPressure(draft.pressure); setTechNote(draft.techNote);
+    setMaintenanceStartAt(draft.maintenanceStartAt); setMaintenanceEndAt(draft.maintenanceEndAt); setPressure(draft.pressure); setTechNote(draft.techNote); setDelayReason(draft.delayReason || ""); setDelayNote(draft.delayNote || "");
     setExtraKeys(draft.extraKeys); setExtraPeriods(draft.extraPeriods); setResponsibleTechnicianId(draft.responsibleTechnicianId); setResponsibleTechnicianDurationMinutes(draft.responsibleTechnicianDurationMinutes);
     setOtherTechnicianIds(draft.otherTechnicianIds); setOtherTechnicianDurations(draft.otherTechnicianDurations); setTechnicianSource(draft.technicianSource); setExternalServiceName(draft.externalServiceName); setChecklist(draft.checklist); setPreviousWorkingHours(draft.previousWorkingHours);
     markReady();
@@ -559,7 +565,7 @@ export default function TamamlaPage() {
             checklistComplete={checklistComplete}
             timeTrackingReady={timeTrackingReady}
             evidenceReady={evidenceReady}
-            onCancel={() => router.back()}
+            onCancel={handleCancel}
           />
         </form>
       </main>
