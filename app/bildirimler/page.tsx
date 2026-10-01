@@ -137,20 +137,20 @@ export default function NotificationsPage() {
           </div>
         ) : loadError ? (
           <div className="mt-4 rounded-card border border-red/30 bg-panel py-12 text-center">
-            <div className="mb-3 text-3xl">⚠️</div>
+            <div className="mb-3 text-3xl"></div>
             <p className="text-sm font-semibold text-text">{loadError}</p>
-            <button onClick={() => { void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
+            <button onClick={() => { void load(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
           </div>
         ) : notifications.length === 0 ? (
           <div className="mt-4 rounded-card border border-border bg-panel py-14 text-center">
-            <div className="mb-3 text-4xl">✅</div>
+            <div className="mb-3 text-4xl"></div>
             <p className="text-sm font-semibold text-text">Yeni bildirim yok.</p>
             <p className="mt-1 text-xs text-faint">Bakım durumları değiştiğinde burada göreceksiniz.</p>
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex items-center gap-2 text-[15px] font-bold text-text">
-              <span className="text-teal" aria-hidden="true">⚑</span>
+              <span className="text-teal" aria-hidden="true"></span>
               Öncelikli bildirimler
             </div>
 

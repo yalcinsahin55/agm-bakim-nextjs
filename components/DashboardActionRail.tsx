@@ -29,9 +29,9 @@ type QuickAction = {
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "✓", tone: "amber" },
+  { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "", tone: "amber" },
   { href: "/kayitlar", label: "Bakım kayıtları", description: "Kayıt ara, geçmiş kanıtları incele.", icon: "▤", tone: "teal" },
-  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor bakım durumu", description: "Motor bakım durumuna git.", icon: "⚙", tone: "purple" },
+  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor bakım durumu", description: "Motor bakım durumuna git.", icon: "", tone: "purple" },
   { href: "/bakim-turleri", label: "Bakım türleri", description: "Tür bazında tüm motorları listele.", icon: "▦", tone: "purple" },
   { href: "/bildirimler", label: "Bildirim merkezi", description: "Dikkat isteyen son olayları aç.", icon: "!", tone: "red" },
 ];
@@ -155,7 +155,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
               type="button"
               onClick={() => setQueueFilter(selected ? "all" : filter.key)}
               aria-pressed={selected}
-              className={`rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber/60 bg-amber/10" : "border-border bg-panel hover:border-borderlt"}`}
+              className={`rounded-control border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber/60 bg-amber/10" : "border-border bg-panel hover:border-borderlt"}`}
             >
               <div className="text-[9px] font-bold uppercase tracking-wide text-faint">{filter.label}</div>
               <div className="mt-1 font-mono text-xl font-extrabold text-text">{value}</div>
@@ -163,7 +163,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
             </button>
           );
         })}
-        <Link href="#dashboard-health-details" className="rounded-xl border border-border bg-panel px-3 py-2 text-left transition hover:border-borderlt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
+        <Link href="#dashboard-health-details" className="rounded-control border border-border bg-panel px-3 py-2 text-left transition hover:border-borderlt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
           <div className="text-[9px] font-bold uppercase tracking-wide text-faint">İzlenen motor</div>
           <div className="mt-1 font-mono text-xl font-extrabold text-text">{enginesCount}</div>
           <div className="mt-0.5 text-[8.5px] text-muted">motor özeti</div>
@@ -171,7 +171,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.9fr)]">
-        <div className="rounded-xl border border-border bg-panel p-3" aria-label="Öncelikli aksiyon kuyruğu">
+        <div className="rounded-control border border-border bg-panel p-3" aria-label="Öncelikli aksiyon kuyruğu">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <div className="text-[10px] font-extrabold uppercase tracking-wide text-text">Aksiyon kuyruğu</div>
@@ -215,7 +215,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
           )}
         </div>
 
-        <div id="dashboard-risk-summary" className="rounded-xl border border-border bg-panel p-3" aria-label="Motor risk özeti">
+        <div id="dashboard-risk-summary" className="rounded-control border border-border bg-panel p-3" aria-label="Motor risk özeti">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div>
               <div className="text-[10px] font-extrabold uppercase tracking-wide text-text">Motor risk özeti</div>
@@ -235,7 +235,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
             {visibleActions.map((action) => {
               const tone = TONE_CLASSES[action.tone];
               return (
-                <Link key={action.href} href={action.href} className="group flex min-h-[78px] min-w-0 items-center gap-2.5 rounded-xl border border-border bg-panel p-3 transition hover:border-borderlt hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
+                <Link key={action.href} href={action.href} className="group flex min-h-[78px] min-w-0 items-center gap-2.5 rounded-control border border-border bg-panel p-3 transition hover:border-borderlt hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
                   <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border text-sm font-extrabold ${tone.icon}`} aria-hidden="true">{action.icon}</span>
                   <span className="min-w-0">
                     <span className={`block break-words text-[11px] font-extrabold text-text ${tone.title}`}>{action.label}</span>

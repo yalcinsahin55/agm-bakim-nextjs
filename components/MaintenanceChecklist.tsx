@@ -14,7 +14,7 @@ export default function MaintenanceChecklist({ items, values, complete, onItemCh
       <div className="grid gap-1.5">
         {items.map((item) => <label key={item} className="flex items-center gap-2.5 rounded-lg border border-border bg-panel2 px-3 py-2.5 text-[11px] text-text"><input type="checkbox" checked={values[item] === true} onChange={(event) => onItemChange(item, event.target.checked)} />{item}</label>)}
       </div>
-      <div className={`mt-3 rounded-lg px-3 py-2.5 text-[10.5px] ${complete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{complete ? "✓ Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div>
+      <div className={`mt-3 rounded-lg px-3 py-2.5 text-[10.5px] ${complete ? "bg-green/10 text-green" : "bg-amber/10 text-amber"}`} role="status">{complete ? " Kontrol listesi tamamlandı." : "Kontrol listesindeki tüm maddeleri işaretleyin."}</div>
     </section>
   );
 }

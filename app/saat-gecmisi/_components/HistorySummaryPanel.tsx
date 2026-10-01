@@ -15,21 +15,21 @@ export default function HistorySummaryPanel({ history, totalDelta, avgPerDay, hi
       <div className="grid grid-cols-3 gap-2 mb-4">
         <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">📈</span>
+            <span className="text-sm"></span>
             <div className="text-[9px] text-faint uppercase font-bold">Toplam Artış</div>
           </div>
           <div className="font-mono text-[15px] font-bold text-text mt-1">{totalDelta.toLocaleString("tr-TR")} sa</div>
         </div>
         <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">⚡</span>
+            <span className="text-sm"></span>
             <div className="text-[9px] text-faint uppercase font-bold">Günlük Ort.</div>
           </div>
           <div className="font-mono text-[15px] font-bold text-amber mt-1">{avgPerDay.toFixed(1)} sa</div>
         </div>
         <div className="bg-panel border border-border rounded-card p-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">📋</span>
+            <span className="text-sm"></span>
             <div className="text-[9px] text-faint uppercase font-bold">Kayıt Sayısı</div>
           </div>
           <div className="font-mono text-[15px] font-bold text-text mt-1">{historyTotal}</div>

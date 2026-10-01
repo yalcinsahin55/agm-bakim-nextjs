@@ -239,11 +239,11 @@ export default function AuditLogPage() {
             </button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-border bg-panel2 px-3 py-2.5">
+            <div className="rounded-control border border-border bg-panel2 px-3 py-2.5">
               <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Toplam kayıt</div>
               <div className="mt-0.5 font-mono text-lg font-bold text-amber">{total.toLocaleString("tr-TR")}</div>
             </div>
-            <div className="rounded-xl border border-border bg-panel2 px-3 py-2.5">
+            <div className="rounded-control border border-border bg-panel2 px-3 py-2.5">
               <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Aktif filtre</div>
               <div className="mt-0.5 font-mono text-lg font-bold text-teal">{activeFilterCount}</div>
             </div>
@@ -273,34 +273,34 @@ export default function AuditLogPage() {
               onChange={(event) => updateDraft("q", event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") applyFilters(); }}
               placeholder="Kullanıcı, açıklama veya kayıt ID ara..."
-              className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
+              className="rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
             />
             <div className="grid grid-cols-2 gap-2">
-              <select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <select value={draftFilters.action} onChange={(event) => updateDraft("action", event.target.value)} className="rounded-control border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm işlemler</option>
                 {Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
-              <select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
+              <select value={draftFilters.entity} onChange={(event) => updateDraft("entity", event.target.value)} className="rounded-control border border-border bg-panel2 px-2.5 py-2.5 text-[12px] outline-none focus:border-teal">
                 <option value="">Tüm kayıt türleri</option>
                 {Object.entries(entityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] font-bold text-faint">Başlangıç
-                <input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <input type="date" value={draftFilters.from} onChange={(event) => updateDraft("from", event.target.value)} className="mt-1 w-full rounded-control border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
               <label className="text-[10px] font-bold text-faint">Bitiş
-                <input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
+                <input type="date" value={draftFilters.to} onChange={(event) => updateDraft("to", event.target.value)} className="mt-1 w-full rounded-control border border-border bg-panel2 px-2.5 py-2.5 text-[12px] font-normal text-text outline-none focus:border-teal" />
               </label>
             </div>
-            <button type="button" onClick={applyFilters} className="rounded-xl bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-on-teal transition hover:brightness-110 active:scale-[.98]">
+            <button type="button" onClick={applyFilters} className="rounded-control bg-gradient-to-b from-teal to-teal/80 py-2.5 text-[12px] font-extrabold text-on-teal transition hover:brightness-110 active:scale-[.98]">
               Filtreleri Uygula
             </button>
           </div>
         </section>
 
         {error && (
-          <section className="mb-3 rounded-xl border border-red/30 bg-red/10 px-3 py-3 text-[11px] text-red">
+          <section className="mb-3 rounded-control border border-red/30 bg-red/10 px-3 py-3 text-[11px] text-red">
             <div>{error}</div>
             <button type="button" onClick={() => load(page, filters, { silent: true })} className="mt-2 rounded-lg border border-red/30 px-2.5 py-1.5 font-bold">Tekrar dene</button>
           </section>
@@ -309,7 +309,7 @@ export default function AuditLogPage() {
         <section className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="rounded-card border border-border bg-panel p-8 text-center text-muted">
-              <div className="mb-2 text-3xl">🧾</div>
+              <div className="mb-2 text-3xl"></div>
               <div className="text-sm font-bold">Kayıt bulunamadı</div>
               <div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div>
             </div>
@@ -349,7 +349,7 @@ export default function AuditLogPage() {
         </section>
 
         {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">
+          <div className="mt-4 flex items-center justify-between rounded-control border border-border bg-panel p-2">
             <button type="button" onClick={() => load(page - 1, filters)} disabled={page <= 1 || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">← Önceki</button>
             <span className="text-[11px] text-faint">{page} / {totalPages}</span>
             <button type="button" onClick={() => load(page + 1, filters)} disabled={page >= totalPages || loading} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition disabled:opacity-40">Sonraki →</button>
@@ -365,26 +365,26 @@ export default function AuditLogPage() {
                 <div className="text-[13px] font-bold text-text">İşlem ayrıntısı</div>
                 <div className="mt-1 text-[10.5px] text-faint">{formatDate(selected.created_at)} · {entityLabels[selected.entity] || selected.entity}</div>
               </div>
-              <button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat">✕</button>
+              <button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat"></button>
             </div>
             <div className="overflow-y-auto px-4 py-3">
-              <div className="rounded-xl border border-border bg-panel2 p-3">
+              <div className="rounded-control border border-border bg-panel2 p-3">
                 <div className="text-[12px] font-bold text-text">{selected.summary || "İşlem kaydı"}</div>
                 <div className="mt-1 text-[10.5px] text-muted">{selected.user_name} · {roleLabels[selected.user_role] || selected.user_role}</div>
               </div>
               {isPasswordResetAudit(selected) && (
-                <div className="mt-3 rounded-xl border border-amber/30 bg-amber/10 px-3 py-2 text-[10.5px] leading-relaxed text-amber">
+                <div className="mt-3 rounded-control border border-amber/30 bg-amber/10 px-3 py-2 text-[10.5px] leading-relaxed text-amber">
                   <strong>Güvenlik kaydı:</strong> Parola değeri audit kaydına yazılmaz ve gösterilmez. Session sürümü artırılarak önceki oturumlar geçersiz kılınır; aşağıdaki sonraki değer yalnızca bu sürüm bilgisini içerir.
                 </div>
               )}
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Önceki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-control border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.before)}</pre>
                 </div>
                 <div>
                   <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-faint">Sonraki değer</div>
-                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-control border border-border bg-bg p-3 text-[10px] leading-relaxed text-muted">{formatValue(selected.after)}</pre>
                 </div>
               </div>
               <div className="mt-3 text-[10px] text-faint">Kayıt ID: {selected._id}</div>

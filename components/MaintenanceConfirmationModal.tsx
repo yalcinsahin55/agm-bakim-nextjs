@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import DurationInput from "@/components/DurationInput";
+import AppIcon from "@/components/ui/AppIcon";
 import { formatMaintenanceDuration } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import type { TechnicianType } from "@/lib/types";
@@ -62,6 +64,11 @@ export default function MaintenanceConfirmationModal({
   onConfirm,
 }: MaintenanceConfirmationModalProps) {
   const dialogRef = useDialogA11y<HTMLDivElement>(true);
+  useEffect(() => {
+    const onEscape = () => onClose();
+    window.addEventListener("app:escape", onEscape);
+    return () => window.removeEventListener("app:escape", onEscape);
+  }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:items-center md:p-4" role="dialog" aria-modal="true" aria-labelledby="confirmation-dialog-title">
       <div ref={dialogRef} tabIndex={-1} className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-border bg-panel p-4 shadow-2xl md:rounded-2xl">
@@ -70,10 +77,10 @@ export default function MaintenanceConfirmationModal({
             <div id="confirmation-dialog-title" className="text-base font-extrabold text-text">Teyit öncesi çalışma süreleri</div>
             <div className="mt-0.5 truncate text-[11px] text-muted">{record.engine_name} · {record.type_label}</div>
           </div>
-          <button type="button" onClick={onClose} className="h-8 w-8 flex-shrink-0 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Teyit penceresini kapat">✕</button>
+          <button type="button" onClick={onClose} className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white" aria-label="Teyit penceresini kapat"><AppIcon name="close" size={15} /></button>
         </div>
-        <div className="rounded-xl border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber"><b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerleri saat ve dakika olarak girin; örnek: <b>8 sa 30 dk</b>.</div>
-        <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
+        <div className="rounded-control border border-amber/30 bg-amber/10 p-3 text-[11px] leading-relaxed text-amber"><b>Önemli:</b> Toplam bakım süresi ile kişi katkı süresi aynı olmak zorunda değildir. Çok günlük bakım ve mesai durumlarında her çalışan için gerçek toplam süreyi ayrı girin. Değerleri saat ve dakika olarak girin; örnek: <b>8 sa 30 dk</b>.</div>
+        <div className="mt-3 rounded-control border border-purple-400/30 bg-purple-400/5 p-3">
           <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Bakımın bağlı olduğu motor</label>
           <p className="mt-0.5 text-[10px] leading-relaxed text-faint">Teknisyen yanlış motora bakım yaptıysa doğru motoru seçin. Yönetici teyit ettiğinde aynı gruptaki tüm bakım türleri yeni motora taşınır ve eski motorun bakım takibi yeniden hesaplanır.</p>
           <select value={engineId} onChange={(event) => onEngineChange(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm outline-none focus:border-purple-300" aria-label="Bakım motoru">
@@ -87,16 +94,16 @@ export default function MaintenanceConfirmationModal({
           <div className="rounded-lg bg-panel2 p-2"><div className="text-faint">Geçen bakım süresi</div><div className="mt-0.5 font-bold text-teal">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</div></div>
         </div>
         {isExternalService ? (
-          <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/10 p-3 text-[11px] text-purple-100"><b>Dış hizmet kaydı</b><div className="mt-1 text-[10.5px] text-purple-200">Bu kayıtta kayıtlı personel bulunmadığı için kişi bazlı çalışma süresi girilmeyecek. Kontrol ettikten sonra teyit edebilirsin.</div></div>
+          <div className="mt-3 rounded-control border border-purple-400/30 bg-purple-400/10 p-3 text-[11px] text-purple-100"><b>Dış hizmet kaydı</b><div className="mt-1 text-[10.5px] text-purple-200">Bu kayıtta kayıtlı personel bulunmadığı için kişi bazlı çalışma süresi girilmeyecek. Kontrol ettikten sonra teyit edebilirsin.</div></div>
         ) : (
           <div className="mt-3 flex flex-col gap-2">
-            {rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel2 px-3 py-2.5"><div className="min-w-0"><div className="truncate text-[12px] font-bold text-text">{row.full_name}</div><div className="mt-0.5 text-[10px] text-faint">{row.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {TECHNICIAN_TYPE_LABELS[row.technician_type || "mekanik"] || "Mekanik teknisyen"}</div></div><DurationInput valueMinutes={durationInputs[row.id] ?? null} onChange={(value) => onDurationChange(row.id, value)} maxMinutes={366 * 24 * 60} compact required label={`${row.full_name} çalışma süresi`} /></div>)}
+            {rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 rounded-control border border-border bg-panel2 px-3 py-2.5"><div className="min-w-0"><div className="truncate text-[12px] font-bold text-text">{row.full_name}</div><div className="mt-0.5 text-[10px] text-faint">{row.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {TECHNICIAN_TYPE_LABELS[row.technician_type || "mekanik"] || "Mekanik teknisyen"}</div></div><DurationInput valueMinutes={durationInputs[row.id] ?? null} onChange={(value) => onDurationChange(row.id, value)} maxMinutes={366 * 24 * 60} compact required label={`${row.full_name} çalışma süresi`} /></div>)}
           </div>
         )}
         {!isExternalService && <div className="mt-3 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-[10.5px] text-teal">Toplam kişi katkısı: <b>{formatMaintenanceDuration(totalMinutes)}</b> · Mesai ve farklı günlerdeki çalışma bu toplamda birlikte tutulur.</div>}
         <div className="mt-4 flex gap-2">
-          <button type="button" onClick={onCancel} className="flex-1 rounded-xl border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
-          <button type="button" onClick={onConfirm} disabled={confirming} className="flex-1 rounded-xl bg-green py-2.5 text-[12px] font-bold text-on-green disabled:opacity-50">{confirming ? "Teyit ediliyor..." : "✓ Süreleri kontrol et ve teyit et"}</button>
+          <button type="button" onClick={onCancel} className="flex-1 rounded-control border border-border py-2.5 text-[12px] font-bold text-muted hover:bg-panel2">Vazgeç</button>
+          <button type="button" onClick={onConfirm} disabled={confirming} className="flex-1 rounded-control bg-green py-2.5 text-[12px] font-bold text-on-green disabled:opacity-50">{confirming ? "Teyit ediliyor..." : " Süreleri kontrol et ve teyit et"}</button>
         </div>
       </div>
     </div>

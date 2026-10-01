@@ -32,10 +32,10 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
             className="w-8 h-8 rounded-lg border border-border text-muted hover:text-text hover:bg-panel2 transition"
             aria-label="QR penceresini kapat"
           >
-            ✕
+
           </button>
         </div>
-        <div className="bg-white rounded-xl p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
+        <div className="bg-white rounded-control p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
           {qrDataUrl ? <Image src={qrDataUrl} width={208} height={208} unoptimized alt={`${engine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}
         </div>
         <p className="text-[11px] text-muted leading-relaxed mt-3">
@@ -52,7 +52,7 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
           <a
             href={qrDataUrl || undefined}
             download={`${engine.name.replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-qr.png`}
-            className={`py-2.5 rounded-lg bg-amber text-[#161006] text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
+            className={`py-2.5 rounded-lg bg-amber text-on-amber text-[11px] font-extrabold transition ${qrDataUrl ? "hover:brightness-110" : "pointer-events-none opacity-50"}`}
           >
             PNG indir
           </a>

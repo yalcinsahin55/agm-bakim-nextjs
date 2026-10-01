@@ -201,7 +201,7 @@ export default function AssistantExportPanel({ question, intent, data, exportQue
     exportQuery.technician_id ? "Seçili teknisyen" : null,
   ].filter(Boolean);
 
-  return <div className="mt-3 min-w-0 rounded-xl border border-amber/25 bg-amber/5 p-2.5">
+  return <div className="mt-3 min-w-0 rounded-control border border-amber/25 bg-amber/5 p-2.5">
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span className="mr-auto text-[9px] font-bold uppercase tracking-wide text-amber">Bu cevabın raporu</span>
       <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="rounded-lg border border-amber/35 bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-amber hover:border-amber/70">{open ? "Paneli kapat" : "Özelleştir"}</button>

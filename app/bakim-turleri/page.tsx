@@ -86,7 +86,7 @@ export default function BakimTurleriPage() {
             type="button"
             onClick={() => setSelectedKey("")}
             aria-pressed={!selectedKey}
-            className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${!selectedKey ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
+            className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${!selectedKey ? "bg-amber text-on-amber shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
           >
             Tüm bakım türleri
             <span className={`ml-1.5 text-[10px] ${!selectedKey ? "opacity-70" : "text-faint"}`}>({items.length})</span>
@@ -100,7 +100,7 @@ export default function BakimTurleriPage() {
                 type="button"
                 onClick={() => setSelectedKey(t.key)}
                 aria-pressed={selected}
-                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selected ? "bg-amber text-[#161006] shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
+                className={`px-4 py-2 rounded-full text-[12.5px] font-bold transition-all ${selected ? "bg-amber text-on-amber shadow-lg" : "bg-panel2 text-muted border border-border hover:text-text hover:border-borderlt"}`}
               >
                 {t.label}
                 <span className={`ml-1.5 text-[10px] ${selected ? "opacity-70" : "text-faint"}`}>
@@ -138,7 +138,7 @@ export default function BakimTurleriPage() {
 
         {rows.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🔧</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
             <button
               onClick={() => { setSelectedKey(""); setStatusFilter("Tümü"); }}

@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass";
+export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass" | "close" | "edit" | "trash";
 
 const PATHS: Record<AppIconName, string> = {
   dashboard: "M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z",
@@ -21,6 +21,9 @@ const PATHS: Record<AppIconName, string> = {
   clock: "M12 7v5l3 2m-3 5a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
   warning: "M12 4 3 20h18L12 4Zm0 6v4m0 3h.01",
   hourglass: "M6 3h12M6 21h12M8 3v4c0 2 4 3 4 5s-4 3-4 5v4m8-18v4c0 2-4 3-4 5s4 3 4 5v4",
+  close: "M6 6l12 12M18 6 6 18",
+  edit: "M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4",
+  trash: "M5 7h14m-9 4v5m4-5v5M9 7V4h6v3m-9 0 1 13h10l1-13",
 };
 
 export default function AppIcon({ name, size = 18, ...props }: { name: AppIconName; size?: number } & Omit<SVGProps<SVGSVGElement>, "name">) {

@@ -91,7 +91,7 @@ export default function KayitlarPage() {
       const res = await fetch(`/api/records/${id}`, { method: "DELETE" });
       toast.dismiss(loadingToast);
       if (res.ok) {
-        toast.success("Kayıt silindi! 🗑️");
+        toast.success("Kayıt silindi! ");
         invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         setConfirmDeleteId(null);
@@ -128,10 +128,10 @@ export default function KayitlarPage() {
       <div>
         <TopBar title="Bakım Kayıtları" subtitle="" />
         <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-3" />
+          <Skeleton className="h-12 w-full rounded-control mb-3" />
           <div className="grid grid-cols-2 gap-2 mb-4">
-            <Skeleton className="h-12 rounded-xl" />
-            <Skeleton className="h-12 rounded-xl" />
+            <Skeleton className="h-12 rounded-control" />
+            <Skeleton className="h-12 rounded-control" />
           </div>
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2">
             <Skeleton className="h-36 rounded-card" />

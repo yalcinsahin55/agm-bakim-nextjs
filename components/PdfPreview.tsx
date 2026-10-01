@@ -80,7 +80,7 @@ export default function PdfPreview({ src, filename }: PdfPreviewProps) {
   }, [src]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-[#e5e7eb] p-2" aria-live="polite">
+    <div className="min-h-0 flex-1 overflow-y-auto rounded-control border border-border bg-[#e5e7eb] p-2" aria-live="polite">
       {status === "loading" && <div className="flex min-h-[240px] items-center justify-center text-sm font-semibold text-muted">PDF hazırlanıyor…</div>}
       {status === "error" && (
         <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 px-4 text-center text-sm text-red">

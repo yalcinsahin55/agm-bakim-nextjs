@@ -41,7 +41,7 @@ async function postImportPressureReadings(req: NextRequest) {
       { status: bodyResult.tooLarge ? 413 : 400 },
     );
   }
-  const { file_b64 } = bodyResult.value as { file_b64?: unknown };
+  const { file_b64, preview } = bodyResult.value as { file_b64?: unknown; preview?: boolean };
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
   if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
     return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });
@@ -117,6 +117,7 @@ async function postImportPressureReadings(req: NextRequest) {
     }
   }
 
+  if (preview) return NextResponse.json({ ok: true, preview: true, inserted: docs.length });
   if (docs.length > 0) {
     await pressureReadingsCollection(db).insertMany(docs);
   }

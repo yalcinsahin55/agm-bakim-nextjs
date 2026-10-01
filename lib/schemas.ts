@@ -1,7 +1,7 @@
 import { z, ZodError } from "zod";
 import { isAllowedReportAttachmentUrl, isReportAttachmentMime, REPORT_ATTACHMENT_MAX_BYTES, REPORT_ATTACHMENT_MAX_COUNT } from "@/lib/reportAttachments";
 
-// 🔐 Giriş validasyonu. `email` alanı eski istemcilerle geriye dönük uyumludur.
+//  Giriş validasyonu. `email` alanı eski istemcilerle geriye dönük uyumludur.
 export const loginSchema = z.object({
   identifier: z.string().trim().min(3, "Telefon numarası veya e-posta gereklidir.").max(254).optional(),
   email: z.string().trim().max(254).optional(),
@@ -15,7 +15,7 @@ export const loginSchema = z.object({
   path: ["identifier"],
 });
 
-// 👤 İlk kurulum kaydı. Sistem kurulduktan sonra bu endpoint yeni kayıtları kapatır.
+//  İlk kurulum kaydı. Sistem kurulduktan sonra bu endpoint yeni kayıtları kapatır.
 export const registerSchema = z.object({
   full_name: z
     .string({ required_error: "Ad Soyad gereklidir." })
@@ -74,7 +74,7 @@ export type AdminUserInput = z.infer<typeof adminUserSchema>;
 export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
 export type PasswordResetInput = z.infer<typeof passwordResetSchema>;
 
-// 📋 Bakım kaydı validasyonu
+//  Bakım kaydı validasyonu
 export const recordSchema = z.object({
   client_request_id: z.string().min(8).max(100).optional(),
   engine_id: z.string().min(1, "Motor seçimi zorunludur."),
@@ -99,6 +99,8 @@ export const recordSchema = z.object({
 
   technician_note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
   note: z.string().max(2000, "Not çok uzun.").optional().or(z.literal("")),
+  delay_reason: z.enum(["planned", "parts", "availability", "technical", "weather", "external", "other"]).optional(),
+  delay_note: z.string().trim().max(500, "Gecikme açıklaması çok uzun.").optional().or(z.literal("")),
   other_technician_ids: z.array(z.string().min(1).max(100)).max(20, "En fazla 20 yardımcı teknisyen seçilebilir.").optional(),
   other_technician_durations: z.record(z.string().min(1).max(100), z.number().int().nonnegative().max(366 * 24 * 60)).optional(),
   checklist: z.array(z.object({ label: z.string().min(1).max(200), completed: z.boolean() })).max(20).optional(),
@@ -177,7 +179,7 @@ export const recordSchema = z.object({
     .optional(),
 });
 
-// 👥 Yönetici teyidinde her ekip üyesinin gerçek katkı süresi ayrı doğrulanır.
+//  Yönetici teyidinde her ekip üyesinin gerçek katkı süresi ayrı doğrulanır.
 export const recordConfirmationSchema = z.object({
   engine_id: z.string().min(1, "Motor kimliği geçersiz.").max(100).optional(),
   technician_contributions: z.array(z.object({
@@ -191,7 +193,7 @@ export const recordConfirmationSchema = z.object({
 
 export type RecordConfirmationInput = z.infer<typeof recordConfirmationSchema>;
 
-// 🔍 Schema'lardan türetilen tipler (TypeScript'in gücü burada!)
+//  Schema'lardan türetilen tipler (TypeScript'in gücü burada!)
 export type RecordInput = z.infer<typeof recordSchema>;
 
 // Zod hatalarını tek okunabilir mesajda birleştir

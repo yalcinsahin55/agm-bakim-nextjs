@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Bu veya çok benzer isimde bir bakım türü zaten var." }, { status: 409 });
     }
 
-    // 🎯 Motor bazlı durumlar (yeni özellik) — yoksa eski apply_to_all davranışı
+    // Motor bazlı durumlar (yeni özellik) — yoksa eski apply_to_all davranışı
     let engineStates: Record<string, { last_maintenance_hour: number; period_hours: number; tracking_source: "manual" }> = {};
     if (engine_states && typeof engine_states === "object") {
       Object.entries(engine_states as Record<string, unknown>).forEach(([engId, rawState]) => {

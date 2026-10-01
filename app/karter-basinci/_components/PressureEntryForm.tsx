@@ -18,7 +18,7 @@ export default function PressureEntryForm({ engines, entries, readingDate, onRea
         value={readingDate}
         max={new Date().toISOString().slice(0, 10)}
         onChange={(event) => onReadingDateChange(event.target.value)}
-        className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+        className="w-full bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
       />
 
       <p className="text-[11px] text-faint mb-3">Her motor için yük ve fark basıncını girin, bakımda/yedek olanları işaretleyin.</p>

@@ -63,7 +63,7 @@ export default function Sidebar() {
       invalidateCachedFetch("/api/auth/me");
       notifyAuthChanged();
       toast.dismiss(loadingToast);
-      toast.success("Güvenli çıkış yapıldı 👋");
+      toast.success("Güvenli çıkış yapıldı ");
       router.push("/login");
     } catch {
       toast.dismiss(loadingToast);
@@ -76,7 +76,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className={`border-b border-border px-3 pb-4 pt-5 ${collapsed ? "flex flex-col items-center gap-3" : ""}`}>
         <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""}`}>
-          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl border border-border shadow-lg">
+          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-control border border-border shadow-lg">
             <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" loading="lazy" />
           </div>
           <div className={collapsed ? "hidden" : "min-w-0"}>

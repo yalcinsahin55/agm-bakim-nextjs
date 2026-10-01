@@ -28,7 +28,7 @@ export default function BakimTuruYonetimiPage() {
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
 
-  // ➕ Yeni tür formu
+  //  Yeni tür formu
   const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newPeriod, setNewPeriod] = useState(1000);
@@ -38,7 +38,7 @@ export default function BakimTuruYonetimiPage() {
   const [addRows, setAddRows] = useState<Record<string, EngineRowState>>({});
   const [saving, setSaving] = useState(false);
 
-  // ✏️ Düzenleme formu
+  //  Düzenleme formu
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [editPeriod, setEditPeriod] = useState(0);
@@ -107,7 +107,7 @@ export default function BakimTuruYonetimiPage() {
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success(`'${newLabel}' bakım türü eklendi! 🔧`);
+        toast.success(`'${newLabel}' bakım türü eklendi! `);
         setNewLabel(""); setNewPeriod(1000); setNewWorkDomains(["mechanical"]); setNewAllowElectromechanicalSupport(false); setNewAllowElectromechanicalResponsible(false); setAddRows({}); setShowAdd(false);
         invalidateMaintenancePanel();
         refreshNotifications();
@@ -170,7 +170,7 @@ export default function BakimTuruYonetimiPage() {
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Bakım türü güncellendi! ✅");
+        toast.success("Bakım türü güncellendi! ");
         setEditingKey(null);
         invalidateMaintenancePanel();
         refreshNotifications();
@@ -243,7 +243,7 @@ export default function BakimTuruYonetimiPage() {
       <div>
         <TopBar title="Bakım Türü Yönetimi" subtitle="" />
         <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-3" />
+          <Skeleton className="h-12 w-full rounded-control mb-3" />
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2">
             <Skeleton className="h-28 rounded-card" />
             <Skeleton className="h-28 rounded-card" />
@@ -262,7 +262,7 @@ export default function BakimTuruYonetimiPage() {
         <TopBar title="Bakım Türü Yönetimi" subtitle="" />
         <div className="px-4 py-4">
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🔒</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Bu sayfa yalnızca yöneticiler içindir.</p>
           </div>
         </div>
@@ -284,11 +284,11 @@ export default function BakimTuruYonetimiPage() {
             }
             setShowAdd((s) => !s);
           }}
-          className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
+          className={`w-full py-3 rounded-control font-bold text-[13px] mb-3 transition-all ${
             showAdd ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"
           }`}
         >
-          {showAdd ? "✕ Kapat" : "➕ Yeni Bakım Türü Ekle"}
+          {showAdd ? " Kapat" : " Yeni Bakım Türü Ekle"}
         </button>
 
         {showAdd && (
@@ -314,7 +314,7 @@ export default function BakimTuruYonetimiPage() {
 
         {sortedTypes.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🧰</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Henüz bakım türü eklenmemiş.</p>
           </div>
         ) : (

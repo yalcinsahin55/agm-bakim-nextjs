@@ -82,7 +82,7 @@ export default function PushNotificationToggle() {
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-border bg-panel2 p-3">
+    <div className="mt-4 rounded-control border border-border bg-panel2 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[12.5px] font-bold text-text">Tarayıcı bildirimi</div>

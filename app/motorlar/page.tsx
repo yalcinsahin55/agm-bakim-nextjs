@@ -158,7 +158,7 @@ export default function MotorlarPage() {
       const data = await res.json() as EngineResponse;
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success(`${data.name} eklendi! ⚙️`);
+        toast.success(`${data.name} eklendi! `);
         setShowAdd(false);
         setNewName(""); setNewHours(""); setNewLoad("");
         void reload();
@@ -197,9 +197,9 @@ export default function MotorlarPage() {
         right={canAdd ? (
           <button
             onClick={() => setShowAdd((s) => !s)}
-            className="px-3 py-2 rounded-lg bg-amber text-[#161006] text-[12px] font-extrabold shadow hover:brightness-110 active:scale-95 transition"
+            className="px-3 py-2 rounded-lg bg-amber text-on-amber text-[12px] font-extrabold shadow hover:brightness-110 active:scale-95 transition"
           >
-            {showAdd ? "✕ Vazgeç" : "＋ Yeni Motor"}
+            {showAdd ? " Vazgeç" : "＋ Yeni Motor"}
           </button>
         ) : undefined}
       />
@@ -224,10 +224,10 @@ export default function MotorlarPage() {
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Motor ara..."
             aria-label="Motor ara"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[12px] text-text outline-none transition placeholder:text-faint focus:border-teal"
+            className="min-w-0 flex-1 rounded-control border border-border bg-panel2 px-3 py-2.5 text-[12px] text-text outline-none transition placeholder:text-faint focus:border-teal"
           />
-          {searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="flex-shrink-0 rounded-xl border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text" aria-label="Motor aramasını temizle">Temizle</button>}
-          <div className="flex flex-shrink-0 items-center rounded-xl border border-border bg-panel2 px-2.5 text-[10px] font-bold text-muted">Sırala: Motor no</div>
+          {searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="flex-shrink-0 rounded-control border border-border bg-panel2 px-3 py-2.5 text-[11px] font-bold text-muted transition hover:border-amber/50 hover:text-text" aria-label="Motor aramasını temizle">Temizle</button>}
+          <div className="flex flex-shrink-0 items-center rounded-control border border-border bg-panel2 px-2.5 text-[10px] font-bold text-muted">Sırala: Motor no</div>
         </div>
         <div className="mb-3 text-[11px] text-muted" aria-live="polite">{visibleEngines.length} / {sorted.length} motor gösteriliyor</div>
         {showAdd && (
@@ -258,13 +258,13 @@ export default function MotorlarPage() {
         </div>
         {sorted.length === 0 && (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
-            <div className="text-4xl mb-3">⚙️</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Henüz motor eklenmemiş.</p>
           </div>
         )}
         {sorted.length > 0 && visibleEngines.length === 0 && (
           <div className="text-center py-10 bg-panel border border-border rounded-card">
-            <div className="text-3xl mb-3">🔎</div>
+            <div className="text-3xl mb-3"></div>
             <p className="text-sm text-muted">Aramanla eşleşen motor bulunamadı.</p>
             <button type="button" onClick={() => setSearchTerm("")} className="mt-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[11px] font-bold text-teal">Aramayı temizle</button>
           </div>

@@ -129,7 +129,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ke
     await applyEngineStatePatches(patches);
   }
 
-  // 🎯 Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
+  // Motor bazlı periyot / son bakım saati düzeltme (yeni özellik)
   if (isObjectRecord(engine_states)) {
     const patches = Object.entries(engine_states)
       .filter(([engineId]) => isSafeMongoPathSegment(engineId))

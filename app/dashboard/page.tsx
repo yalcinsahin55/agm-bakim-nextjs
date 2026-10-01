@@ -104,7 +104,7 @@ export default function DashboardPage() {
           <Skeleton className="h-6 w-40 mb-3" />
           <Skeleton className="h-28 w-full rounded-card mb-5" />
           <Skeleton className="h-6 w-48 mb-3" />
-          <div className="flex flex-col gap-2 mb-5"><Skeleton className="h-20 rounded-xl" /><Skeleton className="h-20 rounded-xl" /><Skeleton className="h-20 rounded-xl" /></div>
+          <div className="flex flex-col gap-2 mb-5"><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /></div>
         </div>
         <BottomNav />
       </div>
@@ -194,7 +194,7 @@ export default function DashboardPage() {
             const statusView = ENGINE_STATUS_VIEW[status];
             const selected = selectedHealthEngineId === engine._id;
             return <div id={healthCardId(engine._id)} key={engine._id} className="flex scroll-mt-24 flex-col gap-2">
-              <button type="button" onClick={() => setSelectedHealthEngineId(selected ? "" : engine._id)} aria-expanded={selected} className={`rounded-xl border bg-panel p-3 text-left transition hover:border-amber/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber shadow-lg shadow-amber/10" : "border-border"}`}>
+              <button type="button" onClick={() => setSelectedHealthEngineId(selected ? "" : engine._id)} aria-expanded={selected} className={`rounded-control border bg-panel p-3 text-left transition hover:border-amber/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber ${selected ? "border-amber shadow-lg shadow-amber/10" : "border-border"}`}>
                 <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-bold text-text"><span className={`h-2 w-2 flex-shrink-0 rounded-full ${statusView.dot}`} aria-hidden="true" />{engine.name}</span><span className={`font-mono text-lg font-extrabold ${statusView.text}`}>%{score}</span></div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel2"><div className={`h-full rounded-full bg-gradient-to-r ${statusView.bar}`} style={{ width: `${score}%` }} /></div>
                 <div className="mt-1 flex items-center justify-between gap-2 text-[10px]"><span className={statusView.text}>{statusView.label}</span><span className="text-faint">{attention ? `${attention} bakım maddesi dikkat istiyor` : "Tüm bakım maddeleri normal"}</span></div>

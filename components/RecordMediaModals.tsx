@@ -1,6 +1,7 @@
 "use client";
 
 import PdfPreview from "@/components/PdfPreview";
+import AppIcon from "@/components/ui/AppIcon";
 import type { ReportAttachment } from "@/lib/types";
 
 interface SelectedReportAttachment {
@@ -44,7 +45,7 @@ export default function RecordMediaModals({
           >
             <div className="mb-2 flex min-h-10 items-center justify-between gap-2 border-b border-border pb-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-bold text-text">📄 {selectedReportAttachment.attachment.filename}</div>
+                <div className="truncate text-[12px] font-bold text-text"> {selectedReportAttachment.attachment.filename}</div>
                 <div className="mt-0.5 text-[10px] text-faint">PDF önizleme · bakım kaydı içinde</div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-1.5">
@@ -60,9 +61,7 @@ export default function RecordMediaModals({
                   onClick={onCloseReportAttachment}
                   className="h-8 w-8 rounded-full border border-border bg-panel2 text-text hover:bg-red hover:text-white"
                   aria-label="PDF önizlemesini kapat"
-                >
-                  ✕
-                </button>
+                ><AppIcon name="close" size={15} /></button>
               </div>
             </div>
             <PdfPreview
@@ -85,10 +84,8 @@ export default function RecordMediaModals({
               onClick={onCloseVideo}
               className="absolute -top-10 right-0 w-8 h-8 rounded-full bg-panel text-text text-lg hover:bg-red hover:text-white transition"
               aria-label="Videoyu kapat"
-            >
-              ✕
-            </button>
-            <video controls autoPlay className="w-full max-h-[80vh] rounded-xl border border-border bg-black">
+            ><AppIcon name="close" size={15} /></button>
+            <video controls autoPlay className="w-full max-h-[80vh] rounded-control border border-border bg-black">
               <source src={selectedVideo.src} />
             </video>
           </div>

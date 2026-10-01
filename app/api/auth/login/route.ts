@@ -30,7 +30,7 @@ async function postLogin(req: NextRequest) {
     const { password } = parsed.data;
     const identifier = parsed.data.identifier || parsed.data.phone || parsed.data.email || "";
     const normalizedIdentifier = isValidPhone(identifier) ? normalizePhone(identifier) : identifier.toLowerCase().trim();
-    // 🔒 IP ve gerçek normalize edilmiş identifier limitleri tek Redis kararında uygulanır.
+    // IP ve gerçek normalize edilmiş identifier limitleri tek Redis kararında uygulanır.
     const clientIp = getClientIp(req);
     const rateLimitRequests = [
       { scope: "login-identifier-v2", limit: 8, windowMs: 10 * 60 * 1000, identity: normalizedIdentifier },

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useDialogA11y } from "@/lib/useDialogA11y";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface LightboxProps {
   src: string | null;
@@ -54,9 +55,7 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
         onClick={onClose}
         className="absolute top-4 right-4 w-9 h-9 rounded-full bg-panel text-text text-lg hover:bg-red hover:text-white transition"
         aria-label="Kapat"
-      >
-        ✕
-      </button>
+      ><AppIcon name="close" size={17} /></button>
       <div
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -73,7 +72,7 @@ export default function Lightbox({ src, alt = "", onClose }: LightboxProps) {
           height={1200}
           unoptimized
           sizes="(max-width: 768px) 92vw, 85vw"
-          className="h-auto max-h-[85vh] w-auto max-w-full rounded-xl border border-border object-contain shadow-2xl"
+          className="h-auto max-h-[85vh] w-auto max-w-full rounded-control border border-border object-contain shadow-2xl"
         />
       </div>
       <div className="absolute bottom-4 left-0 right-0 text-center text-[11px] text-faint">

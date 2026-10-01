@@ -8,6 +8,10 @@ import type { ReportAttachment, VideoRef } from "@/lib/types";
 type CompletionEvidenceSectionProps = {
   techNote: string;
   setTechNote: Dispatch<SetStateAction<string>>;
+  delayReason: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other" | "";
+  setDelayReason: Dispatch<SetStateAction<"planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other" | "">>;
+  delayNote: string;
+  setDelayNote: Dispatch<SetStateAction<string>>;
   photos: string[];
   videos: VideoRef[];
   reportAttachments: ReportAttachment[];
@@ -30,6 +34,10 @@ type CompletionEvidenceSectionProps = {
 export default function CompletionEvidenceSection({
   techNote,
   setTechNote,
+  delayReason,
+  setDelayReason,
+  delayNote,
+  setDelayNote,
   photos,
   videos,
   reportAttachments,
@@ -59,6 +67,16 @@ export default function CompletionEvidenceSection({
         Bakımcı notu
         <textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" />
       </label>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Gecikme nedeni (varsa)
+          <select value={delayReason} onChange={(event) => setDelayReason(event.target.value as typeof delayReason)} className="mt-1.5 w-full rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" aria-label="Bakım gecikme nedeni">
+            <option value="">Belirtilmedi</option><option value="planned">Planlı bekleme</option><option value="parts">Parça bekleniyor</option><option value="availability">Personel uygunluğu</option><option value="technical">Teknik sorun</option><option value="weather">Hava koşulları</option><option value="external">Dış hizmet / tedarikçi</option><option value="other">Diğer</option>
+          </select>
+        </label>
+        <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">Gecikme açıklaması
+          <input value={delayNote} onChange={(event) => setDelayNote(event.target.value)} maxLength={500} placeholder="Kısa açıklama (isteğe bağlı)" className="mt-1.5 w-full rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" />
+        </label>
+      </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <label className="flex min-h-[84px] cursor-pointer items-center justify-center rounded-lg border border-dashed border-border px-3 py-3 text-center text-[10px] text-muted hover:border-amber/60">
           <span>{photoBusy ? "Fotoğraflar işleniyor..." : "Fotoğraf ekle"}<span className="mt-1 block text-[9px] text-faint">Birden fazla seçebilirsiniz</span></span>

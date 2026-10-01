@@ -81,7 +81,7 @@ export default function BottomNav() {
       invalidateCachedFetch("/api/auth/me");
       notifyAuthChanged();
       toast.dismiss(loadingToast);
-      toast.success("Güvenli çıkış yapıldı 👋");
+      toast.success("Güvenli çıkış yapıldı ");
       router.push("/login");
     } catch {
       toast.dismiss(loadingToast);
@@ -100,7 +100,7 @@ export default function BottomNav() {
               <Link
                 key={item.href} href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
+                className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-0 py-1 text-center transition ${active ? "text-amber" : "text-faint hover:text-muted"}`}
               >
                 <span className="relative flex h-6 items-center justify-center leading-none">
                   <AppIcon name={item.icon} size={20} className={`transition-transform duration-150 ${active ? "-translate-y-0.5" : ""}`} />
@@ -120,7 +120,7 @@ export default function BottomNav() {
             onClick={handleLogout}
             onPointerDown={() => triggerHaptic("light")}
             aria-label="Çıkış Yap"
-            className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-0 py-1 text-center text-faint transition hover:text-red"
+            className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-0 py-1 text-center text-faint transition hover:text-red"
           >
             <span className="flex h-6 items-center justify-center"><AppIcon name="logout" size={20} /></span>
             <span className="max-w-full truncate text-[9.5px] font-bold">Çıkış</span>

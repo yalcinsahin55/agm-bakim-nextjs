@@ -16,7 +16,7 @@ export default function EquipmentInfoAddForm({ engineNamesWithoutCard, engineNam
     <div className="bg-panel border border-amber/40 rounded-card p-3.5 mb-4 animate-fade-in">
       <label className="text-[10.5px] font-bold text-muted uppercase tracking-wide block mb-1">Motor</label>
       {engineNamesWithoutCard.length > 0 ? (
-        <select value={engineName} onChange={(event) => onEngineNameChange(event.target.value)} className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition">
+        <select value={engineName} onChange={(event) => onEngineNameChange(event.target.value)} className="w-full bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition">
           <option value="">Seçiniz...</option>
           {engineNamesWithoutCard.map((name) => <option key={name} value={name}>{name}</option>)}
           <option value="__custom__">Listede yok, adını yazacağım...</option>
@@ -27,17 +27,17 @@ export default function EquipmentInfoAddForm({ engineNamesWithoutCard, engineNam
           value={engineName === "__custom__" ? "" : engineName}
           onChange={(event) => onEngineNameChange(event.target.value)}
           placeholder="Motor adı (örn. AGM 40)"
-          className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition"
+          className="w-full bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm mb-3 outline-none focus:border-teal transition"
         />
       )}
       <EquipmentFieldInputs values={fields} onChange={onFieldChange} />
-      <button onClick={onSave} disabled={adding} className="w-full mt-3 py-2.5 rounded-xl bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
+      <button onClick={onSave} disabled={adding} className="w-full mt-3 py-2.5 rounded-control bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[13px] disabled:opacity-50 hover:brightness-110 transition">
         {adding ? (
           <span className="inline-flex items-center gap-2">
             <span className="w-4 h-4 border-2 border-on-amber/40 border-t-on-amber rounded-full animate-spin" />
             Ekleniyor...
           </span>
-        ) : "💾 Motor Bilgisini Kaydet"}
+        ) : " Motor Bilgisini Kaydet"}
       </button>
     </div>
   );

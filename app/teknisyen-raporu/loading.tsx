@@ -7,7 +7,7 @@ export default function Loading() {
         <Skeleton className="h-5 w-40 rounded" />
       </div>
       <div className="px-4 py-4 flex flex-col gap-3">
-        <Skeleton className="h-12 w-full rounded-xl" />
+        <Skeleton className="h-12 w-full rounded-control" />
         <Skeleton className="h-24 w-full rounded-card" />
         <Skeleton className="h-24 w-full rounded-card" />
         <Skeleton className="h-24 w-full rounded-card" />

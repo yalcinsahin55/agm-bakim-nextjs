@@ -20,6 +20,8 @@ export async function insertCreatedMaintenanceRecord(params: {
   maintenanceDurationMinutes: number | null;
   note?: string;
   technicianNote?: string;
+  delayReason?: MaintenanceRecordDocument["delay_reason"];
+  delayNote?: string;
   photosB64?: string[];
   photos?: string[];
   videos?: MaintenanceRecordDocument["videos"];
@@ -62,6 +64,8 @@ export async function insertCreatedMaintenanceRecord(params: {
     maintenanceDurationMinutes,
     note,
     technicianNote,
+    delayReason,
+    delayNote,
     photosB64,
     photos,
     videos,
@@ -109,6 +113,8 @@ export async function insertCreatedMaintenanceRecord(params: {
       : {}),
     note: isPrimary ? note || "" : "",
     technician_note: isPrimary ? technicianNote || "" : "",
+    ...(isPrimary && delayReason ? { delay_reason: delayReason } : {}),
+    ...(isPrimary && delayNote?.trim() ? { delay_note: delayNote.trim() } : {}),
     photos_b64: isPrimary ? photosB64 || [] : [],
     photos: isPrimary ? photos || [] : [],
     videos: isPrimary ? videos || [] : [],

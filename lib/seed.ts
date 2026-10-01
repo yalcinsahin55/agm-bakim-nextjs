@@ -18,7 +18,7 @@ declare global {
  * verilerle motorları ve bakım türlerini doldurur. Var olan kayıtların
  * üzerine yazmaz — güvenle tekrar tekrar çağrılabilir.
  *
- * 🚀 OPTİMİZE: İlk çağrıda seed yapar, sonraki çağrılarda atlar.
+ *  OPTİMİZE: İlk çağrıda seed yapar, sonraki çağrılarda atlar.
  */
 export async function seedIfEmpty(db: Db): Promise<void> {
   if (global._seeded) return;
@@ -103,6 +103,6 @@ export async function seedIfEmpty(db: Db): Promise<void> {
     await pressureCol.insertMany(docs);
   }
 
-  // ✅ Seed tamamlandı, sonraki çağrılarda atla
+  //  Seed tamamlandı, sonraki çağrılarda atla
   global._seeded = true;
 }

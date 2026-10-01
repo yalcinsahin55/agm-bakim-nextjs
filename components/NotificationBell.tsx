@@ -50,7 +50,7 @@ export default function NotificationBell() {
     <Link
       href="/bildirimler"
       aria-label={unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : "Bildirimler"}
-      className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-panel2 text-base text-muted transition hover:border-amber/40 hover:text-amber"
+      className="relative flex h-9 w-9 items-center justify-center rounded-control border border-border bg-panel2 text-base text-muted transition hover:border-amber/40 hover:text-amber"
     >
       <AppIcon name="bell" size={17} />
       {unreadCount > 0 && (

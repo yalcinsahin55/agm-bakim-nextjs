@@ -115,7 +115,7 @@ export default function TahminPage() {
       <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
         <section className="bg-panel border border-border rounded-card p-4 md:p-5">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal/15 text-teal flex items-center justify-center text-lg font-bold flex-shrink-0" aria-hidden="true">24</div>
+            <div className="w-10 h-10 rounded-control bg-teal/15 text-teal flex items-center justify-center text-lg font-bold flex-shrink-0" aria-hidden="true">24</div>
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.16em] text-teal font-bold">Planlama notu</p>
               <h1 className="text-base md:text-lg font-bold text-text mt-1">Motor saati bazlı en geç bakım tahmini</h1>
@@ -189,7 +189,7 @@ export default function TahminPage() {
               <div className="w-12 h-12 mx-auto rounded-full bg-panel2 flex items-center justify-center text-amber font-bold text-xl" aria-hidden="true">—</div>
               <p className="text-sm text-text font-semibold mt-3">Bu filtrelerle eşleşen tahmin yok.</p>
               <p className="text-xs text-muted mt-1">Tüm bakım planlarını görmek için filtreleri temizleyebilirsin.</p>
-              {hasActiveFilter && <button type="button" onClick={clearFilters} className="mt-4 px-4 py-2 rounded-lg bg-amber text-[#161006] text-xs font-bold">Filtreleri temizle</button>}
+              {hasActiveFilter && <button type="button" onClick={clearFilters} className="mt-4 px-4 py-2 rounded-lg bg-amber text-on-amber text-xs font-bold">Filtreleri temizle</button>}
             </div>
           ) : (
             <>

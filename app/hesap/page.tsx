@@ -64,9 +64,9 @@ export default function HesapPage() {
           <div className="mx-auto max-w-xl animate-pulse rounded-card border border-border bg-panel p-5">
             <div className="h-5 w-40 rounded bg-panel2" />
             <div className="mt-3 h-4 w-64 rounded bg-panel2" />
-            <div className="mt-6 h-11 rounded-xl bg-panel2" />
-            <div className="mt-2 h-11 rounded-xl bg-panel2" />
-            <div className="mt-2 h-11 rounded-xl bg-panel2" />
+            <div className="mt-6 h-11 rounded-control bg-panel2" />
+            <div className="mt-2 h-11 rounded-control bg-panel2" />
+            <div className="mt-2 h-11 rounded-control bg-panel2" />
           </div>
         </div>
         <BottomNav />
@@ -80,7 +80,7 @@ export default function HesapPage() {
         <TopBar title="Hesap ve Şifre" />
         <div className="px-4 py-4">
           <div className="mx-auto max-w-xl rounded-card border border-red/30 bg-panel p-5 text-center">
-            <div className="text-3xl">🔒</div>
+            <div className="text-3xl"></div>
             <p className="mt-3 text-sm text-red">{error || "Oturum gerekli."}</p>
           </div>
         </div>
@@ -109,7 +109,7 @@ export default function HesapPage() {
                 minLength={6}
                 maxLength={128}
                 required
-                className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
+                className="rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
               />
             </label>
             <label className="flex flex-col gap-1 text-[11px] font-bold text-muted">
@@ -122,7 +122,7 @@ export default function HesapPage() {
                 minLength={6}
                 maxLength={128}
                 required
-                className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
+                className="rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
               />
             </label>
             <label className="flex flex-col gap-1 text-[11px] font-bold text-muted">
@@ -135,10 +135,10 @@ export default function HesapPage() {
                 minLength={6}
                 maxLength={128}
                 required
-                className="rounded-xl border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
+                className="rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm font-normal text-text outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/20"
               />
             </label>
-            <button type="submit" disabled={saving} className="mt-1 rounded-xl bg-teal px-3 py-3 text-[13px] font-extrabold text-on-teal transition hover:brightness-110 disabled:opacity-50">
+            <button type="submit" disabled={saving} className="mt-1 rounded-control bg-teal px-3 py-3 text-[13px] font-extrabold text-on-teal transition hover:brightness-110 disabled:opacity-50">
               {saving ? "Değiştiriliyor..." : "Şifremi değiştir"}
             </button>
           </form>

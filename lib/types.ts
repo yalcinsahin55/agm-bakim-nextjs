@@ -1,4 +1,4 @@
-// 📚 Ortak tip tanımları — tüm uygulama bu tipleri kullanacak
+//  Ortak tip tanımları — tüm uygulama bu tipleri kullanacak
 
 export type Role = "yonetici" | "planlamaci" | "teknisyen" | "goruntuleyici";
 export type TechnicianType = "mekanik" | "elektromekanik";
@@ -118,6 +118,8 @@ export interface MaintenanceRecord {
   maintenance_duration_minutes?: number;
   note?: string;
   technician_note?: string;
+  delay_reason?: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other";
+  delay_note?: string;
   photos_b64?: string[];
   photos?: string[];
   videos?: (VideoRef | string)[];

@@ -1,4 +1,4 @@
-// 📦 JSON verilerini JS katmanından geçiririz:
+//  JSON verilerini JS katmanından geçiririz:
 // TypeScript'in büyük JSON dosyalarını tip-check etmesini engeller
 // (build süresi ve bellek kullanımı için).
 import seedData from "./seed_data.json";

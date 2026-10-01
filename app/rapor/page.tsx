@@ -178,7 +178,7 @@ export default function RaporPage() {
     return (
       <div>
         <TopBar title="Motor Bakım Raporu" />
-        <div className="px-4 py-4"><Skeleton className="mb-4 h-12 w-full rounded-xl" /><Skeleton className="h-96 rounded-card" /></div>
+        <div className="px-4 py-4"><Skeleton className="mb-4 h-12 w-full rounded-control" /><Skeleton className="h-96 rounded-card" /></div>
         <BottomNav />
       </div>
     );
@@ -190,22 +190,22 @@ export default function RaporPage() {
       <div className="print-hide"><TopBar title="Motor Bakım Raporu" subtitle="Yazdırılabilir bakım geçmişi" /></div>
       <div className="print-hide px-4 py-4">
         <div className="flex flex-wrap gap-2">
-          <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
+          <select value={engineId} onChange={(event) => setEngineId(event.target.value)} className="min-w-0 flex-1 bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-control border border-border">
             {engines.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
           </select>
-          <select value={reportScope} onChange={(event) => setReportScope(event.target.value as "all" | "month")} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border">
+          <select value={reportScope} onChange={(event) => setReportScope(event.target.value as "all" | "month")} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-control border border-border">
             <option value="all">Tüm geçmiş</option>
             <option value="month">Ay seç</option>
           </select>
-          {reportScope === "month" && <input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-xl border border-border" aria-label="Rapor ayı" />}
-          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-xl bg-gradient-to-b from-amber-bright to-amber px-4 py-2.5 text-[13px] font-extrabold text-on-amber transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : "🖨️ Yazdır / PDF"}</button>
+          {reportScope === "month" && <input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className="bg-panel2 px-3 py-2.5 text-sm outline-none transition focus:border-teal rounded-control border border-border" aria-label="Rapor ayı" />}
+          <button onClick={() => void printReport()} disabled={loadingRecords} className="flex-shrink-0 rounded-control bg-gradient-to-b from-amber-bright to-amber px-4 py-2.5 text-[13px] font-extrabold text-on-amber transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">{loadingRecords ? "Hazırlanıyor..." : " Yazdır / PDF"}</button>
         </div>
         <p className="mt-2 text-[10.5px] text-faint">{reportScope === "month" ? `${reportMonth} ayına ait kayıtlar gösteriliyor.` : "Seçili motorun tüm bakım geçmişi gösteriliyor."} Yazdır seçildiğinde aynı kapsamın tamamı yüklenir; tarayıcı penceresinde “PDF olarak kaydet” seçebilirsiniz.</p>
       </div>
 
       <div className="px-4 pb-28 md:pb-8">
         {loadingRecords ? <div className="py-16 text-center text-sm text-muted">Kayıtlar yükleniyor...</div> : (
-          <div id="rapor" className="rounded-xl border border-gray-300 bg-white p-4 text-gray-900 shadow-xl sm:p-6 md:p-8">
+          <div id="rapor" className="rounded-control border border-gray-300 bg-white p-4 text-gray-900 shadow-xl sm:p-6 md:p-8">
             <div className="mb-5 border-b-2 border-gray-800 pb-4 text-center"><div className="text-[18px] font-extrabold uppercase tracking-wide">Avcıkoru Santrali Bakım Merkezi</div><div className="mt-1 text-[12px] text-gray-600">Motor Bakım Raporu</div><div className="mt-1 text-[10px] text-gray-500">Rapor Tarihi: {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</div></div>
 
             <div className="mb-5 grid min-w-0 grid-cols-2 gap-3 text-[11px] md:grid-cols-4">

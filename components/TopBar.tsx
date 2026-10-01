@@ -16,7 +16,7 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {/* Mobilde logo göster, PC'de sidebar'da zaten var */}
-          <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-xl border border-border shadow">
+          <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-control border border-border shadow">
             <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="36px" className="object-cover" priority />
           </div>
           <div className="min-w-0">

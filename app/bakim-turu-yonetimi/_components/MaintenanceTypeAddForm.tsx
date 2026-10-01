@@ -46,18 +46,18 @@ export default function MaintenanceTypeAddForm({
         placeholder="Bakım türü adı (örn. Egzoz Valfi Kontrolü)"
         value={label}
         onChange={(event) => onLabelChange(event.target.value)}
-        className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
+        className="bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition"
       />
       <input
         type="number"
         placeholder="Varsayılan periyodik bakım saati"
         value={period}
         onChange={(event) => onPeriodChange(Number(event.target.value))}
-        className="bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
+        className="bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm font-mono outline-none focus:border-teal transition"
       />
-      <div className="rounded-xl border border-border bg-panel2 p-3">
+      <div className="rounded-control border border-border bg-panel2 p-3">
         <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div>
-        <div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => onToggleDomain(domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${workDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{workDomains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div>
+        <div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => onToggleDomain(domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${workDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{workDomains.includes(domain) ? " " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div>
         <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={allowElectromechanicalSupport} onChange={(event) => onAllowElectromechanicalSupportChange(event.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={allowElectromechanicalResponsible} onChange={(event) => onAllowElectromechanicalResponsibleChange(event.target.checked)} />Elektromekanik sorumlu olabilir</label></div>
         <p className="mt-1.5 text-[10px] text-faint">Eski bakım türleri mekanik kabul edilir. Elektromekanik çalışanları ilgili alanda kullanmak için destek seçeneğini açın.</p>
       </div>
@@ -91,7 +91,7 @@ export default function MaintenanceTypeAddForm({
       <button
         onClick={onSave}
         disabled={saving || !label.trim()}
-        className="py-3 rounded-xl bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+        className="py-3 rounded-control bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
       >
         {saving ? (
           <span className="inline-flex items-center gap-2">

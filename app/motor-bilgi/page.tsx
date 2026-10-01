@@ -38,6 +38,7 @@ export default function MotorBilgiPage() {
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ updated?: number; changes?: Array<{ row: number; engine: string }> } | null>(null);
 
   const [showAdd, setShowAdd] = useState(false);
   const [newEngineName, setNewEngineName] = useState("");
@@ -63,7 +64,7 @@ export default function MotorBilgiPage() {
     return safeEngines.map((e) => e.name || "").filter((n) => n && !existing.has(n)).sort((a, b) => engineSortKey(a) - engineSortKey(b));
   }, [items, engines]);
 
-  async function doImport() {
+  async function doImport(previewOnly = false) {
     if (!importFile) {
       toast.error("Lütfen bir Excel dosyası seçin.");
       return;
@@ -73,13 +74,18 @@ export default function MotorBilgiPage() {
     try {
       const file_b64 = await fileToBase64(importFile);
       const res = await fetch("/api/equipment-info/import", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64 }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64, preview: previewOnly }),
       });
-      const data = await res.json() as EquipmentResponse;
-      if (res.ok) {
+      const data = await res.json() as EquipmentResponse & { updated?: number; changes?: Array<{ row: number; engine: string }> };
+      if (previewOnly) {
         toast.dismiss(loadingToast);
-        toast.success(`${data.updated} motor güncellendi! 📥`);
+        setImportPreview(data);
+        toast.success(`${data.updated || 0} satır önizlendi.`);
+      } else if (res.ok) {
+        toast.dismiss(loadingToast);
+        toast.success(`${data.updated} motor güncellendi! `);
         setImportFile(null);
+        setImportPreview(null);
         setShowImport(false);
         void reload();
       } else {
@@ -110,7 +116,7 @@ export default function MotorBilgiPage() {
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Motor bilgisi güncellendi! ✅");
+        toast.success("Motor bilgisi güncellendi! ");
         setEditingId(null);
         void reload();
       } else {
@@ -140,7 +146,7 @@ export default function MotorBilgiPage() {
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Motor bilgisi eklendi! 🛠️");
+        toast.success("Motor bilgisi eklendi! ");
         setNewEngineName(""); setNewFields(emptyForm()); setShowAdd(false);
         void reload();
       } else {
@@ -162,10 +168,10 @@ export default function MotorBilgiPage() {
         <TopBar title="Motor Bilgi Kartı" />
         <div className="px-4 py-4">
           <div className="grid grid-cols-2 gap-2 mb-3">
-            <Skeleton className="h-10 rounded-xl" />
-            <Skeleton className="h-10 rounded-xl" />
+            <Skeleton className="h-10 rounded-control" />
+            <Skeleton className="h-10 rounded-control" />
           </div>
-          <Skeleton className="h-12 w-full rounded-xl mb-3" />
+          <Skeleton className="h-12 w-full rounded-control mb-3" />
           <div className="flex flex-col gap-2">
             <Skeleton className="h-32 rounded-card" />
             <Skeleton className="h-32 rounded-card" />
@@ -185,11 +191,11 @@ export default function MotorBilgiPage() {
         {canEdit && (
           <>
             <div className="grid grid-cols-2 gap-2 mb-3">
-              <button onClick={() => { setShowAdd((s) => !s); setShowImport(false); }} className={`py-2.5 rounded-xl font-bold text-[12px] transition-all ${showAdd ? "border border-border text-muted hover:bg-panel2" : "border border-amber/40 bg-amber/10 text-amber hover:bg-amber/20"}`}>
-                {showAdd ? "✕ Kapat" : "➕ Yeni Motor"}
+              <button onClick={() => { setShowAdd((s) => !s); setShowImport(false); }} className={`py-2.5 rounded-control font-bold text-[12px] transition-all ${showAdd ? "border border-border text-muted hover:bg-panel2" : "border border-amber/40 bg-amber/10 text-amber hover:bg-amber/20"}`}>
+                {showAdd ? " Kapat" : " Yeni Motor"}
               </button>
-              <button onClick={() => { setShowImport((s) => !s); setShowAdd(false); }} className={`py-2.5 rounded-xl font-bold text-[12px] transition-all ${showImport ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
-                {showImport ? "✕ Kapat" : "📥 Excel'den"}
+              <button onClick={() => { setShowImport((s) => !s); setShowAdd(false); }} className={`py-2.5 rounded-control font-bold text-[12px] transition-all ${showImport ? "border border-border text-muted hover:bg-panel2" : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"}`}>
+                {showImport ? " Kapat" : " Excel'den"}
               </button>
             </div>
 
@@ -209,21 +215,23 @@ export default function MotorBilgiPage() {
               <EquipmentInfoImportPanel
                 importFile={importFile}
                 importing={importing}
-                onFileChange={setImportFile}
-                onImport={doImport}
+                onFileChange={(file) => { setImportFile(file); setImportPreview(null); }}
+                preview={importPreview}
+                onPreview={() => void doImport(true)}
+                onImport={() => void doImport(false)}
               />
             )}
           </>
         )}
 
         <div className="relative mb-3">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm">🔍</span>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara..." className="w-full bg-panel2 border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm"></span>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara..." className="w-full bg-panel2 border border-border rounded-control pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
         </div>
 
         {rows.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🛠️</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">{query ? "Arama sonucu bulunamadı." : "Henüz motor bilgisi eklenmemiş."}</p>
             {query && (
               <button onClick={() => setQuery("")} className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition">

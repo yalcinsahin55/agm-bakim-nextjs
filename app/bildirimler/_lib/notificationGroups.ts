@@ -13,7 +13,7 @@ export type NotificationGroup = {
 export const GROUP_CONFIG: Record<GroupStatus, { title: string; icon: string; summaryNoun: string; className: string; iconClassName: string; badgeClassName: string }> = {
   gecikmis: {
     title: "Gecikmiş bakımlar",
-    icon: "🚨",
+    icon: "!",
     summaryNoun: "gecikmiş bakım",
     className: "border-red/35 bg-red/[0.06]",
     iconClassName: "border-red/35 bg-red/10 text-red",

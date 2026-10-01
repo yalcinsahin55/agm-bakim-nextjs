@@ -41,7 +41,7 @@ async function postImportHours(req: NextRequest) {
       { status: bodyResult.tooLarge ? 413 : 400 },
     );
   }
-  const { file_b64, import_date: rawImportDate } = bodyResult.value as { file_b64?: unknown; import_date?: unknown };
+  const { file_b64, import_date: rawImportDate, preview } = bodyResult.value as { file_b64?: unknown; import_date?: unknown; preview?: unknown };
   if (rawImportDate !== undefined && typeof rawImportDate !== "string") {
     return NextResponse.json({ error: "Geçersiz içe aktarma tarihi." }, { status: 400 });
   }
@@ -89,20 +89,26 @@ async function postImportHours(req: NextRequest) {
     const operations: Array<{ updateOne: { filter: { _id: string }; update: UpdateFilter<EngineDocument> } }> = [];
     const snapshotEntries: Array<{ engine_id: string; date: string; hours: number; load_kw: number; source: "excel"; created_at: Date }> = [];
   const changes: Array<{ engine_id: string; engine: string; before: { hours: number; load_kw: number }; after: { hours: number; load_kw: number } }> = [];
+  const errors: Array<{ row: number; engine: string; message: string }> = [];
   let updated = 0;
 
-  for (const row of rows) {
+  for (const [rowIndex, row] of rows.entries()) {
     const name = String(row[nameCol] || "").trim();
     const hours = parseMetric(row[hourCol]);
-    if (!name || hours === null) continue;
+    if (!name || hours === null) {
+      errors.push({ row: rowIndex + 2, engine: name, message: "Motor adı veya geçerli çalışma saati bulunamadı." });
+      continue;
+    }
 
     const existing = workingEngines.get(name);
-    if (!existing) continue;
+    if (!existing) {
+      errors.push({ row: rowIndex + 2, engine: name, message: "Bu motor sistemde tanımlı değil." });
+      continue;
+    }
 
     if (hours < Number(existing.hours || 0)) {
-      return NextResponse.json({
-        error: `${String(existing.name || name)} için Excel saati geriye çekilemez. Önceki değer: ${Number(existing.hours || 0).toLocaleString("tr-TR")} saat, girilen değer: ${hours.toLocaleString("tr-TR")} saat.`,
-      }, { status: 400 });
+      errors.push({ row: rowIndex + 2, engine: String(existing.name || name), message: `Saat geriye çekilemez. Önceki: ${Number(existing.hours || 0).toLocaleString("tr-TR")}, girilen: ${hours.toLocaleString("tr-TR")} saat.` });
+      continue;
     }
 
     const setFields: Partial<Pick<EngineDocument, "hours" | "load_kw" | "updated_at">> = { updated_at: stamp };
@@ -132,6 +138,13 @@ async function postImportHours(req: NextRequest) {
       } : {}),
     });
     updated++;
+  }
+
+  if (preview === true) {
+    return NextResponse.json({ ok: errors.length === 0, preview: true, updated, changes, errors });
+  }
+  if (errors.length > 0) {
+    return NextResponse.json({ error: "Excel dosyasında doğrulama hataları var.", errors, changes }, { status: 400 });
   }
 
   if (operations.length > 0) {

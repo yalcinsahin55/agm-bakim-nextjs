@@ -28,12 +28,12 @@ export default function CompletionQuickBanner({
         <span className={`w-fit flex-shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-extrabold ${isOnline ? "border-green/30 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber"}`}>{isOnline ? "BAĞLANTI HAZIR" : "ÇEVRİMDIŞI KUYRUK"}</span>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-engine">
+        <div className="rounded-control border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-engine">
           <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Motor</div>
           <div className="mt-1 truncate text-[12px] font-extrabold text-text">{engineName || "Motor seçilecek"}</div>
           <div className="mt-1 text-[9.5px] text-muted">{qrEngineId ? "QR ile önseçildi ve kilitlendi" : "Saha başlangıcında seçin"}</div>
         </div>
-        <div className="rounded-xl border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-type">
+        <div className="rounded-control border border-teal/25 bg-panel2 px-3 py-2.5" data-testid="quick-maintenance-type">
           <div className="text-[9px] font-bold uppercase tracking-wide text-faint">Bakım türü</div>
           <div className="mt-1 truncate text-[12px] font-extrabold text-text">{typeName || "Bakım türü seçilecek"}</div>
           <div className="mt-1 text-[9.5px] text-muted">{qrTypeKey ? "QR ile önseçildi ve kilitlendi" : "Saha başlangıcında seçin"}</div>

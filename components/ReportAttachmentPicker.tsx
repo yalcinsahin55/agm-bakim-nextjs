@@ -118,7 +118,7 @@ export default function ReportAttachmentPicker({
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-purple-400/30 bg-purple-400/5 p-3">
+    <div className="mt-3 rounded-control border border-purple-400/30 bg-purple-400/5 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[10.5px] font-extrabold uppercase tracking-wide text-purple-200">Detaylı rapor ekleri</div>
@@ -138,7 +138,7 @@ export default function ReportAttachmentPicker({
                 <div className="truncate font-bold text-text">{attachment.filename}</div>
                 <div className="mt-0.5 text-[9px] text-faint">{fileTypeLabel(attachment.mime)} · {formatReportAttachmentSize(attachment.size)}{attachment.url.startsWith("offline:") ? " · bağlantı gelince yüklenecek" : ""}</div>
               </div>
-              <button type="button" onClick={() => removeAttachment(attachment)} disabled={disabled || busy} className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-bold text-red hover:bg-red/10 disabled:opacity-50" aria-label={`${attachment.filename} rapor ekini kaldır`}>✕</button>
+              <button type="button" onClick={() => removeAttachment(attachment)} disabled={disabled || busy} className="flex-shrink-0 rounded-md border border-border px-2 py-1 text-[10px] font-bold text-red hover:bg-red/10 disabled:opacity-50" aria-label={`${attachment.filename} rapor ekini kaldır`}></button>
             </div>
           ))}
         </div>

@@ -69,14 +69,14 @@ export default function MaintenanceTypeCard({
       <div className="text-[11px] text-faint mb-2">Varsayılan periyot: <span className="font-mono text-amber">{type.default_period_hours} sa</span></div>
       <div className="mb-2 flex flex-wrap gap-1"><span className="rounded-full border border-border px-2 py-0.5 text-[9px] text-muted">{(type.work_domains || ["mechanical"]).map((domain) => WORK_DOMAIN_LABELS[domain]).join(" + ")}</span>{type.allow_electromechanical_support === true && <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-2 py-0.5 text-[9px] text-purple-200">Elektromekanik destek</span>}</div>
       <div className="flex gap-2">
-        <button onClick={() => onStartEdit(type)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition">✏️ Düzenle</button>
+        <button onClick={() => onStartEdit(type)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1.5 hover:bg-teal/10 transition"> Düzenle</button>
         {confirmDelete ? (
           <>
-            <button onClick={onConfirmDelete} className="text-[11px] font-bold text-on-amber bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition">⚠️ Emin misiniz?</button>
+            <button onClick={onConfirmDelete} className="text-[11px] font-bold text-on-amber bg-red rounded-lg px-2.5 py-1.5 hover:brightness-110 transition"> Emin misiniz?</button>
             <button onClick={onCancelDelete} className="text-[11px] font-bold text-muted border border-border rounded-lg px-2.5 py-1.5 hover:bg-panel2 transition">Vazgeç</button>
           </>
         ) : (
-          <button onClick={onRequestDelete} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition">🗑️ Sil</button>
+          <button onClick={onRequestDelete} className="text-[11px] font-bold text-red border border-red/40 rounded-lg px-2.5 py-1.5 hover:bg-red/10 transition"> Sil</button>
         )}
       </div>
 
@@ -93,7 +93,7 @@ export default function MaintenanceTypeCard({
             onChange={(event) => onEditPeriodChange(Number(event.target.value))}
             className="bg-panel2 border border-border rounded-lg px-2.5 py-2 text-sm font-mono outline-none focus:border-teal transition"
           />
-          <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div><div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => onToggleDomain(domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${editWorkDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{editWorkDomains.includes(domain) ? "✓ " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div><div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalSupport} onChange={(event) => onAllowElectromechanicalSupportChange(event.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalResponsible} onChange={(event) => onAllowElectromechanicalResponsibleChange(event.target.checked)} />Elektromekanik sorumlu olabilir</label></div></div>
+          <div className="rounded-lg border border-border bg-panel2 p-2.5"><div className="text-[10px] font-bold uppercase tracking-wide text-muted">Çalışma alanı</div><div className="mt-2 flex flex-wrap gap-1.5">{WORK_DOMAINS.map((domain) => <button key={domain} type="button" onClick={() => onToggleDomain(domain)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-bold ${editWorkDomains.includes(domain) ? "border-teal/40 bg-teal/10 text-teal" : "border-border text-faint"}`}>{editWorkDomains.includes(domain) ? " " : ""}{WORK_DOMAIN_LABELS[domain]}</button>)}</div><div className="mt-2 flex flex-col gap-1.5 text-[11px] text-text"><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalSupport} onChange={(event) => onAllowElectromechanicalSupportChange(event.target.checked)} />Elektromekanik destek seçilebilir</label><label className="flex items-center gap-1.5"><input type="checkbox" checked={editAllowElectromechanicalResponsible} onChange={(event) => onAllowElectromechanicalResponsibleChange(event.target.checked)} />Elektromekanik sorumlu olabilir</label></div></div>
           <div className="grid grid-cols-[48px_1fr_1fr_1fr] gap-1.5 text-[10px] text-faint font-bold uppercase mb-1 px-0.5">
             <span>Dahil</span><span>Motor</span><span>Son Bakım Saati</span><span>Periyot</span>
           </div>
@@ -123,7 +123,7 @@ export default function MaintenanceTypeCard({
           <div className="flex gap-2">
             <button onClick={onCancelEdit} className="flex-1 py-2 rounded-lg border border-border text-muted font-bold text-[12px] hover:bg-panel2 transition">Vazgeç</button>
             <button onClick={onSave} disabled={savingEdit} className="flex-1 py-2 rounded-lg bg-teal text-on-teal font-bold text-[12px] disabled:opacity-50 hover:brightness-110 transition">
-              {savingEdit ? "..." : "💾 Kaydet"}
+              {savingEdit ? "..." : " Kaydet"}
             </button>
           </div>
         </div>

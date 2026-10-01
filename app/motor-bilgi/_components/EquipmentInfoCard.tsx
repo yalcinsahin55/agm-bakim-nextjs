@@ -20,7 +20,7 @@ export default function EquipmentInfoCard({ item, isEditing, canEdit, editFields
       <div className="flex items-center justify-between mb-1.5">
         <div className="text-[13.5px] font-bold text-text">{item.engine_name || "İsimsiz Motor"}</div>
         {canEdit && !isEditing && (
-          <button onClick={() => onStartEdit(item)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1 hover:bg-teal/10 transition">✏️ Düzenle</button>
+          <button onClick={() => onStartEdit(item)} className="text-[11px] font-bold text-teal border border-teal/40 rounded-lg px-2.5 py-1 hover:bg-teal/10 transition"> Düzenle</button>
         )}
       </div>
 
@@ -35,7 +35,7 @@ export default function EquipmentInfoCard({ item, isEditing, canEdit, editFields
                   <span className="w-3 h-3 border-2 border-on-teal/40 border-t-on-teal rounded-full animate-spin" />
                   Kaydediliyor...
                 </span>
-              ) : "💾 Kaydet"}
+              ) : " Kaydet"}
             </button>
           </div>
         </div>

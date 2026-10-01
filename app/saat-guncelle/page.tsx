@@ -79,7 +79,7 @@ export default function SaatGuncellePage() {
       if (res.ok) {
         const data = await res.json();
         toast.dismiss(loadingToast);
-        toast.success(`${data.changed} motor güncellendi! 🕒`);
+        toast.success(`${data.changed} motor güncellendi! `);
         window.dispatchEvent(new Event("notifications:refresh"));
         setValues({});
         void reload();
@@ -104,7 +104,7 @@ export default function SaatGuncellePage() {
           <Skeleton className="h-24 rounded-card" />
           <Skeleton className="h-24 rounded-card" />
           <Skeleton className="h-24 rounded-card" />
-          <Skeleton className="h-14 rounded-xl mt-2" />
+          <Skeleton className="h-14 rounded-control mt-2" />
         </div>
         <BottomNav />
       </div>
@@ -117,9 +117,9 @@ export default function SaatGuncellePage() {
         <TopBar title="Saat / Yük Güncelle" />
         <div className="px-4 py-8 text-center">
           <div className="rounded-card border border-red/30 bg-panel p-6">
-            <div className="text-4xl mb-3">⚠️</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-red">{loadError}</p>
-            <button onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <button onClick={() => { void reload(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -132,8 +132,8 @@ export default function SaatGuncellePage() {
       <TopBar title="Saat / Yük Güncelle" subtitle="Toplu motor saati ve yük güncelleme" />
       <div className="px-4 py-4">
         {!canEdit && (
-          <div className="bg-amber/10 border border-amber/30 rounded-xl px-3.5 py-3 mb-3 text-[11.5px] text-muted">
-            ⚠️ Bu sayfada değişiklik yapma yetkiniz yok, sadece görüntüleyebilirsiniz.
+          <div className="bg-amber/10 border border-amber/30 rounded-control px-3.5 py-3 mb-3 text-[11.5px] text-muted">
+             Bu sayfada değişiklik yapma yetkiniz yok, sadece görüntüleyebilirsiniz.
           </div>
         )}
 
@@ -191,7 +191,7 @@ export default function SaatGuncellePage() {
               <button
                 onClick={save}
                 disabled={saving || changedEngines.length === 0}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+                className="w-full py-3.5 rounded-control bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
               >
                 {saving ? (
                   <span className="inline-flex items-center gap-2">
@@ -199,9 +199,9 @@ export default function SaatGuncellePage() {
                     Kaydediliyor...
                   </span>
                 ) : changedEngines.length > 0 ? (
-                  `💾 ${changedEngines.length} Motoru Güncelle`
+                  ` ${changedEngines.length} Motoru Güncelle`
                 ) : (
-                  "💾 Tümünü Kaydet"
+                  " Tümünü Kaydet"
                 )}
               </button>
             </div>

@@ -8,6 +8,7 @@ import { invalidateCachedFetch } from "@/lib/apiCache";
 import { notifyAuthChanged } from "@/lib/authClient";
 import { Button } from "@/components/ui/Primitives";
 import AppIcon from "@/components/ui/AppIcon";
+import FieldError from "@/components/ui/FieldError";
 
 interface LoginForm {
   identifier: string;
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [hydrated, setHydrated] = useState(false);
   const [retryUntil, setRetryUntil] = useState<number | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -50,7 +52,7 @@ export default function LoginPage() {
   }, [retryUntil]);
 
   function handleField(field: keyof LoginForm) {
-    return (event: ChangeEvent<HTMLInputElement>) => setForm((current) => ({ ...current, [field]: event.target.value }));
+    return (event: ChangeEvent<HTMLInputElement>) => { setFormError(""); setForm((current) => ({ ...current, [field]: event.target.value })); };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -60,6 +62,7 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
+    setFormError("");
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -75,6 +78,7 @@ export default function LoginPage() {
         } else {
           toast.error(data.error || "Giriş yapılamadı.");
         }
+        setFormError(data.error || "Giriş bilgileri kontrol edilemedi.");
         return;
       }
       setRetryUntil(null);
@@ -95,6 +99,7 @@ export default function LoginPage() {
       router.replace(destination);
       router.refresh();
     } catch {
+      setFormError("Sunucuya ulaşılamadı. Lütfen tekrar deneyin.");
       toast.error("Sunucuya ulaşılamadı. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
@@ -114,35 +119,42 @@ export default function LoginPage() {
       </div>
 
       <div className="mx-auto mt-8 w-full max-w-md rounded-2xl border border-border bg-panel/70 p-5 shadow-2xl backdrop-blur-xl animate-fade-in">
-        <div className="mb-5 rounded-xl border border-teal/30 bg-teal/10 px-3 py-2.5 text-left text-[11px] text-muted">
+        <div className="mb-5 rounded-control border border-teal/30 bg-teal/10 px-3 py-2.5 text-left text-[11px] text-muted">
           <div className="font-bold text-teal">Telefon ile güvenli giriş</div>
           <div className="mt-0.5 leading-relaxed">Telefon numaranızı ve yöneticinizin oluşturduğu şifrenizi kullanın.</div>
         </div>
         <form onSubmit={submit} data-login-hydrated={hydrated ? "true" : "false"} className="flex flex-col gap-3">
-          <label className="text-left text-[10px] font-bold uppercase tracking-wide text-muted">Telefon numarası veya e-posta</label>
+          <label htmlFor="login-identifier" className="text-left text-[10px] font-bold uppercase tracking-wide text-muted">Telefon numarası veya e-posta</label>
           <input
+            id="login-identifier"
             required
             autoComplete="username"
             inputMode="tel"
             placeholder="05xx xxx xx xx"
             value={form.identifier}
             onChange={handleField("identifier")}
+            aria-invalid={Boolean(formError)}
+            aria-describedby={formError ? "login-error" : undefined}
             className="ui-control w-full px-4 py-3 text-sm"
           />
-          <label className="mt-1 text-left text-[10px] font-bold uppercase tracking-wide text-muted">Şifre</label>
+          <label htmlFor="login-password" className="mt-1 text-left text-[10px] font-bold uppercase tracking-wide text-muted">Şifre</label>
           <input
+            id="login-password"
             required
             type="password"
             autoComplete="current-password"
             placeholder="••••••••"
             value={form.password}
             onChange={handleField("password")}
+            aria-invalid={Boolean(formError)}
+            aria-describedby={formError ? "login-error" : undefined}
             className="ui-control w-full px-4 py-3 text-sm"
           />
+          <FieldError id="login-error" message={formError} />
           <Button
             disabled={loading || retryAfterSeconds > 0}
             type="submit"
-            className="mt-2 w-full rounded-xl py-3.5 text-sm font-extrabold"
+            className="mt-2 w-full rounded-control py-3.5 text-sm font-extrabold"
           >
             {loading ? (
               <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-on-amber/40 border-t-on-amber" /> Giriş yapılıyor...</span>

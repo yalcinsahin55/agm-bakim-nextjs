@@ -57,16 +57,16 @@ export default function MaintenanceDefinitionSection({
         </label>
       </div>
       {chosenItem ? (
-        <div className="mt-3 rounded-xl border border-teal/30 bg-teal/10 px-3 py-3 text-[11px] text-muted"><div className="mb-1 flex items-center justify-between gap-2"><span className="font-bold uppercase tracking-wide text-teal">Mevcut bakım takibi</span><span className="rounded-full bg-teal/15 px-2 py-1 text-[9px] font-bold text-teal">{STATUS_LABELS[chosenItem.status]}</span></div><div className="grid gap-1 sm:grid-cols-3"><span>Motor saati <b className="font-mono text-text">{chosenItem.engine_hours.toLocaleString("tr-TR")}</b></span><span>Son bakım <b className="font-mono text-text">{chosenItem.last_hour.toLocaleString("tr-TR")}</b></span><span>Periyot <b className="font-mono text-text">{chosenItem.period.toLocaleString("tr-TR")} sa</b></span></div></div>
+        <div className="mt-3 rounded-control border border-teal/30 bg-teal/10 px-3 py-3 text-[11px] text-muted"><div className="mb-1 flex items-center justify-between gap-2"><span className="font-bold uppercase tracking-wide text-teal">Mevcut bakım takibi</span><span className="rounded-full bg-teal/15 px-2 py-1 text-[9px] font-bold text-teal">{STATUS_LABELS[chosenItem.status]}</span></div><div className="grid gap-1 sm:grid-cols-3"><span>Motor saati <b className="font-mono text-text">{chosenItem.engine_hours.toLocaleString("tr-TR")}</b></span><span>Son bakım <b className="font-mono text-text">{chosenItem.last_hour.toLocaleString("tr-TR")}</b></span><span>Periyot <b className="font-mono text-text">{chosenItem.period.toLocaleString("tr-TR")} sa</b></span></div></div>
       ) : chosenType ? (
-        <div className="mt-3 rounded-xl border border-amber/30 bg-amber/10 px-3 py-3"><div className="text-[11px] leading-5 text-muted"><b className="text-amber">{chosenType.label}</b>, bu motor için tanımlı değil. Bu kaydı eklersen yeni bir bakım takibi başlatılır.</div><label className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati
+        <div className="mt-3 rounded-control border border-amber/30 bg-amber/10 px-3 py-3"><div className="text-[11px] leading-5 text-muted"><b className="text-amber">{chosenType.label}</b>, bu motor için tanımlı değil. Bu kaydı eklersen yeni bir bakım takibi başlatılır.</div><label className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-muted">Periyodik bakım saati
           <input type="number" value={primaryPeriod} onChange={(event) => onPrimaryPeriodChange(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-2.5 py-2 text-sm font-mono text-text outline-none focus:border-amber" />
         </label></div>
       ) : null}
       <label className="mt-4 block text-[10.5px] font-bold uppercase tracking-wide text-muted">O anki motor çalışma saati
         <input type="number" value={hours} onChange={(event) => onHoursChange(Number(event.target.value) || 0)} className="mt-1.5 w-full rounded-lg border border-border bg-panel2 px-3 py-2.5 text-base font-bold text-amber outline-none focus:border-amber" />
       </label>
-      <div className="mt-2 rounded-xl border border-amber/35 bg-amber/10 px-3 py-2.5 text-[10.5px] leading-4 text-amber" role="note" aria-label="Motor saati kuralı">
+      <div className="mt-2 rounded-control border border-amber/35 bg-amber/10 px-3 py-2.5 text-[10.5px] leading-4 text-amber" role="note" aria-label="Motor saati kuralı">
         <div className="font-extrabold">Saat girişi kuralı</div>
         <div className="mt-0.5">Bakım başlangıcındaki motor saati, son Excel ölçümünden o ana kadar geçen çalışma süresini aşamaz. Ayrıca mevcut motor saatinden en fazla <b>24 saat düşük</b> olabilir. Uygunsuz değer girersen kayıt oluşturulmaz.</div>
       </div>

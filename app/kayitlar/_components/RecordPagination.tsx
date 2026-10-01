@@ -10,7 +10,7 @@ export default function RecordPagination({ page, totalPages, onPageChange }: Rec
   if (totalPages <= 1) return null;
 
   return (
-    <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-panel p-2">
+    <div className="mt-4 flex items-center justify-between rounded-control border border-border bg-panel p-2">
       <button
         type="button"
         onClick={() => onPageChange(page - 1)}

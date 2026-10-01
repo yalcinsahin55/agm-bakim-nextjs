@@ -81,7 +81,7 @@ export default function YagAnalizleriPage() {
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Analiz raporu kaydedildi! 🧪");
+        toast.success("Analiz raporu kaydedildi! ");
         setNote(""); setFile(null); setShowForm(false);
         load();
       } else {
@@ -140,7 +140,7 @@ export default function YagAnalizleriPage() {
       const res = await fetch(`/api/oil-analyses/${id}`, { method: "DELETE" });
       toast.dismiss(loadingToast);
       if (res.ok) {
-        toast.success("Rapor silindi! 🗑️");
+        toast.success("Rapor silindi! ");
         setConfirmDeleteId(null);
         load();
       } else {
@@ -170,8 +170,8 @@ export default function YagAnalizleriPage() {
       <div>
         <TopBar title="Yağ Analizleri" subtitle="" />
         <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-3" />
-          <Skeleton className="h-12 w-full rounded-xl mb-4" />
+          <Skeleton className="h-12 w-full rounded-control mb-3" />
+          <Skeleton className="h-12 w-full rounded-control mb-4" />
           <div className="flex flex-col md:grid md:grid-cols-2 gap-2">
             <Skeleton className="h-28 rounded-card" />
             <Skeleton className="h-28 rounded-card" />
@@ -190,9 +190,9 @@ export default function YagAnalizleriPage() {
         <TopBar title="Yağ Analizleri" />
         <div className="px-4 py-8 text-center">
           <div className="rounded-card border border-red/30 bg-panel p-6">
-            <div className="text-4xl mb-3">⚠️</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-red">{loadError}</p>
-            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -212,13 +212,13 @@ export default function YagAnalizleriPage() {
         {canWrite && (
           <button
             onClick={() => setShowForm((s) => !s)}
-          className={`w-full py-3 rounded-xl font-bold text-[13px] mb-3 transition-all ${
+          className={`w-full py-3 rounded-control font-bold text-[13px] mb-3 transition-all ${
             showForm
               ? "border border-border text-muted hover:bg-panel2"
               : "border border-teal/40 bg-teal/10 text-teal hover:bg-teal/20"
           }`}
         >
-            {showForm ? "✕ Kapat" : "➕ Yeni Analiz Raporu Ekle"}
+            {showForm ? " Kapat" : " Yeni Analiz Raporu Ekle"}
           </button>
         )}
 
@@ -252,7 +252,7 @@ export default function YagAnalizleriPage() {
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">🧪</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Henüz analiz raporu eklenmemiş.</p>
           </div>
         ) : (

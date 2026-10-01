@@ -55,6 +55,7 @@ export default function KarterBasinciPage() {
 
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
 
 
   async function loadMoreReadings() {
@@ -108,7 +109,7 @@ export default function KarterBasinciPage() {
       if (res.ok) {
         const data = await res.json() as ImportResult;
         toast.dismiss(loadingToast);
-        toast.success(`${data.inserted} motor için ölçüm kaydedildi! 📊`);
+        toast.success(`${data.inserted} motor için ölçüm kaydedildi! `);
         setEntries({});
         void reload();
       } else {
@@ -131,7 +132,7 @@ export default function KarterBasinciPage() {
       const data = await res.json().catch(() => ({})) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Silinemedi.");
       toast.dismiss(loadingToast);
-      toast.success("Kayıt silindi! 🗑️");
+      toast.success("Kayıt silindi! ");
       void reload();
     } catch (error) {
       toast.dismiss(loadingToast);
@@ -139,19 +140,24 @@ export default function KarterBasinciPage() {
     }
   }
 
-  async function doImport() {
+  async function doImport(previewOnly = false) {
     if (!importFile) return;
     setImporting(true);
     const loadingToast = toast.loading("Dosya işleniyor...");
     try {
       const file_b64 = await fileToBase64(importFile);
       const res = await fetch("/api/pressure-readings/import", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64 }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file_b64, preview: previewOnly }),
       });
       const data = await res.json() as ImportResult;
-      if (res.ok) {
+      if (res.ok && previewOnly) {
         toast.dismiss(loadingToast);
-        toast.success(`${data.inserted} ölçüm kaydı eklendi! 📥`);
+        setImportPreview(data);
+        toast.success(`${data.inserted || 0} ölçüm satırı doğrulandı.`);
+      } else if (res.ok) {
+        toast.dismiss(loadingToast);
+        toast.success(`${data.inserted} ölçüm kaydı eklendi! `);
+        setImportPreview(null);
         void reload();
       } else {
         toast.dismiss(loadingToast);
@@ -182,21 +188,21 @@ export default function KarterBasinciPage() {
   const canWrite = user?.role === "yonetici";
   const visibleTab = canWrite ? tab : "history";
   const tabs: Array<[PressureTab, string]> = canWrite
-    ? [["new", "➕ Yeni Ölçüm"], ["history", "📈 Geçmiş"], ["import", "📥 İçe Aktar"]]
-    : [["history", "📈 Geçmiş"]];
+    ? [["new", " Yeni Ölçüm"], ["history", " Geçmiş"], ["import", " İçe Aktar"]]
+    : [["history", " Geçmiş"]];
 
   if (loading) {
     return (
       <div>
         <TopBar title="Karter Fark Basıncı" />
         <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-4" />
-          <Skeleton className="h-6 w-full rounded-xl mb-3" />
+          <Skeleton className="h-12 w-full rounded-control mb-4" />
+          <Skeleton className="h-6 w-full rounded-control mb-3" />
           <Skeleton className="h-4 w-3/4 mb-3" />
           <div className="flex flex-col gap-2">
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-control" />
+            <Skeleton className="h-24 w-full rounded-control" />
+            <Skeleton className="h-24 w-full rounded-control" />
           </div>
         </div>
         <BottomNav />
@@ -210,9 +216,9 @@ export default function KarterBasinciPage() {
         <TopBar title="Karter Fark Basıncı" />
         <div className="px-4 py-8 text-center">
           <div className="rounded-card border border-red/30 bg-panel p-6">
-            <div className="text-4xl mb-3">⚠️</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-red">{loadError}</p>
-            <button       onClick={() => { void reload(); }} className="mt-4 rounded-xl border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
+            <button       onClick={() => { void reload(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
         </div>
         <BottomNav />
@@ -225,11 +231,11 @@ export default function KarterBasinciPage() {
       <TopBar title="Karter Fark Basıncı" />
       <div className="px-4 py-4">
         <section className="mb-3 rounded-card border border-teal/30 bg-teal/5 p-4">
-          <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true">📈</div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Basınç durumu</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yükü ve karter fark basıncını tek akışta takip et.</p></div></div>
-          <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Motor sayısı</div><div className="mt-1 font-mono text-lg font-bold text-teal">{engines.length}</div></div><div className="rounded-xl border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Toplam ölçüm</div><div className="mt-1 font-mono text-lg font-bold text-amber">{readingsTotal}</div></div></div>
+          <div className="flex items-center gap-3"><div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control border border-teal/30 bg-teal/10 text-2xl" aria-hidden="true"></div><div className="min-w-0"><h1 className="font-display text-[14px] font-bold uppercase tracking-wide text-text">Basınç durumu</h1><p className="mt-0.5 text-[10.5px] text-muted">Motor yükü ve karter fark basıncını tek akışta takip et.</p></div></div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-control border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Motor sayısı</div><div className="mt-1 font-mono text-lg font-bold text-teal">{engines.length}</div></div><div className="rounded-control border border-border bg-panel px-2.5 py-2"><div className="text-[9px] font-extrabold uppercase tracking-wide text-muted">Toplam ölçüm</div><div className="mt-1 font-mono text-lg font-bold text-amber">{readingsTotal}</div></div></div>
         </section>
         {/* Modern Tab Butonları */}
-        <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-xl border border-border mb-4">
+        <div className="flex gap-1 overflow-x-auto bg-panel2 p-1 rounded-control border border-border mb-4">
           {tabs.map(([key, label]) => (
             <button
               key={key}
@@ -277,20 +283,22 @@ export default function KarterBasinciPage() {
           <PressureImportPanel
             importFile={importFile}
             importing={importing}
-            onFileChange={setImportFile}
-            onImport={doImport}
+            onFileChange={(file) => { setImportFile(file); setImportPreview(null); }}
+            preview={importPreview}
+            onPreview={() => void doImport(true)}
+            onImport={() => void doImport(false)}
           />
         )}
       </div>
 
-      {/* 💾 Kaydet butonu — animate-fade-in DIŞINDA (transform fixed'i bozmasın diye) */}
+      {/*  Kaydet butonu — animate-fade-in DIŞINDA (transform fixed'i bozmasın diye) */}
       {canWrite && visibleTab === "new" && (
         <div className="fixed bottom-32 md:bottom-8 left-0 right-0 z-40 px-4 pointer-events-none">
           <div className="max-w-lg mx-auto pointer-events-auto">
             <button
               onClick={saveReadings}
               disabled={saving}
-              className="w-full py-3.5 rounded-xl bg-teal text-on-teal font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
+              className="w-full py-3.5 rounded-control bg-teal text-on-teal font-extrabold text-[14.5px] shadow-lg disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition"
             >
               {saving ? (
                 <span className="inline-flex items-center gap-2">
@@ -298,7 +306,7 @@ export default function KarterBasinciPage() {
                   Kaydediliyor...
                 </span>
               ) : (
-                "💾 Tüm Ölçümleri Kaydet"
+                " Tüm Ölçümleri Kaydet"
               )}
             </button>
           </div>

@@ -21,11 +21,12 @@ interface AnalyticsSummary {
   byType: Array<{ type: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
   byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; responsible_duration_minutes?: number; support_duration_minutes?: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
+  delayReasons: Array<{ reason: string; count: number }>;
   workPeriod?: "week" | "month" | "total";
   periodBreakdown?: Array<{ month: string; week: string; count: number; total_duration_minutes: number }>;
 }
 
-const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [] };
+const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], delayReasons: [] };
 
 function BarList({ items, color }: { items: BarItem[]; color: string }) {
   const max = Math.max(...items.map((item) => item.count), 1);
@@ -63,6 +64,7 @@ export default function IstatistikPage() {
         byType: Array.isArray(data.byType) ? data.byType : [],
         byEngine: Array.isArray(data.byEngine) ? data.byEngine : [],
         byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
+        delayReasons: Array.isArray(data.delayReasons) ? data.delayReasons : [],
         workPeriod: data.workPeriod,
         periodBreakdown: Array.isArray(data.periodBreakdown) ? data.periodBreakdown : [],
       };
@@ -77,7 +79,7 @@ export default function IstatistikPage() {
       <div>
         <TopBar title="İstatistikler" />
         <div className="px-4 py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"><Skeleton className="h-24 rounded-xl" /><Skeleton className="h-24 rounded-xl" /><Skeleton className="h-24 rounded-xl" /><Skeleton className="h-24 rounded-xl" /></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /></div>
           <Skeleton className="h-56 rounded-card mb-4" /><Skeleton className="h-56 rounded-card" />
         </div>
         <BottomNav />
@@ -92,6 +94,7 @@ export default function IstatistikPage() {
   const topTechnicians = summary.byTechnician.slice(0, 12);
   const maxTechnicianDuration = Math.max(...topTechnicians.map((item) => Number(item.total_duration_minutes || 0)), 1);
   const selectedRangeLabel = filterMode === "date" && (selectedFrom || selectedTo) ? `${selectedFrom || "başlangıç"} – ${selectedTo || "bugün"}` : "Tüm kayıtlar";
+  const delayReasonLabels: Record<string, string> = { planned: "Planlı bekleme", parts: "Parça bekleniyor", availability: "Personel uygunluğu", technical: "Teknik sorun", weather: "Hava koşulları", external: "Dış hizmet / tedarikçi", other: "Diğer" };
 
   return (
     <div>
@@ -99,10 +102,10 @@ export default function IstatistikPage() {
       <div className="px-4 py-4">
         {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
-          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Geçen Ay</div><div className="font-mono text-2xl font-bold text-text mt-1">{summary.lastCount}</div></div>
-          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Değişim</div><div className={`font-mono text-2xl font-bold mt-1 ${diff >= 0 ? "text-green" : "text-red"}`}>{diff >= 0 ? "+" : ""}{diff}</div></div>
-          <div className="bg-panel border border-border rounded-xl p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Toplam</div><div className="font-mono text-2xl font-bold text-teal mt-1">{summary.total}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Geçen Ay</div><div className="font-mono text-2xl font-bold text-text mt-1">{summary.lastCount}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Değişim</div><div className={`font-mono text-2xl font-bold mt-1 ${diff >= 0 ? "text-green" : "text-red"}`}>{diff >= 0 ? "+" : ""}{diff}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Toplam</div><div className="font-mono text-2xl font-bold text-teal mt-1">{summary.total}</div></div>
         </div>
         <div className="mb-4 rounded-card border border-border bg-panel p-3">
           <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">İstatistik filtresi</div>
@@ -111,16 +114,21 @@ export default function IstatistikPage() {
           <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">🔧 En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
-          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3">⚙️ En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
           <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
-            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1">👥 Teknisyen Çalışma Özeti</h2>
+            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1"> Teknisyen Çalışma Özeti</h2>
             <p className="mb-3 text-[10.5px] text-faint">Sorumlu olarak tamamlanan ve ekip desteği verilen bakım görevleri birlikte gösterilir.</p>
             {topTechnicians.length ? <div className="flex flex-col gap-3">{topTechnicians.map((item) => <div key={item.technician_id}>
               <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{item.technician}</span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
               <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(Number(item.responsible_duration_minutes || 0) / maxTechnicianDuration) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(Number(item.support_duration_minutes || 0) / maxTechnicianDuration) * 100}%` }} /></div>
               <div className="mt-1 flex flex-wrap gap-3 text-[9.5px] text-faint"><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal" />Sorumlu: {item.responsible_count}</span><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber" />Destek: {item.support_count}</span><span className="font-semibold text-text">Toplam süre: {item.total_duration_minutes ? `${Math.floor(item.total_duration_minutes / 60)} sa ${item.total_duration_minutes % 60 ? `${item.total_duration_minutes % 60} dk` : ""}` : "—"}</span></div>
             </div>)}</div> : <p className="text-[11px] text-faint">Henüz teknisyen çalışma verisi yok.</p>}
+          </div>
+          <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
+            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1">Bakım gecikme nedenleri</h2>
+            <p className="mb-3 text-[10.5px] text-faint">Kayıt sırasında seçilen nedenler, aynı tarih filtresiyle özetlenir.</p>
+            {summary.delayReasons.length ? <BarList items={summary.delayReasons.map((item) => ({ label: delayReasonLabels[item.reason] || item.reason, count: item.count }))} color="bg-red" /> : <p className="text-[11px] text-faint">Henüz gecikme nedeni kaydedilmedi.</p>}
           </div>
         </div>
       </div>

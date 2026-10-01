@@ -24,7 +24,7 @@ export default function CompletionWorkspaceHeader({ isOnline, step }: Completion
           const complete = number < step;
           const active = number === step;
           return <div key={label} className="flex min-w-0 flex-1 items-center gap-1.5">
-            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[9px] font-extrabold ${complete || active ? "border-amber bg-amber text-on-amber" : "border-border bg-panel2 text-faint"}`}>{complete ? "✓" : number}</span>
+            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[9px] font-extrabold ${complete || active ? "border-amber bg-amber text-on-amber" : "border-border bg-panel2 text-faint"}`}>{complete ? "" : number}</span>
             <span className={`hidden truncate text-[9px] font-bold sm:block ${active ? "text-amber" : complete ? "text-teal" : "text-faint"}`}>{label}</span>
             {number < STEPS.length && <span className={`h-px min-w-2 flex-1 ${complete ? "bg-amber/60" : "bg-border"}`} />}
           </div>;

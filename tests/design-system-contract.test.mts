@@ -138,3 +138,38 @@ test("drafts, advanced filters, and dialog accessibility contracts stay present"
   assert.match(a11yText, /previousFocusRef/);
   assert.match(detailsText, /aria-labelledby="maintenance-details-title"/);
 });
+
+
+test("Excel imports validate before writing and expose row-level preview results", async () => {
+  const [routeText, pageText] = await Promise.all([text(new URL("../app/api/import/hours/route.ts", import.meta.url)), text(new URL("../app/excel/page.tsx", import.meta.url))]);
+  assert.match(routeText, /preview === true/);
+  assert.match(routeText, /errors/);
+  assert.match(pageText, /Önizle ve doğrula/);
+  assert.match(pageText, /Onayla ve içe aktar/);
+  assert.match(pageText, /preview\.errors/);
+});
+
+test("delay reasons are typed, persisted, reported, and visible in completion UI", async () => {
+  const [schemaText, payloadText, insertText, analyticsText, statsText, evidenceText] = await Promise.all([
+    text(new URL("../lib/schemas.ts", import.meta.url)),
+    text(new URL("../app/tamamla/_lib/completionPayload.ts", import.meta.url)),
+    text(new URL("../app/api/records/_lib/recordCreateInsert.ts", import.meta.url)),
+    text(new URL("../app/api/analytics/summary/route.ts", import.meta.url)),
+    text(new URL("../app/istatistik/page.tsx", import.meta.url)),
+    text(new URL("../app/tamamla/_components/CompletionEvidenceSection.tsx", import.meta.url)),
+  ]);
+  assert.match(schemaText, /delay_reason/);
+  assert.match(payloadText, /delay_note/);
+  assert.match(insertText, /delay_reason/);
+  assert.match(analyticsText, /delayReasons/);
+  assert.match(statsText, /Bakım gecikme nedenleri/);
+  assert.match(evidenceText, /Gecikme nedeni/);
+});
+
+test("login exposes server failures to assistive technology", async () => {
+  const [loginText, fieldErrorText] = await Promise.all([text(new URL("../app/login/page.tsx", import.meta.url)), text(new URL("../components/ui/FieldError.tsx", import.meta.url))]);
+  assert.match(loginText, /aria-invalid/);
+  assert.match(loginText, /aria-describedby/);
+  assert.match(loginText, /<FieldError/);
+  assert.match(fieldErrorText, /role="alert"/);
+});

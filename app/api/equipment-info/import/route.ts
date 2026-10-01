@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       { status: bodyResult.tooLarge ? 413 : 400 },
     );
   }
-  const { file_b64 } = bodyResult.value as { file_b64?: unknown };
+  const { file_b64, preview } = bodyResult.value as { file_b64?: unknown; preview?: boolean };
   if (!file_b64) return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
   if (typeof file_b64 !== "string" || file_b64.length > MAX_IMPORT_BASE64_CHARS) {
     return NextResponse.json({ error: "Excel dosyası izin verilen boyutu aşıyor." }, { status: 413 });
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
 
   const col = equipmentInfoCollection(db);
   let updated = 0;
+  const changes: Array<{ row: number; engine: string }> = [];
   for (let r = 1; r < grid.length; r++) {
     const row = grid[r] || [];
     const nameRaw = row[motorCol];
@@ -95,9 +96,10 @@ export async function POST(req: NextRequest) {
       const value = row[idx];
       info[key] = value === null || value === undefined ? null : String(value).trim() || null;
     });
-    await col.updateOne({ _id: name }, { $set: info }, { upsert: true });
+    changes.push({ row: r + 1, engine: name });
+    if (!preview) await col.updateOne({ _id: name }, { $set: info }, { upsert: true });
     updated++;
   }
 
-  return NextResponse.json({ ok: true, updated });
+  return NextResponse.json({ ok: true, updated, preview: Boolean(preview), changes });
 }

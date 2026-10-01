@@ -12,6 +12,8 @@ export interface CompletionPayloadInput {
   externalServiceName: string;
   hours: number;
   techNote: string;
+  delayReason: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other" | "";
+  delayNote: string;
   maintenanceStartAt: string;
   maintenanceEndAt: string;
   photos: string[];
@@ -44,6 +46,8 @@ export interface CompletionPayload extends Record<string, unknown> {
   external_service_name?: string;
   hour_at_completion: number;
   technician_note: string;
+  delay_reason?: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other";
+  delay_note?: string;
   time_tracking_version: 2;
   maintenance_start_at: string;
   maintenance_end_at: string;
@@ -85,6 +89,8 @@ export function buildCompletionPayload(input: CompletionPayloadInput): Completio
     external_service_name: input.technicianSource === "external_service" ? input.externalServiceName.trim() || undefined : undefined,
     hour_at_completion: Number(input.hours),
     technician_note: input.techNote,
+    ...(input.delayReason ? { delay_reason: input.delayReason } : {}),
+    ...(input.delayNote.trim() ? { delay_note: input.delayNote.trim() } : {}),
     time_tracking_version: 2,
     maintenance_start_at: new Date(input.maintenanceStartAt).toISOString(),
     maintenance_end_at: new Date(input.maintenanceEndAt).toISOString(),

@@ -61,13 +61,13 @@ export default function RecordEditMediaSection({
             <button type="button" onClick={() => onPhotoClick(getPhotoSrc(photo, offlinePreviews, transientPhotoUrls))} className="block hover:scale-105 transition-transform" aria-label="Fotoğrafı büyüt">
               <NextImage src={getPhotoSrc(photo, offlinePreviews, transientPhotoUrls)} width={48} height={48} unoptimized className="w-12 h-12 rounded-lg object-cover border border-border" alt="" />
             </button>
-            <button type="button" onClick={() => onRemovePhoto(index)} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px] hover:bg-red hover:text-white transition" aria-label="Fotoğrafı kaldır">✕</button>
+            <button type="button" onClick={() => onRemovePhoto(index)} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-panel2 border border-border text-[9px] hover:bg-red hover:text-white transition" aria-label="Fotoğrafı kaldır"></button>
           </div>
         ))}
       </div>
     )}
     <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-      {mediaBusy ? "Fotoğraf işleniyor..." : "📷 Fotoğraf ekle"}
+      {mediaBusy ? "Fotoğraf işleniyor..." : " Fotoğraf ekle"}
       <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || mediaBusy} onChange={onAddPhotos} className="hidden" />
     </label>
 
@@ -75,14 +75,14 @@ export default function RecordEditMediaSection({
       <div className="flex flex-col gap-1">
         {videos.map((video, index) => (
           <div key={index} className="flex items-center justify-between bg-panel2 rounded-lg px-2.5 py-1.5 text-[11px] text-muted">
-            🎬 {video.filename || "Video"}
-            <button type="button" onClick={() => onRemoveVideo(index)} className="text-red hover:scale-110 transition" aria-label="Videoyu kaldır">✕</button>
+             {video.filename || "Video"}
+            <button type="button" onClick={() => onRemoveVideo(index)} className="text-red hover:scale-110 transition" aria-label="Videoyu kaldır"></button>
           </div>
         ))}
       </div>
     )}
     <label className="flex items-center gap-2 border border-dashed border-borderlt rounded-lg px-3 py-2 text-[11.5px] text-muted cursor-pointer hover:border-amber hover:bg-amber/5 transition">
-      {mediaBusy ? "Video yükleniyor..." : "🎬 Video ekle (max 100MB)"}
+      {mediaBusy ? "Video yükleniyor..." : " Video ekle (max 100MB)"}
       <input type="file" accept="video/*" multiple disabled={busy || mediaBusy} onChange={onAddVideos} className="hidden" />
     </label>
   </>;

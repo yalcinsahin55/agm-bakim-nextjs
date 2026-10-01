@@ -113,7 +113,7 @@ export default function SaatGecmisiPage() {
       }
       invalidateCachedFetch("/api/engines");
       toast.dismiss(loadingToast);
-      toast.success("Kayıt güncellendi! ✅");
+      toast.success("Kayıt güncellendi! ");
       setEditingIdx(null); setConfirmDeleteIdx(null);
       await loadHistory(historyPage);
       await loadEngines();
@@ -147,20 +147,20 @@ export default function SaatGecmisiPage() {
       <div>
         <TopBar title="Saat Geçmişi" subtitle="" />
         <div className="px-4 py-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-4" />
+          <Skeleton className="h-12 w-full rounded-control mb-4" />
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
-            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-control" />
+            <Skeleton className="h-20 rounded-control" />
+            <Skeleton className="h-20 rounded-control" />
           </div>
           <Skeleton className="h-6 w-32 mb-2" />
-          <Skeleton className="h-36 w-full rounded-xl mb-4" />
+          <Skeleton className="h-36 w-full rounded-control mb-4" />
           <Skeleton className="h-6 w-24 mb-2" />
-          <Skeleton className="h-36 w-full rounded-xl mb-4" />
+          <Skeleton className="h-36 w-full rounded-control mb-4" />
           <div className="flex flex-col gap-1.5">
-            <Skeleton className="h-14 w-full rounded-xl" />
-            <Skeleton className="h-14 w-full rounded-xl" />
-            <Skeleton className="h-14 w-full rounded-xl" />
+            <Skeleton className="h-14 w-full rounded-control" />
+            <Skeleton className="h-14 w-full rounded-control" />
+            <Skeleton className="h-14 w-full rounded-control" />
           </div>
         </div>
         <BottomNav />
@@ -172,17 +172,17 @@ export default function SaatGecmisiPage() {
     <div>
       <TopBar title="Saat Geçmişi" subtitle={engine ? engine.name : ""} />
       <div className="px-4 py-4">
-        <select 
-          value={selected} 
+        <select
+          value={selected}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => { setSelected(e.target.value); setHistoryPage(1); setHistory([]); setHistorySummary({ first: null, last: null, has_load: false }); setEditingIdx(null); setConfirmDeleteIdx(null); }}
-          className="w-full bg-panel2 border border-border rounded-xl px-3 py-2.5 text-sm mb-4 focus:border-teal focus:ring-2 focus:ring-teal/20 outline-none transition"
+          className="w-full bg-panel2 border border-border rounded-control px-3 py-2.5 text-sm mb-4 focus:border-teal focus:ring-2 focus:ring-teal/20 outline-none transition"
         >
           {sortedEngines.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
         </select>
 
         {historyTotal < 2 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3">📊</div>
+            <div className="text-4xl mb-3"></div>
             <p className="text-sm text-muted">Bu motor için henüz yeterli geçmiş kaydı yok.</p>
             <p className="text-xs text-faint mt-1">En az 2 kayıt gerekli.</p>
           </div>

@@ -56,6 +56,8 @@ export default function TamamlaPage() {
   const [maintenanceEndAt, setMaintenanceEndAt] = useState("");
   const [pressure, setPressure] = useState("");
   const [techNote, setTechNote] = useState("");
+  const [delayReason, setDelayReason] = useState<"planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other" | "">("");
+  const [delayNote, setDelayNote] = useState("");
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
   const [extraPeriods, setExtraPeriods] = useState<Record<string, number>>({});
   const [technicians, setTechnicians] = useState<TechnicianOption[]>([]);
@@ -77,7 +79,7 @@ export default function TamamlaPage() {
   const [submitting, setSubmitting] = useState(false);
   const { signal } = useAbortableFetch();
   const draftKey = `${user?._id || user?.id || "anonymous"}:${quickMode ? "quick" : "standard"}`;
-  const draftValue = useMemo(() => ({ engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours }), [engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours]);
+  const draftValue = useMemo(() => ({ engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, delayReason, delayNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours }), [engineId, typeKey, hours, maintenanceStartAt, maintenanceEndAt, pressure, techNote, delayReason, delayNote, extraKeys, extraPeriods, responsibleTechnicianId, responsibleTechnicianDurationMinutes, otherTechnicianIds, otherTechnicianDurations, technicianSource, externalServiceName, checklist, previousWorkingHours]);
   const { draft, markReady, clearDraft } = useCompletionDraft(draftKey, draftValue);
   const draftRestoredRef = useRef(false);
 
@@ -305,11 +307,11 @@ export default function TamamlaPage() {
       return;
     }
     if (!chosenType) return;
-    
+
     setSubmitting(true);
     const clientRequestId = clientRequestIdRef.current || makeOfflineId();
     clientRequestIdRef.current = clientRequestId;
-    
+
     const startDate = new Date(maintenanceStartAt);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -328,6 +330,8 @@ export default function TamamlaPage() {
       externalServiceName,
       hours,
       techNote,
+      delayReason,
+      delayNote,
       maintenanceStartAt,
       maintenanceEndAt,
       photos,
@@ -398,19 +402,19 @@ export default function TamamlaPage() {
         <TopBar title="Bakım Tamamla" subtitle="Veriler yükleniyor..." />
         <div className="px-4 py-4 flex flex-col gap-1">
           <Skeleton className="h-4 w-16 mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-2" />
+          <Skeleton className="h-12 w-full rounded-control mb-2" />
           <Skeleton className="h-4 w-24 mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-2" />
-          <Skeleton className="h-16 w-full rounded-xl mb-2" />
+          <Skeleton className="h-12 w-full rounded-control mb-2" />
+          <Skeleton className="h-16 w-full rounded-control mb-2" />
           <Skeleton className="h-4 w-40 mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-1" />
+          <Skeleton className="h-12 w-full rounded-control mb-1" />
           <Skeleton className="h-3 w-3/4 mb-2" />
           <Skeleton className="h-4 w-24 mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-2" />
-          <Skeleton className="h-16 w-full rounded-xl mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-2" />
-          <Skeleton className="h-12 w-full rounded-xl mb-2" />
-          <Skeleton className="h-14 w-full rounded-xl mt-2" />
+          <Skeleton className="h-12 w-full rounded-control mb-2" />
+          <Skeleton className="h-16 w-full rounded-control mb-2" />
+          <Skeleton className="h-12 w-full rounded-control mb-2" />
+          <Skeleton className="h-12 w-full rounded-control mb-2" />
+          <Skeleton className="h-14 w-full rounded-control mt-2" />
         </div>
         <BottomNav />
       </div>
@@ -522,6 +526,10 @@ export default function TamamlaPage() {
             <CompletionEvidenceSection
               techNote={techNote}
               setTechNote={setTechNote}
+              delayReason={delayReason}
+              setDelayReason={setDelayReason}
+              delayNote={delayNote}
+              setDelayNote={setDelayNote}
               photos={photos}
               videos={videos}
               reportAttachments={reportAttachments}

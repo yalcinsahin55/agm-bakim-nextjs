@@ -59,7 +59,7 @@ export default function EngineMaintenanceCard({ engine, records, open, recordsLo
           <button
             type="button"
             onClick={onShowQr}
-            className="mb-3 w-full rounded-xl border border-amber/40 bg-amber/10 py-2.5 text-[11px] font-extrabold text-amber transition hover:bg-amber/20 active:scale-[.98]"
+            className="mb-3 w-full rounded-control border border-amber/40 bg-amber/10 py-2.5 text-[11px] font-extrabold text-amber transition hover:bg-amber/20 active:scale-[.98]"
           >
             ▣ Hızlı bakım QR kodu göster ve indir
           </button>

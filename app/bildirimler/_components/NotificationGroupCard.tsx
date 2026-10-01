@@ -20,7 +20,7 @@ export default function NotificationGroupCard({ group, isExpanded, showAll, onTo
   return (
     <section id={`notification-group-${group.status}`} className={`scroll-mt-24 overflow-hidden rounded-card border ${config.className}`}>
       <button onClick={onToggleGroup} aria-expanded={isExpanded} className="flex min-h-[76px] w-full items-center gap-3 px-3.5 py-3 text-left transition hover:bg-white/[0.03]">
-        <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-xl ${config.iconClassName}`} aria-hidden="true">{config.icon}</span>
+        <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control border text-xl ${config.iconClassName}`} aria-hidden="true">{config.icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-extrabold text-text">{config.title}</span>
           <span className="mt-0.5 block text-[11px] text-muted">{group.summary}</span>

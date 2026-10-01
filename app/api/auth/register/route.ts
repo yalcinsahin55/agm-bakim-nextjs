@@ -15,7 +15,7 @@ import { isMongoDuplicateKeyError } from "@/lib/mongoSecurity";
 export const dynamic = "force-dynamic";
 
 async function postRegister(req: NextRequest) {
-  // 🔒 IP başına 10 dakikada en fazla 3 kayıt denemesi
+  // IP başına 10 dakikada en fazla 3 kayıt denemesi
   const rateLimited = await enforceApiRateLimit(req, "register", 3, 10 * 60 * 1000);
   if (rateLimited) return rateLimited;
 
@@ -50,7 +50,7 @@ async function postRegister(req: NextRequest) {
       return NextResponse.json({ error: "Bu telefon numarası veya e-posta zaten kullanılıyor." }, { status: 409 });
     }
 
-    // 🔐 GÜVENLİK: Sistemde kullanıcı varken halka açık kayıt KAPALIDIR.
+    // GÜVENLİK: Sistemde kullanıcı varken halka açık kayıt KAPALIDIR.
     // Yeni hesapları yalnızca yönetici, Kullanıcılar sayfasından açar.
     const userCount = await usersCol.countDocuments();
     if (userCount > 0) {

@@ -130,7 +130,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
       });
       if (res.ok) {
         toast.dismiss(loadingToast);
-        toast.success("Kayıt güncellendi! ✅");
+        toast.success("Kayıt güncellendi! ");
         invalidateMaintenancePanel();
         window.dispatchEvent(new Event("notifications:refresh"));
         onSaved();
@@ -233,7 +233,7 @@ export default function MaintenanceRecordEditForm({ record, onCancel, onSaved, o
               Kaydediliyor...
             </span>
           ) : (
-            "💾 Kaydet"
+            " Kaydet"
           )}
         </button>
       </div>

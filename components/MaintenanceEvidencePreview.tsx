@@ -40,7 +40,7 @@ export default function MaintenanceEvidencePreview({
                 <button type="button" onClick={() => onPhotoClick(getPhotoSrc(photo, offlinePreviews))} className="block" aria-label="Fotoğrafı büyüt">
                   <NextImage src={getPhotoSrc(photo, offlinePreviews)} width={64} height={64} unoptimized className="h-16 w-16 rounded-lg border border-border object-cover" alt="" />
                 </button>
-                <button type="button" onClick={() => onRemovePhoto(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-text" aria-label={`Fotoğraf ${index + 1} sil`}>✕</button>
+                <button type="button" onClick={() => onRemovePhoto(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-text" aria-label={`Fotoğraf ${index + 1} sil`}></button>
               </div>
             ))}
           </div>
@@ -53,7 +53,7 @@ export default function MaintenanceEvidencePreview({
             {videos.map((video, index) => (
               <div key={`${video.url}-${index}`} className="relative">
                 <video src={video.url?.startsWith("offline:") ? offlinePreviews[video.url.slice("offline:".length)] : video.url || undefined} className="h-16 w-20 rounded-lg border border-border bg-black object-cover" controls={false} />
-                <button type="button" onClick={() => onRemoveVideo(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-red" aria-label={`Video ${index + 1} sil`}>✕</button>
+                <button type="button" onClick={() => onRemoveVideo(index)} className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] rounded-full border border-border bg-panel2 text-[10px] leading-none text-red" aria-label={`Video ${index + 1} sil`}></button>
               </div>
             ))}
           </div>

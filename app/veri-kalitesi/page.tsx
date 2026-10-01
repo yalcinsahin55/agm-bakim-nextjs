@@ -54,7 +54,7 @@ export default function DataQualityPage() {
           </button>
         </div>
 
-        {error && <div className="mb-4 rounded-xl border border-red/30 bg-red/10 p-3 text-sm text-red" role="alert">{error}</div>}
+        {error && <div className="mb-4 rounded-control border border-red/30 bg-red/10 p-3 text-sm text-red" role="alert">{error}</div>}
 
         {loading && !report ? (
           <div className="ui-card p-5 text-sm text-muted sm:p-6">Kontroller çalıştırılıyor…</div>
@@ -86,7 +86,7 @@ export default function DataQualityPage() {
                     </span>
                   </div>
                   {issue.rows.length > 0 && (
-                    <pre className="mt-3 max-h-48 overflow-auto rounded-xl bg-bg/60 p-3 text-[10px] leading-relaxed text-muted">{JSON.stringify(issue.rows, null, 2)}</pre>
+                    <pre className="mt-3 max-h-48 overflow-auto rounded-control bg-bg/60 p-3 text-[10px] leading-relaxed text-muted">{JSON.stringify(issue.rows, null, 2)}</pre>
                   )}
                 </section>
               ))}

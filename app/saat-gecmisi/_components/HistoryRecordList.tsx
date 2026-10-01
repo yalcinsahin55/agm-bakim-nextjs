@@ -1,4 +1,6 @@
-import type { HistoryEntry } from "../_lib/types";
+import AppIcon from "@/components/ui/AppIcon";
+
+type HistoryEntry = { date: string; hours: number; load_kw?: number };
 
 interface HistoryRecordListProps {
   history: HistoryEntry[];
@@ -63,7 +65,7 @@ export default function HistoryRecordList({
 
           if (isEditing) {
             return (
-              <div key={realIdx} className="bg-panel border border-teal/40 rounded-xl px-3 py-2.5 flex flex-col gap-2 animate-fade-in">
+              <div key={realIdx} className="bg-panel border border-teal/40 rounded-control px-3 py-2.5 flex flex-col gap-2 animate-fade-in">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <input type="date" value={editDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => onEditDateChange(event.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] outline-none focus:border-teal" />
                   <input type="number" value={editHours} onChange={(event) => onEditHoursChange(event.target.value)} placeholder="Saat" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono outline-none focus:border-teal" />
@@ -78,7 +80,7 @@ export default function HistoryRecordList({
           }
 
           return (
-            <div key={realIdx} className="flex items-center gap-2 bg-panel border border-border rounded-xl px-3 py-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5 group">
+            <div key={realIdx} className="flex items-center gap-2 bg-panel border border-border rounded-control px-3 py-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5 group">
               <span className="text-[12px] text-text flex-shrink-0 w-20">{new Date(entry.date).toLocaleDateString("tr-TR")}</span>
               <span className="font-mono text-[12.5px] font-semibold text-text flex-1 text-center">
                 {entry.hours.toLocaleString("tr-TR")} sa
@@ -93,8 +95,8 @@ export default function HistoryRecordList({
                   </div>
                 ) : (
                   <div className="flex gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition">
-                    <button onClick={() => onStartEdit(realIdx)} className="text-[11px] text-teal px-1 hover:scale-110 transition">✏️</button>
-                    <button onClick={() => onRequestDelete(realIdx)} className="text-[11px] text-red px-1 hover:scale-110 transition">🗑️</button>
+                    <button type="button" onClick={() => onStartEdit(realIdx)} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-teal px-1 hover:bg-teal/10 transition" aria-label="Saat kaydını düzenle"><AppIcon name="edit" size={15} /></button>
+                    <button type="button" onClick={() => onRequestDelete(realIdx)} className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-red px-1 hover:bg-red/10 transition" aria-label="Saat kaydını sil"><AppIcon name="trash" size={15} /></button>
                   </div>
                 )
               )}
@@ -103,7 +105,7 @@ export default function HistoryRecordList({
         })}
       </div>
       {historyTotal > history.length && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-border bg-panel px-3 py-2">
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-control border border-border bg-panel px-3 py-2">
           <button
             type="button"
             disabled={historyPage <= 1 || historyLoading}

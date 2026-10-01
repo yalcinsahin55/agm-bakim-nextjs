@@ -57,14 +57,14 @@ export async function postRecord(req: NextRequest) {
     }
     const body = bodyResult.value;
 
-    // 🔒 Zod validasyonu: bozuk veri kapıdan geçemez
+    // Zod validasyonu: bozuk veri kapıdan geçemez
     const parsed = recordSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
     const {
-      client_request_id, engine_id, type_key, type_label, hour_at_completion, previous_working_hours, note, technician_note,
+      client_request_id, engine_id, type_key, type_label, hour_at_completion, previous_working_hours, note, technician_note, delay_reason, delay_note,
       photos_b64, photos, videos, report_attachments, pressure_reading, backdated, record_date, period, extra_types,
       other_technician_ids, other_technician_durations, checklist, completion_confirmation, component_transfers, time_tracking_version,
       maintenance_start_at, maintenance_end_at, technician_source, responsible_technician_id, responsible_technician_duration, external_service_name,
@@ -244,6 +244,8 @@ export async function postRecord(req: NextRequest) {
         maintenanceDurationMinutes,
         note,
         technicianNote: technician_note,
+        delayReason: delay_reason,
+        delayNote: delay_note,
         photosB64: photos_b64,
         photos,
         videos,

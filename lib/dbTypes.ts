@@ -37,6 +37,8 @@ export type MaintenanceRecordDocument = Omit<MaintenanceRecord, "_id" | "created
   client_request_id?: string;
   auto_created_tracking?: boolean;
   tracking_state_before?: unknown;
+  delay_reason?: "planned" | "parts" | "availability" | "technical" | "weather" | "external" | "other";
+  delay_note?: string;
 };
 
 export type PressureReadingDocument = Omit<PressureReading, "_id"> & {

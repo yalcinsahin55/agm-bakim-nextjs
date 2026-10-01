@@ -230,6 +230,12 @@ async function getAnalyticsSummary(req: NextRequest) {
       { $sort: { "_id.month": 1, "_id.iso_week_year": 1, "_id.iso_week": 1 } },
     ]).toArray(),
   ]);
+  const delayReasons = await aggregate<{ _id?: string; count?: number }>([
+    ...dateMatch,
+    { $match: { delay_reason: { $exists: true, $ne: "" } } },
+    { $group: { _id: "$delay_reason", count: { $sum: 1 } } },
+    { $sort: { count: -1, _id: 1 } },
+  ]).toArray();
   const technicianById = new Map(activeTechnicians.map((technician) => [technician.id, technician]));
   const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
 
@@ -282,6 +288,7 @@ async function getAnalyticsSummary(req: NextRequest) {
     monthly: monthly.map((row) => ({ month: row._id, count: row.count })),
     byEngine: byEngine.map((row) => ({ engine_id: row._id || null, engine: row.engine || "Bilinmeyen", count: row.count })),
     byType: byType.map((row) => ({ type: row._id || "Bilinmeyen", count: row.count })),
+    delayReasons: delayReasons.map((row) => ({ reason: row._id || "other", count: row.count || 0 })),
     byTechnician,
     byTechnicianType,
     total: totalRow.total || 0,

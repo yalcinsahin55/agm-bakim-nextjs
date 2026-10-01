@@ -29,7 +29,7 @@ export default function NotificationSummaryBar({ counts, unreadCount, refreshing
         </button>
         {unreadCount > 0 && (
           <button onClick={onMarkAllRead} disabled={busy} className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-teal/25 px-3 py-2 text-[11px] font-bold text-teal transition hover:bg-teal/10 disabled:opacity-50">
-            <span aria-hidden="true">✓</span>
+            <span aria-hidden="true"></span>
             {busy ? "İşaretleniyor..." : "Tümünü okundu işaretle"}
           </button>
         )}

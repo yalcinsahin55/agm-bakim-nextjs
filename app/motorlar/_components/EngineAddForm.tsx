@@ -12,7 +12,7 @@ interface EngineAddFormProps {
 export default function EngineAddForm({ name, hours, load, saving, onNameChange, onHoursChange, onLoadChange, onSubmit }: EngineAddFormProps) {
   return (
     <form onSubmit={onSubmit} className="bg-panel border border-teal/40 rounded-card p-3.5 mb-4 animate-fade-in">
-      <div className="text-[12px] font-bold text-teal mb-2">➕ Yeni Motor Ekle</div>
+      <div className="text-[12px] font-bold text-teal mb-2"> Yeni Motor Ekle</div>
       <div className="flex flex-col gap-2">
         <input
           required placeholder="Motor adı (örn. Motor 7)" value={name}
@@ -35,7 +35,7 @@ export default function EngineAddForm({ name, hours, load, saving, onNameChange,
           type="submit" disabled={saving}
           className="py-2.5 rounded-lg bg-teal text-on-teal text-[12.5px] font-extrabold disabled:opacity-50 hover:brightness-110 transition"
         >
-          {saving ? "Ekleniyor..." : "💾 Kaydet"}
+          {saving ? "Ekleniyor..." : " Kaydet"}
         </button>
       </div>
     </form>

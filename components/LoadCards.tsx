@@ -17,7 +17,7 @@ export default memo(function LoadCards({ engines }: LoadCardsProps) {
       {engines.map((e) => (
         <div
           key={e._id}
-          className="flex flex-col items-center gap-1 flex-shrink-0 w-[74px] md:w-auto p-2.5 rounded-xl bg-panel border border-border transition-all hover:border-borderlt hover:-translate-y-0.5"
+          className="flex flex-col items-center gap-1 flex-shrink-0 w-[74px] md:w-auto p-2.5 rounded-control bg-panel border border-border transition-all hover:border-borderlt hover:-translate-y-0.5"
         >
           <EngineBadge name={e.name} size={28} />
           <span className="text-[10px] text-muted font-semibold">{e.name}</span>
