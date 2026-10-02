@@ -15,6 +15,7 @@ import EquipmentInfoImportPanel from "./_components/EquipmentInfoImportPanel";
 import { FIELDS, emptyForm } from "./_lib/types";
 import type { EquipmentEngine, EquipmentInfo, EquipmentResponse } from "./_lib/types";
 import { fileToBase64 } from "./_lib/fileToBase64";
+import AppIcon from "@/components/ui/AppIcon";
 
 export default function MotorBilgiPage() {
   const router = useRouter();
@@ -225,7 +226,7 @@ export default function MotorBilgiPage() {
         )}
 
         <div className="relative mb-3">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-faint text-sm"></span>
+          <AppIcon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motor ara..." className="w-full bg-panel2 border border-border rounded-control pl-9 pr-3 py-2.5 text-sm outline-none focus:border-teal focus:ring-2 focus:ring-teal/20 transition" />
         </div>
 

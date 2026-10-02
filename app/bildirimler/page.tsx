@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
+import AppIcon from "@/components/ui/AppIcon";
 import Skeleton from "@/components/Skeleton";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import type { Notification } from "@/lib/types";
@@ -137,20 +138,20 @@ export default function NotificationsPage() {
           </div>
         ) : loadError ? (
           <div className="mt-4 rounded-card border border-red/30 bg-panel py-12 text-center">
-            <div className="mb-3 text-3xl"></div>
+            <AppIcon name="warning" size={34} className="mx-auto mb-3 text-red" />
             <p className="text-sm font-semibold text-text">{loadError}</p>
             <button onClick={() => { void load(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-bold text-teal">Tekrar dene</button>
           </div>
         ) : notifications.length === 0 ? (
           <div className="mt-4 rounded-card border border-border bg-panel py-14 text-center">
-            <div className="mb-3 text-4xl"></div>
+            <AppIcon name="bell" size={38} className="mx-auto mb-3 text-faint" />
             <p className="text-sm font-semibold text-text">Yeni bildirim yok.</p>
             <p className="mt-1 text-xs text-faint">Bakım durumları değiştiğinde burada göreceksiniz.</p>
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex items-center gap-2 text-[15px] font-bold text-text">
-              <span className="text-teal" aria-hidden="true"></span>
+              <AppIcon name="bell" size={17} className="text-teal" />
               Öncelikli bildirimler
             </div>
 

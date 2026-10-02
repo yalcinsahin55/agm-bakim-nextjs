@@ -1,5 +1,6 @@
 import type { Notification } from "@/lib/types";
 import { formatNotificationDate } from "../_lib/notificationGroups";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface SystemNotificationsProps {
   notifications: Notification[];
@@ -13,7 +14,7 @@ export default function SystemNotifications({ notifications, expanded, onToggle,
   return (
     <section className="overflow-hidden rounded-card border border-teal/30 bg-teal/[0.05]">
       <button onClick={onToggle} aria-expanded={expanded} className="flex min-h-[64px] w-full items-center gap-3 px-3.5 py-3 text-left transition hover:bg-white/[0.03]">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-control border border-teal/30 bg-teal/10 text-lg" aria-hidden="true"></span>
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-control border border-teal/30 bg-teal/10 text-teal" aria-hidden="true"><AppIcon name="bell" size={18} /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-[13px] font-extrabold text-text">Sistem bildirimleri</span>
           <span className="mt-0.5 block text-[11px] text-muted">{notifications.length} bildirim</span>

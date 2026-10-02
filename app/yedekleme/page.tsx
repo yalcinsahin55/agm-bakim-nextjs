@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
+import AppIcon from "@/components/ui/AppIcon";
 import BottomNav from "@/components/BottomNav";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
 
@@ -150,7 +151,7 @@ export default function YedeklemePage() {
           <div className="text-[13px] font-bold text-text">Güvenli yedekten geri yükle</div>
           <p className="mt-1">Bu işlem checksum doğrulamasından sonra yalnızca motor, bakım türü, bakım kaydı ve yağ analizi verilerini geri yükler. Production’da transaction, diğer ortamlarda kontrollü <b className="text-amber">merge</b> kullanılır. Kullanıcılar, şifreler, bildirimler ve büyük medya alanları geri yüklenmez; mevcut veriler silinmez.</p>
           <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-control border-2 border-dashed border-borderlt px-3 py-3 text-[12px] text-muted hover:border-amber">
-            <span className="text-lg"></span><span className="flex-1 truncate">{restoreFile ? restoreFile.name : "JSON yedek dosyası seç"}</span>
+            <AppIcon name="file" size={17} className="text-teal" /><span className="flex-1 truncate">{restoreFile ? restoreFile.name : "JSON yedek dosyası seç"}</span>
             <input type="file" accept="application/json,.json" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} className="hidden" />
           </label>
           <input value={restoreConfirm} onChange={(event) => setRestoreConfirm(event.target.value)} placeholder="Onay için RESTORE yazın" className="mt-2 w-full rounded-control border border-border bg-panel2 px-3 py-2.5 text-sm outline-none focus:border-red" autoComplete="off" />

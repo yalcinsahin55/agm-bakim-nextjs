@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass" | "close" | "edit" | "trash";
+export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass" | "close" | "edit" | "trash" | "calendar" | "gauge" | "droplet" | "file" | "users" | "shield" | "download" | "qr" | "database" | "search";
 
 const PATHS: Record<AppIconName, string> = {
   dashboard: "M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z",
@@ -24,6 +24,16 @@ const PATHS: Record<AppIconName, string> = {
   close: "M6 6l12 12M18 6 6 18",
   edit: "M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4",
   trash: "M5 7h14m-9 4v5m4-5v5M9 7V4h6v3m-9 0 1 13h10l1-13",
+  calendar: "M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3-2v4m6-4v4M4 9h16M8 13h2m2 0h2m-6 4h2m2 0h2",
+  gauge: "M4 16a8 8 0 1 1 16 0M12 12l3-3M7 18h10",
+  droplet: "M12 3s6 6.2 6 10a6 6 0 0 1-12 0c0-3.8 6-10 6-10Z",
+  file: "M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm7 0v5h4M8 13h8M8 17h6",
+  users: "M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1m6-9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-7a3 3 0 0 1 0 6m4 10v-1a4 4 0 0 0-3-3.87",
+  shield: "M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Zm-3 9 2 2 4-4",
+  download: "M12 3v12m-5-5 5 5 5-5M5 21h14",
+  qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM15 15h2v2h-2zm3 3h2v2h-2zm-3-3h5",
+  database: "M5 5c0-2 3-3 7-3s7 1 7 3-3 3-7 3-7-1-7-3Zm0 0v7c0 2 3 3 7 3s7-1 7-3V5m-14 7v7c0 2 3 3 7 3s7-1 7-3v-7",
+  search: "m20 20-4.5-4.5m2.5-5.5a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z",
 };
 
 export default function AppIcon({ name, size = 18, ...props }: { name: AppIconName; size?: number } & Omit<SVGProps<SVGSVGElement>, "name">) {

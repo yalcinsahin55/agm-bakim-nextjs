@@ -7,6 +7,7 @@ import type { PanelItem, StatusKey } from "@/lib/status";
 import { STATUS_LABELS } from "@/lib/status";
 import { buildOperationQueue, filterOperationItems } from "@/app/dashboard/_lib/operationQueue";
 import { ENGINE_STATUS_VIEW, type DashboardHealthRow } from "@/app/dashboard/_lib/types";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 
 type DashboardActionRailProps = {
   role: string | undefined;
@@ -24,16 +25,16 @@ type QuickAction = {
   accessPath?: string;
   label: string;
   description: string;
-  icon: string;
+  icon: AppIconName;
   tone: ActionTone;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "", tone: "amber" },
-  { href: "/kayitlar", label: "Bakım kayıtları", description: "Kayıt ara, geçmiş kanıtları incele.", icon: "▤", tone: "teal" },
-  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor bakım durumu", description: "Motor bakım durumuna git.", icon: "", tone: "purple" },
-  { href: "/bakim-turleri", label: "Bakım türleri", description: "Tür bazında tüm motorları listele.", icon: "▦", tone: "purple" },
-  { href: "/bildirimler", label: "Bildirim merkezi", description: "Dikkat isteyen son olayları aç.", icon: "!", tone: "red" },
+  { href: "/tamamla", label: "Bakım tamamla", description: "Saha kaydını başlat.", icon: "check", tone: "amber" },
+  { href: "/kayitlar", label: "Bakım kayıtları", description: "Kayıt ara, geçmiş kanıtları incele.", icon: "records", tone: "teal" },
+  { href: "#dashboard-health-details", accessPath: "/dashboard", label: "Motor bakım durumu", description: "Motor bakım durumuna git.", icon: "engine", tone: "purple" },
+  { href: "/bakim-turleri", label: "Bakım türleri", description: "Tür bazında tüm motorları listele.", icon: "tool", tone: "purple" },
+  { href: "/bildirimler", label: "Bildirim merkezi", description: "Dikkat isteyen son olayları aç.", icon: "bell", tone: "red" },
 ];
 
 const TONE_CLASSES: Record<ActionTone, { icon: string; title: string }> = {
@@ -236,7 +237,7 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
               const tone = TONE_CLASSES[action.tone];
               return (
                 <Link key={action.href} href={action.href} className="group flex min-h-[78px] min-w-0 items-center gap-2.5 rounded-control border border-border bg-panel p-3 transition hover:border-borderlt hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber">
-                  <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border text-sm font-extrabold ${tone.icon}`} aria-hidden="true">{action.icon}</span>
+                  <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${tone.icon}`} aria-hidden="true"><AppIcon name={action.icon} size={17} /></span>
                   <span className="min-w-0">
                     <span className={`block break-words text-[11px] font-extrabold text-text ${tone.title}`}>{action.label}</span>
                     <span className="mt-1 block text-[9px] leading-4 text-muted">{action.description}</span>
