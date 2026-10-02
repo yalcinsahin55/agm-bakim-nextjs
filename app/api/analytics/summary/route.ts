@@ -21,6 +21,7 @@ type TypeAggregateRow = { _id?: string; count?: number };
 type TotalsAggregateRow = { total?: number; thisCount?: number; lastCount?: number };
 type PeriodTotalsAggregateRow = { total?: number; total_duration_minutes?: number; technician_duration_minutes?: number; missing_duration?: number; technician_tasks?: number };
 type PeriodBreakdownRow = { _id?: { month?: string; iso_week_year?: number; iso_week?: number }; count?: number; total_duration_minutes?: number };
+type DelayBreakdownRow = { _id?: string | { month?: string; engine_id?: string; engine?: string; type?: string }; count?: number; total_duration_minutes?: number };
 type TechnicianAggregateRow = {
   _id?: unknown;
   technician?: unknown;
@@ -230,12 +231,12 @@ async function getAnalyticsSummary(req: NextRequest) {
       { $sort: { "_id.month": 1, "_id.iso_week_year": 1, "_id.iso_week": 1 } },
     ]).toArray(),
   ]);
-  const delayReasons = await aggregate<{ _id?: string; count?: number }>([
-    ...dateMatch,
-    { $match: { delay_reason: { $exists: true, $ne: "" } } },
-    { $group: { _id: "$delay_reason", count: { $sum: 1 } } },
-    { $sort: { count: -1, _id: 1 } },
-  ]).toArray();
+  const [delayReasons, delayByEngine, delayByType, delayByMonth] = await Promise.all([
+    aggregate<{ _id?: string; count?: number }>([...dateMatch, { $match: { delay_reason: { $exists: true, $ne: "" } } }, { $group: { _id: "$delay_reason", count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }]).toArray(),
+    aggregate<DelayBreakdownRow>([...dateMatch, { $match: { delay_reason: { $exists: true, $ne: "" } } }, { $group: { _id: { engine_id: "$engine_id", engine: "$engine_name" }, count: { $sum: 1 } } }, { $sort: { count: -1, "_id.engine": 1 } }, { $limit: 12 }]).toArray(),
+    aggregate<DelayBreakdownRow>([...dateMatch, { $match: { delay_reason: { $exists: true, $ne: "" } } }, { $group: { _id: "$type_label", count: { $sum: 1 } } }, { $sort: { count: -1, _id: 1 } }, { $limit: 12 }]).toArray(),
+    aggregate<DelayBreakdownRow>([...dateMatch, { $match: { delay_reason: { $exists: true, $ne: "" } } }, { $group: { _id: { month: { $dateToString: { format: "%Y-%m", date: "$maintenance_date", timezone: "Europe/Istanbul" } } }, count: { $sum: 1 }, total_duration_minutes: { $sum: { $ifNull: ["$maintenance_duration_minutes", 0] } } } }, { $sort: { "_id.month": 1 } }]).toArray(),
+  ]);
   const technicianById = new Map(activeTechnicians.map((technician) => [technician.id, technician]));
   const technicianByName = new Map(activeTechnicians.map((technician) => [normalizeTechnicianName(technician.full_name), technician]));
 
@@ -289,6 +290,9 @@ async function getAnalyticsSummary(req: NextRequest) {
     byEngine: byEngine.map((row) => ({ engine_id: row._id || null, engine: row.engine || "Bilinmeyen", count: row.count })),
     byType: byType.map((row) => ({ type: row._id || "Bilinmeyen", count: row.count })),
     delayReasons: delayReasons.map((row) => ({ reason: row._id || "other", count: row.count || 0 })),
+    delayByEngine: delayByEngine.map((row) => ({ engine_id: typeof row._id === "object" ? row._id.engine_id : "", engine: typeof row._id === "object" ? row._id.engine || "Bilinmeyen" : "Bilinmeyen", count: row.count || 0 })),
+    delayByType: delayByType.map((row) => ({ type: typeof row._id === "string" ? row._id : "Bilinmeyen", count: row.count || 0 })),
+    delayByMonth: delayByMonth.map((row) => ({ month: typeof row._id === "object" ? row._id.month || "" : "", count: row.count || 0, total_duration_minutes: row.total_duration_minutes || 0 })),
     byTechnician,
     byTechnicianType,
     total: totalRow.total || 0,

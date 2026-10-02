@@ -22,11 +22,14 @@ interface AnalyticsSummary {
   byEngine: Array<{ engine: string; count: number }>;
   byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; responsible_duration_minutes?: number; support_duration_minutes?: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
   delayReasons: Array<{ reason: string; count: number }>;
+  delayByEngine: Array<{ engine: string; count: number }>;
+  delayByType: Array<{ type: string; count: number }>;
+  delayByMonth: Array<{ month: string; count: number; total_duration_minutes: number }>;
   workPeriod?: "week" | "month" | "total";
   periodBreakdown?: Array<{ month: string; week: string; count: number; total_duration_minutes: number }>;
 }
 
-const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], delayReasons: [] };
+const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], delayReasons: [], delayByEngine: [], delayByType: [], delayByMonth: [] };
 
 function BarList({ items, color }: { items: BarItem[]; color: string }) {
   const max = Math.max(...items.map((item) => item.count), 1);
@@ -65,6 +68,9 @@ export default function IstatistikPage() {
         byEngine: Array.isArray(data.byEngine) ? data.byEngine : [],
         byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
         delayReasons: Array.isArray(data.delayReasons) ? data.delayReasons : [],
+        delayByEngine: Array.isArray(data.delayByEngine) ? data.delayByEngine : [],
+        delayByType: Array.isArray(data.delayByType) ? data.delayByType : [],
+        delayByMonth: Array.isArray(data.delayByMonth) ? data.delayByMonth : [],
         workPeriod: data.workPeriod,
         periodBreakdown: Array.isArray(data.periodBreakdown) ? data.periodBreakdown : [],
       };
@@ -95,6 +101,7 @@ export default function IstatistikPage() {
   const maxTechnicianDuration = Math.max(...topTechnicians.map((item) => Number(item.total_duration_minutes || 0)), 1);
   const selectedRangeLabel = filterMode === "date" && (selectedFrom || selectedTo) ? `${selectedFrom || "başlangıç"} – ${selectedTo || "bugün"}` : "Tüm kayıtlar";
   const delayReasonLabels: Record<string, string> = { planned: "Planlı bekleme", parts: "Parça bekleniyor", availability: "Personel uygunluğu", technical: "Teknik sorun", weather: "Hava koşulları", external: "Dış hizmet / tedarikçi", other: "Diğer" };
+  const delayTotal = summary.delayReasons.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div>
@@ -129,6 +136,8 @@ export default function IstatistikPage() {
             <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1">Bakım gecikme nedenleri</h2>
             <p className="mb-3 text-[10.5px] text-faint">Kayıt sırasında seçilen nedenler, aynı tarih filtresiyle özetlenir.</p>
             {summary.delayReasons.length ? <BarList items={summary.delayReasons.map((item) => ({ label: delayReasonLabels[item.reason] || item.reason, count: item.count }))} color="bg-red" /> : <p className="text-[11px] text-faint">Henüz gecikme nedeni kaydedilmedi.</p>}
+            {summary.delayReasons.length > 0 && <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-3"><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Motor bazında</div><BarList items={summary.delayByEngine.slice(0, 5).map((item) => ({ label: item.engine, count: item.count }))} color="bg-orange" /></div><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Bakım türü bazında</div><BarList items={summary.delayByType.slice(0, 5).map((item) => ({ label: item.type, count: item.count }))} color="bg-amber" /></div><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Aylık trend</div><BarList items={summary.delayByMonth.slice(-6).map((item) => ({ label: item.month, count: item.count }))} color="bg-teal" /></div></div>}
+            {delayTotal > 0 && <div className="mt-3 text-[10px] text-faint">Toplam {delayTotal} gecikme nedeni kaydı analiz edildi. Bu rapor, bakım tamamlanırken isteğe bağlı seçilen nedenlere dayanır.</div>}
           </div>
         </div>
       </div>
