@@ -544,6 +544,7 @@ export default function TamamlaPage() {
               videoBusy={videoBusy}
               submitting={submitting}
               evidenceReady={evidenceReady}
+              isOverdue={chosenItem?.status === "gecikmis"}
               setReportAttachments={setReportAttachments}
               setReportAttachmentBusy={setReportAttachmentBusy}
               onPhotosChange={handlePhotos}

@@ -20,6 +20,7 @@ type CompletionEvidenceSectionProps = {
   videoBusy: boolean;
   submitting: boolean;
   evidenceReady: boolean;
+  isOverdue?: boolean;
   setReportAttachments: Dispatch<SetStateAction<ReportAttachment[]>>;
   setReportAttachmentBusy: Dispatch<SetStateAction<boolean>>;
   onPhotosChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -46,6 +47,7 @@ export default function CompletionEvidenceSection({
   videoBusy,
   submitting,
   evidenceReady,
+  isOverdue = false,
   setReportAttachments,
   setReportAttachmentBusy,
   onPhotosChange,
@@ -63,6 +65,9 @@ export default function CompletionEvidenceSection({
         <h2 id="evidence-heading" className="mt-1 text-base font-extrabold text-text">Bakım kanıtları</h2>
         <p className="mt-1 text-[10px] text-faint">En az bir not, fotoğraf/video veya PDF/Excel/Word rapor eki eklenmesi zorunludur.</p>
       </div>
+      {isOverdue && <div className="mb-3 rounded-lg border border-amber/35 bg-amber/10 px-3 py-2.5 text-[10.5px] leading-4 text-amber" role="status">
+        Bu bakım periyodunu geçmiş görünüyor. Gecikme nedenini ve kısa açıklamayı isterseniz ekleyebilirsiniz; bu alanlar isteğe bağlıdır.
+      </div>}
       <label className="text-[10.5px] font-bold uppercase tracking-wide text-muted">
         Bakımcı notu
         <textarea value={techNote} onChange={(event) => setTechNote(event.target.value)} rows={3} className="mt-1.5 w-full resize-none rounded-lg border border-border bg-panel2 px-3 py-2.5 text-sm text-text outline-none focus:border-amber" />
