@@ -12,7 +12,6 @@ import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import DashboardActionRail from "@/components/DashboardActionRail";
 import StatCards from "@/components/StatCards";
 import DashboardAssistant from "./_components/DashboardAssistant";
-import DashboardAiBrief from "@/components/DashboardAiBrief";
 import EngineHealthDetails from "./_components/EngineHealthDetails";
 import { ENGINE_STATUS_VIEW, engineStatus, greetingPresentation, healthCardId } from "./_lib/types";
 import type { DashboardEngine, PanelResponse } from "./_lib/types";
@@ -178,8 +177,6 @@ export default function DashboardPage() {
           items={items}
           healthRows={healthRows}
         />
-
-        <DashboardAiBrief />
 
         <DashboardAssistant />
 
