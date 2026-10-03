@@ -24,6 +24,8 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 
 - [Raporlama ve dışa aktarma](#raporlama-ve-d%C4%B1%C5%9Fa-aktarma)
 
+- [Bakım planlama takvimi](#bak%C4%B1m-planlama-takvimi)
+
 - [Çevrimdışı çalışma](#%C3%A7evrimd%C4%B1%C5%9F%C4%B1-%C3%A7al%C4%B1%C5%9Fma)
 
 - [Medya depolama](#medya-depolama)
@@ -60,10 +62,10 @@ Avcıkoru Santrali’ndeki motorların periyodik bakım, çalışma saati, tekni
 | Ekip çalışması | Sorumlu teknisyen ile bakımda çalışan diğer teknisyenlerin ayrı tutulması; mekanik/elektromekanik türleri ve kişi bazlı katkı süreleri |
 | Dış servis | Garanti veya harici servis bakımlarının yönetici tarafından kaydedilmesi; bu kayıtların teknisyen performansından ayrılması |
 | QR workflow | Motor QR’ı, bakım türü QR’ı ve motor + bakım türü bağlantılarıyla mobil hızlı seçim |
-| Raporlama | Teknisyen performans raporu, motor bakım raporu, istatistikler, bakım türü ve motor dağılımları |
+| Raporlama | Teknisyen performans raporu, motor bakım raporu, istatistikler, motor/bakım türü dağılımları ve gecikme nedenleri analizi |
 | Bakım Asistanı | Salt okunur doğal dil raporu; tarih, teknisyen, bakım ve motor sorguları; kayıt oluşturma, düzenleme ve silme yetkisi yoktur |
 | Dışa aktarma | Bakım geçmişinin Excel ve PDF olarak alınması; tarih, başlangıç, bitiş ve toplam süre sütunları |
-| Teknik modüller | Yağ analizleri, karter fark basıncı, bakım periyotları, tahmini bakım ve takvim |
+| Teknik modüller | Yağ analizleri, karter fark basıncı, bakım periyotları, tahmini bakım, motor trendleri ve gerçek planlama takvimi |
 | Bildirimler | Uygulama içi bildirimler ve isteğe bağlı Web Push bildirimleri |
 | Operasyon güvenliği | Rol tabanlı erişim, audit log, rate limit, Zod doğrulaması, çevrimdışı kuyruk ve yedekleme |
 
@@ -200,7 +202,31 @@ Ekip bakımında bir işin süresi katılımcı teknisyenlerin katkısına ayrı
 
 ### Motor raporu ve istatistikler
 
-Motor bazlı rapor; bakım türünü, motor saatini, sorumlu ve ekip teknisyenlerini, başlangıç/bitiş tarih+saatlerini ve toplam süreyi gösterir. Dashboard ve istatistik ekranları bakım sayısı, dönem ve motor durumlarını özetler.
+Motor bazlı rapor; bakım türünü, motor saatini, sorumlu ve ekip teknisyenlerini, başlangıç/bitiş tarih+saatlerini ve toplam süreyi gösterir. `/saat-gecmisi` ekranında seçilen motor için motor saat geçmişiyle bakım kayıtları aynı görünümde karşılaştırılır; aylık bakım etkinliği, bakım sayısı ve çalışma saati trendleri gösterilir. Dashboard ve istatistik ekranları bakım sayısı, dönem ve motor durumlarını özetler.
+
+### Gecikme nedenleri analizi
+
+Bakım tamamlama ekranındaki gecikme nedeni alanı isteğe bağlıdır. Doldurulan nedenler `/istatistik` ekranında tarih filtresine uyan şekilde raporlanır:
+
+- Genel gecikme nedeni dağılımı.
+- Motor bazında gecikme yoğunluğu.
+- Bakım türü bazında gecikme yoğunluğu.
+- Aylık gecikme trendi.
+
+Bu rapor yalnızca bakım tamamlanırken kullanıcı tarafından seçilen nedenleri kullanır; boş bırakılan kayıtlar için yapay bir neden üretilmez.
+
+## Bakım planlama takvimi
+
+`/takvim` ekranı tahmini bakım tarihleri ile operasyon tarafından belirlenen gerçek planı birlikte gösterir. Tahmini tarih, motorun çalışma saatine ve bakım periyoduna göre hesaplanır; tek başına kesin randevu olarak değerlendirilmemelidir.
+
+Bir bakım kartındaki **Planla** veya **Planı düzenle** düğmesiyle aşağıdaki alanlar kaydedilebilir:
+
+- Gerçek plan tarihi.
+- Planlandı, devam ediyor, tamamlandı veya iptal edildi durumu.
+- Sorumlu teknisyen.
+- En fazla 500 karakterlik plan notu.
+
+Planlar `maintenance_plans` koleksiyonunda motor ve bakım türü anahtarıyla kalıcı olarak saklanır. Ay görünümünde planlanan tarih kullanılır; planı olmayan kayıtlar tahmini tarihte gösterilir. Plan yazma işlemi bakım yazma yetkisi, oturum, rate limit ve sunucu tarafı tarih/durum doğrulamalarından geçer. Plan oluşturmak bakım kaydını tamamlamaz; gerçek iş tamamlandıktan sonra **Bakım Tamamla** akışı ayrıca kullanılmalıdır.
 
 ### Excel ve PDF
 
@@ -264,11 +290,12 @@ Vercel Blob kurulumu için proje içinde `BLOB_STORE_ID` ve `BLOB_READ_WRITE_TOK
 
 ```
 app/
-├── api/                         # Auth, motor, kayıt, rapor, bildirim, asistan ve dışa aktarma API'leri
+├── api/                         # Auth, motor, kayıt, plan, rapor, bildirim, asistan ve dışa aktarma API'leri
 ├── dashboard/                   # Ana kontrol paneli ve asistan hızlı soruları
 ├── tamamla/                     # Bakım tamamlama ve QR deep-link akışı
 ├── kayitlar/                    # Bakım listesi, detay ve düzenleme
 ├── motorlar/                    # Motor listesi, sağlık görünümü ve motor QR'ı
+├── saat-gecmisi/                # Motor saat geçmişi ve bakım trendleri
 ├── teknisyen-raporu/            # Teknisyen performans ve süre raporu
 ├── asistan/                     # Salt okunur bakım raporu asistanı
 ├── rapor/                       # Motor bazlı yazdırılabilir rapor
@@ -278,7 +305,7 @@ app/
 ├── karter-basinci/              # Karter fark basıncı kayıtları
 ├── araliklar/                   # Bakım periyotları
 ├── tahmin/                      # Tahmini bakım ekranı
-├── takvim/                      # Bakım takvimi
+├── takvim/                      # Tahmini ve gerçek bakım planlama takvimi
 ├── audit-log/                   # İzlenebilirlik kayıtları
 ├── kullanicilar/                # Kullanıcı yönetimi
 └── ...
