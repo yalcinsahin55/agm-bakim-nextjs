@@ -8,6 +8,8 @@ export interface MaintenanceTrendRecord {
   maintenance_duration_minutes?: number;
   duration_minutes?: number;
   created_at?: string | Date;
+  group_id?: string;
+  technician_contributions?: Array<{ contribution_role?: string; duration_minutes?: number }>;
   hour_at_completion?: number;
   status?: string;
 }
@@ -29,13 +31,25 @@ function eventDate(record: MaintenanceTrendRecord): Date | null {
 }
 
 function durationMinutes(record: MaintenanceTrendRecord): number {
+  if (record.maintenance_start_at && record.maintenance_end_at) {
+    const start = new Date(record.maintenance_start_at).getTime();
+    const end = new Date(record.maintenance_end_at).getTime();
+    const calculated = (end - start) / 60_000;
+    if (Number.isFinite(calculated) && calculated > 0 && calculated <= 366 * 24 * 60) return calculated;
+  }
+  const responsibleDuration = record.technician_contributions?.find((item) => item.contribution_role === "responsible")?.duration_minutes;
+  if (Number.isFinite(Number(responsibleDuration)) && Number(responsibleDuration) > 0) return Number(responsibleDuration);
   const stored = Number(record.maintenance_duration_minutes ?? record.duration_minutes);
-  if (Number.isFinite(stored) && stored > 0) return stored;
-  if (!record.maintenance_start_at || !record.maintenance_end_at) return 0;
-  const start = new Date(record.maintenance_start_at).getTime();
-  const end = new Date(record.maintenance_end_at).getTime();
-  const calculated = (end - start) / 60_000;
-  return Number.isFinite(calculated) && calculated > 0 ? calculated : 0;
+  return Number.isFinite(stored) && stored > 0 && stored <= 366 * 24 * 60 ? stored : 0;
+}
+
+function uniqueMaintenanceEvents(records: MaintenanceTrendRecord[]): MaintenanceTrendRecord[] {
+  const grouped = new Map<string, MaintenanceTrendRecord>();
+  records.forEach((record) => {
+    const key = record.group_id ? `group:${record.group_id}` : `record:${record._id || `${eventDate(record)?.toISOString() || "unknown"}:${record.type_label || "unknown"}`}`;
+    if (!grouped.has(key)) grouped.set(key, record);
+  });
+  return [...grouped.values()];
 }
 
 function LineChart({ values, color, label, suffix = "" }: { values: number[]; color: string; label: string; suffix?: string }) {
@@ -59,9 +73,10 @@ function LineChart({ values, color, label, suffix = "" }: { values: number[]; co
 export default function MaintenanceTrendPanel({ records }: { records: MaintenanceTrendRecord[] }) {
   const now = new Date();
   const keys = Array.from({ length: 6 }, (_, index) => monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1))));
-  const counts = keys.map((key) => records.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).length);
-  const durations = keys.map((key) => records.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).reduce((sum, record) => sum + durationMinutes(record), 0) / 60);
-  const totalHours = records.reduce((sum, record) => sum + durationMinutes(record), 0) / 60;
+  const events = uniqueMaintenanceEvents(records);
+  const counts = keys.map((key) => events.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).length);
+  const durations = keys.map((key) => events.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).reduce((sum, record) => sum + durationMinutes(record), 0) / 60);
+  const totalHours = events.reduce((sum, record) => sum + durationMinutes(record), 0) / 60;
   const types = new Map<string, number>();
   records.forEach((record) => types.set(record.type_label || "Diğer", (types.get(record.type_label || "Diğer") || 0) + 1));
   const topTypes = [...types.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
