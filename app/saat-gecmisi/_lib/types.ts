@@ -2,6 +2,7 @@ export interface HistoryEntry {
   date: string;
   hours: number;
   load_kw?: number;
+  source?: "excel" | "manual" | "record";
 }
 
 export interface Engine {

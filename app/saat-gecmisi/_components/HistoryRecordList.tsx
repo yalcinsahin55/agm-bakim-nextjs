@@ -1,6 +1,6 @@
 import AppIcon from "@/components/ui/AppIcon";
 
-type HistoryEntry = { date: string; hours: number; load_kw?: number };
+type HistoryEntry = { date: string; hours: number; load_kw?: number; source?: "excel" | "manual" | "record" };
 
 interface HistoryRecordListProps {
   history: HistoryEntry[];
@@ -67,7 +67,7 @@ export default function HistoryRecordList({
             return (
               <div key={realIdx} className="bg-panel border border-teal/40 rounded-control px-3 py-2.5 flex flex-col gap-2 animate-fade-in">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <input type="date" value={editDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => onEditDateChange(event.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] outline-none focus:border-teal" />
+                  <input type="datetime-local" value={editDate} max={new Date().toISOString().slice(0, 16)} onChange={(event) => onEditDateChange(event.target.value)} className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] outline-none focus:border-teal" />
                   <input type="number" value={editHours} onChange={(event) => onEditHoursChange(event.target.value)} placeholder="Saat" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono outline-none focus:border-teal" />
                   <input type="number" value={editLoad} onChange={(event) => onEditLoadChange(event.target.value)} placeholder="Yük (kW)" className="bg-panel2 border border-border rounded-lg px-2 py-1.5 text-[12px] font-mono outline-none focus:border-teal" />
                 </div>
@@ -81,12 +81,12 @@ export default function HistoryRecordList({
 
           return (
             <div key={realIdx} className="flex items-center gap-2 bg-panel border border-border rounded-control px-3 py-2.5 hover:border-borderlt transition-all hover:-translate-y-0.5 group">
-              <span className="text-[12px] text-text flex-shrink-0 w-20">{new Date(entry.date).toLocaleDateString("tr-TR")}</span>
+              <span className="flex w-28 flex-shrink-0 flex-col text-[11px] text-text"><span>{new Date(entry.date).toLocaleDateString("tr-TR")}</span><span className="text-[9px] text-faint">{new Date(entry.date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}{entry.source ? ` · ${entry.source === "excel" ? "Excel" : entry.source === "record" ? "Bakım" : "Manuel"}` : ""}</span></span>
               <span className="font-mono text-[12.5px] font-semibold text-text flex-1 text-center">
                 {entry.hours.toLocaleString("tr-TR")} sa
                 {typeof entry.load_kw === "number" && <span className="text-teal"> · {entry.load_kw.toLocaleString("tr-TR")} kW</span>}
               </span>
-              <span className="font-mono text-[11.5px] text-amber flex-shrink-0">{delta === null ? "İlk kayıt" : `+${delta.toLocaleString("tr-TR")}`}</span>
+              <span className={`font-mono text-[11.5px] flex-shrink-0 ${delta !== null && delta < 0 ? "text-red" : "text-amber"}`}>{delta === null ? "İlk kayıt" : `${delta >= 0 ? "+" : ""}${delta.toLocaleString("tr-TR")}`}</span>
               {canEdit && (
                 confirmDeleteIdx === realIdx ? (
                   <div className="flex gap-1 flex-shrink-0">

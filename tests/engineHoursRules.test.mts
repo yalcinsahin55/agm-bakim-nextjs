@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getCompletionHourRule, getCompletionHourValidationError, latestExcelHourSnapshot } from "../lib/engineHoursRules.ts";
+import { compareEngineHistoryEntries } from "../lib/engineHistoryOrdering.ts";
+
+test("engine history orders same-day Excel measurements before maintenance records", () => {
+  const excel = { date: "2026-10-05T00:00:00.000Z", source: "excel" as const };
+  const maintenance = { date: "2026-10-05T08:30:00.000Z", source: "record" as const };
+  assert.ok(compareEngineHistoryEntries(excel, maintenance) < 0);
+  assert.ok(compareEngineHistoryEntries({ ...excel, date: maintenance.date }, maintenance) < 0);
+});
 
 test("latest Excel snapshot is selected by measurement time", () => {
   const snapshot = latestExcelHourSnapshot([

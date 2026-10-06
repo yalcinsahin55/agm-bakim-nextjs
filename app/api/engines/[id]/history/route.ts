@@ -9,7 +9,7 @@ import { withApiTiming } from "@/lib/performance";
 import { invalidateMaintenancePanelServerCache } from "@/lib/maintenancePanelServer";
 import { enforceApiRateLimit } from "@/lib/apiRateLimit";
 import type { EngineDocument } from "@/lib/dbTypes";
-import { readEngineHistory, replaceEngineHistory } from "@/lib/engineHistory";
+import { compareEngineHistoryEntries, readEngineHistory, replaceEngineHistory } from "@/lib/engineHistory";
 import { MAX_SMALL_JSON_REQUEST_BYTES, parseJsonBodyLimited } from "@/lib/requestLimits";
 
 export const dynamic = "force-dynamic";
@@ -43,8 +43,11 @@ function isValidHistoryEntry(value: unknown): value is HistoryEntry {
 }
 
 function sortHistory(history: HistoryEntry[]): HistoryEntry[] {
-  return [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return [...history].sort(compareEngineHistoryEntries);
 }
+
+const sourceOrderStage = { $addFields: { __source_order: { $switch: { branches: [{ case: { $eq: ["$source", "excel"] }, then: 0 }, { case: { $eq: ["$source", "manual"] }, then: 1 }, { case: { $eq: ["$source", "record"] }, then: 2 }], default: 9 } } } };
+const sourceOrderSort = { $sort: { date: 1, __source_order: 1, created_at: 1, _id: 1 } };
 
 async function persistHistory(enginesCol: Collection<EngineDocument>, engine: EngineDocument, history: HistoryEntry[], db: Db) {
   const sorted = sortHistory(history);
@@ -83,10 +86,17 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
     const fullHistory = snapshotTotal > 0 ? null : await readEngineHistory(db, id, engine.history);
     const total = snapshotTotal > 0 ? snapshotTotal : fullHistory?.length || 0;
     const data = snapshotTotal > 0
-      ? await snapshotCollection.find({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: 1, _id: 1 }, skip, limit }).toArray()
+      ? await snapshotCollection.aggregate<HistoryEntry>([
+          { $match: { engine_id: id } },
+          sourceOrderStage,
+          sourceOrderSort,
+          { $skip: skip },
+          { $limit: limit },
+          { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } },
+        ]).toArray()
       : (fullHistory || []).slice(skip, skip + limit);
     const summary = snapshotTotal > 0
-      ? { first: await snapshotCollection.findOne({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: 1, _id: 1 } }), last: await snapshotCollection.findOne({ engine_id: id }, { projection: { _id: 0, engine_id: 0, created_at: 0 }, sort: { date: -1, _id: -1 } }), has_load: true }
+      ? { first: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, sourceOrderStage, sourceOrderSort, { $limit: 1 }, { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } }]).toArray())[0] || null, last: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, sourceOrderStage, { $sort: { date: -1, __source_order: -1, created_at: -1, _id: -1 } }, { $limit: 1 }, { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } }]).toArray())[0] || null, has_load: true }
       : { first: fullHistory?.[0], last: fullHistory?.at(-1), has_load: fullHistory?.some((entry) => typeof entry.load_kw === "number") || false };
     return NextResponse.json({
       engine: { _id: engine._id, name: engine.name, hours: engine.hours, load_kw: engine.load_kw },

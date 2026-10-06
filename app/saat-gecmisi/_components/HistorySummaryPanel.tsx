@@ -11,6 +11,7 @@ interface HistorySummaryPanelProps {
 }
 
 export default function HistorySummaryPanel({ history, totalDelta, avgPerDay, historyTotal, hasLoadData }: HistorySummaryPanelProps) {
+  const pointLabel = (date: string) => new Date(date).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return (
     <>
       <div className="grid grid-cols-3 gap-2 mb-4">
@@ -38,12 +39,12 @@ export default function HistorySummaryPanel({ history, totalDelta, avgPerDay, hi
       </div>
 
       <div className="mb-4">
-        <MiniLineChart points={history.map((entry) => ({ y: entry.hours, label: new Date(entry.date).toLocaleDateString("tr-TR") }))} color="#e8952f" label="Çalışma Saati" />
+            <MiniLineChart points={history.map((entry) => ({ y: entry.hours, label: pointLabel(entry.date) }))} color="#e8952f" label="Çalışma Saati" />
       </div>
 
       {hasLoadData && (
         <div className="mb-4">
-          <MiniLineChart points={history.filter((entry) => typeof entry.load_kw === "number").map((entry) => ({ y: entry.load_kw as number, label: new Date(entry.date).toLocaleDateString("tr-TR") }))} color="#3fb5c4" label="Yük (kW)" />
+            <MiniLineChart points={history.filter((entry) => typeof entry.load_kw === "number").map((entry) => ({ y: entry.load_kw as number, label: pointLabel(entry.date) }))} color="#3fb5c4" label="Yük (kW)" />
         </div>
       )}
     </>

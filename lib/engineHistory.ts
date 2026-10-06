@@ -1,8 +1,11 @@
 import type { ClientSession, Db } from "mongodb";
 import type { EngineHistoryEntry } from "@/lib/types";
 import { engineHourSnapshotsCollection } from "@/lib/dbCollections";
+import { compareEngineHistoryEntries } from "./engineHistoryOrdering";
 
 export type EngineHistorySource = EngineHistoryEntry & { engine_id?: string };
+
+export { compareEngineHistoryEntries } from "./engineHistoryOrdering";
 
 function options(session?: ClientSession) {
   return session ? { session } : {};
@@ -29,11 +32,11 @@ export async function readEngineHistory(
   const snapshots = await engineHourSnapshotsCollection(db)
     .find({ engine_id: engineId }, { projection: { _id: 0, engine_id: 0 }, sort: { date: 1, _id: 1 }, ...options(session) })
     .toArray();
-  if (snapshots.length > 0) return snapshots.map((entry) => normalizeEntry(entry)).filter((entry): entry is EngineHistoryEntry => Boolean(entry));
+  if (snapshots.length > 0) return snapshots.map((entry) => normalizeEntry(entry)).filter((entry): entry is EngineHistoryEntry => Boolean(entry)).sort(compareEngineHistoryEntries);
   return (Array.isArray(legacyHistory) ? legacyHistory : [])
     .map((entry) => normalizeEntry(entry))
     .filter((entry): entry is EngineHistoryEntry => Boolean(entry))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort(compareEngineHistoryEntries);
 }
 
 export async function appendEngineHistoryEntry(

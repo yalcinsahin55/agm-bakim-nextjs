@@ -107,8 +107,10 @@ export default function SaatGecmisiPage() {
 
   function startEdit(realIdx: number) {
     const h = history[realIdx];
+    const localDate = new Date(h.date);
+    localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
     setEditingIdx(realIdx);
-    setEditDate(new Date(h.date).toISOString().slice(0, 10));
+    setEditDate(localDate.toISOString().slice(0, 16));
     setEditHours(String(h.hours));
     setEditLoad(typeof h.load_kw === "number" ? String(h.load_kw) : "");
     setConfirmDeleteIdx(null);
