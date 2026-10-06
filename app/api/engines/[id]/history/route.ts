@@ -55,14 +55,14 @@ function chronologyStages(engineId: string, descending = false) {
         let: { snapshotEngine: engineId, snapshotHours: "$hours" },
         pipeline: [
           { $match: { $expr: { $and: [{ $eq: ["$engine_id", "$$snapshotEngine"] }, { $eq: ["$hour_at_completion", "$$snapshotHours"] }] } } },
-          { $project: { _id: 0, __record_event_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
+          { $project: { _id: 0, __record_event_date: { $convert: { input: { $ifNull: ["$maintenance_start_at", "$created_at"] }, to: "date", onError: null, onNull: null } } } },
           { $sort: { __record_event_date: 1 } },
           { $limit: 1 },
         ],
         as: "__matching_records",
       },
     },
-    { $addFields: { __event_date: { $cond: [{ $and: [{ $eq: ["$source", "record"] }, { $gt: [{ $size: "$__matching_records" }, 0] }] }, { $arrayElemAt: ["$__matching_records.__record_event_date", 0] }, "$date"] } } },
+    { $addFields: { __event_date: { $ifNull: [{ $cond: [{ $and: [{ $eq: ["$source", "record"] }, { $gt: [{ $size: "$__matching_records" }, 0] }] }, { $arrayElemAt: ["$__matching_records.__record_event_date", 0] }, null] }, { $convert: { input: "$date", to: "date", onError: null, onNull: null } }] } } },
     sourceOrderStage,
     { $sort: descending ? { __event_date: -1, __source_order: -1, created_at: -1, _id: -1 } : { __event_date: 1, __source_order: 1, created_at: 1, _id: 1 } },
   ];
