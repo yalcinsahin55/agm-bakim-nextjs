@@ -5,7 +5,9 @@ export interface MaintenanceTrendRecord {
   type_label?: string;
   maintenance_start_at?: string | Date;
   maintenance_end_at?: string | Date;
+  maintenance_duration_minutes?: number;
   duration_minutes?: number;
+  created_at?: string | Date;
   hour_at_completion?: number;
   status?: string;
 }
@@ -17,6 +19,23 @@ function monthKey(date: Date): string {
 function formatMonth(key: string): string {
   const [year, month] = key.split("-").map(Number);
   return new Intl.DateTimeFormat("tr-TR", { month: "short" }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function eventDate(record: MaintenanceTrendRecord): Date | null {
+  const value = record.maintenance_start_at || record.created_at;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function durationMinutes(record: MaintenanceTrendRecord): number {
+  const stored = Number(record.maintenance_duration_minutes ?? record.duration_minutes);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  if (!record.maintenance_start_at || !record.maintenance_end_at) return 0;
+  const start = new Date(record.maintenance_start_at).getTime();
+  const end = new Date(record.maintenance_end_at).getTime();
+  const calculated = (end - start) / 60_000;
+  return Number.isFinite(calculated) && calculated > 0 ? calculated : 0;
 }
 
 function LineChart({ values, color, label, suffix = "" }: { values: number[]; color: string; label: string; suffix?: string }) {
@@ -40,9 +59,9 @@ function LineChart({ values, color, label, suffix = "" }: { values: number[]; co
 export default function MaintenanceTrendPanel({ records }: { records: MaintenanceTrendRecord[] }) {
   const now = new Date();
   const keys = Array.from({ length: 6 }, (_, index) => monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1))));
-  const counts = keys.map((key) => records.filter((record) => record.maintenance_start_at && monthKey(new Date(record.maintenance_start_at)) === key).length);
-  const durations = keys.map((key) => records.filter((record) => record.maintenance_start_at && monthKey(new Date(record.maintenance_start_at)) === key).reduce((sum, record) => sum + (Number(record.duration_minutes) || 0), 0) / 60);
-  const totalHours = records.reduce((sum, record) => sum + (Number(record.duration_minutes) || 0), 0) / 60;
+  const counts = keys.map((key) => records.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).length);
+  const durations = keys.map((key) => records.filter((record) => { const date = eventDate(record); return date && monthKey(date) === key; }).reduce((sum, record) => sum + durationMinutes(record), 0) / 60);
+  const totalHours = records.reduce((sum, record) => sum + durationMinutes(record), 0) / 60;
   const types = new Map<string, number>();
   records.forEach((record) => types.set(record.type_label || "Diğer", (types.get(record.type_label || "Diğer") || 0) + 1));
   const topTypes = [...types.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
