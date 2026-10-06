@@ -46,8 +46,29 @@ function sortHistory(history: HistoryEntry[]): HistoryEntry[] {
   return [...history].sort(compareEngineHistoryEntries);
 }
 
-const sourceOrderStage = { $addFields: { __source_order: { $switch: { branches: [{ case: { $eq: ["$source", "excel"] }, then: 0 }, { case: { $eq: ["$source", "manual"] }, then: 1 }, { case: { $eq: ["$source", "record"] }, then: 2 }], default: 9 } } } };
-const sourceOrderSort = { $sort: { date: 1, __source_order: 1, created_at: 1, _id: 1 } };
+function chronologyStages(engineId: string, descending = false) {
+  const sourceOrderStage = { $addFields: { __source_order: { $switch: { branches: [{ case: { $eq: ["$source", "excel"] }, then: 0 }, { case: { $eq: ["$source", "manual"] }, then: 1 }, { case: { $eq: ["$source", "record"] }, then: 2 }], default: 9 } } } };
+  return [
+    {
+      $lookup: {
+        from: "maintenance_records",
+        let: { snapshotEngine: engineId, snapshotHours: "$hours" },
+        pipeline: [
+          { $match: { $expr: { $and: [{ $eq: ["$engine_id", "$$snapshotEngine"] }, { $eq: ["$hour_at_completion", "$$snapshotHours"] }] } } },
+          { $project: { _id: 0, __record_event_date: { $ifNull: ["$maintenance_start_at", "$created_at"] } } },
+          { $sort: { __record_event_date: 1 } },
+          { $limit: 1 },
+        ],
+        as: "__matching_records",
+      },
+    },
+    { $addFields: { __event_date: { $cond: [{ $and: [{ $eq: ["$source", "record"] }, { $gt: [{ $size: "$__matching_records" }, 0] }] }, { $arrayElemAt: ["$__matching_records.__record_event_date", 0] }, "$date"] } } },
+    sourceOrderStage,
+    { $sort: descending ? { __event_date: -1, __source_order: -1, created_at: -1, _id: -1 } : { __event_date: 1, __source_order: 1, created_at: 1, _id: 1 } },
+  ];
+}
+
+const historyProjection = { $project: { _id: 0, date: "$__event_date", hours: 1, load_kw: 1, source: 1 } };
 
 async function persistHistory(enginesCol: Collection<EngineDocument>, engine: EngineDocument, history: HistoryEntry[], db: Db) {
   const sorted = sortHistory(history);
@@ -88,15 +109,14 @@ async function getHistory(req: NextRequest, context: { params: Promise<{ id: str
     const data = snapshotTotal > 0
       ? await snapshotCollection.aggregate<HistoryEntry>([
           { $match: { engine_id: id } },
-          sourceOrderStage,
-          sourceOrderSort,
+          ...chronologyStages(id),
           { $skip: skip },
           { $limit: limit },
-          { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } },
+          historyProjection,
         ]).toArray()
       : (fullHistory || []).slice(skip, skip + limit);
     const summary = snapshotTotal > 0
-      ? { first: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, sourceOrderStage, sourceOrderSort, { $limit: 1 }, { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } }]).toArray())[0] || null, last: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, sourceOrderStage, { $sort: { date: -1, __source_order: -1, created_at: -1, _id: -1 } }, { $limit: 1 }, { $project: { _id: 0, engine_id: 0, created_at: 0, __source_order: 0 } }]).toArray())[0] || null, has_load: true }
+      ? { first: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, ...chronologyStages(id), { $limit: 1 }, historyProjection]).toArray())[0] || null, last: (await snapshotCollection.aggregate<HistoryEntry>([{ $match: { engine_id: id } }, ...chronologyStages(id, true), { $limit: 1 }, historyProjection]).toArray())[0] || null, has_load: true }
       : { first: fullHistory?.[0], last: fullHistory?.at(-1), has_load: fullHistory?.some((entry) => typeof entry.load_kw === "number") || false };
     return NextResponse.json({
       engine: { _id: engine._id, name: engine.name, hours: engine.hours, load_kw: engine.load_kw },

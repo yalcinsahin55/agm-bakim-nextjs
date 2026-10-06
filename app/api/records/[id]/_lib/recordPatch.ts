@@ -348,7 +348,7 @@ export async function patchRecord(req: NextRequest, { params }: { params: Promis
     });
 
     if (typeof hour_at_completion === "number" && (engineChangeRequested || hour_at_completion !== record.hour_at_completion)) {
-      await updateEngineHoursIfAdvanced(db, effectiveEngineId, hour_at_completion, maintenance_start_at, session);
+      await updateEngineHoursIfAdvanced(db, effectiveEngineId, hour_at_completion, maintenance_start_at, session, record.created_at);
     }
 
     if (Array.isArray(extra_types) && extra_types.length > 0) {

@@ -334,7 +334,7 @@ export async function postRecord(req: NextRequest) {
         if (hour_at_completion > engine.hours) {
           operationStep = "update_engine_hours";
           const stamp = new Date();
-          const eventDate = maintenanceStartAt instanceof Date ? maintenanceStartAt.toISOString() : typeof maintenanceStartAt === "string" ? maintenanceStartAt : stamp.toISOString();
+          const eventDate = maintenanceStartAt instanceof Date ? maintenanceStartAt.toISOString() : typeof maintenanceStartAt === "string" ? maintenanceStartAt : createdAt.toISOString();
           const historyEntry = { date: eventDate, hours: hour_at_completion, load_kw: engine.load_kw || 0, source: "record" as const };
           await enginesCol.updateOne(
             { _id: engine_id, hours: { $lt: hour_at_completion } },
