@@ -24,6 +24,7 @@ const GROUPS: Array<{ title: string; admin?: boolean; items: Array<{ href: strin
     items: [
       { href: "/karter-basinci", icon: "gauge", label: "Karter Fark Basıncı", desc: "Ölçüm girişi ve geçmiş grafiği" },
       { href: "/saat-gecmisi", icon: "chart", label: "Saat Geçmişi", desc: "Motor bazlı grafik ve tablo" },
+      { href: "/bakim-trendleri", icon: "chart", label: "Bakım Trendleri", desc: "Bakım süresi, sıklığı ve tür analizi" },
       { href: "/yag-analizleri", icon: "flask", label: "Yağ Analizleri", desc: "Laboratuvar PDF raporları" },
       { href: "/araliklar", icon: "clock", label: "Bakım Aralıkları", desc: "Bakımlar arası saat farkı analizi" },
     ],

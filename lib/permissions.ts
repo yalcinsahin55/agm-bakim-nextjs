@@ -64,6 +64,7 @@ const VIEWER_ROUTES = [
   "/diger",
   "/karter-basinci",
   "/saat-gecmisi",
+  "/bakim-trendleri",
   "/yag-analizleri",
   "/araliklar",
   "/motor-bilgi",

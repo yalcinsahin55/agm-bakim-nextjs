@@ -23,14 +23,14 @@ function formatMonth(key: string): string {
   return new Intl.DateTimeFormat("tr-TR", { month: "short" }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
-function eventDate(record: MaintenanceTrendRecord): Date | null {
+export function eventDate(record: MaintenanceTrendRecord): Date | null {
   const value = record.maintenance_start_at || record.created_at;
   if (!value) return null;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
-function durationMinutes(record: MaintenanceTrendRecord): number {
+export function durationMinutes(record: MaintenanceTrendRecord): number {
   if (record.maintenance_start_at && record.maintenance_end_at) {
     const start = new Date(record.maintenance_start_at).getTime();
     const end = new Date(record.maintenance_end_at).getTime();
@@ -43,7 +43,7 @@ function durationMinutes(record: MaintenanceTrendRecord): number {
   return Number.isFinite(stored) && stored > 0 && stored <= 366 * 24 * 60 ? stored : 0;
 }
 
-function uniqueMaintenanceEvents(records: MaintenanceTrendRecord[]): MaintenanceTrendRecord[] {
+export function uniqueMaintenanceEvents(records: MaintenanceTrendRecord[]): MaintenanceTrendRecord[] {
   const grouped = new Map<string, MaintenanceTrendRecord>();
   records.forEach((record) => {
     const key = record.group_id ? `group:${record.group_id}` : `record:${record._id || `${eventDate(record)?.toISOString() || "unknown"}:${record.type_label || "unknown"}`}`;

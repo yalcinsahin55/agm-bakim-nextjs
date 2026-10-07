@@ -12,7 +12,6 @@ import { engineSortKey } from "@/lib/status";
 import { ApiFetchError, cachedFetch, invalidateCachedFetch } from "@/lib/apiCache";
 import HistoryRecordList from "./_components/HistoryRecordList";
 import HistorySummaryPanel from "./_components/HistorySummaryPanel";
-import MaintenanceTrendPanel, { type MaintenanceTrendRecord } from "./_components/MaintenanceTrendPanel";
 import type { Engine, HistoryEntry, HistoryResponse, HistorySummary } from "./_lib/types";
 import { HISTORY_PAGE_SIZE } from "./_lib/types";
 
@@ -29,8 +28,6 @@ export default function SaatGecmisiPage() {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyTotalPages, setHistoryTotalPages] = useState(0);
   const [historySummary, setHistorySummary] = useState<HistorySummary>({ first: null, last: null, has_load: false });
-  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceTrendRecord[]>([]);
-
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editHours, setEditHours] = useState("");
@@ -74,21 +71,8 @@ export default function SaatGecmisiPage() {
     }
   }
 
-  async function loadMaintenanceRecords() {
-    if (!selected) return;
-    try {
-      const res = await fetch(`/api/records?engine_id=${encodeURIComponent(selected)}&limit=1000&sort=asc`, { signal });
-      if (!res.ok) return;
-      const data = await res.json() as MaintenanceTrendRecord[] | { records?: MaintenanceTrendRecord[] };
-      setMaintenanceRecords(Array.isArray(data) ? data : data.records || []);
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) setMaintenanceRecords([]);
-    }
-  }
-
   useEffect(() => { if (!signal.aborted) void loadEngines(); }, [signal]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!signal.aborted) void loadHistory(historyPage); }, [selected, historyPage, signal]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!signal.aborted) void loadMaintenanceRecords(); }, [selected, signal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const engine = engines.find((e) => e._id === selected);
@@ -238,7 +222,6 @@ export default function SaatGecmisiPage() {
               onPrevious={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.max(1, page - 1)); }}
               onNext={() => { setEditingIdx(null); setConfirmDeleteIdx(null); setHistoryPage((page) => Math.min(historyTotalPages, page + 1)); }}
             />
-            <MaintenanceTrendPanel records={maintenanceRecords} />
           </div>
         )}
       </div>
