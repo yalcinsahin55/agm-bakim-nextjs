@@ -6,8 +6,10 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import GaugeCardList from "@/components/GaugeCardList";
+import AppIcon from "@/components/ui/AppIcon";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { forecastDaysFromRemainingHours } from "@/lib/forecastMath";
 import { STATUS_COLORS, STATUS_LABELS, type PanelItem, type StatusKey } from "@/lib/status";
 
 const MAX_DAILY_HOURS = 24;
@@ -35,6 +37,8 @@ export default function TahminPage() {
   const [statusFilter, setStatusFilter] = useState<"Tümü" | StatusKey>("Tümü");
   const [engineQuery, setEngineQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [targetYear, setTargetYear] = useState(String(new Date().getFullYear() + 1));
+  const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
 
   useEffect(() => {
     getMaintenancePanel()
@@ -75,7 +79,7 @@ export default function TahminPage() {
       .map((item) => {
         const daysLeft = item.remaining / MAX_DAILY_HOURS;
         const estimatedDate = new Date();
-        estimatedDate.setDate(estimatedDate.getDate() + Math.round(daysLeft));
+        estimatedDate.setDate(estimatedDate.getDate() + forecastDaysFromRemainingHours(item.remaining));
         return { ...item, daysLeft, estimatedDateLabel: estimatedDate.toLocaleDateString("tr-TR") };
       })
       .sort((a, b) => a.daysLeft - b.daysLeft || a.engine_name.localeCompare(b.engine_name, "tr"));
@@ -89,6 +93,32 @@ export default function TahminPage() {
     setStatusFilter("Tümü");
     setEngineQuery("");
   };
+
+  async function exportForecast(kind: "excel" | "pdf"): Promise<void> {
+    if (exporting) return;
+    setExporting(kind);
+    try {
+      const params = new URLSearchParams({ forecast: "1", target_year: targetYear });
+      if (typeFilter !== "Tümü") params.set("type_label", typeFilter);
+      if (statusFilter !== "Tümü") params.set("status", statusFilter === "gecikmis" ? "overdue" : statusFilter === "kritik" ? "critical" : statusFilter === "yaklasiyor" ? "upcoming" : "normal");
+      const response = await fetch(`/api/export/${kind}?${params.toString()}`, { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Plan raporu hazırlanamadı.");
+      const blob = await response.blob();
+      const filename = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] || `AGM_Bakim_Plani_${targetYear}.${kind === "excel" ? "xlsx" : "pdf"}`;
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Plan raporu indirilemedi.");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -172,6 +202,24 @@ export default function TahminPage() {
                 Filtreleri temizle
               </button>
             )}
+          </div>
+        </section>
+
+        <section className="bg-panel border border-amber/30 rounded-card p-3 md:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-amber font-bold">İleriye dönük plan çıktısı</p>
+              <h2 className="text-sm font-bold text-text mt-1">Yıllık bakım planı indir</h2>
+              <p className="text-xs text-muted mt-1">Seçilen yıla kadar oluşan tahmini bakım planını Excel veya PDF olarak al.</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="sr-only" htmlFor="forecast-target-year">Plan yılı</label>
+              <select id="forecast-target-year" value={targetYear} onChange={(event) => setTargetYear(event.target.value)} className="h-10 rounded-control border border-border bg-panel2 px-3 text-sm text-text">
+                {Array.from({ length: 6 }, (_, index) => new Date().getFullYear() + index + 1).map((year) => <option key={year} value={year}>{year} planı</option>)}
+              </select>
+              <button type="button" onClick={() => void exportForecast("excel")} disabled={Boolean(exporting)} className="inline-flex h-10 items-center justify-center gap-2 rounded-control bg-teal px-3 text-xs font-bold text-on-teal disabled:opacity-60"><AppIcon name="file" size={15} />{exporting === "excel" ? "Hazırlanıyor..." : "Excel indir"}</button>
+              <button type="button" onClick={() => void exportForecast("pdf")} disabled={Boolean(exporting)} className="inline-flex h-10 items-center justify-center gap-2 rounded-control bg-amber px-3 text-xs font-bold text-on-amber disabled:opacity-60"><AppIcon name="file" size={15} />{exporting === "pdf" ? "Hazırlanıyor..." : "PDF indir"}</button>
+            </div>
           </div>
         </section>
 
