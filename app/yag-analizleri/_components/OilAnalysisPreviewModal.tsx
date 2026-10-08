@@ -1,3 +1,4 @@
+import AppIcon from "@/components/ui/AppIcon";
 import type { OilAnalysis } from "../_lib/types";
 
 interface OilAnalysisPreviewModalProps {
@@ -23,9 +24,7 @@ export default function OilAnalysisPreviewModal({ analysis, onClose }: OilAnalys
               onClick={onClose}
               className="w-8 h-8 rounded-full bg-panel text-text text-lg hover:bg-red hover:text-white transition flex-shrink-0 ml-2"
               aria-label="Kapat"
-            >
-
-            </button>
+            ><AppIcon name="close" size={15} /></button>
           </div>
         </div>
         <iframe

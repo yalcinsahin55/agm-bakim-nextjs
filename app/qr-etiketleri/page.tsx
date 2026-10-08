@@ -137,7 +137,7 @@ export default function QrEtiketleriPage() {
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={selectAll} className="rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-muted transition hover:bg-panel2">{selected.length === items.length ? "Seçimi kaldır" : "Tümünü seç"}</button>
-              <button type="button" onClick={printLabels} disabled={!selectedItems.length} className="rounded-lg bg-amber px-3 py-2 text-[11px] font-extrabold text-on-amber transition hover:brightness-110 disabled:opacity-40">Yazdır / PDF al</button>
+              <button type="button" onClick={printLabels} disabled={!selectedItems.length} className="inline-flex items-center gap-1.5 rounded-lg bg-amber px-3 py-2 text-[11px] font-extrabold text-on-amber transition hover:brightness-110 disabled:opacity-40"><AppIcon name="file" size={14} />Yazdır / PDF al</button>
             </div>
           </div>
           <div className="mt-3 rounded-lg border border-amber/25 bg-amber/5 px-3 py-2 text-[10px] leading-relaxed text-muted">Hizalamanın doğru çıkması için yazdırma penceresinde <strong className="text-amber">Ölçek: %100 / Gerçek boyut</strong> ve <strong className="text-amber">Kenar boşlukları: Yok</strong> seçeneğini kullan.</div>

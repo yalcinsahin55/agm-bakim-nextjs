@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -183,7 +184,7 @@ export default function SaatGecmisiPage() {
 
         {historyTotal < 2 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="clock" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Bu motor için henüz yeterli geçmiş kaydı yok.</p>
             <p className="text-xs text-faint mt-1">En az 2 kayıt gerekli.</p>
           </div>

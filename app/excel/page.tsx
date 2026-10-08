@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface ExcelEngine {
   _id: string;
@@ -134,9 +135,7 @@ export default function ExcelPage() {
         {/* Rapor İndir */}
         <div className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all animate-fade-in">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-10 h-10 rounded-control bg-teal/10 border border-teal/30 flex items-center justify-center text-xl flex-shrink-0">
-
-            </div>
+            <div className="w-10 h-10 rounded-control bg-teal/10 border border-teal/30 flex items-center justify-center text-teal flex-shrink-0" aria-hidden="true"><AppIcon name="download" size={19} /></div>
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-bold text-text">Rapor İndir</div>
               <p className="text-[11.5px] text-muted mt-0.5 leading-relaxed">
@@ -159,11 +158,11 @@ export default function ExcelPage() {
             <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-control px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={reportUrl} className="block text-center py-3 rounded-control bg-gradient-to-b from-teal to-teal/80 text-on-teal font-extrabold text-[13px] hover:brightness-110 active:scale-[.98] transition">
-               Excel indir
+            <a href={reportUrl} download className="inline-flex items-center justify-center gap-2 rounded-control bg-gradient-to-b from-teal to-teal/80 py-3 text-[13px] font-extrabold text-on-teal transition hover:brightness-110 active:scale-[.98]">
+               <AppIcon name="file" size={16} /> Excel indir
             </a>
-            <a href={pdfReportUrl} className="block text-center py-3 rounded-control border border-amber/50 bg-amber/10 text-amber font-extrabold text-[13px] hover:bg-amber/20 active:scale-[.98] transition">
-               PDF indir
+            <a href={pdfReportUrl} download className="inline-flex items-center justify-center gap-2 rounded-control border border-amber/50 bg-amber/10 py-3 text-[13px] font-extrabold text-amber transition hover:bg-amber/20 active:scale-[.98]">
+               <AppIcon name="file" size={16} /> PDF indir
             </a>
           </div>
           <p className="mt-2 text-[10px] text-faint">Seçtiğin motor, bakım türü ve tarih filtreleri her iki çıktıya da uygulanır. Büyük geçmişlerde en fazla 5.000 kayıt dışa aktarılır.</p>
@@ -172,9 +171,7 @@ export default function ExcelPage() {
         {canImport && (
           <div className="bg-panel border border-border rounded-card p-3.5 hover:border-borderlt transition-all animate-fade-in">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-10 h-10 rounded-control bg-amber/10 border border-amber/30 flex items-center justify-center text-xl flex-shrink-0">
-
-            </div>
+            <div className="w-10 h-10 rounded-control bg-amber/10 border border-amber/30 flex items-center justify-center text-amber flex-shrink-0" aria-hidden="true"><AppIcon name="upload" size={19} /></div>
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-bold text-text">Motor Saatlerini / Yüklerini İçe Aktar</div>
               <p className="text-[11.5px] text-muted mt-0.5 leading-relaxed">
@@ -207,16 +204,16 @@ export default function ExcelPage() {
           </label>
 
           <div className="grid gap-2 sm:grid-cols-2">
-          <button onClick={doPreview} disabled={importing || !importFile} className="w-full py-3 rounded-control border border-teal/40 bg-teal/10 text-teal font-extrabold text-[13.5px] disabled:opacity-50 hover:bg-teal/20 active:scale-[.98] transition">
-            {importing ? "Doğrulanıyor..." : "Önizle ve doğrula"}
+          <button type="button" onClick={doPreview} disabled={importing || !importFile} className="inline-flex w-full items-center justify-center gap-2 rounded-control border border-teal/40 bg-teal/10 py-3 text-[13.5px] font-extrabold text-teal transition hover:bg-teal/20 active:scale-[.98] disabled:opacity-50">
+            <AppIcon name="search" size={16} /> {importing ? "Doğrulanıyor..." : "Önizle ve doğrula"}
           </button>
-          <button onClick={doImport} disabled={importing || !importFile || !preview || Boolean(preview.errors?.length)} className="w-full py-3 rounded-control bg-gradient-to-b from-amber-bright to-amber text-on-amber font-extrabold text-[13.5px] disabled:opacity-50 hover:brightness-110 active:scale-[.98] transition">
+          <button type="button" onClick={doImport} disabled={importing || !importFile || !preview || Boolean(preview.errors?.length)} className="inline-flex w-full items-center justify-center gap-2 rounded-control bg-gradient-to-b from-amber-bright to-amber py-3 text-[13.5px] font-extrabold text-on-amber transition hover:brightness-110 active:scale-[.98] disabled:opacity-50">
             {importing ? (
               <span className="inline-flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-on-amber/40 border-t-on-amber rounded-full animate-spin" />
                 İçe aktarılıyor...
               </span>
-            ) : "Onayla ve içe aktar"}
+            ) : <><AppIcon name="upload" size={16} /> Onayla ve içe aktar</>}
           </button>
           </div>
           {preview && <div className={`mt-3 rounded-control border p-3 text-[11px] ${preview.errors?.length ? "border-red/40 bg-red/10" : "border-teal/30 bg-teal/10"}`} aria-live="polite">

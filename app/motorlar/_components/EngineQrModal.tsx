@@ -1,3 +1,4 @@
+import AppIcon from "@/components/ui/AppIcon";
 import Image from "next/image";
 import type { MotorEngine } from "../_lib/types";
 
@@ -31,9 +32,7 @@ export default function EngineQrModal({ engine, qrDataUrl, onClose, onCopy }: En
             onClick={onClose}
             className="w-8 h-8 rounded-lg border border-border text-muted hover:text-text hover:bg-panel2 transition"
             aria-label="QR penceresini kapat"
-          >
-
-          </button>
+          ><AppIcon name="close" size={15} /></button>
         </div>
         <div className="bg-white rounded-control p-3 mx-auto w-fit min-h-[190px] min-w-[190px] flex items-center justify-center">
           {qrDataUrl ? <Image src={qrDataUrl} width={208} height={208} unoptimized alt={`${engine.name} motor QR kodu`} className="w-52 h-52" /> : <span className="text-xs text-slate-600">QR hazırlanıyor...</span>}

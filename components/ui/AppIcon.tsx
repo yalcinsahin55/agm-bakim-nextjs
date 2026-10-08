@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass" | "close" | "edit" | "trash" | "calendar" | "gauge" | "droplet" | "file" | "users" | "shield" | "download" | "qr" | "database" | "search";
+export type AppIconName = "dashboard" | "check" | "records" | "engine" | "tool" | "chart" | "flask" | "assistant" | "menu" | "lock" | "logout" | "sun" | "moon" | "bell" | "arrowUp" | "clock" | "warning" | "hourglass" | "close" | "edit" | "trash" | "calendar" | "gauge" | "droplet" | "file" | "users" | "shield" | "download" | "upload" | "qr" | "database" | "search";
 
 const PATHS: Record<AppIconName, string> = {
   dashboard: "M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z",
@@ -31,6 +31,7 @@ const PATHS: Record<AppIconName, string> = {
   users: "M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1m6-9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7-7a3 3 0 0 1 0 6m4 10v-1a4 4 0 0 0-3-3.87",
   shield: "M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Zm-3 9 2 2 4-4",
   download: "M12 3v12m-5-5 5 5 5-5M5 21h14",
+  upload: "M12 21V9m-5 5 5-5 5 5M5 3h14",
   qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM15 15h2v2h-2zm3 3h2v2h-2zm-3-3h5",
   database: "M5 5c0-2 3-3 7-3s7 1 7 3-3 3-7 3-7-1-7-3Zm0 0v7c0 2 3 3 7 3s7-1 7-3V5m-14 7v7c0 2 3 3 7 3s7-1 7-3v-7",
   search: "m20 20-4.5-4.5m2.5-5.5a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z",

@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -258,13 +259,13 @@ export default function MotorlarPage() {
         </div>
         {sorted.length === 0 && (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="engine" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Henüz motor eklenmemiş.</p>
           </div>
         )}
         {sorted.length > 0 && visibleEngines.length === 0 && (
           <div className="text-center py-10 bg-panel border border-border rounded-card">
-            <div className="text-3xl mb-3"></div>
+            <AppIcon name="engine" size={30} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Aramanla eşleşen motor bulunamadı.</p>
             <button type="button" onClick={() => setSearchTerm("")} className="mt-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-[11px] font-bold text-teal">Aramayı temizle</button>
           </div>

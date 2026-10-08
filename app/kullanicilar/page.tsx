@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -229,7 +230,7 @@ export default function KullanicilarPage() {
         <TopBar title="Kullanıcılar" />
         <div className="px-4 py-4">
           <div className="text-center py-12 bg-panel border border-red/30 rounded-card">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="users" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-red">{loadError}</p>
             <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
@@ -256,7 +257,7 @@ export default function KullanicilarPage() {
         <TopBar title="Kullanıcılar" />
         <div className="px-4 py-4">
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="users" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Bu sayfa yalnızca yöneticiler içindir.</p>
           </div>
         </div>
@@ -401,7 +402,7 @@ export default function KullanicilarPage() {
 
         {visibleUsers.length === 0 && (
           <div className="text-center py-12 bg-panel border border-border rounded-card">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="users" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">{users.length === 0 ? "Henüz kullanıcı yok." : "Filtrelere uygun kullanıcı bulunamadı."}</p>
           </div>
         )}

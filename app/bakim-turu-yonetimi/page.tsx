@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -262,7 +263,7 @@ export default function BakimTuruYonetimiPage() {
         <TopBar title="Bakım Türü Yönetimi" subtitle="" />
         <div className="px-4 py-4">
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="tool" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Bu sayfa yalnızca yöneticiler içindir.</p>
           </div>
         </div>
@@ -314,7 +315,7 @@ export default function BakimTuruYonetimiPage() {
 
         {sortedTypes.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="tool" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Henüz bakım türü eklenmemiş.</p>
           </div>
         ) : (

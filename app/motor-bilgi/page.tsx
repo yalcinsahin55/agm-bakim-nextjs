@@ -232,7 +232,7 @@ export default function MotorBilgiPage() {
 
         {rows.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name={query ? "search" : "engine"} size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">{query ? "Arama sonucu bulunamadı." : "Henüz motor bilgisi eklenmemiş."}</p>
             {query && (
               <button onClick={() => setQuery("")} className="mt-3 px-4 py-2 bg-panel2 text-sm rounded-lg border border-border hover:bg-panel transition">

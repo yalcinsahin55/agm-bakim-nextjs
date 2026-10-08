@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import { invalidateCachedFetch } from "@/lib/apiCache";
 import { useCurrentUser } from "@/lib/useCurrentUser";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface PasswordForm {
   current_password: string;
@@ -80,7 +81,7 @@ export default function HesapPage() {
         <TopBar title="Hesap ve Şifre" />
         <div className="px-4 py-4">
           <div className="mx-auto max-w-xl rounded-card border border-red/30 bg-panel p-5 text-center">
-            <div className="text-3xl"></div>
+            <AppIcon name="warning" size={30} className="mx-auto text-red" />
             <p className="mt-3 text-sm text-red">{error || "Oturum gerekli."}</p>
           </div>
         </div>

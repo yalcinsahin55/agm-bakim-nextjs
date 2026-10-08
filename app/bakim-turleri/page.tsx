@@ -10,6 +10,7 @@ import type { PanelItem, StatusKey } from "@/lib/status";
 import type { MaintenanceType } from "@/lib/types";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel, type PanelEngine } from "@/lib/maintenancePanel";
+import AppIcon from "@/components/ui/AppIcon";
 
 const STATUS_MAP: Record<string, StatusKey> = {
   "Gecikmiş": "gecikmis", "Kritik": "kritik", "Yaklaşıyor": "yaklasiyor", "Normal": "normal",
@@ -138,7 +139,7 @@ export default function BakimTurleriPage() {
 
         {rows.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="tool" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Bu filtre için kayıt bulunamadı.</p>
             <button
               onClick={() => { setSelectedKey(""); setStatusFilter("Tümü"); }}

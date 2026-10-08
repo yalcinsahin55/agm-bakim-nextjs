@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -190,7 +191,7 @@ export default function YagAnalizleriPage() {
         <TopBar title="Yağ Analizleri" />
         <div className="px-4 py-8 text-center">
           <div className="rounded-card border border-red/30 bg-panel p-6">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="droplet" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-red">{loadError}</p>
             <button onClick={() => { setLoading(true); void load(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>
@@ -252,7 +253,7 @@ export default function YagAnalizleriPage() {
 
         {filtered.length === 0 ? (
           <div className="text-center py-12 bg-panel border border-border rounded-card animate-fade-in">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="droplet" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-muted">Henüz analiz raporu eklenmemiş.</p>
           </div>
         ) : (

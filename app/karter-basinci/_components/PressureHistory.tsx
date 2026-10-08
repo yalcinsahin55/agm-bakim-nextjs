@@ -1,5 +1,6 @@
 import MiniLineChart from "./MiniLineChart";
 import type { PressureEngine, PressureReading } from "./types";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface PressureHistoryProps {
   historyEngines: PressureEngine[];
@@ -62,7 +63,7 @@ export default function PressureHistory({
 
       {engineHistory.length === 0 ? (
         <div className="text-center py-12 bg-panel border border-border rounded-card">
-          <div className="text-4xl mb-3"></div>
+          <AppIcon name="gauge" size={34} className="mx-auto mb-3 text-faint" />
           <p className="text-sm text-muted">Bu motor için henüz ölçüm kaydı yok.</p>
           <p className="text-xs text-faint mt-1">Yeni ölçüm ekleyerek başlayın.</p>
         </div>
@@ -85,9 +86,7 @@ export default function PressureHistory({
                 <button
                   onClick={() => onRemove(reading._id)}
                   className="text-[11px] text-red font-bold flex-shrink-0 ml-2 opacity-60 group-hover:opacity-100 hover:scale-110 transition"
-                >
-
-                </button>
+                ><AppIcon name="trash" size={15} /></button>
               )}
             </div>
           ))}

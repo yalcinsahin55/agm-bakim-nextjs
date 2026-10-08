@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
+import AppIcon from "@/components/ui/AppIcon";
 
 interface AuditItem {
   _id: string;
@@ -309,7 +310,7 @@ export default function AuditLogPage() {
         <section className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="rounded-card border border-border bg-panel p-8 text-center text-muted">
-              <div className="mb-2 text-3xl"></div>
+              <AppIcon name="database" size={30} className="mx-auto mb-2 text-faint" />
               <div className="text-sm font-bold">Kayıt bulunamadı</div>
               <div className="mt-1 text-[11px] text-faint">Seçili filtreleri genişleterek tekrar deneyebilirsiniz.</div>
             </div>
@@ -365,7 +366,7 @@ export default function AuditLogPage() {
                 <div className="text-[13px] font-bold text-text">İşlem ayrıntısı</div>
                 <div className="mt-1 text-[10.5px] text-faint">{formatDate(selected.created_at)} · {entityLabels[selected.entity] || selected.entity}</div>
               </div>
-              <button type="button" onClick={() => setSelected(null)} className="h-8 w-8 flex-shrink-0 rounded-full bg-panel2 text-lg text-muted transition hover:bg-red hover:text-white" aria-label="Kapat"></button>
+              <button type="button" onClick={() => setSelected(null)} className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-panel2 text-muted transition hover:bg-red hover:text-white" aria-label="Kapat"><AppIcon name="close" size={15} /></button>
             </div>
             <div className="overflow-y-auto px-4 py-3">
               <div className="rounded-control border border-border bg-panel2 p-3">

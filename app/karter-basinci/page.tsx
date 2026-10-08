@@ -1,4 +1,5 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -216,7 +217,7 @@ export default function KarterBasinciPage() {
         <TopBar title="Karter Fark Basıncı" />
         <div className="px-4 py-8 text-center">
           <div className="rounded-card border border-red/30 bg-panel p-6">
-            <div className="text-4xl mb-3"></div>
+            <AppIcon name="warning" size={34} className="mx-auto mb-3 text-faint" />
             <p className="text-sm text-red">{loadError}</p>
             <button       onClick={() => { void reload(); }} className="mt-4 rounded-control border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm font-bold text-teal">Tekrar dene</button>
           </div>

@@ -1,10 +1,11 @@
 "use client";
+import AppIcon from "@/components/ui/AppIcon";
 
 export default function Error({ reset }: { reset: () => void }) {
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-6">
       <div className="text-center bg-panel border border-border rounded-card p-6 max-w-sm w-full animate-fade-in">
-        <div className="text-4xl mb-3"></div>
+        <AppIcon name="warning" size={34} className="mx-auto mb-3 text-faint" />
         <div className="font-display text-xl font-bold uppercase tracking-wide mb-1">Bir şeyler ters gitti</div>
         <p className="text-[12px] text-muted mb-4 leading-relaxed">
           Sayfa yüklenirken beklenmeyen bir hata oluştu. Tekrar deneyebilirsin.
