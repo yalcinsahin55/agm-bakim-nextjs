@@ -8,16 +8,21 @@ import Skeleton from "@/components/Skeleton";
 import AppIcon from "@/components/ui/AppIcon";
 import { ApiFetchError } from "@/lib/apiCache";
 import { getMaintenancePanel } from "@/lib/maintenancePanel";
+import { forecastDaysFromRemainingHours } from "@/lib/forecastMath";
 import type { PanelItem, StatusKey } from "@/lib/status";
 
 const statusLabel: Record<string, string> = { gecikmis: "Gecikmiş", kritik: "Kritik", yaklasiyor: "Yaklaşıyor", normal: "Normal" };
 const statusClass: Record<string, string> = { gecikmis: "text-red border-red/30 bg-red/5", kritik: "text-orange border-orange/30 bg-orange/5", yaklasiyor: "text-amber border-amber/30 bg-amber/5", normal: "text-green border-green/30 bg-green/5" };
-const DAY = 24 * 60 * 60 * 1000;
 type Plan = { engine_id: string; type_key: string; planned_date: string; status: "planned" | "in_progress" | "completed" | "cancelled"; technician_id?: string; note?: string };
 type Technician = { id: string; full_name: string };
 
 function dateKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function forecastDate(item: PanelItem) { return new Date(Date.now() + Math.max(item.remaining, 0) * DAY); }
+function forecastDate(item: PanelItem) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + forecastDaysFromRemainingHours(item.remaining));
+  return date;
+}
 
 export default function TakvimPage() {
   const router = useRouter();

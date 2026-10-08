@@ -1,7 +1,8 @@
 import type { Engine, MaintenanceType } from "@/lib/types";
 import { buildItems, engineSortKey, STATUS_LABELS, type PanelItem } from "@/lib/status";
+import { FORECAST_DAILY_ENGINE_HOURS, forecastDaysFromRemainingHours } from "@/lib/forecastMath";
 
-export const FORECAST_DAILY_ENGINE_HOURS = 24;
+export { FORECAST_DAILY_ENGINE_HOURS } from "@/lib/forecastMath";
 export const MAX_FORECAST_ROWS = 5_000;
 
 export type MaintenanceForecastCategory = "overdue" | "before_target_year" | "target_year" | "current_plan";
@@ -79,7 +80,8 @@ export function dateKeyLabel(value: string): string {
 
 export function estimatedMaintenanceDateKey(remainingHours: number, now = new Date()): string {
   const estimatedDate = new Date(`${turkeyDateKey(now)}T00:00:00.000Z`);
-  estimatedDate.setUTCDate(estimatedDate.getUTCDate() + Math.round(remainingHours / FORECAST_DAILY_ENGINE_HOURS));
+  const estimatedDays = forecastDaysFromRemainingHours(remainingHours);
+  estimatedDate.setUTCDate(estimatedDate.getUTCDate() + estimatedDays);
   return estimatedDate.toISOString().slice(0, 10);
 }
 

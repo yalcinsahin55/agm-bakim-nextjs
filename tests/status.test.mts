@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildItems, remainingHours, statusFor } from "../lib/status.ts";
+import { forecastDaysFromRemainingHours } from "../lib/forecastMath.ts";
 
 test("status thresholds remain explicit and ordered", () => {
   assert.equal(remainingHours(18_450, 17_000, 2_000), 550);
@@ -8,6 +9,13 @@ test("status thresholds remain explicit and ordered", () => {
   assert.equal(statusFor(100), "kritik");
   assert.equal(statusFor(250), "yaklasiyor");
   assert.equal(statusFor(251), "normal");
+});
+
+test("forecast converts remaining motor hours into calendar days at 24 hours per day", () => {
+  assert.equal(forecastDaysFromRemainingHours(24), 1);
+  assert.equal(forecastDaysFromRemainingHours(25), 2);
+  assert.equal(forecastDaysFromRemainingHours(19_680), 820);
+  assert.equal(forecastDaysFromRemainingHours(-1), 0);
 });
 
 test("buildItems calculates scoped maintenance status and remaining hours", () => {
