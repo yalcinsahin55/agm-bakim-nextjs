@@ -13,6 +13,7 @@ import {
   type AssistantExportPreset,
   type ExportColumnId,
 } from "@/lib/assistantExport";
+import AppIcon from "@/components/ui/AppIcon";
 
 const PRESET_LABELS: Record<AssistantExportPreset, string> = {
   summary: "Yönetici özeti",
@@ -205,8 +206,8 @@ export default function AssistantExportPanel({ question, intent, data, exportQue
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span className="mr-auto text-[9px] font-bold uppercase tracking-wide text-amber">Bu cevabın raporu</span>
       <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="rounded-lg border border-amber/35 bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-amber hover:border-amber/70">{open ? "Paneli kapat" : "Özelleştir"}</button>
-      <button type="button" onClick={() => void download("pdf")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted hover:border-amber/50 hover:text-amber disabled:opacity-50">{busy === "pdf" ? "Hazırlanıyor..." : "PDF indir"}</button>
-      <button type="button" onClick={() => void download("excel")} disabled={Boolean(busy)} className="rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted hover:border-green/50 hover:text-green disabled:opacity-50">{busy === "excel" ? "Hazırlanıyor..." : "Excel indir"}</button>
+      <button type="button" onClick={() => void download("pdf")} disabled={Boolean(busy)} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted hover:border-amber/50 hover:text-amber disabled:opacity-50"><AppIcon name="file" size={13} />{busy === "pdf" ? "Hazırlanıyor..." : "PDF indir"}</button>
+      <button type="button" onClick={() => void download("excel")} disabled={Boolean(busy)} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-panel2 px-2.5 py-1.5 text-[10px] font-bold text-muted hover:border-green/50 hover:text-green disabled:opacity-50"><AppIcon name="download" size={13} />{busy === "excel" ? "Hazırlanıyor..." : "Excel indir"}</button>
     </div>
     {open && <div className="mt-2 grid min-w-0 gap-3 border-t border-amber/15 pt-2.5">
       <div className="rounded-lg border border-border bg-panel2 px-2.5 py-2">
