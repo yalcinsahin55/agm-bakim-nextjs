@@ -64,6 +64,7 @@ export default function ExcelPage() {
   const [reportType, setReportType] = useState("");
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
+  const [reportDownloading, setReportDownloading] = useState<"excel" | "pdf" | null>(null);
   const importDatePart = importDate.slice(0, 10);
   const importTimePart = importDate.slice(11, 16);
   const todayDate = localDateValue();
@@ -128,6 +129,33 @@ export default function ExcelPage() {
   function doPreview() { void sendImport(true); }
   function doImport() { void sendImport(false); }
 
+  async function downloadReport(url: string, kind: "excel" | "pdf"): Promise<void> {
+    if (reportDownloading) return;
+    setReportDownloading(kind);
+    try {
+      const response = await fetch(url, { credentials: "same-origin" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error || "Rapor hazırlanamadı.");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `AGM_Bakim_Raporu.${kind === "excel" ? "xlsx" : "pdf"}`;
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Rapor indirilemedi.");
+    } finally {
+      setReportDownloading(null);
+    }
+  }
+
   return (
     <div>
       <TopBar title="Excel Dışa / İçe Aktar" subtitle="Motor verilerini toplu yönetin" />
@@ -158,12 +186,12 @@ export default function ExcelPage() {
             <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)} className="bg-panel2 border border-border rounded-control px-2.5 py-2.5 text-[12px] outline-none focus:border-teal" aria-label="Bitiş tarihi" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <a href={reportUrl} download className="inline-flex items-center justify-center gap-2 rounded-control bg-gradient-to-b from-teal to-teal/80 py-3 text-[13px] font-extrabold text-on-teal transition hover:brightness-110 active:scale-[.98]">
-               <AppIcon name="file" size={16} /> Excel indir
-            </a>
-            <a href={pdfReportUrl} download className="inline-flex items-center justify-center gap-2 rounded-control border border-amber/50 bg-amber/10 py-3 text-[13px] font-extrabold text-amber transition hover:bg-amber/20 active:scale-[.98]">
-               <AppIcon name="file" size={16} /> PDF indir
-            </a>
+            <button type="button" onClick={() => void downloadReport(reportUrl, "excel")} disabled={Boolean(reportDownloading)} className="inline-flex items-center justify-center gap-2 rounded-control bg-gradient-to-b from-teal to-teal/80 py-3 text-[13px] font-extrabold text-on-teal transition hover:brightness-110 active:scale-[.98] disabled:cursor-wait disabled:opacity-60">
+               <AppIcon name="file" size={16} /> {reportDownloading === "excel" ? "Excel hazırlanıyor..." : "Excel indir"}
+            </button>
+            <button type="button" onClick={() => void downloadReport(pdfReportUrl, "pdf")} disabled={Boolean(reportDownloading)} className="inline-flex items-center justify-center gap-2 rounded-control border border-amber/50 bg-amber/10 py-3 text-[13px] font-extrabold text-amber transition hover:bg-amber/20 active:scale-[.98] disabled:cursor-wait disabled:opacity-60">
+               <AppIcon name="file" size={16} /> {reportDownloading === "pdf" ? "PDF hazırlanıyor..." : "PDF indir"}
+            </button>
           </div>
           <p className="mt-2 text-[10px] text-faint">Seçtiğin motor, bakım türü ve tarih filtreleri her iki çıktıya da uygulanır. Büyük geçmişlerde en fazla 5.000 kayıt dışa aktarılır.</p>
         </div>

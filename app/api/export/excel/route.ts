@@ -30,6 +30,10 @@ function uniqueSheetName(label: string, used: Set<string>): string {
   return name;
 }
 
+function safeFilenamePart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "rapor";
+}
+
 async function createForecastExcel(context: ForecastExportContext): Promise<Response> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "AGM Bakım Merkezi";
@@ -123,6 +127,7 @@ async function getExcelExport(req: NextRequest) {
     { projection: { _id: 1, key: 1, label: 1, default_period_hours: 1, engine_scope: 1, engine_states: 1 } },
   ).toArray();
   const items = buildItems(engines, types).filter((item) => !typeFilter || item.type_label === typeFilter);
+  const selectedEngine = engineFilter ? engines.find((engine) => String(engine._id) === engineFilter || engine.name === engineFilter) : null;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "AGM Bakım Merkezi";
@@ -140,8 +145,16 @@ async function getExcelExport(req: NextRequest) {
     { "ALAN": "Rapor", "DEĞER": "AGM Motor Bakım Raporu" },
     { "ALAN": "Marka", "DEĞER": "Yeşil Global Enerji · AGM Bakım Merkezi" },
     { "ALAN": "Rapor tarihi", "DEĞER": new Date().toLocaleDateString("tr-TR") },
-    { "ALAN": "Motor filtresi", "DEĞER": engineFilter || "Tümü" },
+    { "ALAN": "Motor filtresi", "DEĞER": selectedEngine?.name || engineFilter || "Tümü" },
     { "ALAN": "Bakım türü filtresi", "DEĞER": typeFilter || "Tümü" },
+    { "ALAN": "Başlangıç tarihi", "DEĞER": searchParams.get("from") || "Tümü" },
+    { "ALAN": "Bitiş tarihi", "DEĞER": searchParams.get("to") || "Tümü" },
+    { "ALAN": "Motor sayısı", "DEĞER": engines.length },
+    { "ALAN": "Bakım takip satırı", "DEĞER": items.length },
+    { "ALAN": "Gecikmiş bakım", "DEĞER": items.filter((item) => item.status === "gecikmis").length },
+    { "ALAN": "Kritik bakım", "DEĞER": items.filter((item) => item.status === "kritik").length },
+    { "ALAN": "Yaklaşan bakım", "DEĞER": items.filter((item) => item.status === "yaklasiyor").length },
+    { "ALAN": "Normal bakım", "DEĞER": items.filter((item) => item.status === "normal").length },
   ]);
   if (logoId !== null) summarySheet.addImage(logoId, { tl: { col: 3, row: 0 }, ext: { width: 180, height: 27 } });
 
@@ -197,9 +210,17 @@ async function getExcelExport(req: NextRequest) {
     };
   });
   addDataSheet("Bakım Geçmişi", historyRows);
+  summarySheet.addRows([
+    ["Dışa aktarılan bakım kaydı", historyRows.length],
+    ["Kayıt sınırı", "En fazla 5.000 kayıt"],
+    ["Yönetici notu", "Gecikmiş ve kritik bakım sayıları, seçilen filtreler uygulandıktan sonra hesaplanmıştır."],
+  ]);
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `AGM_Motor_Bakim_Raporu_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filenameParts = ["AGM_Motor_Bakim_Raporu", selectedEngine?.name, typeFilter, searchParams.get("from"), searchParams.get("to"), new Date().toISOString().slice(0, 10)]
+    .filter(Boolean)
+    .map((part) => safeFilenamePart(String(part)));
+  const filename = `${filenameParts.join("_")}.xlsx`;
   return new Response(Buffer.from(buffer as ArrayBuffer), {
     status: 200,
     headers: {

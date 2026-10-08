@@ -147,6 +147,7 @@ async function createPdf(req: NextRequest) {
     return createForecastPdf(user, await buildForecastExportContext(db, searchParams));
   }
   const engineFilter = searchParams.get("engine_id")?.trim() || null;
+  const typeFilter = searchParams.get("type_label")?.trim() || null;
   const query = await buildMaintenanceRecordQuery(db, searchParams);
 
   const selectedEngine = engineFilter
@@ -247,7 +248,15 @@ async function createPdf(req: NextRequest) {
 
   doc.font(fontRegular).fontSize(7.5).fillColor("#6b7280").text(`Oluşturan: ${user.full_name || "AGM Bakım Merkezi"}`, left, doc.page.height - 28, { width: tableWidth, align: "left" });
   const buffer = await pdfBuffer(doc);
-  const filename = `AGM_Bakim_Gecmisi_${new Date().toISOString().slice(0, 10)}.pdf`;
+  const filenameParts = [
+    "AGM_Bakim_Gecmisi",
+    selectedEngine?.name,
+    typeFilter,
+    searchParams.get("from"),
+    searchParams.get("to"),
+    new Date().toISOString().slice(0, 10),
+  ].filter(Boolean).map((part) => safeFilenamePart(String(part)));
+  const filename = `${filenameParts.join("_")}.pdf`;
   return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
