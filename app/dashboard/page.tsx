@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { cachedFetch } from "@/lib/apiCache";
 import { usePageData } from "@/lib/usePageData";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
+import { averageNonZeroLoad } from "@/lib/loadMath";
 import DashboardActionRail from "@/components/DashboardActionRail";
 import StatCards from "@/components/StatCards";
 import DashboardAssistant from "./_components/DashboardAssistant";
@@ -68,7 +69,7 @@ export default function DashboardPage() {
 
   const sortedEngines = useMemo(() => [...engines].sort((a, b) => engineSortKey(a.name) - engineSortKey(b.name)), [engines]);
   const totalLoad = sortedEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0);
-  const avgLoad = sortedEngines.length ? totalLoad / sortedEngines.length : 0;
+  const avgLoad = averageNonZeroLoad(sortedEngines.map((engine) => engine.load_kw)) ?? 0;
   const healthRows = useMemo(() => {
     const itemsByEngine = new Map<string, PanelItem[]>();
     items.forEach((item) => {

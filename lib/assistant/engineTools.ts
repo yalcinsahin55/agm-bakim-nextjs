@@ -3,6 +3,7 @@ import type { AssistantQuery } from "@/lib/assistantPolicy";
 import { enginesCollection, equipmentInfoCollection, maintenanceTypesCollection } from "@/lib/dbCollections";
 import { readEngineHistory } from "@/lib/engineHistory";
 import { formatPerformanceNumber, formatUnknownDate } from "@/lib/assistantToolOutput";
+import { averageNonZeroLoad } from "@/lib/loadMath";
 import { findEngine, historyDayKey, isDateInAssistantQuery, periodLabel, resolveMaintenanceType } from "@/lib/assistantToolQuery";
 import type { AssistantToolResponse } from "./types";
 export async function getEngineData(db: Db, query: AssistantQuery): Promise<AssistantToolResponse> {
@@ -44,9 +45,8 @@ export async function getEngineData(db: Db, query: AssistantQuery): Promise<Assi
     .sort((a, b) => a.date.localeCompare(b.date) || a.engine.localeCompare(b.engine, "tr"))
     .map(({ timestamp: _timestamp, ...entry }) => entry) : [];
   const hoursValues = performanceDaily.map((entry) => entry.hours).filter((value) => Number.isFinite(value));
-  const loadValues = performanceDaily.map((entry) => entry.load_kw).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   const averageHours = hoursValues.length ? hoursValues.reduce((sum, value) => sum + value, 0) / hoursValues.length : null;
-  const averageLoad = loadValues.length ? loadValues.reduce((sum, value) => sum + value, 0) / loadValues.length : null;
+  const averageLoad = averageNonZeroLoad(performanceDaily.map((entry) => entry.load_kw));
   const performancePeriod = periodLabel(query);
   const performanceSummary = performanceDaily.length > 0
     ? `${performancePeriod} ${performanceDaily.length} motor-günlük ölçüm bulundu. Dönem ortalaması: ${formatPerformanceNumber(averageHours)} motor saati ve ${formatPerformanceNumber(averageLoad)} kW yük.`

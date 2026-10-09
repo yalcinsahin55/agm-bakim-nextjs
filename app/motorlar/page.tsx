@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/lib/useCurrentUser";
 import { usePageData } from "@/lib/usePageData";
 import { useAbortableFetch } from "@/lib/useAbortableFetch";
 import { engineSortKey } from "@/lib/status";
+import { averageNonZeroLoad } from "@/lib/loadMath";
 import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 import EngineAddForm from "./_components/EngineAddForm";
 import EngineMaintenanceCard from "./_components/EngineMaintenanceCard";
@@ -117,7 +118,7 @@ export default function MotorlarPage() {
     return sorted.filter((engine) => engine.name.toLocaleLowerCase("tr-TR").includes(query));
   }, [searchTerm, sorted]);
   const totalLoad = useMemo(() => visibleEngines.reduce((sum, engine) => sum + (engine.load_kw || 0), 0), [visibleEngines]);
-  const averageLoad = useMemo(() => visibleEngines.length ? totalLoad / visibleEngines.length : 0, [totalLoad, visibleEngines.length]);
+  const averageLoad = useMemo(() => averageNonZeroLoad(visibleEngines.map((engine) => engine.load_kw)) ?? 0, [visibleEngines]);
 
   async function toggleEngine(engineId: string): Promise<void> {
     if (openId === engineId) {

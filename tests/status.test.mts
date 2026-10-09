@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildItems, remainingHours, statusFor } from "../lib/status.ts";
 import { forecastDaysFromRemainingHours } from "../lib/forecastMath.ts";
+import { averageNonZeroLoad } from "../lib/loadMath.ts";
 
 test("status thresholds remain explicit and ordered", () => {
   assert.equal(remainingHours(18_450, 17_000, 2_000), 550);
@@ -16,6 +17,11 @@ test("forecast converts remaining motor hours into calendar days at 24 hours per
   assert.equal(forecastDaysFromRemainingHours(25), 2);
   assert.equal(forecastDaysFromRemainingHours(19_680), 820);
   assert.equal(forecastDaysFromRemainingHours(-1), 0);
+});
+
+test("average motor load ignores zero and invalid readings", () => {
+  assert.equal(averageNonZeroLoad([1_175, 1_250, 0, null, Number.NaN]), 1_212.5);
+  assert.equal(averageNonZeroLoad([0, 0, null]), null);
 });
 
 test("buildItems calculates scoped maintenance status and remaining hours", () => {
