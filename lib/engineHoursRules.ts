@@ -96,9 +96,13 @@ export function getCompletionHourRule(
   const effectiveReference = historicalReference || reference;
   const effectiveReferenceDate = validDate(effectiveReference.date) || referenceDate;
   const effectiveElapsedHours = Math.max(0, (start.getTime() - effectiveReferenceDate.getTime()) / 3_600_000);
+  const estimatedHoursAtStart = effectiveReference.hours + effectiveElapsedHours;
   return {
-    minimumHours: Math.max(minimumHours, effectiveReference.hours - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
-    maximumHours: effectiveReference.hours + effectiveElapsedHours,
+    // Geçmiş tarihli kayıtta güncel saat - 24 değil, bakım tarihindeki
+    // referans ölçüm + geçen süre esas alınır. Aksi halde güncel saat
+    // sınırı geçmiş tahmini bastırıp örneğin 80.896 değerine kilitler.
+    minimumHours: Math.max(0, estimatedHoursAtStart - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
+    maximumHours: estimatedHoursAtStart,
     reference: effectiveReference,
     elapsedHours: historicalReference ? effectiveElapsedHours : elapsedHours,
   };
