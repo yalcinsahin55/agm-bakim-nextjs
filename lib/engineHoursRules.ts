@@ -50,9 +50,30 @@ export function getCompletionHourRule(
 ): CompletionHourRule {
   const reference = latestExcelHourSnapshot(history);
   const minimumHours = Math.max(0, Number(currentEngineHours || 0) - MAX_COMPLETION_HOURS_BEHIND_CURRENT);
-  if (!reference || maintenanceStartAt === undefined) return { minimumHours, reference: reference || undefined };
+  if (maintenanceStartAt === undefined) return { minimumHours, reference: reference || undefined };
 
   const start = validDate(maintenanceStartAt);
+  const nowDate = validDate(now);
+  if (!start || !nowDate) return { minimumHours, reference: reference || undefined };
+
+  // Excel ölçümü bulunmasa bile geçmiş tarihli bakımda, motorun güncel
+  // saatinden bakım başlangıcına kadar geçen süreyi düşerek makul bir
+  // tahmin oluştur. Eski akış burada `!reference` nedeniyle erken çıkıyor
+  // ve 10-11 Ekim gibi kayıtları doğrudan güncel saat - 24 kuralına
+  // sıkıştırıyordu.
+  if (!reference) {
+    const elapsedHours = Math.max(0, (nowDate.getTime() - start.getTime()) / 3_600_000);
+    if (elapsedHours > 0) {
+      const estimatedHoursAtStart = Math.max(0, Number(currentEngineHours || 0) - elapsedHours);
+      return {
+        minimumHours: Math.max(0, estimatedHoursAtStart - MAX_COMPLETION_HOURS_BEHIND_CURRENT),
+        maximumHours: Math.max(0, Number(currentEngineHours || 0)),
+        elapsedHours,
+      };
+    }
+    return { minimumHours, maximumHours: Math.max(0, Number(currentEngineHours || 0)) };
+  }
+
   const referenceDate = validDate(reference.date);
   if (!start || !referenceDate) return { minimumHours, reference };
 

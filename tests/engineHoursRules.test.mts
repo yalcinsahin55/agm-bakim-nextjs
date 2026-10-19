@@ -32,9 +32,31 @@ test("completion hour maximum follows elapsed time since Excel measurement", () 
 });
 
 test("completion hour cannot be more than 24 hours below current engine hours", () => {
-  const error = getCompletionHourValidationError(95, 120, undefined, "2026-09-21T10:00:00.000Z");
+  const maintenanceStart = "2026-09-21T10:00:00.000Z";
+  const now = "2026-09-21T10:00:00.000Z";
+  const error = getCompletionHourValidationError(95, 120, undefined, maintenanceStart, now);
   assert.match(error || "", /en fazla 24 saat düşük/);
-  assert.equal(getCompletionHourValidationError(96, 120, undefined, "2026-09-21T10:00:00.000Z"), null);
+  assert.equal(getCompletionHourValidationError(96, 120, undefined, maintenanceStart, now), null);
+});
+
+test("backdated completion estimates elapsed hours even without an Excel snapshot", () => {
+  const rule = getCompletionHourRule(
+    80_920,
+    undefined,
+    "2026-10-10T09:00:00.000Z",
+    "2026-10-19T09:00:00.000Z",
+  );
+  assert.equal(rule.elapsedHours, 216);
+  assert.equal(rule.minimumHours, 80_680);
+  assert.equal(rule.maximumHours, 80_920);
+  assert.equal(
+    getCompletionHourValidationError(80_700, 80_920, undefined, "2026-10-10T09:00:00.000Z", "2026-10-19T09:00:00.000Z"),
+    null,
+  );
+  assert.match(
+    getCompletionHourValidationError(80_679, 80_920, undefined, "2026-10-10T09:00:00.000Z", "2026-10-19T09:00:00.000Z") || "",
+    /En düşük değer/,
+  );
 });
 
 test("backdated completion uses the engine hour estimated for the maintenance date", () => {
