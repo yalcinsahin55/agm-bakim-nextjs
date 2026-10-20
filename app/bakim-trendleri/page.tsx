@@ -7,12 +7,8 @@ import Skeleton from "@/components/Skeleton";
 import AppIcon from "@/components/ui/AppIcon";
 import { cachedFetch } from "@/lib/apiCache";
 import { engineSortKey } from "@/lib/status";
-import MaintenanceTrendPanel, {
-  durationMinutes,
-  eventDate,
-  uniqueMaintenanceEvents,
-  type MaintenanceTrendRecord,
-} from "../saat-gecmisi/_components/MaintenanceTrendPanel";
+import MaintenanceTrendPanel from "../saat-gecmisi/_components/MaintenanceTrendPanel";
+import { durationMinutes, eventDate, maintenanceTypeDurationSummaries, uniqueMaintenanceEvents, type MaintenanceTrendRecord } from "@/lib/maintenanceTrend";
 
 interface TrendEngine {
   _id: string;
@@ -78,17 +74,7 @@ export default function BakimTrendleriPage() {
   const totalMinutes = useMemo(() => events.reduce((sum, record) => sum + durationMinutes(record), 0), [events]);
   const averageMinutes = events.length ? totalMinutes / events.length : 0;
   const lastEvent = useMemo(() => [...events].sort((a, b) => (eventDate(b)?.getTime() || 0) - (eventDate(a)?.getTime() || 0))[0], [events]);
-  const typeRows = useMemo(() => {
-    const counts = new Map<string, { count: number; minutes: number }>();
-    records.forEach((record) => {
-      const type = record.type_label || "Diğer";
-      const row = counts.get(type) || { count: 0, minutes: 0 };
-      row.count += 1;
-      row.minutes += durationMinutes(record);
-      counts.set(type, row);
-    });
-    return [...counts.entries()].map(([type, row]) => ({ type, ...row })).sort((a, b) => b.count - a.count || b.minutes - a.minutes).slice(0, 8);
-  }, [records]);
+  const typeRows = useMemo(() => maintenanceTypeDurationSummaries(records).slice(0, 8), [records]);
   const maxTypeCount = Math.max(...typeRows.map((row) => row.count), 1);
 
   if (loading) {
@@ -115,7 +101,7 @@ export default function BakimTrendleriPage() {
           <>
             <section aria-label="Bakım trend özeti" className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
               <div className="rounded-control border border-border bg-panel p-3"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Bakım olayı</div><div className="mt-1 font-mono text-2xl font-bold text-amber">{events.length}</div><div className="mt-0.5 text-[10px] text-muted">Gruplanmış gerçek olay</div></div>
-              <div className="rounded-control border border-border bg-panel p-3"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Toplam süre</div><div className="mt-1 font-mono text-2xl font-bold text-teal">{(totalMinutes / 60).toFixed(1)}<span className="text-sm"> sa</span></div><div className="mt-0.5 text-[10px] text-muted">Başlangıç-bitiş öncelikli</div></div>
+              <div className="rounded-control border border-border bg-panel p-3"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Toplam çalışma</div><div className="mt-1 font-mono text-2xl font-bold text-teal">{(totalMinutes / 60).toFixed(1)}<span className="text-sm"> sa</span></div><div className="mt-0.5 text-[10px] text-muted">Sorumlu teknisyen bazında</div></div>
               <div className="rounded-control border border-border bg-panel p-3"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Ortalama bakım</div><div className="mt-1 font-mono text-2xl font-bold text-text">{formatDuration(averageMinutes)}</div><div className="mt-0.5 text-[10px] text-muted">Bakım olayı başına</div></div>
               <div className="rounded-control border border-border bg-panel p-3"><div className="text-[9px] font-bold uppercase tracking-wide text-faint">Son bakım</div><div className="mt-1 truncate text-[13px] font-bold text-text">{lastEvent?.type_label || "—"}</div><div className="mt-0.5 truncate text-[10px] text-muted">{formatDate(lastEvent ? eventDate(lastEvent) : null)}</div></div>
             </section>
@@ -125,12 +111,12 @@ export default function BakimTrendleriPage() {
             <section className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-card border border-border bg-panel p-4">
                 <div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-text">Bakım türü dağılımı</h2><p className="mt-1 text-[10px] text-faint">Hangi türlerin daha sık tekrarlandığı</p></div><AppIcon name="tool" size={17} className="text-amber" /></div>
-                {typeRows.length ? <div className="flex flex-col gap-3">{typeRows.map((row) => <div key={row.type}><div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{row.type}</span><span className="flex-shrink-0 font-mono font-bold text-text">{row.count} kayıt</span></div><div className="h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-amber transition-all" style={{ width: `${(row.count / maxTypeCount) * 100}%` }} /></div><div className="mt-1 text-[9px] text-faint">{formatDuration(row.minutes)} kayıtlı süre</div></div>)}</div> : <p className="text-[11px] text-faint">Bu motor için bakım kaydı bulunamadı.</p>}
+                {typeRows.length ? <div className="flex flex-col gap-3">{typeRows.map((row) => <div key={row.type}><div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{row.type}</span><span className="flex-shrink-0 font-mono font-bold text-text">{row.count} kayıt</span></div><div className="h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-amber transition-all" style={{ width: `${(row.count / maxTypeCount) * 100}%` }} /></div><div className="mt-1 text-[9px] text-faint">{formatDuration(row.minutes)} çalışma süresi{row.estimatedCount > 0 ? ` · ${row.estimatedCount} birleşik bakım tahmini` : " · kayıtlı"}</div></div>)}</div> : <p className="text-[11px] text-faint">Bu motor için bakım kaydı bulunamadı.</p>}
               </div>
               <div className="rounded-card border border-border bg-panel p-4"><div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="font-display text-[13px] font-bold uppercase tracking-wide text-text">Son bakım olayları</h2><p className="mt-1 text-[10px] text-faint">Tarih ve gerçek süre sırasıyla</p></div><AppIcon name="records" size={17} className="text-teal" /></div>{events.length ? <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">{[...events].sort((a, b) => (eventDate(b)?.getTime() || 0) - (eventDate(a)?.getTime() || 0)).slice(0, 10).map((record, index) => <div key={record._id || `${record.type_label}-${index}`} className="rounded-control border border-border bg-panel2 px-3 py-2.5"><div className="flex items-center justify-between gap-2"><span className="truncate text-[11px] font-bold text-text">{record.type_label || "Diğer"}</span><span className="flex-shrink-0 font-mono text-[10px] font-bold text-teal">{formatDuration(durationMinutes(record))}</span></div><div className="mt-1 flex items-center justify-between gap-2 text-[9px] text-faint"><span>{formatDate(eventDate(record))}</span><span>{record.hour_at_completion ? `${record.hour_at_completion.toLocaleString("tr-TR")} sa` : "Saat bilgisi yok"}</span></div></div>)}</div> : <p className="text-[11px] text-faint">Henüz bakım olayı bulunamadı.</p>}</div>
             </section>
 
-            <div className="mt-4 rounded-control border border-teal/20 bg-teal/5 px-3 py-2.5 text-[10px] leading-4 text-muted"><span className="font-bold text-teal">Hesaplama notu:</span> Toplam süre aynı <code className="text-text">group_id</code> altındaki kayıtları tek bakım olayı sayar. Süre için önce başlangıç-bitiş farkı, sonra baş sorumlu teknisyen süresi, son olarak kayıtlı süre kullanılır.</div>
+            <div className="mt-4 rounded-control border border-teal/20 bg-teal/5 px-3 py-2.5 text-[10px] leading-4 text-muted"><span className="font-bold text-teal">Hesaplama notu:</span> Toplam ve aylık sürelerde önce sorumlu teknisyenin çalışma süresi kullanılır; kayıtlı değilse kayıt süresi ve son olarak başlangıç-bitiş aralığına dönülür. Birleşik bakım toplamı türlere kopyalanmaz; tür payları aynı motor ve türdeki tekli bakım ortalamasına göre tahmin edilir, tekli geçmiş yoksa motorun tekli bakım ortalaması kullanılır.</div>
           </>
         )}
       </main>

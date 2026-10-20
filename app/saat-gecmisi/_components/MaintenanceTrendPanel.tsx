@@ -1,18 +1,5 @@
 import AppIcon from "@/components/ui/AppIcon";
-
-export interface MaintenanceTrendRecord {
-  _id?: string;
-  type_label?: string;
-  maintenance_start_at?: string | Date;
-  maintenance_end_at?: string | Date;
-  maintenance_duration_minutes?: number;
-  duration_minutes?: number;
-  created_at?: string | Date;
-  group_id?: string;
-  technician_contributions?: Array<{ contribution_role?: string; duration_minutes?: number }>;
-  hour_at_completion?: number;
-  status?: string;
-}
+import { durationMinutes, eventDate, uniqueMaintenanceEvents, type MaintenanceTrendRecord } from "@/lib/maintenanceTrend";
 
 function monthKey(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -21,35 +8,6 @@ function monthKey(date: Date): string {
 function formatMonth(key: string): string {
   const [year, month] = key.split("-").map(Number);
   return new Intl.DateTimeFormat("tr-TR", { month: "short" }).format(new Date(Date.UTC(year, month - 1, 1)));
-}
-
-export function eventDate(record: MaintenanceTrendRecord): Date | null {
-  const value = record.maintenance_start_at || record.created_at;
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date : null;
-}
-
-export function durationMinutes(record: MaintenanceTrendRecord): number {
-  if (record.maintenance_start_at && record.maintenance_end_at) {
-    const start = new Date(record.maintenance_start_at).getTime();
-    const end = new Date(record.maintenance_end_at).getTime();
-    const calculated = (end - start) / 60_000;
-    if (Number.isFinite(calculated) && calculated > 0 && calculated <= 366 * 24 * 60) return calculated;
-  }
-  const responsibleDuration = record.technician_contributions?.find((item) => item.contribution_role === "responsible")?.duration_minutes;
-  if (Number.isFinite(Number(responsibleDuration)) && Number(responsibleDuration) > 0) return Number(responsibleDuration);
-  const stored = Number(record.maintenance_duration_minutes ?? record.duration_minutes);
-  return Number.isFinite(stored) && stored > 0 && stored <= 366 * 24 * 60 ? stored : 0;
-}
-
-export function uniqueMaintenanceEvents(records: MaintenanceTrendRecord[]): MaintenanceTrendRecord[] {
-  const grouped = new Map<string, MaintenanceTrendRecord>();
-  records.forEach((record) => {
-    const key = record.group_id ? `group:${record.group_id}` : `record:${record._id || `${eventDate(record)?.toISOString() || "unknown"}:${record.type_label || "unknown"}`}`;
-    if (!grouped.has(key)) grouped.set(key, record);
-  });
-  return [...grouped.values()];
 }
 
 function LineChart({ values, color, label, suffix = "" }: { values: number[]; color: string; label: string; suffix?: string }) {
@@ -87,12 +45,12 @@ export default function MaintenanceTrendPanel({ records }: { records: Maintenanc
         <div>
           <div className="flex items-center gap-2 text-amber"><AppIcon name="chart" size={16} /><span className="text-[10px] font-bold uppercase tracking-[0.14em]">Bakım trendleri</span></div>
           <h2 id="maintenance-trend-heading" className="mt-1 text-[14px] font-bold text-text">Motorun bakım davranışı</h2>
-          <p className="mt-1 text-[10.5px] leading-4 text-muted">Son altı aydaki bakım sıklığı ve bakımda geçen toplam süre.</p>
+          <p className="mt-1 text-[10.5px] leading-4 text-muted">Son altı aydaki bakım sıklığı ve sorumlu teknisyen çalışma süresi.</p>
         </div>
-        <div className="rounded-lg border border-teal/30 bg-teal/10 px-2.5 py-2 text-right"><div className="text-[9px] text-faint">Toplam süre</div><div className="font-mono text-[13px] font-bold text-teal">{totalHours.toFixed(1)} sa</div></div>
+        <div className="rounded-lg border border-teal/30 bg-teal/10 px-2.5 py-2 text-right"><div className="text-[9px] text-faint">Toplam çalışma</div><div className="font-mono text-[13px] font-bold text-teal">{totalHours.toFixed(1)} sa</div></div>
       </div>
       {records.length === 0 ? <div className="mt-3 rounded-lg border border-border bg-panel2 px-3 py-4 text-center text-[11px] text-muted">Bu motor için bakım kaydı bulunamadı.</div> : <>
-        <div className="mt-3 grid gap-2 md:grid-cols-2"><LineChart values={counts} color="#e8952f" label="Aylık bakım sayısı" /><LineChart values={durations} color="#3fb5c4" label="Bakım süresi" suffix=" sa" /></div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2"><LineChart values={counts} color="#e8952f" label="Aylık bakım sayısı" /><LineChart values={durations} color="#3fb5c4" label="Ana teknisyen süresi" suffix=" sa" /></div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{topTypes.map(([type, count]) => <div key={type} className="rounded-lg border border-border bg-panel2 px-2.5 py-2"><div className="truncate text-[9.5px] text-faint">{type}</div><div className="mt-1 font-mono text-[13px] font-bold text-text">{count} <span className="text-[9px] font-normal text-muted">kayıt</span></div></div>)}</div>
       </>}
     </section>
