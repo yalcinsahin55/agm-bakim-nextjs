@@ -251,3 +251,29 @@ body > div {
 .status-pill .dot {
   width: 5px; height: 5px; border-radius: 999px; background: currentColor;
 }
+
+
+/* Bakım Aralıkları: gerçek içerik genişliği ekran çözünürlüğünden daha güvenilir bir ölçüdür. */
+.interval-layout-container {
+  container: interval-page / inline-size;
+}
+
+.interval-layout-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.interval-engine-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@container interval-page (min-width: 1020px) {
+  .interval-layout-grid {
+    grid-template-columns: minmax(360px, 0.38fr) minmax(0, 0.62fr);
+  }
+}
+
+@container interval-page (min-width: 640px) {
+  .interval-engine-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 88px), 1fr));
+  }
+}

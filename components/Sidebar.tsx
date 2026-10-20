@@ -72,40 +72,41 @@ export default function Sidebar() {
   }
 
   return (
-    <aside data-collapsed={collapsed} className={`fixed bottom-0 left-0 top-0 z-40 hidden flex-col border-r border-border bg-bg/95 backdrop-blur-xl transition-[width] duration-200 md:flex ${collapsed ? "w-[76px]" : "w-64"}`}>
+    <aside data-collapsed={collapsed} className={`fixed bottom-0 left-0 top-0 z-40 hidden flex-col border-r border-border bg-bg/95 backdrop-blur-xl transition-[width] duration-200 md:flex ${collapsed ? "w-[76px]" : "w-64 md:max-xl:w-[76px]"}`}>
       {/* Logo */}
-      <div className={`border-b border-border px-3 pb-4 pt-5 ${collapsed ? "flex flex-col items-center gap-3" : ""}`}>
-        <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : ""}`}>
+      <div className={`border-b border-border px-3 pb-4 pt-5 ${collapsed ? "flex flex-col items-center gap-3" : "md:max-xl:flex md:max-xl:flex-col md:max-xl:items-center md:max-xl:gap-3"}`}>
+        <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : "md:max-xl:justify-center"}`}>
           <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-control border border-border shadow-lg">
             <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" loading="lazy" />
           </div>
-          <div className={collapsed ? "hidden" : "min-w-0"}>
+          <div className={collapsed ? "hidden" : "min-w-0 md:max-xl:hidden"}>
             <div className="font-display text-lg font-bold uppercase tracking-wide leading-tight">
               Avcıkoru <span className="text-amber">Santrali</span>
             </div>
             <div className="text-[10px] text-faint">Bakım Merkezi</div>
           </div>
         </div>
-        <button type="button" onClick={() => setCollapsed((current) => !current)} aria-label={collapsed ? "Kenar çubuğunu genişlet" : "Kenar çubuğunu daralt"} title={collapsed ? "Genişlet" : "Daralt"} className={`mt-3 flex h-8 items-center justify-center rounded-lg border border-border bg-panel2 text-muted transition hover:border-amber/50 hover:text-amber ${collapsed ? "w-10" : "w-full"}`}>
+        <button type="button" onClick={() => setCollapsed((current) => !current)} aria-label={collapsed ? "Kenar çubuğunu genişlet" : "Kenar çubuğunu daralt"} title={collapsed ? "Genişlet" : "Daralt"} className={`mt-3 flex h-8 items-center justify-center rounded-lg border border-border bg-panel2 text-muted transition hover:border-amber/50 hover:text-amber ${collapsed ? "w-10" : "w-full md:max-xl:hidden"}`}>
           <AppIcon name="menu" size={15} />
           {!collapsed && <span className="ml-2 text-[10px] font-bold">Menüyü daralt</span>}
         </button>
       </div>
 
       {/* Menü */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <div className={`px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-faint ${collapsed ? "hidden" : ""}`}>Ana Menü</div>
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:max-xl:px-2">
+        <div className={`px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-faint ${collapsed ? "hidden" : "md:max-xl:hidden"}`}>Ana Menü</div>
         <div className="flex flex-col gap-0.5">
           {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const isOtherMenu = !isTechnicianAccount && item.href === "/diger";
             return (
               <div key={item.href} className={isOtherMenu ? "mt-3 border-t border-border pt-3" : ""}>
-                {isOtherMenu && <div className={`px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-faint ${collapsed ? "hidden" : ""}`}>Diğer</div>}
+                {isOtherMenu && <div className={`px-2 pb-2 text-[9px] font-bold uppercase tracking-[0.16em] text-faint ${collapsed ? "hidden" : "md:max-xl:hidden"}`}>Diğer</div>}
                 <Link
                   href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={`relative flex items-center gap-3 rounded-lg border py-2.5 text-[13px] font-medium transition-all ${collapsed ? "justify-center px-2" : "px-3"} ${
+                  title={item.label}
+                  aria-label={item.label}
+                  className={`relative flex items-center gap-3 rounded-lg border py-2.5 text-[13px] font-medium transition-all ${collapsed ? "justify-center px-2" : "px-3 md:max-xl:justify-center md:max-xl:px-2"} ${
                     active
                       ? "border-amber/20 bg-amber/10 text-amber"
                       : isOtherMenu
@@ -115,8 +116,8 @@ export default function Sidebar() {
                   aria-current={active ? "page" : undefined}
                 >
                   <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center"><AppIcon name={item.icon} size={17} /></span>
-                  <span className={`truncate ${collapsed ? "hidden" : ""}`}>{item.label}</span>
-                  <span className={`ml-auto flex items-center gap-2 ${collapsed ? "hidden" : ""}`}>
+                  <span className={`truncate ${collapsed ? "hidden" : "md:max-xl:hidden"}`}>{item.label}</span>
+                  <span className={`ml-auto flex items-center gap-2 ${collapsed ? "hidden" : "md:max-xl:hidden"}`}>
                     {item.href === "/dashboard" && gecikmis > 0 && (
                       <span
                         title={`${gecikmis} gecikmiş bakım`}
@@ -140,11 +141,11 @@ export default function Sidebar() {
       <div className="shrink-0 p-3 border-t border-border">
         <button
           onClick={handleLogout}
-          title={collapsed ? "Çıkış Yap" : undefined}
-          className={`flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2.5 text-[12px] font-semibold text-muted transition-all hover:border-red/30 hover:bg-red/10 hover:text-red ${collapsed ? "w-10" : "w-full"}`}
+          title="Çıkış Yap"
+          className={`flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2.5 text-[12px] font-semibold text-muted transition-all hover:border-red/30 hover:bg-red/10 hover:text-red ${collapsed ? "w-10" : "w-full md:max-xl:w-10 md:max-xl:px-2"}`}
         >
               <AppIcon name="logout" size={16} />
-          {!collapsed && "Çıkış Yap"}
+          {!collapsed && <span className="md:max-xl:hidden">Çıkış Yap</span>}
         </button>
       </div>
     </aside>

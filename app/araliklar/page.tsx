@@ -182,8 +182,8 @@ export default function AraliklarPage() {
     return (
       <div className="min-h-screen pb-20">
         <TopBar title="Bakım Aralıkları" subtitle="Motor bakım geçmişi ve periyot analizi" />
-        <main className="mx-auto max-w-[1500px] px-4 py-5 md:px-6">
-          <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(400px,0.38fr)_minmax(0,0.62fr)]">
+        <main className="interval-layout-container mx-auto max-w-[1500px] px-4 py-5 md:px-6">
+          <div className="interval-layout-grid grid min-w-0 gap-4">
             <Skeleton className="min-h-[520px] rounded-2xl" />
             <Skeleton className="min-h-[520px] rounded-2xl" />
           </div>
@@ -196,7 +196,7 @@ export default function AraliklarPage() {
   return (
     <div className="min-h-screen pb-20">
       <TopBar title="Bakım Aralıkları" subtitle={`${sortedEngines.length} motor · bakım aralıkları listeleniyor`} />
-      <main className="mx-auto max-w-[1500px] px-4 py-5 md:px-6">
+      <main className="interval-layout-container mx-auto max-w-[1500px] px-4 py-5 md:px-6">
         <div className="mb-4 flex flex-col justify-between gap-3 border-b border-border pb-4 lg:flex-row lg:items-end">
           <div>
             <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Kayıt analizi</div>
@@ -215,12 +215,12 @@ export default function AraliklarPage() {
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(400px,0.38fr)_minmax(0,0.62fr)]">
+        <div className="interval-layout-grid grid min-w-0 gap-4">
           <section className="min-w-0 rounded-2xl border border-border bg-panel p-4" aria-labelledby="engine-list-heading">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">Motor seçimi</div><h2 id="engine-list-heading" className="mt-1 text-base font-extrabold text-text">Motorlar</h2><p className="mt-1 text-[10px] text-muted">{visibleEngines.length} / {sortedEngines.length} motor görünür · seçim için tıklayın</p></div>
             </div>
-            {visibleEngines.length > 0 ? <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-4">{visibleEngines.map((engine) => { const selected = engine.name === engineFilter; return <button type="button" key={engine._id} onClick={() => { setEngineFilter(engine.name); }} className={`min-w-0 rounded-lg border px-2 py-2.5 text-center leading-4 transition ${selected ? "border-amber bg-amber/10 text-amber" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-text"}`} aria-label={`${engine.name} motorunu seç`} aria-pressed={selected}><span className="block whitespace-nowrap text-[10.5px] font-bold">{engine.name}</span><span className={`mt-0.5 block text-[8.5px] ${selected ? "text-amber/80" : "text-faint"}`}>{Number(engine.maintenance_count || 0)} kayıt</span></button>; })}</div> : <div className="rounded-control border border-dashed border-border px-3 py-8 text-center text-[10.5px] text-muted">Aramanızla eşleşen motor bulunamadı.</div>}
+            {visibleEngines.length > 0 ? <div className="interval-engine-grid grid w-full gap-2">{visibleEngines.map((engine) => { const selected = engine.name === engineFilter; return <button type="button" key={engine._id} onClick={() => { setEngineFilter(engine.name); }} className={`min-w-0 rounded-lg border px-2 py-2.5 text-center leading-4 transition ${selected ? "border-amber bg-amber/10 text-amber" : "border-border bg-panel2 text-muted hover:border-amber/50 hover:text-text"}`} aria-label={`${engine.name} motorunu seç`} aria-pressed={selected}><span className="block whitespace-nowrap text-[10.5px] font-bold">{engine.name}</span><span className={`mt-0.5 block text-[8.5px] ${selected ? "text-amber/80" : "text-faint"}`}>{Number(engine.maintenance_count || 0)} kayıt</span></button>; })}</div> : <div className="rounded-control border border-dashed border-border px-3 py-8 text-center text-[10.5px] text-muted">Aramanızla eşleşen motor bulunamadı.</div>}
             {engineSearch && <button type="button" onClick={() => setEngineSearch("")} className="mt-3 text-[10px] font-bold text-amber hover:underline">Tüm motorları göster →</button>}
           </section>
 
