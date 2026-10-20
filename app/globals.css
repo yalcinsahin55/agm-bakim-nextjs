@@ -207,6 +207,23 @@ body > div {
   :root, :root.light { --space-page: 24px; }
 }
 
+/* Geniş masaüstü görünümünde sabit px kullanan arayüz yazıları okunabilir kalsın. */
+@media (min-width: 1600px) {
+  html { zoom: 1.1; }
+}
+
+@media (min-width: 1920px) {
+  html { zoom: 1.18; }
+}
+
+@media (min-width: 2560px) {
+  html { zoom: 1.26; }
+}
+
+@media (min-width: 3440px) {
+  html { zoom: 1.32; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
