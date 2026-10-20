@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { memo } from "react";
 import MaintenanceRecordCard from "@/components/MaintenanceRecordCard";
 import MaintenanceRecordEditForm from "./MaintenanceRecordEditForm";
+import { canWriteMaintenance } from "@/lib/permissions";
 import type { Engine, MaintenanceRecord, VideoItem } from "../_types";
 
 interface RecordGroup {
@@ -76,7 +77,7 @@ export default memo(function RecordList({
           </div>
           <div className="flex flex-col gap-3">
             {group.records.map((record) => {
-              const canEdit = user && (user.role === "yonetici" || user.id === record.technician_id || user._id === record.technician_id);
+              const canEdit = user && canWriteMaintenance(user.role) && (user.role === "yonetici" || user.id === record.technician_id || user._id === record.technician_id);
               return (
                 <MaintenanceRecordCard
                   key={record._id}

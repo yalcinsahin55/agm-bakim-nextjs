@@ -164,10 +164,14 @@ test("role and route permissions keep technician, viewer, and manager boundaries
   assert.equal(canManageUsers("yonetici"), true);
   assert.equal(hasPermission("goruntuleyici", "assistant:read"), true);
   assert.equal(hasPermission("goruntuleyici", "maintenance:write"), false);
+  assert.equal(canWriteMaintenance("goruntuleyici"), false);
   assert.equal(canAccessRoute("teknisyen", "/tamamla"), true);
   assert.equal(canAccessRoute("teknisyen", "/kayitlar"), true);
   assert.equal(canAccessRoute("teknisyen", "/asistan"), false);
   assert.equal(canAccessRoute("goruntuleyici", "/asistan"), true);
+  assert.equal(canAccessRoute("goruntuleyici", "/bildirimler"), true);
+  assert.equal(canAccessRoute("goruntuleyici", "/takvim"), true);
+  assert.equal(canAccessRoute("goruntuleyici", "/kayitlar"), true);
   assert.equal(canAccessRoute("goruntuleyici", "/kullanicilar"), false);
   assert.equal(canAccessRoute("yonetici", "/kullanicilar"), true);
 });

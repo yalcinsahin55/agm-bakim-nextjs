@@ -14,7 +14,7 @@ const GROUPS: Array<{ title: string; admin?: boolean; items: Array<{ href: strin
       { href: "/saat-guncelle", icon: "gauge", label: "Saat / Yük Güncelle", desc: "Toplu motor saati ve yük güncelleme" },
       { href: "/bakim-turleri", icon: "tool", label: "Bakım Türleri", desc: "Tür bazında tüm motorları listele" },
       { href: "/tahmin", icon: "hourglass", label: "Bakım Tarihi Tahmini", desc: "En geç bakım tarihi tahmini" },
-      { href: "/kayitlar", icon: "records", label: "Bakım Kayıtları", desc: "Listele, filtrele, düzenle, sil" },
+      { href: "/kayitlar", icon: "records", label: "Bakım Kayıtları", desc: "Görüntüle, filtrele ve raporları indir" },
       { href: "/bildirimler", icon: "bell", label: "Bildirimler", desc: "Gecikmiş ve yaklaşan bakımlar" },
       { href: "/takvim", icon: "calendar", label: "Bakım Takvimi", desc: "Yaklaşan bakımları planla" },
     ],
