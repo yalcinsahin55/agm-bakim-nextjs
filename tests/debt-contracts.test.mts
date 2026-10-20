@@ -710,6 +710,13 @@ test("offline queue jobs stay bound to the authenticated owner", async () => {
   assert.match(logout, /notifyAuthChanged\(\)/);
 });
 
+test("current user refreshes after login and logout notifications", async () => {
+  const currentUser = await source("lib/useCurrentUser.ts");
+  assert.match(currentUser, /AUTH_CHANGED_EVENT/);
+  assert.match(currentUser, /window\.addEventListener\(AUTH_CHANGED_EVENT, refreshCurrentUser\)/);
+  assert.match(currentUser, /window\.removeEventListener\(AUTH_CHANGED_EVENT, refreshCurrentUser\)/);
+});
+
 test("service worker keeps push handling and closed-window metadata sync bounded", async () => {
   const serviceWorker = await source("lib/serviceWorker.ts");
   assert.match(serviceWorker, /addEventListener\("push"/);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiFetchError, cachedFetch } from "@/lib/apiCache";
 import type { TechnicianType, WorkDomain } from "@/lib/types";
+import { AUTH_CHANGED_EVENT } from "@/lib/authClient";
 
 interface CurrentUser {
   id: string;
@@ -26,29 +27,39 @@ export function useCurrentUser() {
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    setError(null);
-    cachedFetch<CurrentUser>("/api/auth/me", 30_000)
-      .then((data) => {
-        if (!alive) return;
-        setUser(data);
-        setError(null);
-      })
-      .catch((requestError: unknown) => {
-        if (!alive) return;
-        if (requestError instanceof ApiFetchError && requestError.status === 401) {
+    let latestRequest = 0;
+    const refreshCurrentUser = () => {
+      const requestId = ++latestRequest;
+      setLoading(true);
+      setError(null);
+      void cachedFetch<CurrentUser>("/api/auth/me", 30_000)
+        .then((data) => {
+          if (!alive || requestId !== latestRequest) return;
+          setUser(data);
+          setError(null);
+        })
+        .catch((requestError: unknown) => {
+          if (!alive || requestId !== latestRequest) return;
+          if (requestError instanceof ApiFetchError && requestError.status === 401) {
+            setUser(null);
+            router.replace("/login");
+            return;
+          }
           setUser(null);
-          router.replace("/login");
-          return;
-        }
-        setUser(null);
-        setError("Oturum doğrulanamadı. Lütfen tekrar giriş yapın.");
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
+          setError("Oturum doğrulanamadı. Lütfen tekrar giriş yapın.");
+        })
+        .finally(() => {
+          if (alive && requestId === latestRequest) setLoading(false);
+        });
+    };
 
-    return () => { alive = false; };
+    refreshCurrentUser();
+    window.addEventListener(AUTH_CHANGED_EVENT, refreshCurrentUser);
+    return () => {
+      alive = false;
+      latestRequest += 1;
+      window.removeEventListener(AUTH_CHANGED_EVENT, refreshCurrentUser);
+    };
   }, [router]);
 
   return { user, loading, error };
