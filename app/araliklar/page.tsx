@@ -183,8 +183,8 @@ export default function AraliklarPage() {
       <div className="min-h-screen pb-20">
         <TopBar title="Bakım Aralıkları" subtitle="Motor bakım geçmişi ve periyot analizi" />
         <main className="interval-layout-container mx-auto max-w-[1500px] px-4 py-5 md:px-6">
-          <div className="interval-layout-grid grid min-w-0 gap-4">
-            <Skeleton className="min-h-[520px] rounded-2xl" />
+          <div className="flex min-w-0 flex-col gap-4">
+            <Skeleton className="min-h-[280px] rounded-2xl" />
             <Skeleton className="min-h-[520px] rounded-2xl" />
           </div>
         </main>
@@ -215,7 +215,7 @@ export default function AraliklarPage() {
           </div>
         </div>
 
-        <div className="interval-layout-grid grid min-w-0 gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <section className="min-w-0 rounded-2xl border border-border bg-panel p-4" aria-labelledby="engine-list-heading">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber">Motor seçimi</div><h2 id="engine-list-heading" className="mt-1 text-base font-extrabold text-text">Motorlar</h2><p className="mt-1 text-[10px] text-muted">{visibleEngines.length} / {sortedEngines.length} motor görünür · seçim için tıklayın</p></div>

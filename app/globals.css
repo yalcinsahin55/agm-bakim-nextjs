@@ -258,18 +258,8 @@ body > div {
   container: interval-page / inline-size;
 }
 
-.interval-layout-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .interval-engine-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-@container interval-page (min-width: 1020px) {
-  .interval-layout-grid {
-    grid-template-columns: minmax(360px, 0.38fr) minmax(0, 0.62fr);
-  }
 }
 
 @container interval-page (min-width: 640px) {
