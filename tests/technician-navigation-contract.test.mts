@@ -16,3 +16,12 @@ test("technician navigation exposes the account and password page on desktop and
   assert.match(bottomNav, /const TECHNICIAN_ITEMS[\s\S]*href: "\/hesap", label: "Şifre"/);
   assert.match(permissions, /const TECHNICIAN_ROUTES[\s\S]*"\/hesap"/);
 });
+
+test("viewer can load read-only technician filter data without exposing work permissions", () => {
+  const technicianApi = source("app/api/users/technicians/route.ts");
+  const recordsHook = source("app/kayitlar/_hooks/useRecordsPageData.ts");
+
+  assert.match(technicianApi, /hasPermission\(user\.role, "maintenance:read"\)/);
+  assert.match(technicianApi, /technicians\.map\(\(\{ id, full_name \}\) => \(\{ id, full_name \}\)\)/);
+  assert.match(recordsHook, /setTechnicians\(Array\.isArray\(technicianData\) \? technicianData : \[\]\)/);
+});

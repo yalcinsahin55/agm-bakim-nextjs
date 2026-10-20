@@ -58,10 +58,12 @@ export function useRecordsPageData(user: RecordsPageUser | null | undefined) {
       setPage(recordData.page || requestedPage);
       setTotalPages(recordData.totalPages || 1);
       if (engRes && typeRes && techRes) {
-        setEngines(await engRes.json());
-        setTypes(await typeRes.json());
-        setTechnicians(await techRes.json());
-        referenceDataLoadedRef.current = true;
+        const [engineData, typeData, technicianData] = await Promise.all([engRes.json(), typeRes.json(), techRes.json()]);
+        setEngines(Array.isArray(engineData) ? engineData : []);
+        setTypes(Array.isArray(typeData) ? typeData : []);
+        setTechnicians(Array.isArray(technicianData) ? technicianData : []);
+        referenceDataLoadedRef.current = engRes.ok && typeRes.ok && techRes.ok
+          && Array.isArray(engineData) && Array.isArray(typeData) && Array.isArray(technicianData);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
