@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import type { ReportAttachment, TechnicianType, VideoRef } from "@/lib/types";
 import type { ComponentTransfer } from "@/lib/types";
 import { formatReportAttachmentSize } from "@/lib/reportAttachments";
-import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
+import { formatMaintenanceDuration, getMaintenanceRecordDate, getMaintenanceWorkDurationMinutes, getResponsibleTechnicianDurationMinutes } from "@/lib/maintenanceTime";
 import { TECHNICIAN_TYPE_LABELS } from "@/lib/technicians";
 import { useDialogA11y } from "@/lib/useDialogA11y";
 import AppIcon from "@/components/ui/AppIcon";
@@ -79,6 +79,8 @@ export default function MaintenanceRecordDetailsModal({
 }: MaintenanceRecordDetailsModalProps) {
   const photos = record.photos || record.photos_b64 || [];
   const videos = record.videos || [];
+  const responsibleDuration = getResponsibleTechnicianDurationMinutes(record.technician_contributions);
+  const displayedWorkDuration = getMaintenanceWorkDurationMinutes(record);
   const dialogRef = useDialogA11y<HTMLDivElement>(true);
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export default function MaintenanceRecordDetailsModal({
         <div className="mt-2 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-3">
           <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Başlangıç</div><div className="mt-0.5 font-mono text-teal">{record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "—"}</div></div>
           <div className="rounded-lg border border-teal/30 bg-teal/10 p-2"><div className="text-faint">Bitiş</div><div className="mt-0.5 font-mono text-teal">{record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "—"}</div></div>
-          <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(record.maintenance_duration_minutes)}</div></div>
+          <div className="rounded-lg border border-amber/30 bg-amber/10 p-2"><div className="text-faint">Toplam bakım süresi</div><div className="mt-0.5 font-bold text-amber">{formatMaintenanceDuration(displayedWorkDuration)}</div>{responsibleDuration !== null && <div className="mt-0.5 text-[9px] text-faint">Sorumlu teknisyen çalışma saati</div>}</div>
         </div>
         {record.technician_contributions?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Teknisyen katkıları:</b><div className="mt-1 flex flex-col gap-0.5">{record.technician_contributions.map((contribution) => <span key={`${contribution.id}-${contribution.contribution_role}`}>{contribution.full_name} · {TECHNICIAN_TYPE_LABELS[contribution.technician_type || "mekanik"]} · {contribution.contribution_role === "responsible" ? "Sorumlu" : "Destek"} · {formatMaintenanceDuration(contribution.duration_minutes)}</span>)}</div></div> : record.other_technicians?.length ? <div className="mt-2 rounded-lg border border-teal/30 bg-teal/10 p-2 text-[11px] text-teal"><b>Bu bakımda çalışan diğer teknisyenler:</b> {record.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}
         {record.manager_confirmation_status === "confirmed" ? <div className="mt-2 rounded-lg border border-green/30 bg-green/10 p-2 text-[11px] text-green"><b> Yönetici teyidi:</b> {record.manager_confirmed_by_name || "Yönetici"} · {record.manager_confirmed_at ? new Date(record.manager_confirmed_at).toLocaleString("tr-TR") : "Tarih bilgisi yok"}</div> : record.manager_confirmation_status === "pending" ? <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 p-2 text-[11px] text-amber"><b>Teyit bekliyor:</b> Bu kayıt yönetici tarafından kontrol edilmelidir. {isManager && <button type="button" onClick={onOpenConfirmation} disabled={isConfirming} className="mt-2 w-full rounded-lg bg-green px-3 py-2 font-bold text-on-green disabled:opacity-50">{isConfirming ? "Teyit ediliyor..." : " Kontrol ettim, teyit et"}</button>}

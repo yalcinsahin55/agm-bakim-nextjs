@@ -43,6 +43,33 @@ export function normalizeTechnicianContributionDuration(value: unknown, fallback
   return Number.isFinite(fallbackValue) && fallbackValue >= 0 ? fallbackValue : 60;
 }
 
+export interface TechnicianDurationContribution {
+  contribution_role?: string;
+  duration_minutes?: number;
+}
+
+export function getResponsibleTechnicianDurationMinutes(
+  contributions?: readonly TechnicianDurationContribution[] | null,
+): number | null {
+  const duration = contributions?.find((item) => item.contribution_role === "responsible")?.duration_minutes;
+  return typeof duration === "number" && Number.isFinite(duration) && duration > 0 && duration <= 366 * 24 * 60
+    ? duration
+    : null;
+}
+
+export function getMaintenanceWorkDurationMinutes(record: {
+  technician_contributions?: readonly TechnicianDurationContribution[] | null;
+  maintenance_duration_minutes?: number | null;
+  duration_minutes?: number | null;
+}): number | null {
+  const responsibleDuration = getResponsibleTechnicianDurationMinutes(record.technician_contributions);
+  if (responsibleDuration !== null) return responsibleDuration;
+  const stored = record.maintenance_duration_minutes ?? record.duration_minutes;
+  return typeof stored === "number" && Number.isFinite(stored) && stored > 0 && stored <= 366 * 24 * 60
+    ? stored
+    : null;
+}
+
 export function minutesToHoursInput(minutes: number | undefined | null): string {
   if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) return "";
   return String(Math.round((minutes / 60) * 100) / 100);

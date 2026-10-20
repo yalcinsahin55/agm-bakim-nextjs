@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import NextImage from "next/image";
 import type { ReportAttachment, VideoRef } from "@/lib/types";
-import { formatMaintenanceDuration, getMaintenanceRecordDate } from "@/lib/maintenanceTime";
+import { formatMaintenanceDuration, getMaintenanceRecordDate, getMaintenanceWorkDurationMinutes, getResponsibleTechnicianDurationMinutes } from "@/lib/maintenanceTime";
 import type { TechnicianType } from "@/lib/types";
 import { triggerHaptic } from "@/lib/haptics";
 
@@ -29,6 +29,7 @@ export interface MaintenanceRecordCardData {
   photos_b64?: string[];
   videos?: RecordCardVideo[];
   other_technicians?: Array<{ id: string; full_name: string; technician_type?: TechnicianType }>;
+  technician_contributions?: Array<{ contribution_role: "responsible" | "support"; duration_minutes: number }>;
   report_attachments?: ReportAttachment[];
   manager_confirmation_status?: "pending" | "confirmed";
 }
@@ -80,6 +81,8 @@ export default function MaintenanceRecordCard({
 }: MaintenanceRecordCardProps) {
   const photos = record.photos || record.photos_b64 || [];
   const videos = record.videos || [];
+  const responsibleDuration = getResponsibleTechnicianDurationMinutes(record.technician_contributions);
+  const displayedWorkDuration = getMaintenanceWorkDurationMinutes(record);
   const showMedia = !record.group_id || photos.length > 0 || videos.length > 0;
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
@@ -95,7 +98,7 @@ export default function MaintenanceRecordCard({
         {record.manager_confirmation_status === "confirmed" ? <span className="flex-shrink-0 rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[9px] font-bold text-green"> Teyitli</span> : record.manager_confirmation_status === "pending" ? <span className="flex-shrink-0 rounded-full border border-amber/40 bg-amber/10 px-2 py-0.5 text-[9px] font-bold text-amber">Teyit bekliyor</span> : <span className="flex-shrink-0 rounded-full border border-border bg-panel2 px-2 py-0.5 text-[9px] font-bold text-faint">Eski kayıt</span>}
       </div>
       <div className="mt-1 break-words text-[11px] leading-relaxed text-faint">{getMaintenanceRecordDate(record.maintenance_start_at, record.created_at)?.toLocaleDateString("tr-TR") || "—"} · {record.hour_at_completion.toLocaleString("tr-TR")} sa · {technicianLabel}</div>
-      {(record.maintenance_start_at || record.maintenance_end_at || record.maintenance_duration_minutes != null) && <div className="mt-1 grid gap-0.5 text-[10.5px] leading-relaxed text-teal sm:flex sm:flex-wrap sm:gap-x-2 sm:gap-y-0.5"><span>Başlangıç: {record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>Süre: {formatMaintenanceDuration(record.maintenance_duration_minutes)}</span></div>}
+      {(record.maintenance_start_at || record.maintenance_end_at || record.maintenance_duration_minutes != null) && <div className="mt-1 grid gap-0.5 text-[10.5px] leading-relaxed text-teal sm:flex sm:flex-wrap sm:gap-x-2 sm:gap-y-0.5"><span>Başlangıç: {record.maintenance_start_at ? new Date(record.maintenance_start_at).toLocaleString("tr-TR") : "—"}</span><span>Bitiş: {record.maintenance_end_at ? new Date(record.maintenance_end_at).toLocaleString("tr-TR") : "—"}</span><span>{responsibleDuration !== null ? "Sorumlu çalışma" : "Geçen süre"}: {formatMaintenanceDuration(displayedWorkDuration)}</span></div>}
       {record.pressure_reading != null && <div className="mt-1 text-[11.5px] text-muted"> Fark Basıncı: {record.pressure_reading} bar</div>}
       {record.technician_note && <div className="mt-1 text-[11.5px] text-muted"> {record.technician_note}</div>}
       {record.other_technicians?.length ? <div className="mt-1 text-[11px] text-muted"> Ekip: {record.other_technicians.map((technician) => technician.full_name).join(", ")}</div> : null}

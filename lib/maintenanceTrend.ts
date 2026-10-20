@@ -1,3 +1,5 @@
+import { getMaintenanceWorkDurationMinutes } from "./maintenanceTime.ts";
+
 export interface MaintenanceTrendRecord {
   _id?: string;
   type_key?: string;
@@ -32,12 +34,8 @@ export function eventDate(record: MaintenanceTrendRecord): Date | null {
 
 /** Trendler, varsa baş/sorumlu teknisyenin çalışma süresini temel alır. */
 export function durationMinutes(record: MaintenanceTrendRecord): number {
-  const responsibleDuration = record.technician_contributions?.find((item) => item.contribution_role === "responsible")?.duration_minutes;
-  const responsible = Number(responsibleDuration);
-  if (Number.isFinite(responsible) && responsible > 0 && responsible <= MAX_DURATION_MINUTES) return responsible;
-
-  const stored = Number(record.maintenance_duration_minutes ?? record.duration_minutes);
-  if (Number.isFinite(stored) && stored > 0 && stored <= MAX_DURATION_MINUTES) return stored;
+  const recordedWorkDuration = getMaintenanceWorkDurationMinutes(record);
+  if (recordedWorkDuration !== null) return recordedWorkDuration;
 
   if (record.maintenance_start_at && record.maintenance_end_at) {
     const start = new Date(record.maintenance_start_at).getTime();
@@ -79,24 +77,9 @@ function average(values: number[]): number | null {
   return usable.length ? usable.reduce((sum, value) => sum + value, 0) / usable.length : null;
 }
 
-function allocateByWeights(total: number, weights: number[]): number[] {
-  if (weights.length === 0) return [];
-  const safeWeights = weights.map((weight) => Number.isFinite(weight) && weight > 0 ? weight : 1);
-  const weightTotal = safeWeights.reduce((sum, weight) => sum + weight, 0);
-  const rawShares = safeWeights.map((weight) => total * weight / weightTotal);
-  const shares = rawShares.map(Math.floor);
-  let remaining = Math.max(0, total - shares.reduce((sum, share) => sum + share, 0));
-  const remainders = rawShares
-    .map((share, index) => ({ index, remainder: share - shares[index] }))
-    .sort((a, b) => b.remainder - a.remainder);
-  for (let index = 0; index < remaining; index += 1) shares[remainders[index % remainders.length].index] += 1;
-  return shares;
-}
-
 /**
- * Tek tür olaylarda kaydedilen süre gerçek referans kabul edilir. Birleşik bakımda
- * ortak toplam baş teknisyen süresidir; türlere, kendi geçmiş tekil süre ortalamaları
- * oranında paylaştırılır. Böylece aynı ortak süre her türe tekrar yazılmaz.
+ * Birleşik bakımın ana türü sorumlu teknisyenin tüm çalışma süresini korur.
+ * Ek türler, aynı motordaki tek tür kayıtlarının ortalamasından tahmin edilir.
  */
 export function maintenanceTypeDurationSummaries(records: MaintenanceTrendRecord[]): MaintenanceTypeDurationSummary[] {
   const groups = new Map<string, MaintenanceTrendRecord[]>();
@@ -139,10 +122,18 @@ export function maintenanceTypeDurationSummaries(records: MaintenanceTrendRecord
     }
 
     const primary = primaryRecord(group);
-    const sharedDuration = durationMinutes(primary) || Math.max(...group.map(durationMinutes));
-    const weights = entries.map(([key]) => average(singleTypeDurations.get(key) || []) || globalAverage || 1);
-    const allocations = allocateByWeights(sharedDuration, weights);
-    entries.forEach(([, record], index) => add(record, allocations[index], true));
+    const primaryTypeKey = typeKey(primary);
+    const primaryEntry = entries.find(([key]) => key === primaryTypeKey);
+    const primaryTypeRecord = primaryEntry?.[1] || primary;
+    const primaryDuration = durationMinutes(primary) || Math.max(...group.map(durationMinutes));
+    add(primaryTypeRecord, primaryDuration, false);
+
+    const fallbackExtraDuration = Math.round(primaryDuration / entries.length);
+    entries.forEach(([key, record]) => {
+      if (key === primaryTypeKey) return;
+      const estimatedDuration = Math.round(average(singleTypeDurations.get(key) || []) || globalAverage || fallbackExtraDuration);
+      add(record, estimatedDuration, true);
+    });
   }
 
   return [...summaries.values()].sort((a, b) => b.count - a.count || b.minutes - a.minutes);
