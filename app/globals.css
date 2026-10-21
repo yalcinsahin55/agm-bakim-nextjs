@@ -7,6 +7,10 @@
 
 :root {
   color-scheme: dark;
+  --display-scale: 1;
+  --user-font-scale: 1;
+  --ui-font-scale: calc(var(--display-scale) * var(--user-font-scale));
+  font-size: calc(16px * var(--ui-font-scale));
   --color-bg: #0f1319;
   --color-panel: #171d25;
   --color-panel2: #1f2730;
@@ -29,6 +33,28 @@
   --color-on-green: #071a12;
   --space-page: 16px;
 }
+:root[data-font-size="small"] { --user-font-scale: 0.9; }
+:root[data-font-size="normal"] { --user-font-scale: 1; }
+:root[data-font-size="large"] { --user-font-scale: 1.1; }
+
+[class*="text-[8px]"] { font-size: calc(8px * var(--ui-font-scale)); }
+[class*="text-[8.5px]"] { font-size: calc(8.5px * var(--ui-font-scale)); }
+[class*="text-[9px]"] { font-size: calc(9px * var(--ui-font-scale)); }
+[class*="text-[9.5px]"] { font-size: calc(9.5px * var(--ui-font-scale)); }
+[class*="text-[10px]"] { font-size: calc(10px * var(--ui-font-scale)); }
+[class*="text-[10.5px]"] { font-size: calc(10.5px * var(--ui-font-scale)); }
+[class*="text-[11px]"] { font-size: calc(11px * var(--ui-font-scale)); }
+[class*="text-[11.5px]"] { font-size: calc(11.5px * var(--ui-font-scale)); }
+[class*="text-[12px]"] { font-size: calc(12px * var(--ui-font-scale)); }
+[class*="text-[12.5px]"] { font-size: calc(12.5px * var(--ui-font-scale)); }
+[class*="text-[13px]"] { font-size: calc(13px * var(--ui-font-scale)); }
+[class*="text-[13.5px]"] { font-size: calc(13.5px * var(--ui-font-scale)); }
+[class*="text-[14px]"] { font-size: calc(14px * var(--ui-font-scale)); }
+[class*="text-[14.5px]"] { font-size: calc(14.5px * var(--ui-font-scale)); }
+[class*="text-[15px]"] { font-size: calc(15px * var(--ui-font-scale)); }
+[class*="text-[18px]"] { font-size: calc(18px * var(--ui-font-scale)); }
+[class*="text-[21px]"] { font-size: calc(21px * var(--ui-font-scale)); }
+[class*="text-[23px]"] { font-size: calc(23px * var(--ui-font-scale)); }
 
 :root.light {
   color-scheme: light;
@@ -207,21 +233,21 @@ body > div {
   :root, :root.light { --space-page: 24px; }
 }
 
-/* Geniş masaüstü görünümünde sabit px kullanan arayüz yazıları okunabilir kalsın. */
+/* Kök yazı boyutunu ölçekle; html zoom sabit menünün viewport hizasını bozabilir. */
 @media (min-width: 1600px) {
-  html { zoom: 1.1; }
+  :root { --display-scale: 1.1; }
 }
 
 @media (min-width: 1920px) {
-  html { zoom: 1.18; }
+  :root { --display-scale: 1.18; }
 }
 
 @media (min-width: 2560px) {
-  html { zoom: 1.26; }
+  :root { --display-scale: 1.26; }
 }
 
 @media (min-width: 3440px) {
-  html { zoom: 1.32; }
+  :root { --display-scale: 1.32; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -257,7 +283,7 @@ body > div {
   gap: 5px;
   padding: 3px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale));
   font-weight: 800;
 }
 .status-pill.gecikmis { background: color-mix(in srgb, var(--color-red) 14%, transparent); color: var(--color-red); }

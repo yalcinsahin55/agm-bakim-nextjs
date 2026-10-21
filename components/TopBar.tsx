@@ -3,6 +3,7 @@ import Image from "next/image";
 import NotificationBell from "@/components/NotificationBell";
 import LogoutButton from "@/components/LogoutButton";
 import ThemeToggle from "@/components/ThemeToggle";
+import FontSizeControl from "@/components/FontSizeControl";
 
 interface TopBarProps {
   title: string;
@@ -26,6 +27,7 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
+          <FontSizeControl />
           <NotificationBell />
           {right}
           <LogoutButton />
