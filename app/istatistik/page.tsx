@@ -19,6 +19,7 @@ interface AnalyticsSummary {
   total: number;
   thisCount: number;
   lastCount: number;
+  monthly: Array<{ month: string; count: number }>;
   byType: Array<{ type: string; count: number }>;
   byEngine: Array<{ engine: string; count: number }>;
   byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; responsible_duration_minutes?: number; support_duration_minutes?: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
@@ -30,7 +31,7 @@ interface AnalyticsSummary {
   periodBreakdown?: Array<{ month: string; week: string; count: number; total_duration_minutes: number }>;
 }
 
-const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], delayReasons: [], delayByEngine: [], delayByType: [], delayByMonth: [] };
+const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, monthly: [], byType: [], byEngine: [], byTechnician: [], delayReasons: [], delayByEngine: [], delayByType: [], delayByMonth: [] };
 
 function BarList({ items, color }: { items: BarItem[]; color: string }) {
   const max = Math.max(...items.map((item) => item.count), 1);
@@ -65,6 +66,7 @@ export default function IstatistikPage() {
         total: Number(data.total || 0),
         thisCount: Number(data.thisCount || 0),
         lastCount: Number(data.lastCount || 0),
+        monthly: Array.isArray(data.monthly) ? data.monthly : [],
         byType: Array.isArray(data.byType) ? data.byType : [],
         byEngine: Array.isArray(data.byEngine) ? data.byEngine : [],
         byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
@@ -121,7 +123,7 @@ export default function IstatistikPage() {
           {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
           <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
         </div>
-        <div className="mb-4"><AnalyticsTrendChart points={summary.delayByMonth.map((item) => ({ label: item.month, value: item.count }))} /></div>
+        <div className="mb-4"><AnalyticsTrendChart points={summary.monthly.map((item) => ({ label: item.month, value: item.count }))} /></div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
           <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
