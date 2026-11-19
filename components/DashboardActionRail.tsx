@@ -134,11 +134,11 @@ export default memo(function DashboardActionRail(props: DashboardActionRailProps
   if (!visibleActions.length && !operationQueue.length && !riskRows.length) return <></>;
 
   return (
-    <section className="mb-5" aria-labelledby="dashboard-actions-heading">
+    <section className="dashboard-section mb-5" aria-labelledby="dashboard-actions-heading">
       <div className="mb-3 flex items-end justify-between gap-3 border-b border-border pb-2">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber">Operasyon merkezi</div>
-          <h2 id="dashboard-actions-heading" className="mt-1 font-display text-lg font-bold uppercase tracking-wide text-text">Sıradaki iş</h2>
+          <h2 id="dashboard-actions-heading" className="app-section-title mt-1">Sıradaki iş</h2>
           <p className="mt-1 max-w-2xl text-[10.5px] leading-4 text-muted">{presentation.description}</p>
         </div>
         <span className={`flex-shrink-0 rounded-full border px-2 py-1 text-right text-[8.5px] font-extrabold tracking-wide ${viewerMode ? "border-teal/30 bg-teal/10 text-teal" : "border-amber/30 bg-amber/10 text-amber"}`}>

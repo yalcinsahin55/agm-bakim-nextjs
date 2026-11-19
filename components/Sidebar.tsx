@@ -72,9 +72,9 @@ export default function Sidebar() {
   }
 
   return (
-    <aside data-collapsed={collapsed} className={`fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r border-border bg-bg/95 backdrop-blur-xl transition-[width] duration-200 md:flex ${collapsed ? "w-[76px]" : "w-64 md:max-xl:w-[76px]"}`}>
+    <aside data-collapsed={collapsed} className={`sidebar-shell fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r border-border backdrop-blur-xl transition-[width] duration-200 md:flex ${collapsed ? "w-[76px]" : "w-64 md:max-xl:w-[76px]"}`}>
       {/* Logo */}
-      <div className={`border-b border-border px-3 pb-4 pt-5 ${collapsed ? "flex flex-col items-center gap-3" : "md:max-xl:flex md:max-xl:flex-col md:max-xl:items-center md:max-xl:gap-3"}`}>
+      <div className={`sidebar-brand border-b border-border px-3 pb-4 pt-5 ${collapsed ? "flex flex-col items-center gap-3" : "md:max-xl:flex md:max-xl:flex-col md:max-xl:items-center md:max-xl:gap-3"}`}>
         <div className={`flex items-center gap-3 ${collapsed ? "justify-center" : "md:max-xl:justify-center"}`}>
           <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-control border border-border shadow-lg">
             <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="44px" className="object-cover" loading="lazy" />
@@ -106,7 +106,7 @@ export default function Sidebar() {
                   href={item.href}
                   title={item.label}
                   aria-label={item.label}
-                  className={`relative flex items-center gap-3 rounded-lg border py-2.5 text-[13px] font-medium transition-all ${collapsed ? "justify-center px-2" : "px-3 md:max-xl:justify-center md:max-xl:px-2"} ${
+                  className={`sidebar-nav-item relative flex items-center gap-3 rounded-lg border py-2.5 text-[13px] font-medium transition-all ${collapsed ? "justify-center px-2" : "px-3 md:max-xl:justify-center md:max-xl:px-2"} ${
                     active
                       ? "border-amber/20 bg-amber/10 text-amber"
                       : isOtherMenu

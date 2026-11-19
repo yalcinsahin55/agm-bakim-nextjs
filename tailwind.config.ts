@@ -31,7 +31,7 @@ const config: Config = {
       },
       fontFamily: {
         display: ["'Barlow Condensed'", "sans-serif"],
-        body: ["Inter", "sans-serif"],
+        body: ["AGM Noto Sans", "Inter", "sans-serif"],
         mono: ["'JetBrains Mono'", "monospace"],
       },
       borderRadius: {

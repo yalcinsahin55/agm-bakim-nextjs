@@ -12,6 +12,7 @@ import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import { averageNonZeroLoad } from "@/lib/loadMath";
 import DashboardActionRail from "@/components/DashboardActionRail";
 import StatCards from "@/components/StatCards";
+import AppIcon from "@/components/ui/AppIcon";
 import DashboardAssistant from "./_components/DashboardAssistant";
 import EngineHealthDetails from "./_components/EngineHealthDetails";
 import { ENGINE_STATUS_VIEW, engineStatus, greetingPresentation, healthCardId } from "./_lib/types";
@@ -98,7 +99,7 @@ export default function DashboardPage() {
     return (
       <div>
         <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle="Bakım Merkezi" />
-        <div className="px-4 py-4">
+        <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
           <Skeleton className="h-32 w-full rounded-card mb-4" />
           <Skeleton className="h-14 w-full rounded-card mb-4" />
           <Skeleton className="h-36 w-full rounded-card mb-4" />
@@ -115,7 +116,7 @@ export default function DashboardPage() {
   return (
     <div>
       <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle={todayStr} />
-      <div className="px-4 py-4">
+      <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
         {error && (
           <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3.5 text-[12px] text-red" role="alert">
             <div className="font-bold">{error}</div>
@@ -141,7 +142,7 @@ export default function DashboardPage() {
           <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border border-white/5 bg-white/[0.02]" aria-hidden="true" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3">
-              <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border text-xl ${greetingView.iconClass}`} aria-hidden="true">{greetingView.icon}</div>
+              <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border ${greetingView.iconClass}`} aria-hidden="true"><AppIcon name={greetingView.icon} size={23} /></div>
               <div className="min-w-0">
                 <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Avcıkoru Santrali</div>
                 <h1 className={`mt-1 truncate text-[21px] font-extrabold tracking-tight ${greetingView.titleClass}`}>{greetingView.title}{firstName ? `, ${firstName}` : ""}</h1>
@@ -182,13 +183,13 @@ export default function DashboardPage() {
         <DashboardAssistant />
 
 
-        <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor yük özeti</h2>
+        <h2 className="app-section-title mt-6 mb-3 border-b border-border pb-2">Motor yük özeti</h2>
         <div className="flex gap-4 text-xs text-muted mb-2"><span>Toplam <b className="text-text font-mono">{totalLoad.toLocaleString("tr-TR")}</b> kW</span><span>Ort. <b className="text-text font-mono">{avgLoad.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}</b> kW</span></div>
         <LoadCards engines={sortedEngines} />
 
 
         <section id="dashboard-health-details" className="scroll-mt-24">
-          <h2 className="font-display text-lg font-bold uppercase tracking-wide mt-5 mb-3 border-b border-border pb-2">Motor Bakım Durumu</h2>
+          <h2 className="app-section-title mt-6 mb-3 border-b border-border pb-2">Motor Bakım Durumu</h2>
           <p className="mb-3 text-[10.5px] text-muted">Bir motora dokunarak tüm bakım türlerindeki kalan ve çalışılan saatleri görüntüleyebilirsin.</p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 mb-5">
           {healthRows.map(({ engine, score, status, attention, items: engineItems }) => {

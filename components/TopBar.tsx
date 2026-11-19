@@ -13,7 +13,7 @@ interface TopBarProps {
 
 export default function TopBar({ title, subtitle, right }: TopBarProps) {
   return (
-    <div className="sticky top-0 z-20 border-b border-border bg-bg/95 px-3 pb-2.5 pt-3 backdrop-blur-md sm:px-4 sm:pb-3 sm:pt-4">
+    <div className="topbar-shell sticky top-0 z-20 border-b border-border px-3 pb-2.5 pt-3 backdrop-blur-md sm:px-4 sm:pb-3 sm:pt-4">
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {/* Mobilde logo göster, PC'de sidebar'da zaten var */}
@@ -21,7 +21,7 @@ export default function TopBar({ title, subtitle, right }: TopBarProps) {
             <Image src="/app-icon.png" alt="Avcıkoru Bakım" fill sizes="36px" className="object-cover" priority />
           </div>
           <div className="min-w-0">
-            <div className="truncate font-display text-lg font-bold uppercase tracking-wide sm:text-xl">{title}</div>
+            <div className="truncate font-display text-xl font-bold uppercase tracking-[0.045em] sm:text-2xl">{title}</div>
             {subtitle && <div className="mt-0.5 max-w-[48vw] truncate text-[10px] text-faint sm:max-w-none sm:text-[10.5px]">{subtitle}</div>}
           </div>
         </div>

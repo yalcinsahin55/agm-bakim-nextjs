@@ -93,7 +93,7 @@ export default function BottomNav() {
     <>
       <div className="h-24 md:hidden" aria-hidden="true" />
       <div className={`fixed bottom-0 left-0 right-0 z-30 pb-safe transition-transform duration-200 md:hidden ${hiddenOnScroll || keyboardOpen ? "mobile-nav-hidden" : ""}`}>
-        <nav aria-label="Mobil ana navigasyon" className="mx-auto flex min-h-20 w-full max-w-lg min-w-0 items-stretch border-t border-border bg-bg/98 px-1 pb-3 pt-2 shadow-[0_-8px_28px_rgba(15,19,25,0.12)] backdrop-blur-xl">
+            <nav aria-label="Mobil ana navigasyon" className="bottom-nav-shell mx-auto flex min-h-20 w-full max-w-lg min-w-0 items-stretch border-t border-border px-1 pb-3 pt-2 backdrop-blur-xl">
           {visibleItems.map((item) => {
             const active = pathname === item.href || (item.href === "/diger" && pathname.startsWith("/diger"));
             return (

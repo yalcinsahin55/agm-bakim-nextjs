@@ -1,4 +1,5 @@
 import type { PanelItem, StatusKey } from "@/lib/status";
+import type { AppIconName } from "@/components/ui/AppIcon";
 
 export interface DashboardEngine {
   _id: string;
@@ -49,15 +50,15 @@ export function healthCardId(engineId: string): string {
   return `motor-health-${engineId.replace(/[^a-zA-Z0-9_-]/gu, "-")}`;
 }
 
-export function greetingPresentation(hour: number) {
+export function greetingPresentation(hour: number): { title: string; icon: AppIconName; description: string; panelClass: string; iconClass: string; titleClass: string } {
   if (hour < 6 || hour >= 20) {
-    return { title: "İyi geceler", icon: "◐", description: "Gece bakım durumunu sakin bir özetle kontrol et.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };
+    return { title: "İyi geceler", icon: "moon", description: "Gece bakım durumunu sakin bir özetle kontrol et.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };
   }
   if (hour < 12) {
-    return { title: "İyi günler", icon: "☀️", description: "Bugünkü bakım planına hızlıca göz at.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
+    return { title: "İyi günler", icon: "sun", description: "Bugünkü bakım planına hızlıca göz at.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
   }
   if (hour < 18) {
-    return { title: "İyi günler", icon: "☀️", description: "Motor ve bakım durumlarını güncel tut.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };
+    return { title: "İyi günler", icon: "sun", description: "Motor ve bakım durumlarını güncel tut.", panelClass: "border-teal/30 bg-panel2", iconClass: "border-teal/30 bg-teal/10 text-teal", titleClass: "text-teal" };
   }
-  return { title: "İyi akşamlar", icon: "◒", description: "Günün bakım durumunu gözden geçir.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
+  return { title: "İyi akşamlar", icon: "moon", description: "Günün bakım durumunu gözden geçir.", panelClass: "border-amber/30 bg-panel2", iconClass: "border-amber/30 bg-amber/10 text-amber", titleClass: "text-amber" };
 }

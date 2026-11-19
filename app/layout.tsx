@@ -11,7 +11,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0f1319",
+  themeColor: "#0a1220",
   width: "device-width",
   initialScale: 1,
   // Kullanıcıların erişilebilirlik amacıyla yakınlaştırma yapabilmesine izin verilir.

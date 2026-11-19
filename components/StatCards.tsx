@@ -21,12 +21,12 @@ export default function StatCards({ counts }: StatCardsProps) {
       {order.map((key) => (
         <div
           key={key}
-          className="relative overflow-hidden bg-panel border border-border rounded-card p-3 md:p-4 transition-all hover:border-borderlt hover:-translate-y-0.5"
+          className="stat-card relative overflow-hidden border border-border rounded-card p-3 md:p-4 transition-all hover:border-borderlt hover:-translate-y-0.5"
         >
           <div className="absolute left-0 top-0 w-[3px] h-full" style={{ background: STATUS_COLORS[key] }} />
           <div className="flex items-center justify-between">
             <div className="text-[10.5px] font-bold tracking-wide text-muted uppercase">{STATUS_LABELS[key]}</div>
-            <span className="text-muted"><AppIcon name={ICONS[key]} size={16} /></span>
+            <span className="rounded-lg border border-border bg-panel2 p-1.5 text-muted"><AppIcon name={ICONS[key]} size={16} /></span>
           </div>
           <div className="font-mono text-2xl md:text-3xl font-bold mt-1" style={{ color: STATUS_COLORS[key] }}>
             {counts[key]}
