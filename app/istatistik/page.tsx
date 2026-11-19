@@ -1,0 +1,149 @@
+"use client";
+
+import { useState } from "react";
+import TopBar from "@/components/TopBar";
+import BottomNav from "@/components/BottomNav";
+import Skeleton from "@/components/Skeleton";
+import AnalyticsTrendChart from "@/components/AnalyticsTrendChart";
+import { cachedFetch } from "@/lib/apiCache";
+import { usePageData } from "@/lib/usePageData";
+
+type FilterMode = "all" | "date";
+
+interface BarItem {
+  label: string;
+  count: number;
+}
+
+interface AnalyticsSummary {
+  total: number;
+  thisCount: number;
+  lastCount: number;
+  byType: Array<{ type: string; count: number }>;
+  byEngine: Array<{ engine: string; count: number }>;
+  byTechnician: Array<{ technician_id: string; technician: string; responsible_count: number; support_count: number; total_count: number; responsible_duration_minutes?: number; support_duration_minutes?: number; total_duration_minutes?: number; average_duration_minutes?: number }>;
+  delayReasons: Array<{ reason: string; count: number }>;
+  delayByEngine: Array<{ engine: string; count: number }>;
+  delayByType: Array<{ type: string; count: number }>;
+  delayByMonth: Array<{ month: string; count: number; total_duration_minutes: number }>;
+  workPeriod?: "week" | "month" | "total";
+  periodBreakdown?: Array<{ month: string; week: string; count: number; total_duration_minutes: number }>;
+}
+
+const EMPTY_SUMMARY: AnalyticsSummary = { total: 0, thisCount: 0, lastCount: 0, byType: [], byEngine: [], byTechnician: [], delayReasons: [], delayByEngine: [], delayByType: [], delayByMonth: [] };
+
+function BarList({ items, color }: { items: BarItem[]; color: string }) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+  return (
+    <div className="flex flex-col gap-2.5">
+      {items.map((item) => (
+        <div key={item.label}>
+          <div className="flex justify-between text-[11px] mb-1">
+            <span className="text-muted font-semibold truncate pr-2">{item.label}</span>
+            <span className="text-text font-mono font-bold flex-shrink-0">{item.count}</span>
+          </div>
+          <div className="h-2 rounded-full bg-panel2 overflow-hidden">
+            <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${(item.count / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function IstatistikPage() {
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [selectedFrom, setSelectedFrom] = useState("");
+  const [selectedTo, setSelectedTo] = useState("");
+  const { data: summary, loading, error, reload } = usePageData<AnalyticsSummary>(
+    async () => {
+      const params = new URLSearchParams({ workPeriod: "total" });
+      if (filterMode === "date" && selectedFrom) params.set("from", selectedFrom);
+      if (filterMode === "date" && selectedTo) params.set("to", selectedTo);
+      const data = await cachedFetch<AnalyticsSummary>(`/api/analytics/summary?${params.toString()}`, 30_000);
+      return {
+        total: Number(data.total || 0),
+        thisCount: Number(data.thisCount || 0),
+        lastCount: Number(data.lastCount || 0),
+        byType: Array.isArray(data.byType) ? data.byType : [],
+        byEngine: Array.isArray(data.byEngine) ? data.byEngine : [],
+        byTechnician: Array.isArray(data.byTechnician) ? data.byTechnician : [],
+        delayReasons: Array.isArray(data.delayReasons) ? data.delayReasons : [],
+        delayByEngine: Array.isArray(data.delayByEngine) ? data.delayByEngine : [],
+        delayByType: Array.isArray(data.delayByType) ? data.delayByType : [],
+        delayByMonth: Array.isArray(data.delayByMonth) ? data.delayByMonth : [],
+        workPeriod: data.workPeriod,
+        periodBreakdown: Array.isArray(data.periodBreakdown) ? data.periodBreakdown : [],
+      };
+    },
+    EMPTY_SUMMARY,
+    [filterMode, selectedFrom, selectedTo],
+    "İstatistikler yüklenemedi. Lütfen tekrar deneyin.",
+  );
+
+  if (loading) {
+    return (
+      <div>
+        <TopBar title="İstatistikler" />
+        <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /></div>
+          <Skeleton className="h-56 rounded-card mb-4" /><Skeleton className="h-56 rounded-card" />
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  const monthName = new Date().toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+  const diff = summary.thisCount - summary.lastCount;
+  const topTypes: BarItem[] = summary.byType.slice(0, 6).map((item) => ({ label: item.type, count: item.count }));
+  const topEngines: BarItem[] = summary.byEngine.slice(0, 6).map((item) => ({ label: item.engine, count: item.count }));
+  const topTechnicians = summary.byTechnician.slice(0, 12);
+  const maxTechnicianDuration = Math.max(...topTechnicians.map((item) => Number(item.total_duration_minutes || 0)), 1);
+  const selectedRangeLabel = filterMode === "date" && (selectedFrom || selectedTo) ? `${selectedFrom || "başlangıç"} – ${selectedTo || "bugün"}` : "Tüm kayıtlar";
+  const delayReasonLabels: Record<string, string> = { planned: "Planlı bekleme", parts: "Parça bekleniyor", availability: "Personel uygunluğu", technical: "Teknik sorun", weather: "Hava koşulları", external: "Dış hizmet / tedarikçi", other: "Diğer" };
+  const delayTotal = summary.delayReasons.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <div>
+      <TopBar title="İstatistikler" subtitle={`${summary.total} kayıt analiz edildi`} />
+      <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
+        {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Geçen Ay</div><div className="font-mono text-2xl font-bold text-text mt-1">{summary.lastCount}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Değişim</div><div className={`font-mono text-2xl font-bold mt-1 ${diff >= 0 ? "text-green" : "text-red"}`}>{diff >= 0 ? "+" : ""}{diff}</div></div>
+          <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Toplam</div><div className="font-mono text-2xl font-bold text-teal mt-1">{summary.total}</div></div>
+        </div>
+        <div className="mb-4 rounded-card border border-border bg-panel p-3">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-faint">İstatistik filtresi</div>
+          <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setFilterMode("all"); setSelectedFrom(""); setSelectedTo(""); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "all" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tümü</button><button type="button" onClick={() => setFilterMode("date")} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${filterMode === "date" ? "border-teal bg-teal/15 text-teal" : "border-border bg-panel2 text-muted"}`}>Tarih Bazlı</button></div>
+          {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
+          <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
+        </div>
+        <div className="mb-4"><AnalyticsTrendChart points={summary.delayByMonth.map((item) => ({ label: item.month, value: item.count }))} /></div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
+            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1"> Teknisyen Çalışma Özeti</h2>
+            <p className="mb-3 text-[10.5px] text-faint">Sorumlu olarak tamamlanan ve ekip desteği verilen bakım görevleri birlikte gösterilir.</p>
+            {topTechnicians.length ? <div className="flex flex-col gap-3">{topTechnicians.map((item) => <div key={item.technician_id}>
+              <div className="mb-1 flex items-center justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-muted">{item.technician}</span><span className="flex-shrink-0 font-mono font-bold text-text">{item.total_count} görev</span></div>
+              <div className="flex h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full bg-teal transition-all" style={{ width: `${(Number(item.responsible_duration_minutes || 0) / maxTechnicianDuration) * 100}%` }} /><div className="h-full bg-amber transition-all" style={{ width: `${(Number(item.support_duration_minutes || 0) / maxTechnicianDuration) * 100}%` }} /></div>
+              <div className="mt-1 flex flex-wrap gap-3 text-[9.5px] text-faint"><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal" />Sorumlu: {item.responsible_count}</span><span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber" />Destek: {item.support_count}</span><span className="font-semibold text-text">Toplam süre: {item.total_duration_minutes ? `${Math.floor(item.total_duration_minutes / 60)} sa ${item.total_duration_minutes % 60 ? `${item.total_duration_minutes % 60} dk` : ""}` : "—"}</span></div>
+            </div>)}</div> : <p className="text-[11px] text-faint">Henüz teknisyen çalışma verisi yok.</p>}
+          </div>
+          <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
+            <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1">Bakım gecikme nedenleri</h2>
+            <p className="mb-3 text-[10.5px] text-faint">Kayıt sırasında seçilen nedenler, aynı tarih filtresiyle özetlenir.</p>
+            {summary.delayReasons.length ? <BarList items={summary.delayReasons.map((item) => ({ label: delayReasonLabels[item.reason] || item.reason, count: item.count }))} color="bg-red" /> : <p className="text-[11px] text-faint">Henüz gecikme nedeni kaydedilmedi.</p>}
+            {summary.delayReasons.length > 0 && <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-3"><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Motor bazında</div><BarList items={summary.delayByEngine.slice(0, 5).map((item) => ({ label: item.engine, count: item.count }))} color="bg-orange" /></div><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Bakım türü bazında</div><BarList items={summary.delayByType.slice(0, 5).map((item) => ({ label: item.type, count: item.count }))} color="bg-amber" /></div><div><div className="mb-2 text-[10px] font-bold uppercase text-faint">Aylık trend</div><BarList items={summary.delayByMonth.slice(-6).map((item) => ({ label: item.month, count: item.count }))} color="bg-teal" /></div></div>}
+            {delayTotal > 0 && <div className="mt-3 text-[10px] text-faint">Toplam {delayTotal} gecikme nedeni kaydı analiz edildi. Bu rapor, bakım tamamlanırken isteğe bağlı seçilen nedenlere dayanır.</div>}
+          </div>
+        </div>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
