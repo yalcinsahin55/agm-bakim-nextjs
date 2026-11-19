@@ -101,13 +101,11 @@ export default function DashboardPage() {
       <div>
         <TopBar title="Avcıkoru Santrali Motor Bakım Merkezi" subtitle="Bakım Merkezi" />
         <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
-          <Skeleton className="h-32 w-full rounded-card mb-4" />
-          <Skeleton className="h-14 w-full rounded-card mb-4" />
-          <Skeleton className="h-36 w-full rounded-card mb-4" />
-          <Skeleton className="h-6 w-40 mb-3" />
-          <Skeleton className="h-28 w-full rounded-card mb-5" />
-          <Skeleton className="h-6 w-48 mb-3" />
-          <div className="flex flex-col gap-2 mb-5"><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /></div>
+          <Skeleton className="mb-4 h-28 w-full rounded-card" />
+          <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4"><Skeleton className="h-28 rounded-card" /><Skeleton className="h-28 rounded-card" /><Skeleton className="h-28 rounded-card" /><Skeleton className="h-28 rounded-card" /></div>
+          <Skeleton className="mb-5 h-64 w-full rounded-card" />
+          <Skeleton className="mb-3 h-7 w-48" />
+          <div className="mb-5 grid gap-2 md:grid-cols-2"><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /><Skeleton className="h-20 rounded-control" /></div>
         </div>
         <BottomNav />
       </div>

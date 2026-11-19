@@ -16,5 +16,5 @@ export default function AppToaster() {
     return () => observer.disconnect();
   }, []);
 
-  return <Toaster position="top-center" theme={theme} richColors closeButton expand visibleToasts={4} duration={4200} toastOptions={{ className: "text-[12px]" }} />;
+  return <Toaster position="top-center" theme={theme} richColors closeButton expand visibleToasts={4} duration={4200} toastOptions={{ className: "rounded-control border border-border bg-panel text-[12px] text-text shadow-2xl" }} />;
 }
