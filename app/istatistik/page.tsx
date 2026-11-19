@@ -4,6 +4,7 @@ import { useState } from "react";
 import TopBar from "@/components/TopBar";
 import BottomNav from "@/components/BottomNav";
 import Skeleton from "@/components/Skeleton";
+import AnalyticsTrendChart from "@/components/AnalyticsTrendChart";
 import { cachedFetch } from "@/lib/apiCache";
 import { usePageData } from "@/lib/usePageData";
 
@@ -84,7 +85,7 @@ export default function IstatistikPage() {
     return (
       <div>
         <TopBar title="İstatistikler" />
-        <div className="px-4 py-4">
+        <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /><Skeleton className="h-24 rounded-control" /></div>
           <Skeleton className="h-56 rounded-card mb-4" /><Skeleton className="h-56 rounded-card" />
         </div>
@@ -106,7 +107,7 @@ export default function IstatistikPage() {
   return (
     <div>
       <TopBar title="İstatistikler" subtitle={`${summary.total} kayıt analiz edildi`} />
-      <div className="px-4 py-4">
+      <div className="app-page px-4 py-5 sm:px-5 lg:px-6">
         {error && <div className="mb-4 rounded-card border border-red/40 bg-red/10 p-3 text-[12px] text-red" role="alert"><div className="font-bold">{error}</div><button onClick={() => void reload()} className="mt-2 rounded-lg bg-red px-3 py-1.5 text-[11px] font-bold text-white">Tekrar dene</button></div>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <div className="bg-panel border border-border rounded-control p-3.5 text-center"><div className="text-[10px] font-bold text-faint uppercase">Bu Ay</div><div className="font-mono text-2xl font-bold text-amber mt-1">{summary.thisCount}</div><div className="text-[9.5px] text-faint mt-0.5 capitalize">{monthName}</div></div>
@@ -120,9 +121,10 @@ export default function IstatistikPage() {
           {filterMode === "date" && <div className="mt-3 grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-from">Başlangıç</label><input id="stats-from" type="date" value={selectedFrom} onChange={(event) => setSelectedFrom(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div><div><label className="text-[10px] font-bold uppercase text-faint" htmlFor="stats-to">Bitiş</label><input id="stats-to" type="date" value={selectedTo} onChange={(event) => setSelectedTo(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-panel2 px-3 py-2 text-[12px] text-text" /></div></div>}
           <p className="mt-2 text-[10px] text-faint">{filterMode === "date" ? `Seçilen aralık: ${selectedRangeLabel}. Bu aralık; bakımlara, motorlara, bakım türlerine ve teknisyenlere birlikte uygulanır.` : "Tüm bakım geçmişi gösterilir."}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
-          <div className="bg-panel border border-border rounded-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+        <div className="mb-4"><AnalyticsTrendChart points={summary.delayByMonth.map((item) => ({ label: item.month, value: item.count }))} /></div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Yapılan Bakımlar</h2>{topTypes.length ? <BarList items={topTypes} color="bg-amber" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
+          <div className="ui-card p-4"><h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-3"> En Çok Bakım Gören Motorlar</h2>{topEngines.length ? <BarList items={topEngines} color="bg-teal" /> : <p className="text-[11px] text-faint">Henüz veri yok.</p>}</div>
           <div className="bg-panel border border-border rounded-card p-4 md:col-span-2">
             <h2 className="font-display text-[13px] font-bold uppercase tracking-wide mb-1"> Teknisyen Çalışma Özeti</h2>
             <p className="mb-3 text-[10.5px] text-faint">Sorumlu olarak tamamlanan ve ekip desteği verilen bakım görevleri birlikte gösterilir.</p>

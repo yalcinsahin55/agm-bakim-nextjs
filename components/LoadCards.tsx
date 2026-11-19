@@ -12,17 +12,20 @@ interface LoadCardsProps {
 }
 
 export default memo(function LoadCards({ engines }: LoadCardsProps) {
+  const maxLoad = Math.max(...engines.map((engine) => Number(engine.load_kw || 0)), 1);
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] md:overflow-visible">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {engines.map((e) => (
         <div
           key={e._id}
-          className="flex flex-col items-center gap-1 flex-shrink-0 w-[74px] md:w-auto p-2.5 rounded-control bg-panel border border-border transition-all hover:border-borderlt hover:-translate-y-0.5"
+          className="group flex min-w-0 flex-col gap-2 rounded-control border border-border bg-panel p-3 transition-all hover:-translate-y-0.5 hover:border-borderlt"
         >
-          <EngineBadge name={e.name} size={28} />
-          <span className="text-[10px] text-muted font-semibold">{e.name}</span>
-          <span className="font-mono text-[13px] text-teal font-bold">{(e.load_kw || 0).toLocaleString("tr-TR")}</span>
-          <span className="text-[8px] text-faint tracking-wide">kW</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2 truncate text-[11px] font-extrabold text-text"><EngineBadge name={e.name} size={24} />{e.name}</span>
+            <span className="font-mono text-[13px] font-extrabold text-teal">{(e.load_kw || 0).toLocaleString("tr-TR")}</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-gradient-to-r from-teal to-amber-bright transition-all group-hover:brightness-110" style={{ width: `${Math.max(4, (Number(e.load_kw || 0) / maxLoad) * 100)}%` }} /></div>
+          <div className="flex items-center justify-between text-[9px] text-faint"><span>kW yük</span><span>{Number(e.hours || 0).toLocaleString("tr-TR")} saat</span></div>
         </div>
       ))}
     </div>

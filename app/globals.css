@@ -369,6 +369,21 @@ body > div {
   }
 }
 
+@media (max-width: 639px) {
+  .app-section-title { font-size: 1.05rem; }
+  .app-page { overflow-x: hidden; }
+  .ui-card { box-shadow: 0 10px 24px color-mix(in srgb, var(--color-panel-deep) 22%, transparent); }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-page { padding-inline: 20px; }
+}
+
+.toast-action-button {
+  min-height: 36px;
+  border-radius: 10px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
