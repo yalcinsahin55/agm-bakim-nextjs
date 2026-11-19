@@ -77,3 +77,14 @@ test("backdated completion uses the engine hour estimated for the maintenance da
   assert.equal(getCompletionHourValidationError(1_980, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z"), null);
   assert.match(getCompletionHourValidationError(1_927, 2_000, history, "2026-09-28T12:00:00.000Z", "2026-09-30T12:00:00.000Z") || "", /En düşük değer/);
 });
+
+test("without Excel history, completion hours cannot exceed the current engine hours", () => {
+  const now = "2026-11-19T10:00:00.000Z";
+  const maintenanceStart = "2026-11-19T09:00:00.000Z";
+
+  assert.equal(getCompletionHourValidationError(1_000, 1_000, [], maintenanceStart, now), null);
+  assert.match(
+    getCompletionHourValidationError(1_010, 1_000, [], maintenanceStart, now) || "",
+    /en yüksek değer: 1\.000 saat/,
+  );
+});

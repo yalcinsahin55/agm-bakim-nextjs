@@ -9,19 +9,24 @@ interface UnreadCountResponse {
 }
 
 const UNREAD_COUNT_URL = "/api/notifications/unread-count";
+const UNREAD_COUNT_POLL_MS = 120_000;
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let alive = true;
+    let lastSuccessfulLoadAt = 0;
 
     const load = async (fresh = false) => {
       try {
         if (fresh) invalidateCachedFetch(UNREAD_COUNT_URL);
         const url = fresh ? `${UNREAD_COUNT_URL}?fresh=1` : UNREAD_COUNT_URL;
         const data = await cachedFetch<UnreadCountResponse>(url, fresh ? 0 : 5_000);
-        if (alive) setUnreadCount(Number(data.unreadCount || 0));
+        if (alive) {
+          setUnreadCount(Number(data.unreadCount || 0));
+          lastSuccessfulLoadAt = Date.now();
+        }
       } catch {
         // Bildirim sayacı ana sayfanın çalışmasını engellememeli.
       }
@@ -30,10 +35,12 @@ export default function NotificationBell() {
     const handleChanged = () => { void load(true); };
     const handleRefresh = () => { void load(true); };
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible" && Date.now() - lastSuccessfulLoadAt >= UNREAD_COUNT_POLL_MS) void load();
     };
     void load();
-    const timer = window.setInterval(() => { void load(); }, 60_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, UNREAD_COUNT_POLL_MS);
     window.addEventListener("notifications:changed", handleChanged);
     window.addEventListener("notifications:refresh", handleRefresh);
     document.addEventListener("visibilitychange", handleVisibility);

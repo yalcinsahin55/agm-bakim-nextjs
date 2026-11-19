@@ -44,26 +44,39 @@ export function useRecordsPageData(user: RecordsPageUser | null | undefined) {
     if (technicianFilter !== "Tümü") params.set("technician_id", technicianFilter);
     if (fromDate) params.set("from_date", fromDate);
     if (toDate) params.set("to_date", toDate);
-    const requests: Promise<Response>[] = [fetch(`/api/records?${params}`, { signal: requestController.signal })];
-    if (!referenceDataLoadedRef.current) {
-      requests.push(fetch("/api/engines", { signal: requestController.signal }), fetch("/api/maintenance-types", { signal: requestController.signal }), fetch("/api/users/technicians", { signal: requestController.signal }));
-    }
+    const recordRequest = fetch(`/api/records?${params}`, { signal: requestController.signal });
+    const referenceRequest = !referenceDataLoadedRef.current
+      ? Promise.all([
+        fetch("/api/engines", { signal: requestController.signal }),
+        fetch("/api/maintenance-types", { signal: requestController.signal }),
+        fetch("/api/users/technicians", { signal: requestController.signal }),
+      ]).then(async ([engRes, typeRes, techRes]) => {
+        const [engineData, typeData, technicianData] = await Promise.all([
+          engRes.json().catch(() => null),
+          typeRes.json().catch(() => null),
+          techRes.json().catch(() => null),
+        ]);
+        return { engRes, typeRes, techRes, engineData, typeData, technicianData };
+      }).catch(() => null)
+    : null;
     try {
-      const [recRes, engRes, typeRes, techRes] = await Promise.all(requests);
-      if (recRes.status === 401) { router.push("/login"); return; }
+      const recRes = await recordRequest;
+      if (recRes.status === 401) { requestController.abort(); router.push("/login"); return; }
       const recordData = await recRes.json();
       if (requestController.signal.aborted) return;
       setRecords(recordData.records || []);
       setTotal(recordData.total || 0);
       setPage(recordData.page || requestedPage);
       setTotalPages(recordData.totalPages || 1);
-      if (engRes && typeRes && techRes) {
-        const [engineData, typeData, technicianData] = await Promise.all([engRes.json(), typeRes.json(), techRes.json()]);
-        setEngines(Array.isArray(engineData) ? engineData : []);
-        setTypes(Array.isArray(typeData) ? typeData : []);
-        setTechnicians(Array.isArray(technicianData) ? technicianData : []);
-        referenceDataLoadedRef.current = engRes.ok && typeRes.ok && techRes.ok
-          && Array.isArray(engineData) && Array.isArray(typeData) && Array.isArray(technicianData);
+      if (requestControllerRef.current === requestController) setLoading(false);
+      if (referenceRequest) {
+        const references = await referenceRequest;
+        if (!references || requestController.signal.aborted) return;
+        setEngines(Array.isArray(references.engineData) ? references.engineData : []);
+        setTypes(Array.isArray(references.typeData) ? references.typeData : []);
+        setTechnicians(Array.isArray(references.technicianData) ? references.technicianData : []);
+        referenceDataLoadedRef.current = references.engRes.ok && references.typeRes.ok && references.techRes.ok
+          && Array.isArray(references.engineData) && Array.isArray(references.typeData) && Array.isArray(references.technicianData);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;

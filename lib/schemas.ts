@@ -1,13 +1,13 @@
 import { z, ZodError } from "zod";
 import { isAllowedReportAttachmentUrl, isReportAttachmentMime, REPORT_ATTACHMENT_MAX_BYTES, REPORT_ATTACHMENT_MAX_COUNT } from "@/lib/reportAttachments";
+import { numberWithTypeError, requiredNumber, requiredString } from "./zodHelpers";
 
 //  Giriş validasyonu. `email` alanı eski istemcilerle geriye dönük uyumludur.
 export const loginSchema = z.object({
   identifier: z.string().trim().min(3, "Telefon numarası veya e-posta gereklidir.").max(254).optional(),
   email: z.string().trim().max(254).optional(),
   phone: z.string().trim().max(30).optional(),
-  password: z
-    .string({ required_error: "Şifre gereklidir." })
+  password: requiredString("Şifre gereklidir.")
     .min(6, "Şifre en az 6 karakter olmalıdır.")
     .max(128, "Şifre çok uzun."),
 }).refine((data) => Boolean(data.identifier || data.email || data.phone), {
@@ -17,15 +17,13 @@ export const loginSchema = z.object({
 
 //  İlk kurulum kaydı. Sistem kurulduktan sonra bu endpoint yeni kayıtları kapatır.
 export const registerSchema = z.object({
-  full_name: z
-    .string({ required_error: "Ad Soyad gereklidir." })
+  full_name: requiredString("Ad Soyad gereklidir.")
     .trim()
     .min(2, "Ad Soyad en az 2 karakter olmalı.")
     .max(100, "Ad Soyad çok uzun."),
   phone: z.string().trim().max(30).optional(),
   email: z.string().trim().email("Geçerli bir e-posta adresi girin.").max(254).optional(),
-  password: z
-    .string({ required_error: "Şifre gereklidir." })
+  password: requiredString("Şifre gereklidir.")
     .min(6, "Şifre en az 6 karakter olmalıdır.")
     .max(128, "Şifre çok uzun."),
 }).refine((data) => Boolean(data.phone || data.email), {
@@ -46,8 +44,7 @@ export const adminUserSchema = z.object({
   allowed_work_domains: z.array(workDomainSchema).max(3).optional(),
 });
 
-const passwordInputSchema = z
-  .string({ required_error: "Şifre gereklidir." })
+const passwordInputSchema = requiredString("Şifre gereklidir.")
   .min(6, "Şifre en az 6 karakter olmalıdır.")
   .max(128, "Şifre çok uzun.");
 
@@ -85,8 +82,7 @@ export const recordSchema = z.object({
   responsible_technician_duration: z.number().int("Sorumlu teknisyen süresi tam dakika olmalıdır.").nonnegative("Sorumlu teknisyen süresi negatif olamaz.").max(366 * 24 * 60, "Sorumlu teknisyen süresi mantık dışı büyük.").optional(),
   external_service_name: z.string().trim().max(160, "Dış hizmet adı çok uzun.").optional().or(z.literal("")),
 
-  hour_at_completion: z
-    .number({ required_error: "Motor çalışma saati gereklidir.", invalid_type_error: "Motor saati bir sayı olmalıdır." })
+  hour_at_completion: requiredNumber("Motor çalışma saati gereklidir.", "Motor saati bir sayı olmalıdır.")
     .nonnegative("Saat negatif olamaz.")
     .max(5000000, "Saat değeri mantık dışı büyük."),
 
@@ -148,8 +144,7 @@ export const recordSchema = z.object({
     note: z.string().trim().max(500, "Parça açıklaması çok uzun.").optional().or(z.literal("")),
   })).max(20, "En fazla 20 parça transferi eklenebilir.").optional(),
 
-  pressure_reading: z
-    .number({ invalid_type_error: "Basınç bir sayı olmalıdır." })
+  pressure_reading: numberWithTypeError("Basınç bir sayı olmalıdır.")
     .min(0, "Basınç negatif olamaz.")
     .max(200, "Basınç değeri mantık dışı.")
     .optional(),
@@ -160,8 +155,7 @@ export const recordSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih biçimi geçersiz (YYYY-AA-GG).")
     .optional(),
 
-  period: z
-    .number({ invalid_type_error: "Periyot bir sayı olmalıdır." })
+  period: numberWithTypeError("Periyot bir sayı olmalıdır.")
     .positive("Periyot pozitif olmalıdır.")
     .max(500000, "Periyot mantık dışı büyük.")
     .optional(),
@@ -184,7 +178,7 @@ export const recordConfirmationSchema = z.object({
   engine_id: z.string().min(1, "Motor kimliği geçersiz.").max(100).optional(),
   technician_contributions: z.array(z.object({
     id: z.string().min(1).max(100),
-    duration_minutes: z.number({ required_error: "Kişi çalışma süresi gereklidir.", invalid_type_error: "Kişi çalışma süresi sayı olmalıdır." })
+    duration_minutes: requiredNumber("Kişi çalışma süresi gereklidir.", "Kişi çalışma süresi sayı olmalıdır.")
       .int("Kişi çalışma süresi tam dakika olmalıdır.")
       .positive("Çalışan kişi için çalışma süresi 0’dan büyük olmalıdır.")
       .max(366 * 24 * 60, "Kişi çalışma süresi mantık dışı büyük."),

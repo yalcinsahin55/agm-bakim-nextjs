@@ -9,7 +9,7 @@ function readProjectFile(relativePath: string): string {
 
 test("password schemas keep bounded length and require matching confirmation", () => {
   const source = readProjectFile("lib/schemas.ts");
-  assert.match(source, /const passwordInputSchema = z[\s\S]*\.min\(6, "Şifre en az 6 karakter olmalıdır\."\)[\s\S]*\.max\(128, "Şifre çok uzun\."\)/);
+  assert.match(source, /const passwordInputSchema = requiredString\("Şifre gereklidir\."\)[\s\S]*\.min\(6, "Şifre en az 6 karakter olmalıdır\."\)[\s\S]*\.max\(128, "Şifre çok uzun\."\)/);
   assert.match(source, /export const passwordChangeSchema = z\.object\(\{/);
   assert.match(source, /current_password: passwordInputSchema/);
   assert.match(source, /new_password: passwordInputSchema/);

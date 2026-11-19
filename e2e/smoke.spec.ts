@@ -93,17 +93,19 @@ function backupChecksum(collections: unknown): string {
 }
 
 function maintenancePayload(engineId: string, typeKey: string, clientRequestId: string): Record<string, unknown> {
+  const maintenanceEndAt = new Date(Date.now() - 60_000);
+  const maintenanceStartAt = new Date(maintenanceEndAt.getTime() - 60 * 60_000);
   return {
     client_request_id: clientRequestId,
     engine_id: engineId,
     type_key: typeKey,
     type_label: "E2E 1000H Bakım",
-    hour_at_completion: 1_010,
+    hour_at_completion: 1_000,
     technician_source: "internal",
     responsible_technician_duration: 60,
     time_tracking_version: 2,
-    maintenance_start_at: "2026-08-26T08:00:00.000Z",
-    maintenance_end_at: "2026-08-26T09:00:00.000Z",
+    maintenance_start_at: maintenanceStartAt.toISOString(),
+    maintenance_end_at: maintenanceEndAt.toISOString(),
     technician_note: "P1 izole idempotency fixture",
   };
 }
@@ -224,7 +226,7 @@ test.describe("AGM Bakım configured authentication", () => {
     const payload = maintenancePayload(engineId, typeKey, clientRequestId);
 
     const first = await fetchJson(page, "/api/records", { method: "POST", body: payload });
-    expect(first.status).toBe(200);
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
     expect(first.body).toMatchObject({ ok: true, completed: ["E2E 1000H Bakım"], confirmed: true });
 
     const second = await fetchJson(page, "/api/records", { method: "POST", body: payload });

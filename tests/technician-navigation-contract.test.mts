@@ -23,5 +23,5 @@ test("viewer can load read-only technician filter data without exposing work per
 
   assert.match(technicianApi, /hasPermission\(user\.role, "maintenance:read"\)/);
   assert.match(technicianApi, /technicians\.map\(\(\{ id, full_name \}\) => \(\{ id, full_name \}\)\)/);
-  assert.match(recordsHook, /setTechnicians\(Array\.isArray\(technicianData\) \? technicianData : \[\]\)/);
+  assert.match(recordsHook, /setTechnicians\(Array\.isArray\(references\.technicianData\) \? references\.technicianData : \[\]\)/);
 });

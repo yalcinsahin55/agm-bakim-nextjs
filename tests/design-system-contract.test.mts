@@ -82,9 +82,22 @@ test("mobile loading avoids duplicate auth work, hidden polling, and duplicate i
   const [pwaText, notificationText, sidebarText, globalsText] = await Promise.all([text(pwaRegister), text(notificationBell), text(sidebarSource), text(globalsSource)]);
   assert.match(pwaText, /cachedFetch<AuthMeResponse>\("\/api\/auth\/me", 5_000\)/);
   assert.match(notificationText, /visibilitychange/);
+  assert.match(notificationText, /UNREAD_COUNT_POLL_MS = 120_000/);
+  assert.match(notificationText, /if \(document\.visibilityState === "visible"\) void load\(\);/);
+  assert.match(notificationText, /Date\.now\(\) - lastSuccessfulLoadAt >= UNREAD_COUNT_POLL_MS/);
   assert.doesNotMatch(sidebarText, /app-icon\.png[^\n]+priority/);
   assert.match(globalsText, /\.mobile-render-defer/);
   assert.match(globalsText, /content-visibility: auto/);
+});
+
+test("records render before slower reference data requests finish", async () => {
+  const source = await text(recordsHook);
+  const recordResponse = source.indexOf("const recRes = await recordRequest;");
+  const recordState = source.indexOf("setRecords(recordData.records || []);", recordResponse);
+  const loadingComplete = source.indexOf("setLoading(false)", recordState);
+  const referenceResponse = source.indexOf("const references = await referenceRequest;", recordState);
+  assert.ok(recordResponse >= 0 && recordState > recordResponse);
+  assert.ok(loadingComplete > recordState && referenceResponse > loadingComplete);
 });
 
 test("mobile interactions provide reduced-motion-safe touch feedback and keyboard affordances", async () => {
