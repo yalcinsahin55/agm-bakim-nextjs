@@ -106,7 +106,9 @@ async function getAnalyticsSummary(req: NextRequest) {
     ? analyticsWorkRange(now, workPeriod, { month: workPeriod === "month" ? currentMonth : selectedMonth, weekStart: selectedWeekStart, from: selectedFrom, to: selectedTo })
     : analyticsWorkRange(now, workPeriod, { month: selectedMonth, weekStart: selectedWeekStart, from: selectedFrom, to: selectedTo });
   const dateMatch = workRange ? dateRangeStages(workRange.from, workRange.to) : [];
-  const monthlyDateMatch = dateRangeStages(since);
+  // Trend, "Tüm kayıtlar" görünümünde geçmişteki tüm bakımları; tarih filtresinde ise seçili aralığı göstermeli.
+  // Önceki 6 aylık sabit pencere, eski ama geçerli kayıtlar varken grafiğin boş görünmesine neden olabiliyordu.
+  const monthlyDateMatch = dateMatch;
   const technicianRecordMatch = [{ $match: { technician_source: { $ne: "external_service" }, technician_id: { $ne: EXTERNAL_SERVICE_TECHNICIAN_ID } } }];
   const internalTechnicianExpr = { $and: [{ $ne: ["$technician_source", "external_service"] }, { $ne: ["$technician_id", EXTERNAL_SERVICE_TECHNICIAN_ID] }] };
   const contributionStages = (role: "responsible" | "support") => [
