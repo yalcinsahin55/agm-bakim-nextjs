@@ -11,6 +11,7 @@ import { usePageData } from "@/lib/usePageData";
 import { engineSortKey, type PanelItem, type StatusKey } from "@/lib/status";
 import { averageNonZeroLoad } from "@/lib/loadMath";
 import DashboardActionRail from "@/components/DashboardActionRail";
+import DashboardPriorityBoard from "@/components/DashboardPriorityBoard";
 import StatCards from "@/components/StatCards";
 import AppIcon from "@/components/ui/AppIcon";
 import DashboardAssistant from "./_components/DashboardAssistant";
@@ -171,6 +172,8 @@ export default function DashboardPage() {
             <a href="#dashboard-actions-heading" className="mt-2 inline-flex text-[10px] font-extrabold text-amber hover:underline">Aksiyon kuyruğuna git →</a>
           </div>
         </section>
+
+        <DashboardPriorityBoard items={items} />
 
         <DashboardActionRail
           role={user?.role}

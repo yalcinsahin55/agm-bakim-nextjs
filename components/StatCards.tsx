@@ -10,6 +10,13 @@ const ICONS: Record<StatusKey, AppIconName> = {
   normal: "check",
 };
 
+const SUBTITLES: Record<StatusKey, string> = {
+  gecikmis: "acil aksiyon",
+  kritik: "100 saat içinde",
+  yaklasiyor: "250 saat içinde",
+  normal: "kontrol altında",
+};
+
 interface StatCardsProps {
   counts: Record<StatusKey, number>;
 }
@@ -28,9 +35,10 @@ export default function StatCards({ counts }: StatCardsProps) {
             <div className="text-[10.5px] font-bold tracking-wide text-muted uppercase">{STATUS_LABELS[key]}</div>
             <span className="rounded-lg border border-border bg-panel2 p-1.5 text-muted"><AppIcon name={ICONS[key]} size={16} /></span>
           </div>
-          <div className="font-mono text-2xl md:text-3xl font-bold mt-1" style={{ color: STATUS_COLORS[key] }}>
+          <div className="mt-1 font-mono text-3xl font-extrabold md:text-4xl" style={{ color: STATUS_COLORS[key] }}>
             {counts[key]}
           </div>
+          <div className="mt-0.5 text-[10px] font-semibold text-faint">{SUBTITLES[key]}</div>
         </div>
       ))}
     </div>
