@@ -22,3 +22,9 @@ export interface EngineResponse {
   name?: string;
   error?: string;
 }
+
+export interface EngineMaintenanceOption {
+  key: string;
+  label: string;
+  default_period_hours: number;
+}

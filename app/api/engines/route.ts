@@ -1,4 +1,4 @@
-import { engineHourSnapshotsCollection, enginesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
+import { engineHourSnapshotsCollection, enginesCollection, maintenanceTypesCollection, recordsCollection, usersCollection } from "@/lib/dbCollections";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -102,8 +102,8 @@ async function postEngine(req: NextRequest) {
       );
     }
     const body = bodyResult.value;
-    const { name, hours, load_kw } = typeof body === "object" && body !== null && !Array.isArray(body)
-      ? body as { name?: unknown; hours?: unknown; load_kw?: unknown }
+    const { name, hours, load_kw, maintenance_assignments } = typeof body === "object" && body !== null && !Array.isArray(body)
+      ? body as { name?: unknown; hours?: unknown; load_kw?: unknown; maintenance_assignments?: unknown }
       : {};
     const normalizedName = typeof name === "string" ? name.trim() : "";
     if (!normalizedName) {
@@ -117,6 +117,18 @@ async function postEngine(req: NextRequest) {
     if (parsedHours === null || parsedLoadKw === null) {
       return NextResponse.json({ error: "Motor saati ve yük değeri geçerli, negatif olmayan sayılar olmalıdır." }, { status: 400 });
     }
+
+    const assignments = Array.isArray(maintenance_assignments)
+      ? maintenance_assignments.flatMap((value) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+        const item = value as { maintenance_type_key?: unknown; period_hours?: unknown; last_maintenance_hour?: unknown };
+        const typeKey = typeof item.maintenance_type_key === "string" ? item.maintenance_type_key.trim() : "";
+        const period = parseNonNegativeNumber(item.period_hours);
+        const lastHour = parseNonNegativeNumber(item.last_maintenance_hour);
+        if (!typeKey || !isSafeMongoPathSegment(typeKey) || period === null || lastHour === null) return [];
+        return [{ maintenance_type_key: typeKey, period_hours: period, last_maintenance_hour: lastHour }];
+      })
+      : [];
 
     const enginesCol = enginesCollection(db);
     const existing = await enginesCol.findOne({ _id: normalizedName });
@@ -136,13 +148,20 @@ async function postEngine(req: NextRequest) {
     };
     await enginesCol.insertOne(doc);
     await engineHourSnapshotsCollection(db).insertOne({ engine_id: normalizedName, date: now.toISOString(), hours: parsedHours, load_kw: parsedLoadKw, source: "manual", created_at: now });
+    if (assignments.length > 0) {
+      const typesCol = maintenanceTypesCollection(db);
+      await Promise.all(assignments.map((assignment) => typesCol.updateOne(
+        { _id: assignment.maintenance_type_key, is_deleted: { $ne: true } },
+        { $set: { [`engine_states.${normalizedName}`]: { last_maintenance_hour: assignment.last_maintenance_hour, period_hours: assignment.period_hours, tracking_source: "manual" } } },
+      )));
+    }
     await writeAuditLog(db, {
       user,
       action: "create",
       entity: "engine",
       entityId: normalizedName,
       summary: `${normalizedName} motoru oluşturuldu`,
-      after: { engine_id: normalizedName, name: normalizedName, hours: parsedHours, load_kw: parsedLoadKw },
+      after: { engine_id: normalizedName, name: normalizedName, hours: parsedHours, load_kw: parsedLoadKw, maintenance_assignments: assignments },
     });
     invalidateMaintenancePanelServerCache();
     return NextResponse.json(doc);

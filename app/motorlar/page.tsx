@@ -16,7 +16,7 @@ import { buildQuickMaintenanceLink } from "@/lib/quickMaintenanceLink";
 import EngineAddForm from "./_components/EngineAddForm";
 import EngineMaintenanceCard from "./_components/EngineMaintenanceCard";
 import EngineQrModal from "./_components/EngineQrModal";
-import type { EngineResponse, MotorEngine, MotorMaintenanceRecord } from "./_lib/types";
+import type { EngineMaintenanceOption, EngineResponse, MotorEngine, MotorMaintenanceRecord } from "./_lib/types";
 
 export default function MotorlarPage() {
   const router = useRouter();
@@ -33,10 +33,36 @@ export default function MotorlarPage() {
   const [newName, setNewName] = useState("");
   const [newHours, setNewHours] = useState("");
   const [newLoad, setNewLoad] = useState("");
+  const [maintenanceOptions, setMaintenanceOptions] = useState<EngineMaintenanceOption[]>([]);
+  const [maintenanceAssignments, setMaintenanceAssignments] = useState<Record<string, { selected: boolean; period: string }>>({});
   const [saving, setSaving] = useState(false);
   const { signal } = useAbortableFetch();
 
   const canAdd = user?.role === "yonetici";
+
+  useEffect(() => {
+    if (!showAdd || !canAdd) return;
+    let active = true;
+    fetch("/api/maintenance-types")
+      .then(async (response) => {
+        if (!response.ok) return [];
+        const data = await response.json() as unknown;
+        return Array.isArray(data) ? data as Array<{ key?: unknown; label?: unknown; default_period_hours?: unknown }> : [];
+      })
+      .then((types) => {
+        if (!active) return;
+        const options = types.flatMap((type) => {
+          const key = typeof type.key === "string" ? type.key : "";
+          const label = typeof type.label === "string" ? type.label : key;
+          if (!key) return [];
+          return [{ key, label, default_period_hours: Number(type.default_period_hours) || 0 }];
+        });
+        setMaintenanceOptions(options);
+        setMaintenanceAssignments((current) => Object.fromEntries(options.map((option) => [option.key, current[option.key] || { selected: false, period: String(option.default_period_hours || "") }])));
+      })
+      .catch(() => { if (active) toast.error("Bakım türleri yüklenemedi."); });
+    return () => { active = false; };
+  }, [canAdd, showAdd]);
 
   const { data: engines, loading, reload } = usePageData<MotorEngine[]>(async (signal) => {
     const response = await fetch("/api/engines?include_maintenance_counts=true", { signal });
@@ -155,6 +181,9 @@ export default function MotorlarPage() {
           name: newName,
           hours: Number(newHours) || 0,
           load_kw: Number(newLoad) || 0,
+          maintenance_assignments: Object.entries(maintenanceAssignments)
+            .filter(([, assignment]) => assignment.selected)
+            .map(([maintenance_type_key, assignment]) => ({ maintenance_type_key, period_hours: Number(assignment.period) || 0, last_maintenance_hour: Number(newHours) || 0 })),
         }),
       });
       const data = await res.json() as EngineResponse;
@@ -162,7 +191,7 @@ export default function MotorlarPage() {
         toast.dismiss(loadingToast);
         toast.success(`${data.name} eklendi! `);
         setShowAdd(false);
-        setNewName(""); setNewHours(""); setNewLoad("");
+        setNewName(""); setNewHours(""); setNewLoad(""); setMaintenanceAssignments((current) => Object.fromEntries(Object.entries(current).map(([key, value]) => [key, { ...value, selected: false }])));
         void reload();
       } else {
         toast.dismiss(loadingToast);
@@ -241,6 +270,9 @@ export default function MotorlarPage() {
             onNameChange={setNewName}
             onHoursChange={setNewHours}
             onLoadChange={setNewLoad}
+            maintenanceOptions={maintenanceOptions}
+            assignments={maintenanceAssignments}
+            onAssignmentChange={(key, change) => setMaintenanceAssignments((current) => ({ ...current, [key]: { ...(current[key] || { selected: false, period: "" }), ...change } }))}
             onSubmit={addEngine}
           />
         )}
